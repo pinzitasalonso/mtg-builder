@@ -36,9 +36,121 @@ const COLORS = [
 const TYPES = [
   "Creature", "Instant", "Sorcery", "Enchantment",
   "Artifact", "Planeswalker", "Saga", "Land", "Battle",
+  "Legendary", "Equipment", "Aura",
+];
+
+const MANA_VALUES = [0, 1, 2, 3, 4, 5, 6, 7];
+
+const RARITIES = [
+  { code: "common", label: "Common" },
+  { code: "uncommon", label: "Uncommon" },
+  { code: "rare", label: "Rare" },
+  { code: "mythic", label: "Mythic" },
+];
+
+const FORMATS = [
+  { code: "standard", label: "Standard" },
+  { code: "pioneer", label: "Pioneer" },
+  { code: "modern", label: "Modern" },
+  { code: "legacy", label: "Legacy" },
+  { code: "vintage", label: "Vintage" },
+  { code: "commander", label: "Commander" },
+  { code: "pauper", label: "Pauper" },
+];
+
+type ColorMode = "includes" | "exact" | "identity";
+const COLOR_MODES: { code: ColorMode; label: string }[] = [
+  { code: "includes", label: "Includes" },
+  { code: "exact", label: "Exactly" },
+  { code: "identity", label: "Identity" },
 ];
 
 type SearchMode = "ai" | "scryfall";
+
+const FILTER_LABEL: React.CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: "0.06em",
+  textTransform: "uppercase",
+  color: "var(--text-muted)",
+  marginBottom: 8,
+};
+
+/* Toggle a value in a Set state immutably */
+function toggleInSet<T>(
+  setFn: React.Dispatch<React.SetStateAction<Set<T>>>,
+  value: T
+) {
+  setFn((prev) => {
+    const next = new Set(prev);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    return next;
+  });
+}
+
+/* Wrap a list of OR-able Scryfall terms into a single grouped term */
+function orGroup(terms: string[]): string[] {
+  if (terms.length === 0) return [];
+  if (terms.length === 1) return [terms[0]];
+  return [`(${terms.join(" or ")})`];
+}
+
+/* Reusable pill toggle */
+function Chip({
+  active,
+  onClick,
+  children,
+  title,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+      style={{
+        flexShrink: 0,
+        padding: "0 13px",
+        height: 38,
+        borderRadius: 19,
+        border: active ? "1px solid var(--accent)" : "1px solid var(--border)",
+        background: active ? "var(--accent)" : "var(--surface2)",
+        color: active ? "#111" : "var(--text-muted)",
+        cursor: "pointer",
+        fontSize: 13,
+        fontWeight: active ? 700 : 500,
+        whiteSpace: "nowrap",
+        transition: "background 0.12s, color 0.12s, border-color 0.12s",
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+/* A labeled, horizontally scrollable row of chips */
+function FilterRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div style={FILTER_LABEL}>{label}</div>
+      <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 2 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function DeckPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -53,7 +165,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [searchError, setSearchError] = useState("");
   const [preview, setPreview] = useState<SearchCard | null>(null);
   const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
+  const [colorMode, setColorMode] = useState<ColorMode>("includes");
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+  const [selectedMV, setSelectedMV] = useState<Set<number>>(new Set());
+  const [selectedRarity, setSelectedRarity] = useState<Set<string>>(new Set());
+  const [selectedFormat, setSelectedFormat] = useState<string>("");
+  const [filtersOpen, setFiltersOpen] = useState(true);
   /* #2: AI vs Scryfall mode toggle, default AI */
   const [searchMode, setSearchMode] = useState<SearchMode>("ai");
 
@@ -83,37 +200,59 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     loadPool();
   }, [deckId, loadPool]);
 
-  function toggleColor(code: string) {
-    setSelectedColors((prev) => {
-      const next = new Set(prev);
-      if (next.has(code)) next.delete(code);
-      else next.add(code);
-      return next;
-    });
-  }
-
-  function toggleType(type: string) {
-    setSelectedTypes((prev) => {
-      const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
-      return next;
-    });
+  function clearAllFilters() {
+    setSelectedColors(new Set());
+    setSelectedTypes(new Set());
+    setSelectedMV(new Set());
+    setSelectedRarity(new Set());
+    setSelectedFormat("");
   }
 
   function buildFilterTerms(): string[] {
     const terms: string[] = [];
-    const activeColors = COLORS.filter((c) => selectedColors.has(c.code)).map((c) => c.code);
-    if (activeColors.length > 0) {
-      terms.push(`c:${activeColors.join("")}`);
+
+    // Colors — match mode controls the operator
+    const activeColors = COLORS.filter((c) => selectedColors.has(c.code))
+      .map((c) => c.code)
+      .join("");
+    if (activeColors) {
+      const op =
+        colorMode === "exact" ? "c=" : colorMode === "identity" ? "id<=" : "c>=";
+      terms.push(`${op}${activeColors}`);
     }
-    TYPES.forEach((type) => {
-      if (selectedTypes.has(type)) {
-        terms.push(`t:${type.toLowerCase()}`);
-      }
-    });
+
+    // Card types (OR — a card rarely satisfies two of these at once)
+    const typeTerms = TYPES.filter((t) => selectedTypes.has(t)).map(
+      (t) => `t:${t.toLowerCase()}`
+    );
+    terms.push(...orGroup(typeTerms));
+
+    // Mana value (OR); 7 means 7+
+    const mvTerms = [...selectedMV]
+      .sort((a, b) => a - b)
+      .map((v) => (v >= 7 ? "mv>=7" : `mv=${v}`));
+    terms.push(...orGroup(mvTerms));
+
+    // Rarity (OR)
+    const rarityTerms = RARITIES.filter((r) => selectedRarity.has(r.code)).map(
+      (r) => `r:${r.code}`
+    );
+    terms.push(...orGroup(rarityTerms));
+
+    // Format legality
+    if (selectedFormat) terms.push(`f:${selectedFormat}`);
+
     return terms;
   }
+
+  const activeFilterCount =
+    selectedColors.size +
+    selectedTypes.size +
+    selectedMV.size +
+    selectedRarity.size +
+    (selectedFormat ? 1 : 0);
+
+  const filterPreview = buildFilterTerms().join(" ");
 
   async function search(e: React.FormEvent) {
     e.preventDefault();
@@ -295,144 +434,261 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         </button>
       </form>
 
-      {/* Filters */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-        {/* #1/#6: Color identity mana pips — 44px touch target wrapping a 36px circle */}
-        <div style={{ display: "flex", gap: 0, alignItems: "center" }}>
-          {COLORS.map((color) => {
-            const selected = selectedColors.has(color.code);
-            return (
-              <button
-                key={color.code}
-                onClick={() => toggleColor(color.code)}
-                title={`Color: ${color.label}`}
-                aria-label={`Filter by ${color.label}`}
-                style={{
-                  width: 44,
-                  height: 44,
-                  padding: 0,
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <div
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: "50%",
-                    background: selected ? color.hex : "#2a2d33",
-                    color: selected ? color.textHex : "#8b9099",
-                    fontWeight: 800,
-                    fontSize: 13,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    border: selected
-                      ? color.code === "w"
-                        ? "2px solid #ccc"
-                        : "2px solid transparent"
-                      : "2px solid #3e4148",
-                    letterSpacing: 0,
-                    transition: "background 0.12s, color 0.12s",
-                  }}
-                >
-                  {color.label}
-                </div>
-              </button>
-            );
-          })}
-          {selectedColors.size > 0 && (
-            <button
-              onClick={() => setSelectedColors(new Set())}
+      {/* Filters panel */}
+      <div
+        style={{
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 14,
+          marginBottom: 14,
+          overflow: "hidden",
+        }}
+      >
+        {/* Panel header */}
+        <div
+          onClick={() => setFiltersOpen((o) => !o)}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "12px 14px",
+            cursor: "pointer",
+            userSelect: "none",
+          }}
+        >
+          <span style={{ fontSize: 14, fontWeight: 700 }}>Filters</span>
+          {activeFilterCount > 0 && (
+            <span
               style={{
-                marginLeft: 4,
+                background: "var(--accent)",
+                color: "#111",
+                fontSize: 11,
+                fontWeight: 800,
+                minWidth: 18,
+                height: 18,
+                borderRadius: 9,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 5px",
+              }}
+            >
+              {activeFilterCount}
+            </span>
+          )}
+          <span style={{ flex: 1 }} />
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                clearAllFilters();
+              }}
+              style={{
                 background: "transparent",
                 border: "none",
                 color: "var(--text-muted)",
-                cursor: "pointer",
                 fontSize: 12,
+                cursor: "pointer",
                 padding: "4px 6px",
               }}
-              title="Clear color filters"
             >
-              ✕
+              Clear all
             </button>
           )}
-        </div>
-
-        {/* #3/#6: Card type chips — min 44px height, right-fade scroll affordance */}
-        <div style={{ position: "relative" }}>
-          <div
+          <span
             style={{
-              display: "flex",
-              gap: 6,
-              overflowX: "auto",
-              paddingBottom: 2,
-              paddingRight: 40,
-              /* hide scrollbar visually but keep scroll */
+              transform: filtersOpen ? "rotate(180deg)" : "none",
+              transition: "transform 0.15s",
+              color: "var(--text-muted)",
+              fontSize: 11,
             }}
           >
-            {TYPES.map((type) => {
-              const selected = selectedTypes.has(type);
-              return (
-                <button
-                  key={type}
-                  onClick={() => toggleType(type)}
-                  style={{
-                    flexShrink: 0,
-                    padding: "0 14px",
-                    minHeight: 44,
-                    borderRadius: 22,
-                    border: selected ? "1px solid var(--accent)" : "1px solid var(--border)",
-                    background: selected ? "var(--accent)" : "transparent",
-                    color: selected ? "#111" : "var(--text-muted)",
-                    cursor: "pointer",
-                    fontSize: 13,
-                    fontWeight: selected ? 700 : 400,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {type}
-                </button>
-              );
-            })}
-            {selectedTypes.size > 0 && (
-              <button
-                onClick={() => setSelectedTypes(new Set())}
-                style={{
-                  flexShrink: 0,
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  padding: "0 6px",
-                  minHeight: 44,
-                }}
-                title="Clear type filters"
-              >
-                ✕
-              </button>
-            )}
-          </div>
-          {/* Right-side fade gradient scroll affordance */}
+            ▾
+          </span>
+        </div>
+
+        {filtersOpen && (
           <div
             style={{
-              position: "absolute",
-              right: 0,
-              top: 0,
-              bottom: 0,
-              width: 44,
-              background: "linear-gradient(to right, transparent, var(--bg))",
-              pointerEvents: "none",
+              padding: "2px 14px 16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
             }}
-          />
-        </div>
+          >
+            {/* Colors + match mode */}
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 6,
+                }}
+              >
+                <span style={FILTER_LABEL}>Colors</span>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    background: "var(--surface2)",
+                    borderRadius: 13,
+                    padding: 2,
+                  }}
+                >
+                  {COLOR_MODES.map((m) => (
+                    <button
+                      key={m.code}
+                      type="button"
+                      onClick={() => setColorMode(m.code)}
+                      title={
+                        m.code === "includes"
+                          ? "Cards that contain these colors"
+                          : m.code === "exact"
+                          ? "Cards that are exactly these colors"
+                          : "Cards within this color identity (great for Commander)"
+                      }
+                      style={{
+                        padding: "4px 9px",
+                        borderRadius: 11,
+                        border: "none",
+                        background:
+                          colorMode === m.code ? "var(--accent)" : "transparent",
+                        color: colorMode === m.code ? "#111" : "var(--text-muted)",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 0, alignItems: "center" }}>
+                {COLORS.map((color) => {
+                  const selected = selectedColors.has(color.code);
+                  return (
+                    <button
+                      key={color.code}
+                      type="button"
+                      onClick={() => toggleInSet(setSelectedColors, color.code)}
+                      title={`Color: ${color.label}`}
+                      aria-label={`Filter by ${color.label}`}
+                      aria-pressed={selected}
+                      style={{
+                        width: 44,
+                        height: 44,
+                        padding: 0,
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 34,
+                          height: 34,
+                          borderRadius: "50%",
+                          background: selected ? color.hex : "#2a2d33",
+                          color: selected ? color.textHex : "#8b9099",
+                          fontWeight: 800,
+                          fontSize: 13,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          border: selected
+                            ? color.code === "w"
+                              ? "2px solid #ccc"
+                              : "2px solid transparent"
+                            : "2px solid #3e4148",
+                          transition: "background 0.12s, color 0.12s",
+                        }}
+                      >
+                        {color.label}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Card type */}
+            <FilterRow label="Card type">
+              {TYPES.map((type) => (
+                <Chip
+                  key={type}
+                  active={selectedTypes.has(type)}
+                  onClick={() => toggleInSet(setSelectedTypes, type)}
+                >
+                  {type}
+                </Chip>
+              ))}
+            </FilterRow>
+
+            {/* Mana value */}
+            <FilterRow label="Mana value">
+              {MANA_VALUES.map((v) => (
+                <Chip
+                  key={v}
+                  active={selectedMV.has(v)}
+                  onClick={() => toggleInSet(setSelectedMV, v)}
+                  title={v >= 7 ? "Mana value 7 or more" : `Mana value ${v}`}
+                >
+                  {v >= 7 ? "7+" : v}
+                </Chip>
+              ))}
+            </FilterRow>
+
+            {/* Rarity */}
+            <FilterRow label="Rarity">
+              {RARITIES.map((r) => (
+                <Chip
+                  key={r.code}
+                  active={selectedRarity.has(r.code)}
+                  onClick={() => toggleInSet(setSelectedRarity, r.code)}
+                >
+                  {r.label}
+                </Chip>
+              ))}
+            </FilterRow>
+
+            {/* Format legality */}
+            <FilterRow label="Format legality">
+              {FORMATS.map((f) => (
+                <Chip
+                  key={f.code}
+                  active={selectedFormat === f.code}
+                  onClick={() =>
+                    setSelectedFormat(selectedFormat === f.code ? "" : f.code)
+                  }
+                >
+                  {f.label}
+                </Chip>
+              ))}
+            </FilterRow>
+
+            {activeFilterCount > 0 && filterPreview && (
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                Adds to query:{" "}
+                <code
+                  style={{
+                    color: "var(--accent)",
+                    background: "var(--surface2)",
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                  }}
+                >
+                  {filterPreview}
+                </code>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {generatedQuery && (
