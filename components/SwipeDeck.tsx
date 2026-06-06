@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 
 export interface SwipeCard {
@@ -38,6 +38,17 @@ export default function SwipeDeck({
   const dragging = useRef(false);
   const moved = useRef(false);
   const start = useRef({ x: 0, y: 0 });
+  const stackRef = useRef<HTMLDivElement>(null);
+
+  // Prevent iOS Safari from treating the horizontal swipe as a page scroll
+  // (touchAction: none alone isn't always respected before the first touchmove)
+  useEffect(() => {
+    const el = stackRef.current;
+    if (!el) return;
+    const prevent = (e: TouchEvent) => e.preventDefault();
+    el.addEventListener("touchmove", prevent, { passive: false });
+    return () => el.removeEventListener("touchmove", prevent);
+  }, []);
 
   const current = cards[index];
   const next = cards[index + 1];
@@ -97,7 +108,7 @@ export default function SwipeDeck({
     : Math.max(-16, Math.min(16, drag.x / 16));
   const transform = flyOut
     ? `translate(${flyOut === "right" ? 140 : -140}%, 0) rotate(${rotate}deg)`
-    : `translate(${drag.x}px, ${drag.y}px) rotate(${rotate}deg)`;
+    : `translate(${drag.x}px, 0) rotate(${rotate}deg)`;
   const transition =
     flyOut || (!dragging.current && drag.x === 0 && drag.y === 0)
       ? "transform 0.26s ease"
@@ -148,7 +159,7 @@ export default function SwipeDeck({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, touchAction: "none" }}>
       {/* Progress */}
       <div
         style={{
@@ -187,6 +198,7 @@ export default function SwipeDeck({
 
       {/* Card stack */}
       <div
+        ref={stackRef}
         style={{
           position: "relative",
           width: "100%",
