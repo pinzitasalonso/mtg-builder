@@ -39,21 +39,48 @@ export async function POST(req: Request) {
     query = [query, ...filterTerms].join(" ");
   }
 
-  const scryfallUrl = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&order=edhrec`;
-  const scryfallRes = await fetch(scryfallUrl, {
-    headers: { "User-Agent": "mtg-builder/1.0" },
-  });
+  // Scryfall paginates 175 cards/page. Follow next_page to return ALL matches,
+  // capped at MAX_PAGES so a wildly broad query can't fetch tens of thousands.
+  const MAX_PAGES = 7; // 7 * 175 = up to 1225 cards
+  const raw: ScryfallCard[] = [];
+  let pageUrl: string | null = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&order=edhrec`;
+  let totalCards = 0;
+  let truncated = false;
 
-  if (!scryfallRes.ok) {
-    const err = await scryfallRes.json().catch(() => ({}));
-    return NextResponse.json(
-      { error: "Scryfall search failed", details: err, query },
-      { status: 422 }
-    );
+  for (let page = 0; page < MAX_PAGES && pageUrl; page++) {
+    const res: Response = await fetch(pageUrl, {
+      headers: { "User-Agent": "mtg-builder/1.0" },
+    });
+
+    // Only surface an error if the very first page fails; otherwise return
+    // whatever we've gathered so far.
+    if (!res.ok) {
+      if (page === 0) {
+        const err = await res.json().catch(() => ({}));
+        return NextResponse.json(
+          { error: "Scryfall search failed", details: err, query },
+          { status: 422 }
+        );
+      }
+      break;
+    }
+
+    const data = await res.json();
+    raw.push(...(data.data as ScryfallCard[]));
+    totalCards = data.total_cards ?? raw.length;
+
+    if (data.has_more && data.next_page) {
+      pageUrl = data.next_page as string;
+      // Respect Scryfall's rate-limit guidance between requests.
+      await new Promise((r) => setTimeout(r, 100));
+    } else {
+      pageUrl = null;
+    }
   }
 
-  const data = await scryfallRes.json();
-  const cards = (data.data as ScryfallCard[]).slice(0, 20).map((c) => {
+  if (pageUrl) truncated = true; // hit MAX_PAGES with more available
+
+  const cards = raw.map((c) => {
     const imageUri =
       c.image_uris?.normal ??
       c.image_uris?.large ??
@@ -70,5 +97,5 @@ export async function POST(req: Request) {
     };
   });
 
-  return NextResponse.json({ cards, query });
+  return NextResponse.json({ cards, query, totalCards, truncated });
 }

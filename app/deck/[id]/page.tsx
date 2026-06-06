@@ -3,6 +3,7 @@
 import { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import SwipeDeck from "@/components/SwipeDeck";
 
 interface SearchCard {
   id: string;
@@ -159,6 +160,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [deck, setDeck] = useState<Deck | null>(null);
   const [pool, setPool] = useState<PoolCard[]>([]);
   const [searchResults, setSearchResults] = useState<SearchCard[]>([]);
+  const [searchId, setSearchId] = useState(0);
+  const [truncated, setTruncated] = useState(false);
   const [query, setQuery] = useState("");
   const [generatedQuery, setGeneratedQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -274,6 +277,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       } else {
         setSearchResults(data.cards);
         setGeneratedQuery(data.query);
+        setTruncated(Boolean(data.truncated));
+        setSearchId((n) => n + 1);
       }
     } catch {
       setSearchError("Network error");
@@ -306,7 +311,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const inPool = (id: string) => pool.some((c) => c.id === id);
 
   return (
-    <main style={{ maxWidth: 680, margin: "0 auto", padding: "16px", display: "flex", flexDirection: "column", gap: 0 }}>
+    <main className="container" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
       {/* #7: Header with styled back chevron and deck settings button */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
         {/* #7: styled ‹ back chevron */}
@@ -410,8 +415,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             borderRadius: 10,
             padding: "12px 14px",
             color: "var(--text)",
-            fontSize: 15,
+            fontSize: 16,
             outline: "none",
+            minWidth: 0,
           }}
         />
         <button
@@ -706,72 +712,36 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
-      {/* Search results horizontal scroll */}
+      {/* Search results — swipe to triage */}
       {searchResults.length > 0 && (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 28 }}>
           <div
             style={{
               display: "flex",
-              gap: 12,
-              overflowX: "auto",
-              paddingBottom: 8,
-              paddingTop: 4,
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              marginBottom: 14,
+              gap: 8,
             }}
           >
-            {searchResults.map((card) => {
-              const already = inPool(card.id);
-              return (
-                <div
-                  key={card.id}
-                  style={{ flexShrink: 0, position: "relative", width: 130 }}
-                >
-                  <div
-                    style={{ cursor: "pointer", borderRadius: 8, overflow: "hidden", border: "2px solid " + (already ? "var(--accent)" : "transparent") }}
-                    onClick={() => setPreview(card)}
-                  >
-                    {card.imageUri ? (
-                      <Image
-                        src={card.imageUri}
-                        alt={card.name}
-                        width={130}
-                        height={181}
-                        style={{ display: "block", width: "100%", height: "auto" }}
-                        unoptimized
-                      />
-                    ) : (
-                      <div style={{ width: 130, height: 181, background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--text-muted)", padding: 8, textAlign: "center" }}>
-                        {card.name}
-                      </div>
-                    )}
-                  </div>
-                  <button
-                    onClick={() => addCard(card)}
-                    disabled={already}
-                    style={{
-                      position: "absolute",
-                      bottom: 6,
-                      right: 6,
-                      width: 26,
-                      height: 26,
-                      borderRadius: "50%",
-                      border: "none",
-                      background: already ? "var(--accent)" : "#1a1d21cc",
-                      color: already ? "#111" : "var(--text)",
-                      cursor: already ? "default" : "pointer",
-                      fontWeight: 700,
-                      fontSize: 16,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backdropFilter: "blur(4px)",
-                    }}
-                  >
-                    {already ? "✓" : "+"}
-                  </button>
-                </div>
-              );
-            })}
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-muted)" }}>
+              Results ({searchResults.length})
+            </h2>
+            {truncated && (
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                showing the first {searchResults.length}
+              </span>
+            )}
           </div>
+          <SwipeDeck
+            key={searchId}
+            cards={searchResults}
+            inPool={inPool}
+            onAdd={addCard}
+            onDiscard={() => {}}
+            onInfo={setPreview}
+            onRestart={() => setSearchId((n) => n + 1)}
+          />
         </div>
       )}
 
@@ -785,13 +755,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             No cards in pool yet. Search and add some above.
           </p>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-              gap: 12,
-            }}
-          >
+          <div className="card-grid">
             {pool.map((card) => (
               <div key={card.dbId} style={{ position: "relative" }}>
                 <div

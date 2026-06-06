@@ -53,10 +53,27 @@ export default function HomePage() {
   }
 
   return (
-    <main style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+    <main className="container">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+          marginBottom: 28,
+        }}
+      >
         {/* #4: heading is white, not gold */}
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", margin: 0 }}>
+        <h1
+          style={{
+            fontSize: "clamp(22px, 5vw, 30px)",
+            fontWeight: 700,
+            color: "var(--text)",
+            margin: 0,
+            minWidth: 0,
+          }}
+        >
           MTG Deck Builder
         </h1>
         <button
@@ -65,11 +82,12 @@ export default function HomePage() {
             background: "var(--accent)",
             color: "#111",
             border: "none",
-            borderRadius: 8,
-            padding: "8px 16px",
+            borderRadius: 10,
+            padding: "11px 20px",
             fontWeight: 700,
             cursor: "pointer",
-            fontSize: 14,
+            fontSize: 15,
+            flexShrink: 0,
           }}
         >
           + New Deck
@@ -81,7 +99,7 @@ export default function HomePage() {
           No decks yet. Create one to get started.
         </p>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="deck-grid">
           {decks.map((deck) => (
             /* #5: card body is the nav link; delete button is a sibling absolutely-positioned */
             <div key={deck.id} style={{ position: "relative" }}>
