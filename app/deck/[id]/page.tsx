@@ -59,13 +59,6 @@ const FORMATS = [
   { code: "pauper", label: "Pauper" },
 ];
 
-type ColorMode = "includes" | "exact" | "identity";
-const COLOR_MODES: { code: ColorMode; label: string }[] = [
-  { code: "includes", label: "Includes" },
-  { code: "exact", label: "Exactly" },
-  { code: "identity", label: "Identity" },
-];
-
 type SearchMode = "ai" | "scryfall";
 
 const FILTER_LABEL: React.CSSProperties = {
@@ -77,24 +70,50 @@ const FILTER_LABEL: React.CSSProperties = {
   marginBottom: 8,
 };
 
-/* Toggle a value in a Set state immutably */
-function toggleInSet<T>(
-  setFn: React.Dispatch<React.SetStateAction<Set<T>>>,
-  value: T
-) {
-  setFn((prev) => {
-    const next = new Set(prev);
-    if (next.has(value)) next.delete(value);
-    else next.add(value);
-    return next;
-  });
+/* The query text is the single source of truth. Chips toggle Scryfall tokens
+   directly in and out of the input, and their selected state is derived from
+   whatever is currently typed there. */
+
+/* A single color-identity token, e.g. id:uw */
+const ID_RE = /^id:([wubrg]+)$/i;
+
+/* Split a query string into whitespace-separated tokens */
+function queryTokens(query: string): string[] {
+  return query.split(/\s+/).filter(Boolean);
 }
 
-/* Wrap a list of OR-able Scryfall terms into a single grouped term */
-function orGroup(terms: string[]): string[] {
-  if (terms.length === 0) return [];
-  if (terms.length === 1) return [terms[0]];
-  return [`(${terms.join(" or ")})`];
+/* Toggle a standalone token (e.g. t:wizard) in/out of the query */
+function toggleToken(query: string, token: string): string {
+  const tokens = queryTokens(query);
+  const i = tokens.indexOf(token);
+  if (i >= 0) tokens.splice(i, 1);
+  else tokens.push(token);
+  return tokens.join(" ");
+}
+
+function hasToken(query: string, token: string): boolean {
+  return queryTokens(query).includes(token);
+}
+
+/* Toggle one color letter inside the (single) id: identity token */
+function toggleColor(query: string, letter: string): string {
+  const tokens = queryTokens(query);
+  const i = tokens.findIndex((t) => ID_RE.test(t));
+  if (i >= 0) {
+    const cur = tokens[i].slice(3).toLowerCase();
+    const next = cur.includes(letter) ? cur.replace(letter, "") : cur + letter;
+    const ordered = "wubrg".split("").filter((c) => next.includes(c)).join("");
+    if (ordered) tokens[i] = `id:${ordered}`;
+    else tokens.splice(i, 1);
+  } else {
+    tokens.push(`id:${letter}`);
+  }
+  return tokens.join(" ");
+}
+
+function colorActive(query: string, letter: string): boolean {
+  const t = queryTokens(query).find((t) => ID_RE.test(t));
+  return t ? t.slice(3).toLowerCase().includes(letter) : false;
 }
 
 /* Reusable pill toggle */
@@ -167,12 +186,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [preview, setPreview] = useState<SearchCard | null>(null);
-  const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
-  const [colorMode, setColorMode] = useState<ColorMode>("includes");
-  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
-  const [selectedMV, setSelectedMV] = useState<Set<number>>(new Set());
-  const [selectedRarity, setSelectedRarity] = useState<Set<string>>(new Set());
-  const [selectedFormat, setSelectedFormat] = useState<string>("");
   const [filtersOpen, setFiltersOpen] = useState(true);
   /* #2: AI vs Scryfall mode toggle, default AI */
   const [searchMode, setSearchMode] = useState<SearchMode>("ai");
@@ -203,59 +216,28 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     loadPool();
   }, [deckId, loadPool]);
 
+  /* Strip every known filter token, leaving any free-text the user typed */
   function clearAllFilters() {
-    setSelectedColors(new Set());
-    setSelectedTypes(new Set());
-    setSelectedMV(new Set());
-    setSelectedRarity(new Set());
-    setSelectedFormat("");
-  }
-
-  function buildFilterTerms(): string[] {
-    const terms: string[] = [];
-
-    // Colors — match mode controls the operator
-    const activeColors = COLORS.filter((c) => selectedColors.has(c.code))
-      .map((c) => c.code)
-      .join("");
-    if (activeColors) {
-      const op =
-        colorMode === "exact" ? "c=" : colorMode === "identity" ? "id<=" : "c>=";
-      terms.push(`${op}${activeColors}`);
-    }
-
-    // Card types (OR — a card rarely satisfies two of these at once)
-    const typeTerms = TYPES.filter((t) => selectedTypes.has(t)).map(
-      (t) => `t:${t.toLowerCase()}`
+    setQuery((q) =>
+      queryTokens(q)
+        .filter(
+          (t) =>
+            !ID_RE.test(t) &&
+            !/^t:/i.test(t) &&
+            !/^mv(=|>=)/i.test(t) &&
+            !/^r:/i.test(t) &&
+            !/^f:/i.test(t)
+        )
+        .join(" ")
     );
-    terms.push(...orGroup(typeTerms));
-
-    // Mana value (OR); 7 means 7+
-    const mvTerms = [...selectedMV]
-      .sort((a, b) => a - b)
-      .map((v) => (v >= 7 ? "mv>=7" : `mv=${v}`));
-    terms.push(...orGroup(mvTerms));
-
-    // Rarity (OR)
-    const rarityTerms = RARITIES.filter((r) => selectedRarity.has(r.code)).map(
-      (r) => `r:${r.code}`
-    );
-    terms.push(...orGroup(rarityTerms));
-
-    // Format legality
-    if (selectedFormat) terms.push(`f:${selectedFormat}`);
-
-    return terms;
   }
 
   const activeFilterCount =
-    selectedColors.size +
-    selectedTypes.size +
-    selectedMV.size +
-    selectedRarity.size +
-    (selectedFormat ? 1 : 0);
-
-  const filterPreview = buildFilterTerms().join(" ");
+    COLORS.filter((c) => colorActive(query, c.code)).length +
+    TYPES.filter((t) => hasToken(query, `t:${t.toLowerCase()}`)).length +
+    MANA_VALUES.filter((v) => hasToken(query, v >= 7 ? "mv>=7" : `mv=${v}`)).length +
+    RARITIES.filter((r) => hasToken(query, `r:${r.code}`)).length +
+    FORMATS.filter((f) => hasToken(query, `f:${f.code}`)).length;
 
   async function search(e: React.FormEvent) {
     e.preventDefault();
@@ -268,8 +250,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        /* #2: pass mode to API */
-        body: JSON.stringify({ prompt: query, filters: buildFilterTerms(), mode: searchMode }),
+        /* #3: send the input text as-is; chips already wrote their syntax into it */
+        body: JSON.stringify({ prompt: query, mode: searchMode }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -396,14 +378,223 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         </div>
       </div>
 
-      {/* Search section */}
+      {/* #1 + #2: Filters live above the search input and only appear in Scryfall
+          mode — in AI mode you just describe what you want in plain language. */}
+      {searchMode === "scryfall" && (
+        <div
+          style={{
+            background: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: 14,
+            marginBottom: 10,
+            overflow: "hidden",
+          }}
+        >
+          {/* Panel header */}
+          <div
+            onClick={() => setFiltersOpen((o) => !o)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "12px 14px",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <span style={{ fontSize: 14, fontWeight: 700 }}>Filters</span>
+            {activeFilterCount > 0 && (
+              <span
+                style={{
+                  background: "var(--accent)",
+                  color: "#111",
+                  fontSize: 11,
+                  fontWeight: 800,
+                  minWidth: 18,
+                  height: 18,
+                  borderRadius: 9,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "0 5px",
+                }}
+              >
+                {activeFilterCount}
+              </span>
+            )}
+            <span style={{ flex: 1 }} />
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearAllFilters();
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  padding: "4px 6px",
+                }}
+              >
+                Clear all
+              </button>
+            )}
+            <span
+              style={{
+                transform: filtersOpen ? "rotate(180deg)" : "none",
+                transition: "transform 0.15s",
+                color: "var(--text-muted)",
+                fontSize: 11,
+              }}
+            >
+              ▾
+            </span>
+          </div>
+
+          {filtersOpen && (
+            <div
+              style={{
+                padding: "2px 14px 16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
+              {/* Colors — tapping toggles a letter inside the id: identity token */}
+              <div>
+                <div style={FILTER_LABEL}>Colors</div>
+                <div style={{ display: "flex", gap: 0, alignItems: "center" }}>
+                  {COLORS.map((color) => {
+                    const selected = colorActive(query, color.code);
+                    return (
+                      <button
+                        key={color.code}
+                        type="button"
+                        onClick={() => setQuery((q) => toggleColor(q, color.code))}
+                        title={`Color identity: ${color.label}`}
+                        aria-label={`Filter by ${color.label}`}
+                        aria-pressed={selected}
+                        style={{
+                          width: 44,
+                          height: 44,
+                          padding: 0,
+                          border: "none",
+                          background: "transparent",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: "50%",
+                            background: selected ? color.hex : "#2a2d33",
+                            color: selected ? color.textHex : "#8b9099",
+                            fontWeight: 800,
+                            fontSize: 13,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            border: selected
+                              ? color.code === "w"
+                                ? "2px solid #ccc"
+                                : "2px solid transparent"
+                              : "2px solid #3e4148",
+                            transition: "background 0.12s, color 0.12s",
+                          }}
+                        >
+                          {color.label}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Card type */}
+              <FilterRow label="Card type">
+                {TYPES.map((type) => {
+                  const token = `t:${type.toLowerCase()}`;
+                  return (
+                    <Chip
+                      key={type}
+                      active={hasToken(query, token)}
+                      onClick={() => setQuery((q) => toggleToken(q, token))}
+                    >
+                      {type}
+                    </Chip>
+                  );
+                })}
+              </FilterRow>
+
+              {/* Mana value */}
+              <FilterRow label="Mana value">
+                {MANA_VALUES.map((v) => {
+                  const token = v >= 7 ? "mv>=7" : `mv=${v}`;
+                  return (
+                    <Chip
+                      key={v}
+                      active={hasToken(query, token)}
+                      onClick={() => setQuery((q) => toggleToken(q, token))}
+                      title={v >= 7 ? "Mana value 7 or more" : `Mana value ${v}`}
+                    >
+                      {v >= 7 ? "7+" : v}
+                    </Chip>
+                  );
+                })}
+              </FilterRow>
+
+              {/* Rarity */}
+              <FilterRow label="Rarity">
+                {RARITIES.map((r) => {
+                  const token = `r:${r.code}`;
+                  return (
+                    <Chip
+                      key={r.code}
+                      active={hasToken(query, token)}
+                      onClick={() => setQuery((q) => toggleToken(q, token))}
+                    >
+                      {r.label}
+                    </Chip>
+                  );
+                })}
+              </FilterRow>
+
+              {/* Format legality */}
+              <FilterRow label="Format legality">
+                {FORMATS.map((f) => {
+                  const token = `f:${f.code}`;
+                  return (
+                    <Chip
+                      key={f.code}
+                      active={hasToken(query, token)}
+                      onClick={() => setQuery((q) => toggleToken(q, token))}
+                    >
+                      {f.label}
+                    </Chip>
+                  );
+                })}
+              </FilterRow>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* #2: Search input sits below the filters */}
       <form onSubmit={search} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <input
           /* #2: placeholder changes by mode */
           placeholder={
             searchMode === "ai"
               ? "Describe cards to find…"
-              : "Type Scryfall syntax: t:wizard c:u…"
+              : "Type Scryfall syntax: t:wizard id:u…"
           }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -439,263 +630,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           {searching ? "Searching…" : "Search"}
         </button>
       </form>
-
-      {/* Filters panel */}
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--border)",
-          borderRadius: 14,
-          marginBottom: 14,
-          overflow: "hidden",
-        }}
-      >
-        {/* Panel header */}
-        <div
-          onClick={() => setFiltersOpen((o) => !o)}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "12px 14px",
-            cursor: "pointer",
-            userSelect: "none",
-          }}
-        >
-          <span style={{ fontSize: 14, fontWeight: 700 }}>Filters</span>
-          {activeFilterCount > 0 && (
-            <span
-              style={{
-                background: "var(--accent)",
-                color: "#111",
-                fontSize: 11,
-                fontWeight: 800,
-                minWidth: 18,
-                height: 18,
-                borderRadius: 9,
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "0 5px",
-              }}
-            >
-              {activeFilterCount}
-            </span>
-          )}
-          <span style={{ flex: 1 }} />
-          {activeFilterCount > 0 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                clearAllFilters();
-              }}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--text-muted)",
-                fontSize: 12,
-                cursor: "pointer",
-                padding: "4px 6px",
-              }}
-            >
-              Clear all
-            </button>
-          )}
-          <span
-            style={{
-              transform: filtersOpen ? "rotate(180deg)" : "none",
-              transition: "transform 0.15s",
-              color: "var(--text-muted)",
-              fontSize: 11,
-            }}
-          >
-            ▾
-          </span>
-        </div>
-
-        {filtersOpen && (
-          <div
-            style={{
-              padding: "2px 14px 16px",
-              display: "flex",
-              flexDirection: "column",
-              gap: 16,
-            }}
-          >
-            {/* Colors + match mode */}
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 6,
-                }}
-              >
-                <span style={FILTER_LABEL}>Colors</span>
-                <div
-                  style={{
-                    display: "inline-flex",
-                    background: "var(--surface2)",
-                    borderRadius: 13,
-                    padding: 2,
-                  }}
-                >
-                  {COLOR_MODES.map((m) => (
-                    <button
-                      key={m.code}
-                      type="button"
-                      onClick={() => setColorMode(m.code)}
-                      title={
-                        m.code === "includes"
-                          ? "Cards that contain these colors"
-                          : m.code === "exact"
-                          ? "Cards that are exactly these colors"
-                          : "Cards within this color identity (great for Commander)"
-                      }
-                      style={{
-                        padding: "4px 9px",
-                        borderRadius: 11,
-                        border: "none",
-                        background:
-                          colorMode === m.code ? "var(--accent)" : "transparent",
-                        color: colorMode === m.code ? "#111" : "var(--text-muted)",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        cursor: "pointer",
-                      }}
-                    >
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 0, alignItems: "center" }}>
-                {COLORS.map((color) => {
-                  const selected = selectedColors.has(color.code);
-                  return (
-                    <button
-                      key={color.code}
-                      type="button"
-                      onClick={() => toggleInSet(setSelectedColors, color.code)}
-                      title={`Color: ${color.label}`}
-                      aria-label={`Filter by ${color.label}`}
-                      aria-pressed={selected}
-                      style={{
-                        width: 44,
-                        height: 44,
-                        padding: 0,
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: "50%",
-                          background: selected ? color.hex : "#2a2d33",
-                          color: selected ? color.textHex : "#8b9099",
-                          fontWeight: 800,
-                          fontSize: 13,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          border: selected
-                            ? color.code === "w"
-                              ? "2px solid #ccc"
-                              : "2px solid transparent"
-                            : "2px solid #3e4148",
-                          transition: "background 0.12s, color 0.12s",
-                        }}
-                      >
-                        {color.label}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Card type */}
-            <FilterRow label="Card type">
-              {TYPES.map((type) => (
-                <Chip
-                  key={type}
-                  active={selectedTypes.has(type)}
-                  onClick={() => toggleInSet(setSelectedTypes, type)}
-                >
-                  {type}
-                </Chip>
-              ))}
-            </FilterRow>
-
-            {/* Mana value */}
-            <FilterRow label="Mana value">
-              {MANA_VALUES.map((v) => (
-                <Chip
-                  key={v}
-                  active={selectedMV.has(v)}
-                  onClick={() => toggleInSet(setSelectedMV, v)}
-                  title={v >= 7 ? "Mana value 7 or more" : `Mana value ${v}`}
-                >
-                  {v >= 7 ? "7+" : v}
-                </Chip>
-              ))}
-            </FilterRow>
-
-            {/* Rarity */}
-            <FilterRow label="Rarity">
-              {RARITIES.map((r) => (
-                <Chip
-                  key={r.code}
-                  active={selectedRarity.has(r.code)}
-                  onClick={() => toggleInSet(setSelectedRarity, r.code)}
-                >
-                  {r.label}
-                </Chip>
-              ))}
-            </FilterRow>
-
-            {/* Format legality */}
-            <FilterRow label="Format legality">
-              {FORMATS.map((f) => (
-                <Chip
-                  key={f.code}
-                  active={selectedFormat === f.code}
-                  onClick={() =>
-                    setSelectedFormat(selectedFormat === f.code ? "" : f.code)
-                  }
-                >
-                  {f.label}
-                </Chip>
-              ))}
-            </FilterRow>
-
-            {activeFilterCount > 0 && filterPreview && (
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                Adds to query:{" "}
-                <code
-                  style={{
-                    color: "var(--accent)",
-                    background: "var(--surface2)",
-                    padding: "2px 6px",
-                    borderRadius: 4,
-                  }}
-                >
-                  {filterPreview}
-                </code>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {generatedQuery && (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
