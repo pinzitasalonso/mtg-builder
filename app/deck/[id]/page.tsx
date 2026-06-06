@@ -24,6 +24,19 @@ interface Deck {
   commander: string | null;
 }
 
+const COLORS = [
+  { code: "w", label: "W", hex: "#f9faf4", textHex: "#1a1a1a" },
+  { code: "u", label: "U", hex: "#0e68ab", textHex: "#ffffff" },
+  { code: "b", label: "B", hex: "#150b00", textHex: "#ffffff" },
+  { code: "r", label: "R", hex: "#d3202a", textHex: "#ffffff" },
+  { code: "g", label: "G", hex: "#00733e", textHex: "#ffffff" },
+];
+
+const TYPES = [
+  "Creature", "Instant", "Sorcery", "Enchantment",
+  "Artifact", "Planeswalker", "Saga", "Land", "Battle",
+];
+
 export default function DeckPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const deckId = Number(id);
@@ -36,6 +49,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [preview, setPreview] = useState<SearchCard | null>(null);
+  const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
+  const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
 
   const loadPool = useCallback(async () => {
     const res = await fetch(`/api/decks/${deckId}/cards`);
@@ -63,6 +78,38 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     loadPool();
   }, [deckId, loadPool]);
 
+  function toggleColor(code: string) {
+    setSelectedColors((prev) => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+  }
+
+  function toggleType(type: string) {
+    setSelectedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }
+
+  function buildFilterTerms(): string[] {
+    const terms: string[] = [];
+    const activeColors = COLORS.filter((c) => selectedColors.has(c.code)).map((c) => c.code);
+    if (activeColors.length > 0) {
+      terms.push(`c:${activeColors.join("")}`);
+    }
+    TYPES.forEach((type) => {
+      if (selectedTypes.has(type)) {
+        terms.push(`t:${type.toLowerCase()}`);
+      }
+    });
+    return terms;
+  }
+
   async function search(e: React.FormEvent) {
     e.preventDefault();
     if (!query.trim()) return;
@@ -74,7 +121,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: query }),
+        body: JSON.stringify({ prompt: query, filters: buildFilterTerms() }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -131,9 +178,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       </div>
 
       {/* Search section */}
-      <form onSubmit={search} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+      <form onSubmit={search} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <input
-          placeholder="Describe cards to add… e.g. blue wizards"
+          placeholder="Describe cards… or type Scryfall syntax directly"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           disabled={searching}
@@ -167,6 +214,112 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           {searching ? "Searching…" : "Search"}
         </button>
       </form>
+
+      {/* Filters */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
+        {/* Color identity chips */}
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {COLORS.map((color) => {
+            const selected = selectedColors.has(color.code);
+            return (
+              <button
+                key={color.code}
+                onClick={() => toggleColor(color.code)}
+                title={`Color: ${color.label}`}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: "50%",
+                  border: selected
+                    ? `2px solid ${color.code === "b" ? "#555" : color.hex}`
+                    : "2px solid var(--border)",
+                  background: selected ? color.hex : "transparent",
+                  color: selected ? color.textHex : "var(--text-muted)",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontSize: 11,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  letterSpacing: 0,
+                  boxShadow: selected && color.code === "b" ? "0 0 0 1px #333 inset" : "none",
+                }}
+              >
+                {color.label}
+              </button>
+            );
+          })}
+          {selectedColors.size > 0 && (
+            <button
+              onClick={() => setSelectedColors(new Set())}
+              style={{
+                marginLeft: 2,
+                background: "transparent",
+                border: "none",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                fontSize: 11,
+                padding: "2px 4px",
+              }}
+              title="Clear color filters"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* Card type chips */}
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            overflowX: "auto",
+            paddingBottom: 2,
+          }}
+        >
+          {TYPES.map((type) => {
+            const selected = selectedTypes.has(type);
+            return (
+              <button
+                key={type}
+                onClick={() => toggleType(type)}
+                style={{
+                  flexShrink: 0,
+                  padding: "4px 10px",
+                  borderRadius: 20,
+                  border: selected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                  background: selected ? "var(--accent)" : "transparent",
+                  color: selected ? "#111" : "var(--text-muted)",
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: selected ? 700 : 400,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {type}
+              </button>
+            );
+          })}
+          {selectedTypes.size > 0 && (
+            <button
+              onClick={() => setSelectedTypes(new Set())}
+              style={{
+                flexShrink: 0,
+                background: "transparent",
+                border: "none",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                fontSize: 11,
+                padding: "4px 4px",
+              }}
+              title="Clear type filters"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      </div>
 
       {generatedQuery && (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
