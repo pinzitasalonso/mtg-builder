@@ -20,6 +20,24 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Deploying on Railway
+
+This app uses a SQLite database (via Prisma). The container filesystem is
+**wiped on every deploy**, so the database file must live on a persistent
+[Railway Volume](https://docs.railway.com/reference/volumes) — otherwise all
+decks are lost on each redeploy.
+
+One-time setup in the Railway dashboard:
+
+1. Open your service → **Variables** → add a **Volume** mounted at `/data`.
+2. In **Variables**, set `DATABASE_URL=file:/data/db.sqlite`.
+3. Set `ANTHROPIC_API_KEY` to your Anthropic API key.
+4. Redeploy.
+
+The `start` script (`mkdir -p /data && prisma db push && next start`) ensures
+the `/data` directory exists and applies the schema before booting. Because the
+database now lives on the mounted Volume, decks persist across deployments.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

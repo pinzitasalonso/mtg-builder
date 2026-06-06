@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "prisma db push && next start",
+    "start": "mkdir -p /data && prisma db push && next start",
     "postinstall": "prisma generate"
   },
   "dependencies": {
