@@ -46,6 +46,7 @@ export default function HomePage() {
 
   async function deleteDeck(id: number, e: React.MouseEvent) {
     e.preventDefault();
+    e.stopPropagation();
     if (!confirm("Delete this deck?")) return;
     await fetch(`/api/decks/${id}`, { method: "DELETE" });
     loadDecks();
@@ -54,7 +55,8 @@ export default function HomePage() {
   return (
     <main style={{ maxWidth: 640, margin: "0 auto", padding: "24px 16px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--accent)", margin: 0 }}>
+        {/* #4: heading is white, not gold */}
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--text)", margin: 0 }}>
           MTG Deck Builder
         </h1>
         <button
@@ -81,24 +83,22 @@ export default function HomePage() {
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {decks.map((deck) => (
-            <Link
-              key={deck.id}
-              href={`/deck/${deck.id}`}
-              style={{ textDecoration: "none" }}
-            >
-              <div
-                style={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--border)",
-                  borderRadius: 12,
-                  padding: "16px 18px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
+            /* #5: card body is the nav link; delete button is a sibling absolutely-positioned */
+            <div key={deck.id} style={{ position: "relative" }}>
+              <Link
+                href={`/deck/${deck.id}`}
+                style={{ textDecoration: "none", display: "block" }}
               >
-                <div>
+                <div
+                  style={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 12,
+                    padding: "16px 18px",
+                    paddingRight: 56,
+                    cursor: "pointer",
+                  }}
+                >
                   <div style={{ fontWeight: 700, fontSize: 16, color: "var(--text)" }}>
                     {deck.name}
                   </div>
@@ -109,24 +109,34 @@ export default function HomePage() {
                     {deck._count.cards} card{deck._count.cards !== 1 ? "s" : ""}
                   </div>
                 </div>
-                <button
-                  onClick={(e) => deleteDeck(deck.id, e)}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    fontSize: 20,
-                    padding: "4px 8px",
-                    borderRadius: 6,
-                    lineHeight: 1,
-                  }}
-                  title="Delete deck"
-                >
-                  ×
-                </button>
-              </div>
-            </Link>
+              </Link>
+              {/* Delete button outside the link with ample padding to avoid accidental taps */}
+              <button
+                onClick={(e) => deleteDeck(deck.id, e)}
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  right: 12,
+                  transform: "translateY(-50%)",
+                  width: 36,
+                  height: 36,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  background: "transparent",
+                  border: "1px solid var(--border)",
+                  borderRadius: 8,
+                  color: "var(--text-muted)",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  lineHeight: 1,
+                }}
+                title="Delete deck"
+                aria-label="Delete deck"
+              >
+                ×
+              </button>
+            </div>
           ))}
         </div>
       )}

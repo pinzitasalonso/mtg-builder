@@ -12,7 +12,7 @@ interface ScryfallCard {
 }
 
 export async function POST(req: Request) {
-  const { prompt, filters } = await req.json();
+  const { prompt, filters, mode } = await req.json();
   if (!prompt) {
     return NextResponse.json({ error: "prompt required" }, { status: 400 });
   }
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
 
   let query: string;
 
-  if (process.env.ANTHROPIC_API_KEY) {
+  if (process.env.ANTHROPIC_API_KEY && mode !== "scryfall") {
     const anthropic = new Anthropic();
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",

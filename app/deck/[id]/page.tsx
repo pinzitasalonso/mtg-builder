@@ -24,10 +24,11 @@ interface Deck {
   commander: string | null;
 }
 
+/* #1: MTG mana pip colors */
 const COLORS = [
   { code: "w", label: "W", hex: "#f9faf4", textHex: "#1a1a1a" },
   { code: "u", label: "U", hex: "#0e68ab", textHex: "#ffffff" },
-  { code: "b", label: "B", hex: "#150b00", textHex: "#ffffff" },
+  { code: "b", label: "B", hex: "#1a1718", textHex: "#ffffff" },
   { code: "r", label: "R", hex: "#d3202a", textHex: "#ffffff" },
   { code: "g", label: "G", hex: "#00733e", textHex: "#ffffff" },
 ];
@@ -36,6 +37,8 @@ const TYPES = [
   "Creature", "Instant", "Sorcery", "Enchantment",
   "Artifact", "Planeswalker", "Saga", "Land", "Battle",
 ];
+
+type SearchMode = "ai" | "scryfall";
 
 export default function DeckPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -51,6 +54,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [preview, setPreview] = useState<SearchCard | null>(null);
   const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+  /* #2: AI vs Scryfall mode toggle, default AI */
+  const [searchMode, setSearchMode] = useState<SearchMode>("ai");
 
   const loadPool = useCallback(async () => {
     const res = await fetch(`/api/decks/${deckId}/cards`);
@@ -121,7 +126,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: query, filters: buildFilterTerms() }),
+        /* #2: pass mode to API */
+        body: JSON.stringify({ prompt: query, filters: buildFilterTerms(), mode: searchMode }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -162,12 +168,29 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <main style={{ maxWidth: 680, margin: "0 auto", padding: "16px", display: "flex", flexDirection: "column", gap: 0 }}>
-      {/* Header */}
+      {/* #7: Header with styled back chevron and deck settings button */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        <Link href="/" style={{ color: "var(--text-muted)", textDecoration: "none", fontSize: 20, lineHeight: 1 }}>
-          ←
+        {/* #7: styled ‹ back chevron */}
+        <Link
+          href="/"
+          aria-label="Back to decks"
+          style={{
+            color: "var(--text-muted)",
+            textDecoration: "none",
+            fontSize: 26,
+            lineHeight: 1,
+            fontWeight: 300,
+            display: "flex",
+            alignItems: "center",
+            padding: "8px",
+            margin: "-8px",
+            borderRadius: 8,
+          }}
+        >
+          ‹
         </Link>
-        <div>
+        <div style={{ flex: 1 }}>
+          {/* #4: heading inherits white (var(--text)) — no explicit color override needed */}
           <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{deck?.name ?? "…"}</h1>
           {deck && (
             <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
@@ -175,12 +198,69 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           )}
         </div>
+        {/* #7: deck settings button replaces ⋯ */}
+        <button
+          title="Deck settings"
+          aria-label="Deck settings"
+          style={{
+            background: "transparent",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            color: "var(--text-muted)",
+            cursor: "pointer",
+            fontSize: 16,
+            padding: "6px 10px",
+            display: "flex",
+            alignItems: "center",
+            lineHeight: 1,
+          }}
+        >
+          ⚙︎
+        </button>
+      </div>
+
+      {/* #2: AI vs Scryfall mode toggle pill */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <div
+          style={{
+            display: "inline-flex",
+            background: "var(--surface2)",
+            borderRadius: 20,
+            padding: 3,
+            gap: 2,
+          }}
+        >
+          {(["ai", "scryfall"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setSearchMode(mode)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 17,
+                border: "none",
+                background: searchMode === mode ? "var(--accent)" : "transparent",
+                color: searchMode === mode ? "#111" : "var(--text-muted)",
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: "pointer",
+                transition: "background 0.15s",
+              }}
+            >
+              {mode === "ai" ? "✨ AI" : "⚡ Scryfall"}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Search section */}
       <form onSubmit={search} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <input
-          placeholder="Describe cards… or type Scryfall syntax directly"
+          /* #2: placeholder changes by mode */
+          placeholder={
+            searchMode === "ai"
+              ? "Describe cards to find…"
+              : "Type Scryfall syntax: t:wizard c:u…"
+          }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           disabled={searching}
@@ -217,8 +297,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {/* Filters */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
-        {/* Color identity chips */}
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        {/* #1/#6: Color identity mana pips — 44px touch target wrapping a 36px circle */}
+        <div style={{ display: "flex", gap: 0, alignItems: "center" }}>
           {COLORS.map((color) => {
             const selected = selectedColors.has(color.code);
             return (
@@ -226,27 +306,43 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 key={color.code}
                 onClick={() => toggleColor(color.code)}
                 title={`Color: ${color.label}`}
+                aria-label={`Filter by ${color.label}`}
                 style={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: "50%",
-                  border: selected
-                    ? `2px solid ${color.code === "b" ? "#555" : color.hex}`
-                    : "2px solid var(--border)",
-                  background: selected ? color.hex : "transparent",
-                  color: selected ? color.textHex : "var(--text-muted)",
+                  width: 44,
+                  height: 44,
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
                   cursor: "pointer",
-                  fontWeight: 800,
-                  fontSize: 11,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
-                  letterSpacing: 0,
-                  boxShadow: selected && color.code === "b" ? "0 0 0 1px #333 inset" : "none",
                 }}
               >
-                {color.label}
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: "50%",
+                    background: selected ? color.hex : "#2a2d33",
+                    color: selected ? color.textHex : "#8b9099",
+                    fontWeight: 800,
+                    fontSize: 13,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: selected
+                      ? color.code === "w"
+                        ? "2px solid #ccc"
+                        : "2px solid transparent"
+                      : "2px solid #3e4148",
+                    letterSpacing: 0,
+                    transition: "background 0.12s, color 0.12s",
+                  }}
+                >
+                  {color.label}
+                </div>
               </button>
             );
           })}
@@ -254,13 +350,13 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             <button
               onClick={() => setSelectedColors(new Set())}
               style={{
-                marginLeft: 2,
+                marginLeft: 4,
                 background: "transparent",
                 border: "none",
                 color: "var(--text-muted)",
                 cursor: "pointer",
-                fontSize: 11,
-                padding: "2px 4px",
+                fontSize: 12,
+                padding: "4px 6px",
               }}
               title="Clear color filters"
             >
@@ -269,55 +365,73 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           )}
         </div>
 
-        {/* Card type chips */}
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            overflowX: "auto",
-            paddingBottom: 2,
-          }}
-        >
-          {TYPES.map((type) => {
-            const selected = selectedTypes.has(type);
-            return (
+        {/* #3/#6: Card type chips — min 44px height, right-fade scroll affordance */}
+        <div style={{ position: "relative" }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 6,
+              overflowX: "auto",
+              paddingBottom: 2,
+              paddingRight: 40,
+              /* hide scrollbar visually but keep scroll */
+            }}
+          >
+            {TYPES.map((type) => {
+              const selected = selectedTypes.has(type);
+              return (
+                <button
+                  key={type}
+                  onClick={() => toggleType(type)}
+                  style={{
+                    flexShrink: 0,
+                    padding: "0 14px",
+                    minHeight: 44,
+                    borderRadius: 22,
+                    border: selected ? "1px solid var(--accent)" : "1px solid var(--border)",
+                    background: selected ? "var(--accent)" : "transparent",
+                    color: selected ? "#111" : "var(--text-muted)",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: selected ? 700 : 400,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {type}
+                </button>
+              );
+            })}
+            {selectedTypes.size > 0 && (
               <button
-                key={type}
-                onClick={() => toggleType(type)}
+                onClick={() => setSelectedTypes(new Set())}
                 style={{
                   flexShrink: 0,
-                  padding: "4px 10px",
-                  borderRadius: 20,
-                  border: selected ? "1px solid var(--accent)" : "1px solid var(--border)",
-                  background: selected ? "var(--accent)" : "transparent",
-                  color: selected ? "#111" : "var(--text-muted)",
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
                   cursor: "pointer",
                   fontSize: 12,
-                  fontWeight: selected ? 700 : 400,
-                  whiteSpace: "nowrap",
+                  padding: "0 6px",
+                  minHeight: 44,
                 }}
+                title="Clear type filters"
               >
-                {type}
+                ✕
               </button>
-            );
-          })}
-          {selectedTypes.size > 0 && (
-            <button
-              onClick={() => setSelectedTypes(new Set())}
-              style={{
-                flexShrink: 0,
-                background: "transparent",
-                border: "none",
-                color: "var(--text-muted)",
-                cursor: "pointer",
-                fontSize: 11,
-                padding: "4px 4px",
-              }}
-              title="Clear type filters"
-            >
-              ✕
-            </button>
-          )}
+            )}
+          </div>
+          {/* Right-side fade gradient scroll affordance */}
+          <div
+            style={{
+              position: "absolute",
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 44,
+              background: "linear-gradient(to right, transparent, var(--bg))",
+              pointerEvents: "none",
+            }}
+          />
         </div>
       </div>
 
