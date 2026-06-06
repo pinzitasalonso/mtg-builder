@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Deck {
+  id        Int        @id @default(autoincrement())
+  name      String
+  format    String     @default("commander")
+  commander String?
+  createdAt DateTime   @default(now())
+  cards     PoolCard[]
+}
+
+model PoolCard {
+  id         Int      @id @default(autoincrement())
+  deckId     Int
+  deck       Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  scryfallId String
+  name       String
+  imageUri   String
+  manaCost   String?
+  typeLine   String?
+  oracleText String?
+  addedAt    DateTime @default(now())
+
+  @@unique([deckId, scryfallId])
+}

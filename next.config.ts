@@ -1,7 +1,22 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "cards.scryfall.io",
+      },
+      {
+        protocol: "https",
+        hostname: "*.scryfall.io",
+      },
+      {
+        protocol: "https",
+        hostname: "gatherer.wizards.com",
+      },
+    ],
+  },
 };
 
 export default nextConfig;
