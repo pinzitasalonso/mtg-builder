@@ -59,7 +59,7 @@ const FORMATS = [
   { code: "pauper", label: "Pauper" },
 ];
 
-type SearchMode = "ai" | "scryfall";
+type SearchMode = "ai" | "scryfall" | "name";
 
 const FILTER_LABEL: React.CSSProperties = {
   fontSize: 11,
@@ -189,6 +189,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [filtersOpen, setFiltersOpen] = useState(true);
   /* #2: AI vs Scryfall mode toggle, default AI */
   const [searchMode, setSearchMode] = useState<SearchMode>("ai");
+  const [nameInput, setNameInput] = useState("");
+  const [nameError, setNameError] = useState("");
+  const [nameAdding, setNameAdding] = useState(false);
 
   const loadPool = useCallback(async () => {
     const res = await fetch(`/api/decks/${deckId}/cards`);
@@ -285,6 +288,40 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     loadPool();
   }
 
+  async function addByName(e: React.FormEvent) {
+    e.preventDefault();
+    const name = nameInput.trim();
+    if (!name) return;
+    setNameAdding(true);
+    setNameError("");
+    try {
+      const res = await fetch(
+        `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setNameError(data.details ?? data.error ?? "Card not found");
+      } else {
+        const imageUri =
+          data.image_uris?.normal ??
+          data.card_faces?.[0]?.image_uris?.normal ??
+          "";
+        await addCard({
+          id: data.id,
+          name: data.name,
+          imageUri,
+          manaCost: data.mana_cost ?? null,
+          typeLine: data.type_line ?? null,
+          oracleText: data.oracle_text ?? null,
+        });
+        setNameInput("");
+      }
+    } catch {
+      setNameError("Network error");
+    }
+    setNameAdding(false);
+  }
+
   async function removeCard(dbId: number) {
     await fetch(`/api/decks/${deckId}/cards/${dbId}`, { method: "DELETE" });
     loadPool();
@@ -356,7 +393,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             gap: 2,
           }}
         >
-          {(["ai", "scryfall"] as const).map((mode) => (
+          {(["ai", "scryfall", "name"] as const).map((mode) => (
             <button
               key={mode}
               onClick={() => setSearchMode(mode)}
@@ -372,7 +409,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 transition: "background 0.15s",
               }}
             >
-              {mode === "ai" ? "✨ AI" : "⚡ Scryfall"}
+              {mode === "ai" ? "✨ AI" : mode === "scryfall" ? "⚡ Scryfall" : "🔤 Name"}
             </button>
           ))}
         </div>
@@ -587,7 +624,57 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
 
+      {/* Name mode — type a card name, hit Add */}
+      {searchMode === "name" && (
+        <form onSubmit={addByName} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input
+              placeholder="Exact or fuzzy card name…"
+              value={nameInput}
+              onChange={(e) => { setNameInput(e.target.value); setNameError(""); }}
+              disabled={nameAdding}
+              autoFocus
+              style={{
+                flex: 1,
+                background: "var(--surface)",
+                border: nameError ? "1px solid var(--danger)" : "1px solid var(--border)",
+                borderRadius: 10,
+                padding: "12px 14px",
+                color: "var(--text)",
+                fontSize: 16,
+                outline: "none",
+                minWidth: 0,
+              }}
+            />
+            <button
+              type="submit"
+              disabled={nameAdding || !nameInput.trim()}
+              style={{
+                background: "var(--accent)",
+                border: "none",
+                borderRadius: 10,
+                color: "#111",
+                fontWeight: 700,
+                padding: "12px 18px",
+                cursor: nameAdding ? "wait" : "pointer",
+                fontSize: 14,
+                whiteSpace: "nowrap",
+                opacity: nameAdding ? 0.7 : 1,
+              }}
+            >
+              {nameAdding ? "Adding…" : "Add"}
+            </button>
+          </div>
+          {nameError && (
+            <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 12px", background: "#2a1414", borderRadius: 8, border: "1px solid #5a2020" }}>
+              {nameError}
+            </div>
+          )}
+        </form>
+      )}
+
       {/* #2: Search input sits below the filters */}
+      {searchMode !== "name" && (
       <form onSubmit={search} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <input
           /* #2: placeholder changes by mode */
@@ -630,6 +717,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           {searching ? "Searching…" : "Search"}
         </button>
       </form>
+      )}
 
       {generatedQuery && (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
