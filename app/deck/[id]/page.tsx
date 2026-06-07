@@ -633,10 +633,16 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {generatedQuery && (
         <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
-          Scryfall query:{" "}
-          <code style={{ color: "var(--accent)", background: "var(--surface2)", padding: "2px 6px", borderRadius: 4 }}>
-            {generatedQuery}
-          </code>
+          {searchMode === "ai" ? (
+            <>What I looked for: {generatedQuery}</>
+          ) : (
+            <>
+              Scryfall query:{" "}
+              <code style={{ color: "var(--accent)", background: "var(--surface2)", padding: "2px 6px", borderRadius: 4 }}>
+                {generatedQuery}
+              </code>
+            </>
+          )}
         </div>
       )}
 
