@@ -55,44 +55,6 @@ async function mapPool<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>
   return out;
 }
 
-// ── EDHREC: the gold-standard source. Commander pages are reliably available as
-// structured JSON at json.edhrec.com; theme/tribe pages are blocked there, so
-// those are left to Claude's web_search instead.
-function edhrecListRank(header: string): number {
-  const h = (header ?? "").toLowerCase();
-  if (h.includes("synergy")) return 3; // "High Synergy Cards" — most characteristic
-  if (h.includes("top") || h.includes("signature") || h.includes("new")) return 2;
-  return 1;
-}
-
-async function fetchEdhrecCommander(slug: string): Promise<string[]> {
-  const clean = slug
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  if (!clean) return [];
-  try {
-    const res = await fetch(`https://json.edhrec.com/pages/commanders/${clean}.json`, {
-      headers: SCRYFALL_HEADERS,
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    const cardlists: { header?: string; cardviews?: { name?: string }[] }[] =
-      data?.container?.json_dict?.cardlists ?? [];
-    const ordered = [...cardlists].sort((a, b) => edhrecListRank(b.header ?? "") - edhrecListRank(a.header ?? ""));
-    const names: string[] = [];
-    for (const list of ordered) {
-      for (const cv of list.cardviews ?? []) {
-        if (cv?.name) names.push(cv.name);
-      }
-    }
-    return names;
-  } catch {
-    return [];
-  }
-}
-
 // ── Scryfall: resolve a loose card name to a full card object. Returns null when
 // the name doesn't resolve (typo, double-faced quirk, not a real card) so the
 // caller can simply skip it.
@@ -111,7 +73,6 @@ async function resolveNamed(name: string): Promise<OutCard | null> {
 }
 
 interface AiRecommendation {
-  commanderSlug: string | null;
   summary: string;
   cards: string[];
 }
@@ -134,30 +95,39 @@ function extractJson(text: string): unknown | null {
   return null;
 }
 
-// Ask Claude — acting as a knowledgeable MTG deckbuilder — to research real card
-// recommendations from EDHREC / Moxfield / Reddit via web search, and to surface
-// an EDHREC commander slug when the request maps to a specific commander.
+// Make Claude the reasoning engine. It interprets the (possibly multi-faceted)
+// request, leans on its own deep MTG knowledge, and uses web search whenever a
+// lookup would help — EDHREC, Scryfall, Moxfield, Reddit, anything. It is NOT
+// locked to a single source or page. The output is 15-20 specific, real card
+// names that genuinely satisfy ALL the constraints in the prompt.
 async function aiRecommend(anthropic: Anthropic, prompt: string): Promise<AiRecommendation> {
   const msg = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 1500,
-    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 5 }],
+    max_tokens: 6000,
+    thinking: { type: "enabled", budget_tokens: 3000 },
+    tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 6 }],
     system:
-      "You are a deeply knowledgeable Magic: The Gathering deckbuilder. A user describes the cards they want " +
-      "(a commander, a tribe, a theme, an effect, a color combination, etc.). Recommend the BEST real cards for " +
-      "that request, the way an expert friend would — not a filter.\n\n" +
-      "Use the web_search tool to ground your picks in real deckbuilding sources: EDHREC (edhrec.com — commander, " +
-      "theme, and tribe pages are the gold standard), Moxfield decklists, and Reddit r/EDH. Search for the actual " +
-      "card lists those sources recommend and pull genuine, popular, synergistic card names from them. If web " +
-      "search is thin or unavailable, fall back to your own expert knowledge so you still return a strong list.\n\n" +
-      "If the request clearly centers on ONE specific commander, also provide that commander's EDHREC slug " +
-      "(lowercase, words joined by hyphens, no punctuation) so the app can pull the canonical EDHREC page. " +
-      "Examples: 'Tom Bombadil' -> 'tom-bombadil', 'Atraxa, Praetors' Voice' -> 'atraxa-praetors-voice'. If the " +
-      "request is not about a single commander, set commanderSlug to null.\n\n" +
-      "Respond with ONLY a JSON object, no prose and no markdown fences, in exactly this shape:\n" +
-      '{"commanderSlug": string | null, "summary": string, "cards": string[]}\n' +
-      "- cards: 20-30 exact card names (English, as printed on the card).\n" +
-      "- summary: one short sentence describing what you searched for and why these cards fit.",
+      "You are a world-class Magic: The Gathering deckbuilding expert. A user describes the cards they want in " +
+      "natural language. The request may be simple ('blue wizards that draw cards') or multi-faceted and " +
+      "cross-cutting ('white cards that play well with Sagas and have a villain theme', 'budget black zombies " +
+      "that regenerate for a Wilhelt deck'). Your job is to recommend the BEST real cards that genuinely satisfy " +
+      "EVERY constraint in the request — the way an expert friend would, not a keyword filter.\n\n" +
+      "How to think:\n" +
+      "1. Break the prompt into its distinct constraints (color, type, mechanic, theme/flavor, commander, format, " +
+      "budget, etc.). A good answer must satisfy ALL of them together, not just one.\n" +
+      "2. Reason from your own MTG knowledge first — you know the card pool deeply. For the example 'white Sagas " +
+      "with a villain theme', you'd think: white Saga cards (Enchanting Tales reprints, Eldraine/March of the " +
+      "Machine sagas), villain-flavored white cards, sets with villain themes (Eldraine, LOTR, Wilds of Eldraine), " +
+      "then narrow to cards that hit both the mechanical and flavor angles.\n" +
+      "3. Use the web_search tool whenever a lookup would sharpen your picks — verify a card exists, find what " +
+      "EDHREC/Moxfield/Reddit recommend for a commander or theme, confirm a card's color or text, or discover " +
+      "cards you don't recall. Search multiple angles for multi-faceted prompts. You are free to pull from any " +
+      "source; you are not required to use any particular one.\n" +
+      "4. Prefer specific, real, playable cards that are well-regarded for the request. Avoid off-theme filler.\n\n" +
+      "After reasoning, respond with ONLY a JSON object — no prose, no markdown fences — in exactly this shape:\n" +
+      '{"summary": string, "cards": string[]}\n' +
+      "- cards: 15-20 exact card names (English, as printed on the card). Real cards only.\n" +
+      "- summary: one short sentence describing how you interpreted the request and why these cards fit.",
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -169,7 +139,6 @@ async function aiRecommend(anthropic: Anthropic, prompt: string): Promise<AiReco
   const parsed = extractJson(text) as Partial<AiRecommendation> | null;
   const cards = Array.isArray(parsed?.cards) ? parsed!.cards.filter((c): c is string => typeof c === "string") : [];
   return {
-    commanderSlug: typeof parsed?.commanderSlug === "string" ? parsed.commanderSlug : null,
     summary: typeof parsed?.summary === "string" ? parsed.summary : "",
     cards,
   };
@@ -223,20 +192,16 @@ export async function POST(req: Request) {
       const anthropic = new Anthropic();
       const rec = await aiRecommend(anthropic, prompt);
 
-      // EDHREC commander page (gold standard) goes first; Claude's web/expert
-      // picks fill in behind it.
-      const edhrecNames = rec.commanderSlug ? await fetchEdhrecCommander(rec.commanderSlug) : [];
-
-      // Dedupe names case-insensitively, preserving the EDHREC-first ordering,
-      // and cap the candidate pool so a few Scryfall misses still leave us 20.
+      // Dedupe the names Claude recommended (case-insensitive), preserving its
+      // ordering. Resolve a few extra so Scryfall misses still leave us ~20.
       const seenName = new Set<string>();
       const candidates: string[] = [];
-      for (const name of [...edhrecNames, ...rec.cards]) {
+      for (const name of rec.cards) {
         const key = name.toLowerCase().trim();
         if (!key || seenName.has(key)) continue;
         seenName.add(key);
         candidates.push(name);
-        if (candidates.length >= 30) break;
+        if (candidates.length >= 25) break;
       }
 
       const resolved = await mapPool(candidates, 6, resolveNamed);
@@ -251,17 +216,13 @@ export async function POST(req: Request) {
         if (cards.length >= 20) break;
       }
 
-      const sources: string[] = [];
-      if (edhrecNames.length) sources.push(`EDHREC: ${rec.commanderSlug}`);
-      sources.push("web search + expert picks");
-      const query = rec.summary || `AI recommendations (${sources.join(", ")})`;
+      const query = rec.summary || "AI recommendations";
 
       return NextResponse.json({
         cards,
         query,
         totalCards: cards.length,
         truncated: false,
-        sources,
         mode: "ai",
       });
     } catch (e) {
