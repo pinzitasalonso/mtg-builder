@@ -250,10 +250,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         if (!res.ok) {
           setSearchError(data.details?.details ?? data.error ?? "Search failed");
         } else {
-          setSearchResults(data.cards);
+          const poolIds = new Set(pool.map((c) => c.id));
+          const filtered = (data.cards as SearchCard[]).filter((c) => !poolIds.has(c.id));
+          setSearchResults(filtered);
           setGeneratedQuery(data.query);
           setTruncated(Boolean(data.truncated));
-          if (data.cards.length > 0) setSwipeOpen(true);
+          if (filtered.length > 0) setSwipeOpen(true);
           else setSearchError("No cards matched — try a different search.");
         }
       } catch {
@@ -261,7 +263,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       }
       setSearching(false);
     },
-    [searchMode]
+    [searchMode, pool]
   );
 
   function onSubmitSearch(e: React.FormEvent) {
