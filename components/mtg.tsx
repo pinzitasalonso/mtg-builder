@@ -274,7 +274,7 @@ export function ManaCurve({ curve, accent }: { curve: number[]; accent: string }
               width: "100%",
               height: `${(n / max) * 100}%`,
               minHeight: n ? 4 : 0,
-              background: n ? `linear-gradient(180deg, ${accent}, ${accent}aa)` : "transparent",
+              background: n ? `linear-gradient(180deg, ${accent}, color-mix(in srgb, ${accent} 60%, transparent))` : "transparent",
               borderRadius: 4,
               transition: "height .5s cubic-bezier(.2,.8,.2,1)",
             }}

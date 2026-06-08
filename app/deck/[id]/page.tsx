@@ -552,6 +552,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
         </div>
+        <button style={iconBtn} title="Deck settings" aria-label="Deck settings">
+          ⚙︎
+        </button>
       </header>
 
       <div className="deck-layout" style={{ maxWidth: 1240, margin: "0 auto", padding: "24px 20px 80px" }}>
