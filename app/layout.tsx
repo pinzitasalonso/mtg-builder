@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "MTG Deck Builder",
-  description: "Magic: The Gathering deck builder powered by Claude + Scryfall",
+  title: "Spellpool — MTG Deck Builder",
+  description:
+    "Spellpool — build and brew Magic: The Gathering decks, powered by Claude + Scryfall.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

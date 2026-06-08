@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Logo from "@/components/Logo";
 
 interface Deck {
   id: number;
@@ -64,18 +65,18 @@ export default function HomePage() {
           marginBottom: 28,
         }}
       >
-        {/* #4: heading is white, not gold */}
-        <h1
-          style={{
-            fontSize: "clamp(22px, 5vw, 30px)",
-            fontWeight: 700,
-            color: "var(--text)",
-            margin: 0,
-            minWidth: 0,
-          }}
-        >
-          MTG Deck Builder
-        </h1>
+        <div style={{ minWidth: 0 }}>
+          <Logo size={34} />
+          <p
+            style={{
+              margin: "8px 0 0",
+              fontSize: 14,
+              color: "var(--text-muted)",
+            }}
+          >
+            Build and brew your Magic: The Gathering decks.
+          </p>
+        </div>
         <button
           onClick={() => setShowModal(true)}
           style={{

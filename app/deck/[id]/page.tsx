@@ -4,6 +4,7 @@ import { use, useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import SwipeDeck from "@/components/SwipeDeck";
+import { LogoMark } from "@/components/Logo";
 
 interface SearchCard {
   id: string;
@@ -351,6 +352,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           }}
         >
           ‹
+        </Link>
+        <Link href="/" aria-label="Spellpool home" style={{ display: "flex", marginRight: 2 }}>
+          <LogoMark size={24} />
         </Link>
         <div style={{ flex: 1 }}>
           {/* #4: heading inherits white (var(--text)) — no explicit color override needed */}
