@@ -12,7 +12,7 @@ export interface SwipeCard {
   oracleText: string | null;
 }
 
-const THRESHOLD = 110;
+const THRESHOLD = 80;
 
 /* Full-screen "Oracle Search" modal — review AI/Scryfall results one classic
    card at a time: swipe/→ to add to the pool, swipe/← to skip. */
@@ -60,6 +60,12 @@ export default function SwipeModal({
   );
 
   useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === "ArrowRight") act("right");
       else if (e.key === "ArrowLeft") act("left");
@@ -103,6 +109,8 @@ export default function SwipeModal({
         backdropFilter: "blur(8px)",
         display: "flex",
         flexDirection: "column",
+        touchAction: "none",
+        overscrollBehavior: "none",
       }}
     >
       {/* header */}
