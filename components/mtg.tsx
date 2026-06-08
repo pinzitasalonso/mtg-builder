@@ -386,22 +386,302 @@ export function StatCard({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ background: "var(--surface)", borderRadius: 14, boxShadow: "inset 0 0 0 1px var(--line)", padding: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: ".08em",
-            textTransform: "uppercase",
-            color: "var(--text-dim)",
-          }}
-        >
+    <div style={{ background: "var(--app-bg2)", borderRadius: 8, boxShadow: "inset 0 0 0 1px rgba(200,155,65,.16)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "11px 15px 10px",
+          borderBottom: "1px solid rgba(200,155,65,.16)",
+        }}
+      >
+        <span className="label-sc" style={{ fontSize: 13, color: "var(--gold)", letterSpacing: ".14em" }}>
           {label}
         </span>
         {right}
       </div>
+      <div style={{ padding: 15 }}>{children}</div>
+    </div>
+  );
+}
+
+/* ============================================================
+   Classic (Alpha/Beta) card-frame components — real-card anatomy.
+   ============================================================ */
+
+const RARITY_HEX: Record<string, string> = {
+  common: "#2b2b2b",
+  uncommon: "#b9c2c6",
+  rare: "#d7b256",
+  mythic: "#d4702a",
+};
+
+export function RarityGem({ rarity = "rare", size = 11 }: { rarity?: string; size?: number }) {
+  const c = RARITY_HEX[rarity] || RARITY_HEX.rare;
+  return (
+    <span
+      title={rarity}
+      style={{
+        width: size,
+        height: size,
+        transform: "rotate(45deg)",
+        borderRadius: 2,
+        flex: "none",
+        background: `linear-gradient(135deg, #fff6, ${c})`,
+        boxShadow: `inset 0 0 0 1px rgba(0,0,0,.45), 0 0 3px ${c}88`,
+      }}
+    />
+  );
+}
+
+/* A serif label engraved directly onto the textured frame. */
+export function FrameText({
+  children,
+  size,
+  ink,
+  flex,
+}: {
+  children: React.ReactNode;
+  size: number;
+  ink?: string;
+  flex?: boolean;
+}) {
+  return (
+    <span
+      style={{
+        flex: flex ? 1 : "none",
+        fontFamily: "var(--font-display)",
+        fontWeight: 600,
+        fontSize: size,
+        color: ink || "var(--frame-ink)",
+        letterSpacing: ".005em",
+        lineHeight: 1.12,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        textShadow: "0 1px 2px rgba(0,0,0,.6), 0 0 1px rgba(0,0,0,.5)",
+        minWidth: 0,
+      }}
+    >
       {children}
+    </span>
+  );
+}
+
+interface FrameCard {
+  name: string;
+  imageUri?: string | null;
+  manaCost: string | null;
+  typeLine: string | null;
+  oracleText: string | null;
+}
+
+/* The classic card frame. variant "tile" (pool grid) or "full" (swipe modal). */
+export function ClassicCard({
+  card,
+  variant = "tile",
+  onRemove,
+  onClick,
+  style,
+}: {
+  card: FrameCard;
+  variant?: "tile" | "full";
+  onRemove?: () => void;
+  onClick?: () => void;
+  style?: CSSProperties;
+}) {
+  const [hover, setHover] = useState(false);
+  const full = variant === "full";
+  const colors = colorsOf(card.manaCost);
+  return (
+    <div
+      className="cc-black"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        position: "relative",
+        padding: full ? 11 : 8,
+        cursor: onClick ? "pointer" : "default",
+        transform: hover && onClick ? "translateY(-2px)" : "none",
+        boxShadow:
+          hover && onClick
+            ? "0 8px 18px -6px rgba(0,0,0,.65), 0 0 0 1.5px var(--gold)"
+            : "0 5px 13px -4px rgba(0,0,0,.6)",
+        transition: "transform .15s ease, box-shadow .15s",
+        ...style,
+      }}
+    >
+      <div
+        className="cc-brown"
+        style={{ padding: full ? "8px 9px" : "6px 7px", display: "flex", flexDirection: "column", gap: full ? 6 : 4 }}
+      >
+        {/* title — engraved on frame */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: full ? "1px 4px 2px" : "0 3px 1px" }}>
+          <FrameText flex size={full ? 22 : 15}>
+            {card.name}
+          </FrameText>
+          <ManaCost cost={card.manaCost} size={full ? 19 : 14} />
+        </div>
+
+        {/* art window */}
+        <div className="cc-art" style={{ aspectRatio: full ? "1 / 0.64" : "1 / 0.76" }}>
+          <CardArt
+            name={card.name}
+            src={card.imageUri || undefined}
+            colors={colors}
+            version={full ? "normal" : "art_crop"}
+            radius={0}
+            style={{ position: "absolute", inset: 0 }}
+          />
+        </div>
+
+        {/* type line — engraved on frame */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: full ? "0 4px" : "0 3px" }}>
+          <FrameText flex size={full ? 15 : 11.5}>
+            {card.typeLine}
+          </FrameText>
+          <RarityGem rarity="rare" size={full ? 13 : 10} />
+        </div>
+
+        {/* text box — confetti cardstock */}
+        <div className="cc-paper" style={{ padding: full ? "11px 13px 13px" : "6px 8px 7px", minHeight: full ? 92 : 46 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: full ? 15 : 11,
+              lineHeight: full ? 1.48 : 1.32,
+              color: "var(--ink)",
+              ...(full
+                ? {}
+                : { display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }),
+            }}
+          >
+            {card.oracleText}
+          </p>
+          {full && (
+            <div style={{ marginTop: 10, fontStyle: "italic", fontSize: 12.5, color: "var(--ink-soft)" }}>
+              Illus. — Spellpool · Scryfall
+            </div>
+          )}
+        </div>
+
+        {full && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              padding: "1px 4px 0",
+              fontSize: 10.5,
+              color: "rgba(244,233,205,.55)",
+            }}
+          >
+            <span>SPL · EN</span>
+            <span>™ &amp; © Spellpool</span>
+          </div>
+        )}
+      </div>
+
+      {onRemove && !full && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          style={{
+            position: "absolute",
+            top: 5,
+            right: 5,
+            width: 22,
+            height: 22,
+            borderRadius: 6,
+            border: "none",
+            cursor: "pointer",
+            background: "rgba(10,8,6,.82)",
+            color: "#e8d8b4",
+            fontSize: 12,
+            opacity: hover ? 1 : 0,
+            transition: "opacity .15s",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "inset 0 0 0 1px rgba(200,155,65,.4)",
+          }}
+          aria-label="Remove"
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* Compact list row — parchment ledger line. */
+export function ClassicRow({
+  card,
+  onRemove,
+  onClick,
+}: {
+  card: FrameCard;
+  onRemove?: () => void;
+  onClick?: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={onClick}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "30px 1fr auto 16px",
+        alignItems: "center",
+        gap: 11,
+        padding: "6px 10px 6px 7px",
+        borderRadius: 5,
+        cursor: onClick ? "pointer" : "default",
+        background: hover ? "rgba(200,155,65,.08)" : "transparent",
+        boxShadow: hover ? "inset 0 0 0 1px rgba(200,155,65,.18)" : "none",
+        transition: "background .12s",
+      }}
+    >
+      <div className="cc-art" style={{ width: 30, height: 30, borderRadius: 4 }}>
+        <CardArt name={card.name} src={card.imageUri || undefined} colors={colorsOf(card.manaCost)} radius={0} style={{ position: "absolute", inset: 0 }} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 16, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.15 }}>
+          {card.name}
+        </div>
+        <div style={{ fontSize: 12.5, fontStyle: "italic", color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {card.typeLine}
+        </div>
+      </div>
+      <ManaCost cost={card.manaCost} size={15} />
+      {onRemove && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: 4,
+            border: "none",
+            cursor: "pointer",
+            padding: 0,
+            background: "transparent",
+            color: "var(--text-dim)",
+            opacity: hover ? 1 : 0,
+            transition: "opacity .12s",
+            fontSize: 11,
+          }}
+          aria-label="Remove"
+        >
+          ✕
+        </button>
+      )}
     </div>
   );
 }

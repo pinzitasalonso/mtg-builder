@@ -1,20 +1,29 @@
 import type { Metadata, Viewport } from "next";
-import { Hanken_Grotesk, Geist_Mono } from "next/font/google";
+import { Cormorant_Garamond, EB_Garamond, Cormorant_SC } from "next/font/google";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import "./globals.css";
 
-const hanken = Hanken_Grotesk({
+const cormorant = Cormorant_Garamond({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-hanken",
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-cormorant",
   display: "swap",
 });
 
-const geistMono = Geist_Mono({
+const ebGaramond = EB_Garamond({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  variable: "--font-geist-mono",
+  style: ["normal", "italic"],
+  variable: "--font-ebgaramond",
+  display: "swap",
+});
+
+const cormorantSC = Cormorant_SC({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-cormorant-sc",
   display: "swap",
 });
 
@@ -39,24 +48,27 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#111214",
+  themeColor: "#14100a",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`h-full ${hanken.variable} ${geistMono.variable}`}>
+    <html
+      lang="en"
+      className={`h-full ${cormorant.variable} ${ebGaramond.variable} ${cormorantSC.variable}`}
+    >
       <body className="min-h-full flex flex-col">
         {children}
         <footer
           style={{
             marginTop: "auto",
-            borderTop: "1px solid var(--border)",
-            padding: "22px 16px",
+            borderTop: "1px solid var(--line)",
+            padding: "22px 20px",
           }}
         >
           <div
             style={{
-              maxWidth: 1080,
+              maxWidth: 1160,
               margin: "0 auto",
               display: "flex",
               alignItems: "center",
@@ -66,9 +78,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }}
           >
             <Link href="/" aria-label="Spellpool home" style={{ textDecoration: "none" }}>
-              <Logo size={20} />
+              <Logo size={19} />
             </Link>
-            <span style={{ fontSize: 13, color: "var(--text-muted)" }}>
+            <span style={{ fontSize: 14, fontStyle: "italic", color: "var(--text-dim)" }}>
               Powered by Claude + Scryfall
             </span>
           </div>
