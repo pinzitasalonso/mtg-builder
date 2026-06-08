@@ -188,6 +188,7 @@ export default function SwipeModal({
               </div>
             )}
             <div
+              key={i}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
