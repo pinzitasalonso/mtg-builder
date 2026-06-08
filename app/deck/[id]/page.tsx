@@ -5,6 +5,21 @@ import Link from "next/link";
 import Image from "next/image";
 import SwipeDeck from "@/components/SwipeDeck";
 import { LogoMark } from "@/components/Logo";
+import {
+  CardArt,
+  ManaCost,
+  ColorPips,
+  StatCard,
+  ManaCurve,
+  ColorBar,
+  TypeBreakdown,
+  CountRing,
+  deckStats,
+  categoryOf,
+  colorsOf,
+  deckTarget,
+  TYPE_ORDER,
+} from "@/components/mtg";
 
 interface SearchCard {
   id: string;
@@ -26,7 +41,6 @@ interface Deck {
   commander: string | null;
 }
 
-/* #1: MTG mana pip colors */
 const COLORS = [
   { code: "w", label: "W", hex: "#f9faf4", textHex: "#1a1a1a" },
   { code: "u", label: "U", hex: "#0e68ab", textHex: "#ffffff" },
@@ -60,30 +74,28 @@ const FORMATS = [
   { code: "pauper", label: "Pauper" },
 ];
 
+const AI_SUGGESTIONS = ["blue clones", "cheap card draw", "board wipes", "ramp"];
+
 type SearchMode = "ai" | "scryfall" | "name";
 
 const FILTER_LABEL: React.CSSProperties = {
   fontSize: 11,
   fontWeight: 700,
-  letterSpacing: "0.06em",
+  letterSpacing: "0.08em",
   textTransform: "uppercase",
-  color: "var(--text-muted)",
-  marginBottom: 8,
+  color: "var(--text-dim)",
+  marginBottom: 9,
 };
 
 /* The query text is the single source of truth. Chips toggle Scryfall tokens
    directly in and out of the input, and their selected state is derived from
    whatever is currently typed there. */
-
-/* A single color-identity token, e.g. id:uw */
 const ID_RE = /^id:([wubrg]+)$/i;
 
-/* Split a query string into whitespace-separated tokens */
 function queryTokens(query: string): string[] {
   return query.split(/\s+/).filter(Boolean);
 }
 
-/* Toggle a standalone token (e.g. t:wizard) in/out of the query */
 function toggleToken(query: string, token: string): string {
   const tokens = queryTokens(query);
   const i = tokens.indexOf(token);
@@ -96,7 +108,6 @@ function hasToken(query: string, token: string): boolean {
   return queryTokens(query).includes(token);
 }
 
-/* Toggle one color letter inside the (single) id: identity token */
 function toggleColor(query: string, letter: string): string {
   const tokens = queryTokens(query);
   const i = tokens.findIndex((t) => ID_RE.test(t));
@@ -137,17 +148,17 @@ function Chip({
       aria-pressed={active}
       style={{
         flexShrink: 0,
-        padding: "0 13px",
-        height: 38,
-        borderRadius: 19,
-        border: active ? "1px solid var(--accent)" : "1px solid var(--border)",
-        background: active ? "var(--accent)" : "var(--surface2)",
-        color: active ? "#111" : "var(--text-muted)",
+        padding: "7px 13px",
+        borderRadius: 20,
+        border: "none",
+        background: active ? "var(--accent)" : "rgba(255,255,255,.05)",
+        color: active ? "var(--accent-ink)" : "var(--text-muted)",
+        boxShadow: active ? "none" : "inset 0 0 0 1px var(--line)",
         cursor: "pointer",
-        fontSize: 13,
-        fontWeight: active ? 700 : 500,
+        fontSize: 12.5,
+        fontWeight: 600,
         whiteSpace: "nowrap",
-        transition: "background 0.12s, color 0.12s, border-color 0.12s",
+        transition: "background 0.12s, color 0.12s",
       }}
     >
       {children}
@@ -155,20 +166,147 @@ function Chip({
   );
 }
 
-/* A labeled, horizontally scrollable row of chips */
-function FilterRow({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
       <div style={FILTER_LABEL}>{label}</div>
-      <div style={{ display: "flex", gap: 7, overflowX: "auto", paddingBottom: 2 }}>
-        {children}
+      <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>{children}</div>
+    </div>
+  );
+}
+
+/* ---------- pool card: grid tile ---------- */
+function CardTile({ card, onRemove, onClick }: { card: PoolCard; onRemove: () => void; onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  const cardColors = colorsOf(card.manaCost);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={onClick}
+      style={{
+        position: "relative",
+        borderRadius: 12,
+        overflow: "hidden",
+        cursor: "pointer",
+        background: "var(--surface)",
+        boxShadow: hover
+          ? "0 12px 30px -10px rgba(0,0,0,.7), inset 0 0 0 1px var(--accent)"
+          : "0 2px 8px rgba(0,0,0,.35), inset 0 0 0 1px var(--line)",
+        transform: hover ? "translateY(-3px)" : "none",
+        transition: "transform .18s ease, box-shadow .18s ease",
+      }}
+    >
+      <div style={{ position: "relative", aspectRatio: "1 / 1.02" }}>
+        <CardArt
+          name={card.name}
+          src={card.imageUri || undefined}
+          colors={cardColors}
+          version="art_crop"
+          radius={0}
+          style={{ position: "absolute", inset: 0 }}
+        />
+        <div style={{ position: "absolute", inset: 0, background: "linear-gradient(180deg, rgba(8,9,11,.05) 40%, rgba(8,9,11,.78) 100%)" }} />
+        <div style={{ position: "absolute", top: 8, right: 8 }}>
+          <ManaCost cost={card.manaCost} size={17} />
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          style={{
+            position: "absolute",
+            top: 8,
+            left: 8,
+            width: 24,
+            height: 24,
+            borderRadius: 7,
+            border: "none",
+            cursor: "pointer",
+            background: "rgba(8,9,11,.62)",
+            color: "#fff",
+            opacity: hover ? 1 : 0,
+            transition: "opacity .15s",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 14,
+            lineHeight: 1,
+          }}
+          aria-label="Remove"
+        >
+          ✕
+        </button>
       </div>
+      <div style={{ padding: "9px 11px 11px" }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {card.name}
+        </div>
+        <div style={{ fontSize: 11.5, color: "var(--text-dim)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {card.typeLine}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- pool card: compact list row ---------- */
+function CardRow({ card, onRemove, onClick }: { card: PoolCard; onRemove: () => void; onClick: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={onClick}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "34px 1fr auto auto",
+        alignItems: "center",
+        gap: 12,
+        padding: "7px 10px 7px 7px",
+        borderRadius: 9,
+        cursor: "pointer",
+        background: hover ? "var(--surface2)" : "transparent",
+        boxShadow: hover ? "inset 0 0 0 1px var(--line)" : "none",
+        transition: "background .12s",
+      }}
+    >
+      <CardArt name={card.name} src={card.imageUri || undefined} colors={colorsOf(card.manaCost)} radius={6} style={{ width: 34, height: 34 }} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {card.name}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {card.typeLine}
+        </div>
+      </div>
+      <ManaCost cost={card.manaCost} size={16} />
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 6,
+          border: "none",
+          cursor: "pointer",
+          background: hover ? "rgba(255,255,255,.06)" : "transparent",
+          color: "var(--text-dim)",
+          opacity: hover ? 1 : 0,
+          transition: "opacity .12s",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 12,
+        }}
+        aria-label="Remove"
+      >
+        ✕
+      </button>
     </div>
   );
 }
@@ -187,12 +325,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [preview, setPreview] = useState<SearchCard | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(true);
-  /* #2: AI vs Scryfall mode toggle, default AI */
   const [searchMode, setSearchMode] = useState<SearchMode>("ai");
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
   const [nameAdding, setNameAdding] = useState(false);
+  const [view, setView] = useState<"grid" | "list">("grid");
 
   const loadPool = useCallback(async () => {
     const res = await fetch(`/api/decks/${deckId}/cards`);
@@ -220,7 +357,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     loadPool();
   }, [deckId, loadPool]);
 
-  /* Strip every known filter token, leaving any free-text the user typed */
   function clearAllFilters() {
     setQuery((q) =>
       queryTokens(q)
@@ -243,51 +379,66 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     RARITIES.filter((r) => hasToken(query, `r:${r.code}`)).length +
     FORMATS.filter((f) => hasToken(query, `f:${f.code}`)).length;
 
-  async function search(e: React.FormEvent) {
-    e.preventDefault();
-    if (!query.trim()) return;
-    setSearching(true);
-    setSearchError("");
-    setSearchResults([]);
-    setGeneratedQuery("");
-    try {
-      const res = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        /* #3: send the input text as-is; chips already wrote their syntax into it */
-        body: JSON.stringify({ prompt: query, mode: searchMode }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setSearchError(data.details?.details ?? data.error ?? "Search failed");
-      } else {
-        setSearchResults(data.cards);
-        setGeneratedQuery(data.query);
-        setTruncated(Boolean(data.truncated));
-        setSearchId((n) => n + 1);
+  /* Core search, callable from the form or from a suggestion chip. */
+  const runSearch = useCallback(
+    async (text: string) => {
+      if (!text.trim()) return;
+      setSearching(true);
+      setSearchError("");
+      setSearchResults([]);
+      setGeneratedQuery("");
+      try {
+        const res = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: text, mode: searchMode }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setSearchError(data.details?.details ?? data.error ?? "Search failed");
+        } else {
+          setSearchResults(data.cards);
+          setGeneratedQuery(data.query);
+          setTruncated(Boolean(data.truncated));
+          setSearchId((n) => n + 1);
+        }
+      } catch {
+        setSearchError("Network error");
       }
-    } catch {
-      setSearchError("Network error");
-    }
-    setSearching(false);
+      setSearching(false);
+    },
+    [searchMode]
+  );
+
+  function onSubmitSearch(e: React.FormEvent) {
+    e.preventDefault();
+    runSearch(query);
   }
 
-  async function addCard(card: SearchCard) {
-    if (pool.some((c) => c.id === card.id)) return;
-    await fetch(`/api/decks/${deckId}/cards`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        scryfallId: card.id,
-        name: card.name,
-        imageUri: card.imageUri,
-        manaCost: card.manaCost,
-        typeLine: card.typeLine,
-        oracleText: card.oracleText,
-      }),
-    });
-    loadPool();
+  function onSuggestion(s: string) {
+    setQuery(s);
+    runSearch(s);
   }
+
+  const addCard = useCallback(
+    async (card: SearchCard) => {
+      if (pool.some((c) => c.id === card.id)) return;
+      await fetch(`/api/decks/${deckId}/cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scryfallId: card.id,
+          name: card.name,
+          imageUri: card.imageUri,
+          manaCost: card.manaCost,
+          typeLine: card.typeLine,
+          oracleText: card.oracleText,
+        }),
+      });
+      loadPool();
+    },
+    [pool, deckId, loadPool]
+  );
 
   async function addByName(e: React.FormEvent) {
     e.preventDefault();
@@ -296,17 +447,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     setNameAdding(true);
     setNameError("");
     try {
-      const res = await fetch(
-        `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`
-      );
+      const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
       const data = await res.json();
       if (!res.ok) {
         setNameError(data.details ?? data.error ?? "Card not found");
       } else {
-        const imageUri =
-          data.image_uris?.normal ??
-          data.card_faces?.[0]?.image_uris?.normal ??
-          "";
+        const imageUri = data.image_uris?.normal ?? data.card_faces?.[0]?.image_uris?.normal ?? "";
         await addCard({
           id: data.id,
           name: data.name,
@@ -328,186 +474,134 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     loadPool();
   }
 
-  const inPool = (id: string) => pool.some((c) => c.id === id);
+  const inPool = (cardId: string) => pool.some((c) => c.id === cardId);
+
+  const stats = deckStats(pool);
+  const poolColors = ["W", "U", "B", "R", "G"].filter((c) => stats.colors[c] > 0);
+  const target = deckTarget(deck?.format);
+  const grouped = TYPE_ORDER.map((t) => ({
+    t,
+    cards: pool.map((c, i) => ({ c, i })).filter(({ c }) => categoryOf(c.typeLine) === t),
+  })).filter((g) => g.cards.length);
+
+  const iconBtn: React.CSSProperties = {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    border: "none",
+    cursor: "pointer",
+    background: "rgba(255,255,255,.05)",
+    color: "var(--text-muted)",
+    fontSize: 16,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  };
 
   return (
-    <main className="container" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-      {/* #7: Header with styled back chevron and deck settings button */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
-        {/* #7: styled ‹ back chevron */}
-        <Link
-          href="/"
-          aria-label="Back to decks"
-          style={{
-            color: "var(--text-muted)",
-            textDecoration: "none",
-            fontSize: 26,
-            lineHeight: 1,
-            fontWeight: 300,
-            display: "flex",
-            alignItems: "center",
-            padding: "8px",
-            margin: "-8px",
-            borderRadius: 8,
-          }}
-        >
-          ‹
-        </Link>
-        <Link href="/" aria-label="Spellpool home" style={{ display: "flex", marginRight: 2 }}>
-          <LogoMark size={24} />
-        </Link>
-        <div style={{ flex: 1 }}>
-          {/* #4: heading inherits white (var(--text)) — no explicit color override needed */}
-          <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{deck?.name ?? "…"}</h1>
-          {deck && (
-            <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-              {deck.format}{deck.commander ? ` · ${deck.commander}` : ""}
-            </div>
-          )}
-        </div>
-        {/* #7: deck settings button replaces ⋯ */}
-        <button
-          title="Deck settings"
-          aria-label="Deck settings"
-          style={{
-            background: "transparent",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            color: "var(--text-muted)",
-            cursor: "pointer",
-            fontSize: 16,
-            padding: "6px 10px",
-            display: "flex",
-            alignItems: "center",
-            lineHeight: 1,
-          }}
-        >
-          ⚙︎
-        </button>
-      </div>
-
-      {/* #2: AI vs Scryfall mode toggle pill */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <div
-          style={{
-            display: "inline-flex",
-            background: "var(--surface2)",
-            borderRadius: 20,
-            padding: 3,
-            gap: 2,
-          }}
-        >
-          {(["ai", "scryfall", "name"] as const).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setSearchMode(mode)}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 17,
-                border: "none",
-                background: searchMode === mode ? "var(--accent)" : "transparent",
-                color: searchMode === mode ? "#111" : "var(--text-muted)",
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: "pointer",
-                transition: "background 0.15s",
-              }}
-            >
-              {mode === "ai" ? "✨ AI" : mode === "scryfall" ? "⚡ Scryfall" : "🔤 Name"}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* #1 + #2: Filters live above the search input and only appear in Scryfall
-          mode — in AI mode you just describe what you want in plain language. */}
-      {searchMode === "scryfall" && (
-        <div
-          style={{
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 14,
-            marginBottom: 10,
-            overflow: "hidden",
-          }}
-        >
-          {/* Panel header */}
-          <div
-            onClick={() => setFiltersOpen((o) => !o)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "12px 14px",
-              cursor: "pointer",
-              userSelect: "none",
-            }}
-          >
-            <span style={{ fontSize: 14, fontWeight: 700 }}>Filters</span>
-            {activeFilterCount > 0 && (
+    <main style={{ flex: 1 }}>
+      {/* top bar */}
+      <header
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "14px 20px",
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          background: "color-mix(in srgb, var(--bg) 82%, transparent)",
+          backdropFilter: "blur(14px)",
+          boxShadow: "0 1px 0 var(--line)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          <Link href="/" aria-label="Back to decks" style={{ ...iconBtn, color: "var(--text)", textDecoration: "none" }}>
+            ‹
+          </Link>
+          <Link href="/" aria-label="Spellpool home" style={{ display: "flex", flexShrink: 0 }}>
+            <LogoMark size={22} />
+          </Link>
+          <div style={{ width: 38, height: 38, borderRadius: 10, overflow: "hidden", flex: "none" }}>
+            <CardArt name={deck?.commander || deck?.name} colors={poolColors} radius={10} style={{ width: 38, height: 38 }} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
               <span
                 style={{
-                  background: "var(--accent)",
-                  color: "#111",
-                  fontSize: 11,
-                  fontWeight: 800,
-                  minWidth: 18,
-                  height: 18,
-                  borderRadius: 9,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 5px",
+                  fontFamily: "var(--font-display)",
+                  fontSize: 19,
+                  fontWeight: 700,
+                  color: "var(--text)",
+                  letterSpacing: "-.01em",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
-                {activeFilterCount}
+                {deck?.name ?? "…"}
               </span>
+              {poolColors.length > 0 && <ColorPips colors={poolColors} size={15} />}
+            </div>
+            {deck && (
+              <div style={{ fontSize: 12, color: "var(--text-dim)" }}>
+                {deck.format}
+                {deck.commander ? ` · ${deck.commander}` : ""}
+              </div>
             )}
-            <span style={{ flex: 1 }} />
-            {activeFilterCount > 0 && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  clearAllFilters();
-                }}
-                style={{
-                  background: "transparent",
-                  border: "none",
-                  color: "var(--text-muted)",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  padding: "4px 6px",
-                }}
-              >
-                Clear all
-              </button>
-            )}
-            <span
-              style={{
-                transform: filtersOpen ? "rotate(180deg)" : "none",
-                transition: "transform 0.15s",
-                color: "var(--text-muted)",
-                fontSize: 11,
-              }}
-            >
-              ▾
-            </span>
           </div>
+        </div>
+      </header>
 
-          {filtersOpen && (
-            <div
-              style={{
-                padding: "2px 14px 16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 16,
-              }}
-            >
-              {/* Colors — tapping toggles a letter inside the id: identity token */}
-              <div>
-                <div style={FILTER_LABEL}>Colors</div>
-                <div style={{ display: "flex", gap: 0, alignItems: "center" }}>
+      <div className="deck-layout" style={{ maxWidth: 1240, margin: "0 auto", padding: "24px 20px 80px" }}>
+        {/* main column */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
+          {/* search panel */}
+          <div style={{ background: "var(--surface)", borderRadius: 16, boxShadow: "inset 0 0 0 1px var(--line)", padding: 16 }}>
+            {/* segmented control */}
+            <div style={{ display: "inline-flex", padding: 3, background: "rgba(8,9,11,.5)", borderRadius: 11, gap: 2, marginBottom: 14 }}>
+              {(["ai", "scryfall", "name"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setSearchMode(mode)}
+                  style={{
+                    padding: "7px 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    background: searchMode === mode ? "var(--accent)" : "transparent",
+                    color: searchMode === mode ? "var(--accent-ink)" : "var(--text-muted)",
+                    transition: "all .14s",
+                  }}
+                >
+                  <span>{mode === "ai" ? "✦" : mode === "scryfall" ? "⚡" : "Aa"}</span>
+                  {mode === "ai" ? "AI" : mode === "scryfall" ? "Scryfall" : "Name"}
+                </button>
+              ))}
+            </div>
+
+            {/* scryfall filters */}
+            {searchMode === "scryfall" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 14 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={FILTER_LABEL}>Colors</div>
+                  {activeFilterCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={clearAllFilters}
+                      style={{ background: "transparent", border: "none", color: "var(--text-muted)", fontSize: 12, cursor: "pointer", padding: "0 0 9px" }}
+                    >
+                      Clear all ({activeFilterCount})
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: -6 }}>
                   {COLORS.map((color) => {
                     const selected = colorActive(query, color.code);
                     return (
@@ -516,330 +610,270 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                         type="button"
                         onClick={() => setQuery((q) => toggleColor(q, color.code))}
                         title={`Color identity: ${color.label}`}
-                        aria-label={`Filter by ${color.label}`}
                         aria-pressed={selected}
                         style={{
-                          width: 44,
-                          height: 44,
-                          padding: 0,
+                          width: 34,
+                          height: 34,
+                          borderRadius: "50%",
                           border: "none",
-                          background: "transparent",
                           cursor: "pointer",
+                          padding: 0,
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          flexShrink: 0,
+                          background: selected ? color.hex : "#2a2d33",
+                          color: selected ? color.textHex : "#8b9099",
+                          fontWeight: 800,
+                          fontSize: 13,
+                          boxShadow: selected ? "inset 0 0 0 2px var(--accent)" : "inset 0 0 0 1px #3e4148",
+                          transform: selected ? "scale(1.05)" : "scale(1)",
+                          transition: "all .12s",
                         }}
                       >
-                        <div
-                          style={{
-                            width: 34,
-                            height: 34,
-                            borderRadius: "50%",
-                            background: selected ? color.hex : "#2a2d33",
-                            color: selected ? color.textHex : "#8b9099",
-                            fontWeight: 800,
-                            fontSize: 13,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            border: selected
-                              ? color.code === "w"
-                                ? "2px solid #ccc"
-                                : "2px solid transparent"
-                              : "2px solid #3e4148",
-                            transition: "background 0.12s, color 0.12s",
-                          }}
-                        >
-                          {color.label}
-                        </div>
+                        {color.label}
                       </button>
                     );
                   })}
                 </div>
+                <FilterRow label="Card type">
+                  {TYPES.map((type) => {
+                    const token = `t:${type.toLowerCase()}`;
+                    return (
+                      <Chip key={type} active={hasToken(query, token)} onClick={() => setQuery((q) => toggleToken(q, token))}>
+                        {type}
+                      </Chip>
+                    );
+                  })}
+                </FilterRow>
+                <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+                  <FilterRow label="Mana value">
+                    {MANA_VALUES.map((v) => {
+                      const token = v >= 7 ? "mv>=7" : `mv=${v}`;
+                      return (
+                        <Chip key={v} active={hasToken(query, token)} onClick={() => setQuery((q) => toggleToken(q, token))} title={v >= 7 ? "Mana value 7 or more" : `Mana value ${v}`}>
+                          {v >= 7 ? "7+" : v}
+                        </Chip>
+                      );
+                    })}
+                  </FilterRow>
+                  <FilterRow label="Rarity">
+                    {RARITIES.map((r) => {
+                      const token = `r:${r.code}`;
+                      return (
+                        <Chip key={r.code} active={hasToken(query, token)} onClick={() => setQuery((q) => toggleToken(q, token))}>
+                          {r.label}
+                        </Chip>
+                      );
+                    })}
+                  </FilterRow>
+                </div>
+                <FilterRow label="Format legality">
+                  {FORMATS.map((f) => {
+                    const token = `f:${f.code}`;
+                    return (
+                      <Chip key={f.code} active={hasToken(query, token)} onClick={() => setQuery((q) => toggleToken(q, token))}>
+                        {f.label}
+                      </Chip>
+                    );
+                  })}
+                </FilterRow>
               </div>
+            )}
 
-              {/* Card type */}
-              <FilterRow label="Card type">
-                {TYPES.map((type) => {
-                  const token = `t:${type.toLowerCase()}`;
-                  return (
-                    <Chip
-                      key={type}
-                      active={hasToken(query, token)}
-                      onClick={() => setQuery((q) => toggleToken(q, token))}
-                    >
-                      {type}
-                    </Chip>
-                  );
-                })}
-              </FilterRow>
+            {/* name mode */}
+            {searchMode === "name" ? (
+              <form onSubmit={addByName} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <input
+                    placeholder="Exact or fuzzy card name…"
+                    value={nameInput}
+                    onChange={(e) => {
+                      setNameInput(e.target.value);
+                      setNameError("");
+                    }}
+                    disabled={nameAdding}
+                    style={searchInputStyle(nameError ? "var(--danger)" : undefined)}
+                  />
+                  <button type="submit" disabled={nameAdding || !nameInput.trim()} style={searchBtnStyle(nameAdding)}>
+                    {nameAdding ? "Adding…" : "Add"}
+                  </button>
+                </div>
+                {nameError && <ErrorNote>{nameError}</ErrorNote>}
+              </form>
+            ) : (
+              <>
+                <form onSubmit={onSubmitSearch} style={{ display: "flex", gap: 10 }}>
+                  <input
+                    placeholder={searchMode === "ai" ? "Describe cards to find…" : "Scryfall syntax: t:wizard id:u…"}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    disabled={searching}
+                    style={searchInputStyle(undefined, searchMode === "scryfall")}
+                  />
+                  <button type="submit" disabled={searching || !query.trim()} style={searchBtnStyle(searching)}>
+                    {searchMode === "ai" && <span style={{ marginRight: 6 }}>✦</span>}
+                    {searching ? "Searching…" : "Search"}
+                  </button>
+                </form>
+                {searchMode === "ai" && (
+                  <div style={{ display: "flex", gap: 7, marginTop: 12, flexWrap: "wrap" }}>
+                    {AI_SUGGESTIONS.map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => onSuggestion(s)}
+                        disabled={searching}
+                        style={{
+                          fontSize: 12,
+                          padding: "5px 11px",
+                          borderRadius: 16,
+                          border: "none",
+                          cursor: searching ? "default" : "pointer",
+                          background: "rgba(255,255,255,.04)",
+                          color: "var(--text-dim)",
+                          boxShadow: "inset 0 0 0 1px var(--line)",
+                        }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
 
-              {/* Mana value */}
-              <FilterRow label="Mana value">
-                {MANA_VALUES.map((v) => {
-                  const token = v >= 7 ? "mv>=7" : `mv=${v}`;
-                  return (
-                    <Chip
-                      key={v}
-                      active={hasToken(query, token)}
-                      onClick={() => setQuery((q) => toggleToken(q, token))}
-                      title={v >= 7 ? "Mana value 7 or more" : `Mana value ${v}`}
-                    >
-                      {v >= 7 ? "7+" : v}
-                    </Chip>
-                  );
-                })}
-              </FilterRow>
-
-              {/* Rarity */}
-              <FilterRow label="Rarity">
-                {RARITIES.map((r) => {
-                  const token = `r:${r.code}`;
-                  return (
-                    <Chip
-                      key={r.code}
-                      active={hasToken(query, token)}
-                      onClick={() => setQuery((q) => toggleToken(q, token))}
-                    >
-                      {r.label}
-                    </Chip>
-                  );
-                })}
-              </FilterRow>
-
-              {/* Format legality */}
-              <FilterRow label="Format legality">
-                {FORMATS.map((f) => {
-                  const token = `f:${f.code}`;
-                  return (
-                    <Chip
-                      key={f.code}
-                      active={hasToken(query, token)}
-                      onClick={() => setQuery((q) => toggleToken(q, token))}
-                    >
-                      {f.label}
-                    </Chip>
-                  );
-                })}
-              </FilterRow>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Name mode — type a card name, hit Add */}
-      {searchMode === "name" && (
-        <form onSubmit={addByName} style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 10 }}>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input
-              placeholder="Exact or fuzzy card name…"
-              value={nameInput}
-              onChange={(e) => { setNameInput(e.target.value); setNameError(""); }}
-              disabled={nameAdding}
-              autoFocus
-              style={{
-                flex: 1,
-                background: "var(--surface)",
-                border: nameError ? "1px solid var(--danger)" : "1px solid var(--border)",
-                borderRadius: 10,
-                padding: "12px 14px",
-                color: "var(--text)",
-                fontSize: 16,
-                outline: "none",
-                minWidth: 0,
-              }}
-            />
-            <button
-              type="submit"
-              disabled={nameAdding || !nameInput.trim()}
-              style={{
-                background: "var(--accent)",
-                border: "none",
-                borderRadius: 10,
-                color: "#111",
-                fontWeight: 700,
-                padding: "12px 18px",
-                cursor: nameAdding ? "wait" : "pointer",
-                fontSize: 14,
-                whiteSpace: "nowrap",
-                opacity: nameAdding ? 0.7 : 1,
-              }}
-            >
-              {nameAdding ? "Adding…" : "Add"}
-            </button>
+            {generatedQuery && (
+              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12 }}>
+                {searchMode === "ai" ? (
+                  <>
+                    <span style={{ color: "var(--accent)", fontWeight: 600 }}>What I looked for · </span>
+                    {generatedQuery}
+                  </>
+                ) : (
+                  <>
+                    Scryfall query:{" "}
+                    <code style={{ color: "var(--accent)", background: "var(--surface2)", padding: "2px 6px", borderRadius: 4, fontFamily: "var(--font-mono)" }}>
+                      {generatedQuery}
+                    </code>
+                  </>
+                )}
+              </div>
+            )}
+            {searchError && <div style={{ marginTop: 12 }}><ErrorNote>{searchError}</ErrorNote></div>}
           </div>
-          {nameError && (
-            <div style={{ color: "var(--danger)", fontSize: 13, padding: "8px 12px", background: "#2a1414", borderRadius: 8, border: "1px solid #5a2020" }}>
-              {nameError}
+
+          {/* search results — swipe to triage */}
+          {searchResults.length > 0 && (
+            <div>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 14, gap: 8 }}>
+                <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--text)" }}>
+                  Results <span style={{ color: "var(--text-dim)", fontWeight: 500 }}>· {searchResults.length}</span>
+                </h2>
+                {truncated && <span style={{ fontSize: 11, color: "var(--text-dim)" }}>showing the first {searchResults.length}</span>}
+              </div>
+              <SwipeDeck
+                key={searchId}
+                cards={searchResults}
+                inPool={inPool}
+                onAdd={addCard}
+                onDiscard={() => {}}
+                onInfo={setPreview}
+                onRestart={() => setSearchId((n) => n + 1)}
+              />
             </div>
           )}
-        </form>
-      )}
 
-      {/* #2: Search input sits below the filters */}
-      {searchMode !== "name" && (
-      <form onSubmit={search} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-        <input
-          /* #2: placeholder changes by mode */
-          placeholder={
-            searchMode === "ai"
-              ? "Describe cards to find…"
-              : "Type Scryfall syntax: t:wizard id:u…"
-          }
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          disabled={searching}
-          style={{
-            flex: 1,
-            background: "var(--surface)",
-            border: "1px solid var(--border)",
-            borderRadius: 10,
-            padding: "12px 14px",
-            color: "var(--text)",
-            fontSize: 16,
-            outline: "none",
-            minWidth: 0,
-          }}
-        />
-        <button
-          type="submit"
-          disabled={searching || !query.trim()}
-          style={{
-            background: "var(--accent)",
-            border: "none",
-            borderRadius: 10,
-            color: "#111",
-            fontWeight: 700,
-            padding: "12px 18px",
-            cursor: searching ? "wait" : "pointer",
-            fontSize: 14,
-            whiteSpace: "nowrap",
-            opacity: searching ? 0.7 : 1,
-          }}
-        >
-          {searching ? "Searching…" : "Search"}
-        </button>
-      </form>
-      )}
+          {/* pool */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--text)" }}>
+                Pool <span style={{ color: "var(--text-dim)", fontWeight: 500 }}>· {pool.length} card{pool.length !== 1 ? "s" : ""}</span>
+              </h2>
+              {pool.length > 0 && (
+                <div style={{ display: "inline-flex", padding: 3, background: "rgba(8,9,11,.5)", borderRadius: 9, gap: 2, boxShadow: "inset 0 0 0 1px var(--line)" }}>
+                  {([["grid", "▦"], ["list", "≣"]] as const).map(([v, ic]) => (
+                    <button
+                      key={v}
+                      onClick={() => setView(v)}
+                      style={{
+                        width: 34,
+                        height: 30,
+                        borderRadius: 7,
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: 15,
+                        background: view === v ? "rgba(255,255,255,.1)" : "transparent",
+                        color: view === v ? "var(--text)" : "var(--text-dim)",
+                      }}
+                    >
+                      {ic}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
-      {generatedQuery && (
-        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
-          {searchMode === "ai" ? (
-            <>What I looked for: {generatedQuery}</>
-          ) : (
-            <>
-              Scryfall query:{" "}
-              <code style={{ color: "var(--accent)", background: "var(--surface2)", padding: "2px 6px", borderRadius: 4 }}>
-                {generatedQuery}
-              </code>
-            </>
-          )}
-        </div>
-      )}
-
-      {searchError && (
-        <div style={{ color: "var(--danger)", fontSize: 13, marginBottom: 10, padding: "10px 14px", background: "#2a1414", borderRadius: 8, border: "1px solid #5a2020" }}>
-          {searchError}
-        </div>
-      )}
-
-      {/* Search results — swipe to triage */}
-      {searchResults.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-              marginBottom: 14,
-              gap: 8,
-            }}
-          >
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text-muted)" }}>
-              Results ({searchResults.length})
-            </h2>
-            {truncated && (
-              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
-                showing the first {searchResults.length}
-              </span>
+            {pool.length === 0 ? (
+              <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-dim)", borderRadius: 14, boxShadow: "inset 0 0 0 1px var(--line)" }}>
+                No cards yet — search above to start filling the pool.
+              </div>
+            ) : view === "grid" ? (
+              <div className="card-grid">
+                {pool.map((card) => (
+                  <CardTile key={card.dbId} card={card} onRemove={() => removeCard(card.dbId)} onClick={() => setPreview(card)} />
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                {grouped.map((g) => (
+                  <div key={g.t}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 4px 6px", fontSize: 12.5, fontWeight: 700, color: "var(--text-muted)" }}>
+                      {g.t} <span style={{ color: "var(--text-dim)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>{g.cards.length}</span>
+                    </div>
+                    <div style={{ background: "var(--surface)", borderRadius: 12, boxShadow: "inset 0 0 0 1px var(--line)", padding: 5 }}>
+                      {g.cards.map(({ c }) => (
+                        <CardRow key={c.dbId} card={c} onRemove={() => removeCard(c.dbId)} onClick={() => setPreview(c)} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
-          <SwipeDeck
-            key={searchId}
-            cards={searchResults}
-            inPool={inPool}
-            onAdd={addCard}
-            onDiscard={() => {}}
-            onInfo={setPreview}
-            onRestart={() => setSearchId((n) => n + 1)}
-          />
         </div>
-      )}
 
-      {/* Pool */}
-      <div>
-        <h2 style={{ margin: "0 0 14px", fontSize: 16, fontWeight: 700, color: "var(--text-muted)" }}>
-          Pool ({pool.length} card{pool.length !== 1 ? "s" : ""})
-        </h2>
-        {pool.length === 0 ? (
-          <p style={{ color: "var(--text-muted)", fontSize: 14, margin: 0 }}>
-            No cards in pool yet. Search and add some above.
-          </p>
-        ) : (
-          <div className="card-grid">
-            {pool.map((card) => (
-              <div key={card.dbId} style={{ position: "relative" }}>
-                <div
-                  style={{ cursor: "pointer", borderRadius: 8, overflow: "hidden" }}
-                  onClick={() => setPreview(card)}
-                >
-                  {card.imageUri ? (
-                    <Image
-                      src={card.imageUri}
-                      alt={card.name}
-                      width={140}
-                      height={195}
-                      style={{ display: "block", width: "100%", height: "auto" }}
-                      unoptimized
-                    />
-                  ) : (
-                    <div style={{ width: "100%", aspectRatio: "5/7", background: "var(--surface2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "var(--text-muted)", padding: 8, textAlign: "center" }}>
-                      {card.name}
-                    </div>
-                  )}
-                </div>
-                <button
-                  onClick={() => removeCard(card.dbId)}
-                  style={{
-                    position: "absolute",
-                    top: 4,
-                    right: 4,
-                    width: 22,
-                    height: 22,
-                    borderRadius: "50%",
-                    border: "none",
-                    background: "rgba(0,0,0,0.6)",
-                    color: "#fff",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    lineHeight: 1,
-                    backdropFilter: "blur(4px)",
-                  }}
-                  title="Remove from pool"
-                >
-                  ×
-                </button>
+        {/* stats sidebar */}
+        <aside className="deck-sidebar" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <StatCard
+            label="Overview"
+            right={
+              <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
+                avg MV <b style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{stats.avgMv.toFixed(1)}</b>
+              </span>
+            }
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <CountRing count={stats.count} target={target} accent="var(--accent)" />
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12.5 }}>
+                <span style={{ color: "var(--text-dim)" }}>{deck?.format ?? "—"} deck</span>
+                <span style={{ color: "var(--text-muted)" }}>
+                  {target - stats.count > 0 ? `${target - stats.count} to go` : "Deck complete"}
+                </span>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          </StatCard>
+          <StatCard label="Mana curve">
+            <ManaCurve curve={stats.curve} accent="var(--accent)" />
+          </StatCard>
+          <StatCard label="Colors">
+            {stats.count > 0 ? <ColorBar colors={stats.colors} /> : <span style={{ fontSize: 12.5, color: "var(--text-dim)" }}>No cards yet.</span>}
+          </StatCard>
+          <StatCard label="Card types">
+            {stats.types.length > 0 ? <TypeBreakdown types={stats.types} accent="var(--accent)" /> : <span style={{ fontSize: 12.5, color: "var(--text-dim)" }}>No cards yet.</span>}
+          </StatCard>
+        </aside>
       </div>
 
-      {/* Card preview modal */}
+      {/* card preview modal */}
       {preview && (
         <div
           style={{
@@ -851,13 +885,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             justifyContent: "center",
             padding: 16,
             zIndex: 50,
+            animation: "sp-fade .15s ease",
           }}
           onClick={() => setPreview(null)}
         >
           <div
             style={{
               background: "var(--surface)",
-              border: "1px solid var(--border)",
+              boxShadow: "inset 0 0 0 1px var(--line)",
               borderRadius: 16,
               padding: 20,
               maxWidth: 360,
@@ -865,6 +900,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               display: "flex",
               flexDirection: "column",
               gap: 14,
+              animation: "sp-pop .18s ease",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -879,26 +915,24 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               />
             )}
             <div>
-              <div style={{ fontWeight: 700, fontSize: 16 }}>{preview.name}</div>
-              {preview.manaCost && <div style={{ fontSize: 13, color: "var(--text-muted)" }}>{preview.manaCost}</div>}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ fontWeight: 700, fontSize: 16 }}>{preview.name}</span>
+                <ManaCost cost={preview.manaCost} size={18} />
+              </div>
               {preview.typeLine && <div style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 2 }}>{preview.typeLine}</div>}
-              {preview.oracleText && (
-                <div style={{ fontSize: 13, marginTop: 8, color: "var(--text)", lineHeight: 1.5 }}>
-                  {preview.oracleText}
-                </div>
-              )}
+              {preview.oracleText && <div style={{ fontSize: 13, marginTop: 8, color: "var(--text)", lineHeight: 1.5 }}>{preview.oracleText}</div>}
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button
-                onClick={() => setPreview(null)}
-                style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-muted)", padding: "9px 0", cursor: "pointer" }}
-              >
+              <button onClick={() => setPreview(null)} style={{ flex: 1, background: "transparent", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-muted)", padding: "9px 0", cursor: "pointer" }}>
                 Close
               </button>
               {!inPool(preview.id) ? (
                 <button
-                  onClick={() => { addCard(preview); setPreview(null); }}
-                  style={{ flex: 1, background: "var(--accent)", border: "none", borderRadius: 8, color: "#111", fontWeight: 700, padding: "9px 0", cursor: "pointer" }}
+                  onClick={() => {
+                    addCard(preview);
+                    setPreview(null);
+                  }}
+                  style={{ flex: 1, background: "var(--accent)", border: "none", borderRadius: 8, color: "var(--accent-ink)", fontWeight: 700, padding: "9px 0", cursor: "pointer" }}
                 >
                   Add to Pool
                 </button>
@@ -906,7 +940,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 <button
                   onClick={() => {
                     const pc = pool.find((c) => c.id === preview.id);
-                    if (pc) { removeCard(pc.dbId); setPreview(null); }
+                    if (pc) {
+                      removeCard(pc.dbId);
+                      setPreview(null);
+                    }
                   }}
                   style={{ flex: 1, background: "var(--danger)", border: "none", borderRadius: 8, color: "#fff", fontWeight: 700, padding: "9px 0", cursor: "pointer" }}
                 >
@@ -919,4 +956,45 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       )}
     </main>
   );
+}
+
+function ErrorNote({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ color: "var(--danger)", fontSize: 13, padding: "10px 14px", background: "rgba(224,121,90,.1)", borderRadius: 10, boxShadow: "inset 0 0 0 1px rgba(224,121,90,.3)" }}>
+      {children}
+    </div>
+  );
+}
+
+function searchInputStyle(borderColor?: string, mono?: boolean): React.CSSProperties {
+  return {
+    flex: 1,
+    padding: "13px 15px",
+    borderRadius: 11,
+    border: "none",
+    outline: "none",
+    background: "rgba(8,9,11,.5)",
+    color: "var(--text)",
+    fontSize: 16,
+    fontFamily: mono ? "var(--font-mono)" : "inherit",
+    boxShadow: `inset 0 0 0 1px ${borderColor || "var(--line)"}`,
+    minWidth: 0,
+  };
+}
+
+function searchBtnStyle(busy: boolean): React.CSSProperties {
+  return {
+    padding: "0 22px",
+    borderRadius: 11,
+    border: "none",
+    cursor: busy ? "wait" : "pointer",
+    background: "var(--accent)",
+    color: "var(--accent-ink)",
+    fontWeight: 700,
+    fontSize: 14,
+    whiteSpace: "nowrap",
+    opacity: busy ? 0.7 : 1,
+    display: "flex",
+    alignItems: "center",
+  };
 }

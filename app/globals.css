@@ -1,30 +1,44 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #111214;
-  --surface: #1a1d21;
-  --surface2: #24282e;
-  --border: #2e3238;
-  --accent: #c89b3c;
-  --accent-hover: #e0b050;
-  --text: #e8e8e8;
-  --text-muted: #8b9099;
-  --danger: #d64444;
+  /* Spellpool design tokens (dark + gold). The whole app reads these vars,
+     so the palette lives here. Names kept stable for existing components. */
+  --bg: #0c0d0f;
+  --surface: #15171b;
+  --surface2: #1c1f24;
+  --bg3: #1c1f24;
+  --border: rgba(255, 255, 255, 0.07);
+  --line: rgba(255, 255, 255, 0.07);
+  --accent: #e6b547;
+  --accent-hover: #efc56a;
+  --accent-ink: #1a1407; /* readable ink on the gold accent */
+  --text: #f2ede3;
+  --text-muted: #9a968e;
+  --text-dim: #67645d;
+  --danger: #e0795a;
 }
 
 * {
   box-sizing: border-box;
 }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: system-ui, -apple-system, sans-serif;
-  min-height: 100dvh;
-}
-
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+body {
+  /* Defined here (not :root) because next/font sets --font-hanken on <html>;
+     a same-element var() chain on :root resolves to empty, but descendants
+     resolve it correctly. */
+  --font-ui: var(--font-hanken), system-ui, -apple-system, sans-serif;
+  --font-display: var(--font-hanken), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
 }
 
 input,
@@ -34,47 +48,91 @@ button {
   font-family: inherit;
 }
 
+::selection {
+  background: rgba(230, 181, 71, 0.3);
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 11px;
+  height: 11px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.09);
+  border-radius: 6px;
+  border: 3px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
-/* Responsive page container: full-width on phones, centered + roomy on desktop */
+@keyframes sp-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sp-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Responsive page container */
 .container {
   width: 100%;
-  max-width: 1080px;
+  max-width: 1120px;
   margin: 0 auto;
   padding: 20px 16px 56px;
 }
 @media (min-width: 768px) {
   .container {
-    padding: 32px 24px 72px;
+    padding: 30px 32px 72px;
   }
 }
 
-/* Responsive grid of MTG cards (search results + pool) */
+/* Grid of MTG card tiles (search results + pool) */
 .card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 14px;
 }
 @media (min-width: 768px) {
   .card-grid {
-    grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
-    gap: 18px;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    gap: 16px;
   }
 }
 
-/* Responsive grid of deck cards on the home page */
+/* Grid of deck cards on the home page */
 .deck-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(264px, 1fr));
+  gap: 20px;
+}
+
+/* Deck view two-column layout: main + sticky stats sidebar */
+.deck-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (min-width: 1024px) {
+  .deck-layout {
+    grid-template-columns: 1fr 312px;
+  }
+  .deck-sidebar {
+    position: sticky;
+    top: 84px;
+  }
 }

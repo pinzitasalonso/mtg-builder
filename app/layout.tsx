@@ -1,7 +1,22 @@
 import type { Metadata, Viewport } from "next";
+import { Hanken_Grotesk, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import "./globals.css";
+
+const hanken = Hanken_Grotesk({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-hanken",
+  display: "swap",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-geist-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.spellpool.com"),
@@ -29,7 +44,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className={`h-full ${hanken.variable} ${geistMono.variable}`}>
       <body className="min-h-full flex flex-col">
         {children}
         <footer
