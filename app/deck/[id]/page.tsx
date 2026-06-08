@@ -174,6 +174,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [swipeOpen, setSwipeOpen] = useState(false);
   const [swipeQuery, setSwipeQuery] = useState("");
   const [truncated, setTruncated] = useState(false);
+  const [sources, setSources] = useState<string[]>([]);
   const [query, setQuery] = useState("");
   const [generatedQuery, setGeneratedQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -239,6 +240,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       setSearchError("");
       setSearchResults([]);
       setGeneratedQuery("");
+      setSources([]);
       setSwipeQuery(text);
       try {
         const res = await fetch("/api/search", {
@@ -255,6 +257,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           setSearchResults(filtered);
           setGeneratedQuery(data.query);
           setTruncated(Boolean(data.truncated));
+          setSources(Array.isArray(data.sources) ? data.sources : []);
           if (filtered.length > 0) setSwipeOpen(true);
           else setSearchError("No cards matched — try a different search.");
         }
@@ -642,7 +645,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             {searchError && <div style={{ marginTop: 12 }}><ErrorNote>{searchError}</ErrorNote></div>}
             {!swipeOpen && searchResults.length > 0 && (
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, color: "var(--text-muted)" }}>
-                <span style={{ fontStyle: "italic" }}>{searchResults.length} cards found{truncated ? " (first batch)" : ""}.</span>
+                <span style={{ fontStyle: "italic" }}>
+                  {searchResults.length} cards found{truncated ? " (first batch)" : ""}
+                  {sources.length > 0 ? ` · via ${sources.join(", ")}` : ""}.
+                </span>
                 <button onClick={() => setSwipeOpen(true)} style={{ ...goldSearchBtn(false), padding: "6px 14px", fontSize: 14 }}>
                   Review again
                 </button>
