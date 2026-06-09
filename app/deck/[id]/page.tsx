@@ -1112,15 +1112,33 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {PRESET_LANDS.map((l) => {
                       const n = landSel[l] ?? 0;
-                      const bump = (d: number) => setLandSel((s) => ({ ...s, [l]: Math.max(0, (s[l] ?? 0) + d) }));
                       return (
                         <div key={l} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 8, background: n > 0 ? "rgba(200,155,65,.12)" : "transparent" }}>
                           <span style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "var(--frame-ink)" }}>{l}</span>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                            <button type="button" onClick={() => bump(-1)} disabled={n === 0} style={stepBtn(n === 0)}>−</button>
-                            <span style={{ width: 30, textAlign: "center", fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, color: n > 0 ? "var(--gold)" : "rgba(236,225,198,.55)" }}>{n}</span>
-                            <button type="button" onClick={() => bump(1)} style={stepBtn(false)}>+</button>
-                          </div>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            value={n === 0 ? "" : n}
+                            placeholder="0"
+                            onChange={(e) => {
+                              const v = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                              setLandSel((s) => ({ ...s, [l]: v }));
+                            }}
+                            className="cc-paper"
+                            style={{
+                              width: 64,
+                              padding: "8px 10px",
+                              border: "none",
+                              outline: "none",
+                              borderRadius: 7,
+                              fontFamily: "var(--font-display)",
+                              fontSize: 16,
+                              fontWeight: 700,
+                              textAlign: "center",
+                              color: "var(--ink)",
+                            }}
+                          />
                         </div>
                       );
                     })}
@@ -1377,22 +1395,6 @@ const actionBtn: React.CSSProperties = {
   fontWeight: 700,
   whiteSpace: "nowrap",
 };
-
-function stepBtn(disabled: boolean): React.CSSProperties {
-  return {
-    width: 30,
-    height: 30,
-    borderRadius: 7,
-    border: "none",
-    cursor: disabled ? "default" : "pointer",
-    background: disabled ? "rgba(0,0,0,.15)" : "rgba(0,0,0,.28)",
-    color: disabled ? "rgba(236,225,198,.35)" : "var(--frame-ink)",
-    fontSize: 19,
-    fontWeight: 700,
-    lineHeight: 1,
-    boxShadow: "inset 0 0 0 1px rgba(236,225,198,.22)",
-  };
-}
 
 const toolBtn: React.CSSProperties = {
   background: "rgba(0,0,0,.22)",
