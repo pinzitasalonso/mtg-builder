@@ -11,8 +11,10 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const { name, format = "commander", commander } = body;
+  const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
+  const format = typeof body.format === "string" && body.format.trim() ? body.format.trim() : "commander";
+  const commander = typeof body.commander === "string" && body.commander.trim() ? body.commander.trim() : null;
   const deck = await prisma.deck.create({ data: { name, format, commander } });
   return NextResponse.json(deck, { status: 201 });
 }

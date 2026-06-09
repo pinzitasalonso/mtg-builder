@@ -1,76 +1,10 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { mapPool } from "@/lib/async";
+import { extractJson, messageText, strArr } from "@/lib/ai";
+import { OutCard, resolveNamed, scryfallSearch } from "@/lib/scryfall";
 
 export const runtime = "nodejs";
-
-interface ScryfallCard {
-  id: string;
-  name: string;
-  image_uris?: { normal?: string; large?: string };
-  card_faces?: { image_uris?: { normal?: string; large?: string } }[];
-  mana_cost?: string;
-  type_line?: string;
-  oracle_text?: string;
-}
-
-interface OutCard {
-  id: string;
-  name: string;
-  imageUri: string;
-  manaCost: string | null;
-  typeLine: string | null;
-  oracleText: string | null;
-}
-
-const SCRYFALL_HEADERS = { "User-Agent": "mtg-builder/1.0", Accept: "application/json" };
-
-function toOutCard(c: ScryfallCard): OutCard {
-  const imageUri =
-    c.image_uris?.normal ??
-    c.image_uris?.large ??
-    c.card_faces?.[0]?.image_uris?.normal ??
-    c.card_faces?.[0]?.image_uris?.large ??
-    "";
-  return {
-    id: c.id,
-    name: c.name,
-    imageUri,
-    manaCost: c.mana_cost ?? null,
-    typeLine: c.type_line ?? null,
-    oracleText: c.oracle_text ?? null,
-  };
-}
-
-// Run `fn` over `items` with bounded concurrency, preserving order.
-async function mapPool<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
-  const out: R[] = new Array(items.length);
-  let next = 0;
-  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
-    while (next < items.length) {
-      const i = next++;
-      out[i] = await fn(items[i]);
-    }
-  });
-  await Promise.all(workers);
-  return out;
-}
-
-// ── Scryfall: resolve a loose card name to a full card object. Returns null when
-// the name doesn't resolve (typo, double-faced quirk, not a real card) so the
-// caller can simply skip it.
-async function resolveNamed(name: string): Promise<OutCard | null> {
-  try {
-    const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`, {
-      headers: SCRYFALL_HEADERS,
-    });
-    if (!res.ok) return null;
-    const c = (await res.json()) as ScryfallCard;
-    if (!c?.id) return null;
-    return toOutCard(c);
-  } catch {
-    return null;
-  }
-}
 
 interface AiRecommendation {
   summary: string;
@@ -93,24 +27,6 @@ interface SourceData {
   edhrec: string[];
   reddit: string[];
   moxfield: string[];
-}
-
-// Pull a JSON object out of an LLM text response that may be wrapped in prose or
-// ```json fences.
-function extractJson(text: string): unknown | null {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidates = [fenced?.[1], text].filter(Boolean) as string[];
-  for (const c of candidates) {
-    const start = c.indexOf("{");
-    const end = c.lastIndexOf("}");
-    if (start === -1 || end <= start) continue;
-    try {
-      return JSON.parse(c.slice(start, end + 1));
-    } catch {
-      // try next candidate
-    }
-  }
-  return null;
 }
 
 // ── Generic safe JSON fetch with a hard timeout. Returns null on ANY failure
@@ -165,21 +81,15 @@ async function analyzeIntent(anthropic: Anthropic, prompt: string): Promise<Inte
         "Infer reasonably, but do not invent constraints the user didn't ask for.",
       messages: [{ role: "user", content: prompt }],
     });
-    const text = msg.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
-    const parsed = extractJson(text) as Partial<Intent> | null;
+    const parsed = extractJson(messageText(msg)) as Partial<Intent> | null;
     if (!parsed) return empty;
-    const arr = (v: unknown): string[] =>
-      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : [];
     return {
       commander:
         typeof parsed.commander === "string" && parsed.commander.trim() ? parsed.commander.trim() : null,
-      themes: arr(parsed.themes),
-      colors: arr(parsed.colors),
-      types: arr(parsed.types),
-      mechanics: arr(parsed.mechanics),
+      themes: strArr(parsed.themes),
+      colors: strArr(parsed.colors),
+      types: strArr(parsed.types),
+      mechanics: strArr(parsed.mechanics),
     };
   } catch {
     return empty;
@@ -329,13 +239,8 @@ async function synthesize(
     messages: [{ role: "user", content: prompt }],
   });
 
-  const text = msg.content
-    .filter((b): b is Anthropic.TextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n");
-  const parsed = extractJson(text) as Partial<AiRecommendation> | null;
-  const cards = Array.isArray(parsed?.cards) ? parsed!.cards.filter((c): c is string => typeof c === "string") : [];
-  return { summary: typeof parsed?.summary === "string" ? parsed.summary : "", cards };
+  const parsed = extractJson(messageText(msg)) as Partial<AiRecommendation> | null;
+  return { summary: typeof parsed?.summary === "string" ? parsed.summary : "", cards: strArr(parsed?.cards) };
 }
 
 // Deterministic multi-source pipeline: analyze the prompt → fetch EDHREC, Reddit
@@ -364,44 +269,16 @@ async function aiRecommend(anthropic: Anthropic, prompt: string): Promise<AiReco
   return { ...rec, sources };
 }
 
-// ── Scryfall direct-syntax search (unchanged behavior). Paginates and returns up
-// to MAX_PAGES * 175 cards.
-async function scryfallSearch(query: string) {
-  const MAX_PAGES = 7; // 7 * 175 = up to 1225 cards
-  const raw: ScryfallCard[] = [];
-  let pageUrl: string | null = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&order=edhrec`;
-  let totalCards = 0;
-
-  for (let page = 0; page < MAX_PAGES && pageUrl; page++) {
-    const res: Response = await fetch(pageUrl, { headers: SCRYFALL_HEADERS });
-    if (!res.ok) {
-      if (page === 0) {
-        const err = await res.json().catch(() => ({}));
-        return { error: err as unknown, status: 422 as const };
-      }
-      break;
-    }
-    const data = await res.json();
-    raw.push(...(data.data as ScryfallCard[]));
-    totalCards = data.total_cards ?? raw.length;
-    if (data.has_more && data.next_page) {
-      pageUrl = data.next_page as string;
-      await new Promise((r) => setTimeout(r, 100));
-    } else {
-      pageUrl = null;
-    }
-  }
-
-  return { cards: raw.map(toOutCard), totalCards, truncated: Boolean(pageUrl) };
-}
-
 export async function POST(req: Request) {
   const { prompt, filters, mode } = await req.json();
-  if (!prompt || typeof prompt !== "string") {
+  if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return NextResponse.json({ error: "prompt required" }, { status: 400 });
   }
+  if (prompt.length > 1000) {
+    return NextResponse.json({ error: "prompt too long (max 1000 characters)" }, { status: 400 });
+  }
 
-  const filterTerms: string[] = Array.isArray(filters) ? filters : [];
+  const filterTerms = strArr(filters);
   const useAi = mode !== "scryfall" && Boolean(process.env.ANTHROPIC_API_KEY);
 
   // ─────────────────────────────────────────────────────────────────────────

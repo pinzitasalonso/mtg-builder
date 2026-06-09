@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { extractJson, messageText, strArr } from "@/lib/ai";
 
 export const runtime = "nodejs";
 
+// Keep prompts bounded — a Commander pool is ~100 distinct cards, so this cap
+// only trips on abuse, not real use.
+const MAX_CARDS = 500;
+const MAX_FIELD = 200;
+
 interface JudgeCard {
   name: string;
-  manaCost?: string | null;
-  typeLine?: string | null;
-  quantity?: number;
+  manaCost: string | null;
+  typeLine: string | null;
+  quantity: number;
 }
 
 interface JudgeResult {
@@ -17,44 +23,40 @@ interface JudgeResult {
   missing: string[];
 }
 
-// Pull a JSON object out of an LLM text response that may be wrapped in prose or
-// ```json fences. (Mirrors the helper in the search route.)
-function extractJson(text: string): unknown | null {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidates = [fenced?.[1], text].filter(Boolean) as string[];
-  for (const c of candidates) {
-    const start = c.indexOf("{");
-    const end = c.lastIndexOf("}");
-    if (start === -1 || end <= start) continue;
-    try {
-      return JSON.parse(c.slice(start, end + 1));
-    } catch {
-      // try next candidate
-    }
-  }
-  return null;
+// Coerce one client-supplied card entry; null drops invalid entries instead of
+// letting `undefined` leak into the prompt.
+function toJudgeCard(v: unknown): JudgeCard | null {
+  if (v === null || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.name !== "string" || !o.name.trim()) return null;
+  const str = (x: unknown) => (typeof x === "string" && x.trim() ? x.slice(0, MAX_FIELD) : null);
+  const qty = typeof o.quantity === "number" && Number.isFinite(o.quantity) && o.quantity > 0 ? Math.floor(o.quantity) : 1;
+  return { name: o.name.slice(0, MAX_FIELD), manaCost: str(o.manaCost), typeLine: str(o.typeLine), quantity: qty };
 }
-
-const arr = (v: unknown): string[] =>
-  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0).map((s) => s.trim()) : [];
 
 export async function POST(req: Request) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "AI is not configured" }, { status: 503 });
   }
 
-  const { cards, format, commander } = await req.json();
-  if (!Array.isArray(cards) || cards.length === 0) {
+  const body = await req.json();
+  const rawCards: unknown[] = Array.isArray(body.cards) ? body.cards : [];
+  const cards = rawCards
+    .map(toJudgeCard)
+    .filter((c): c is JudgeCard => c !== null)
+    .slice(0, MAX_CARDS);
+  if (cards.length === 0) {
     return NextResponse.json({ error: "no cards to judge — add some first" }, { status: 400 });
   }
+  const format = typeof body.format === "string" ? body.format.slice(0, MAX_FIELD) : null;
+  const commander = typeof body.commander === "string" ? body.commander.slice(0, MAX_FIELD) : null;
 
   // Compact, deterministic card list: "{qty}x Name — {cost} — {type}" per line.
   let totalCopies = 0;
-  const list = (cards as JudgeCard[])
+  const list = cards
     .map((c) => {
-      const qty = Number.isFinite(c.quantity) && (c.quantity as number) > 0 ? Math.floor(c.quantity as number) : 1;
-      totalCopies += qty;
-      const bits = [qty > 1 ? `${qty}x ${c.name}` : c.name];
+      totalCopies += c.quantity;
+      const bits = [c.quantity > 1 ? `${c.quantity}x ${c.name}` : c.name];
       if (c.manaCost) bits.push(c.manaCost);
       if (c.typeLine) bits.push(c.typeLine);
       return "- " + bits.join("  ·  ");
@@ -92,20 +94,16 @@ export async function POST(req: Request) {
       ],
     });
 
-    const text = msg.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("\n");
-    const parsed = extractJson(text) as Partial<JudgeResult> | null;
+    const parsed = extractJson(messageText(msg)) as Partial<JudgeResult> | null;
     if (!parsed) {
       return NextResponse.json({ error: "AI returned an unreadable response" }, { status: 502 });
     }
 
     const result: JudgeResult = {
       summary: typeof parsed.summary === "string" ? parsed.summary.trim() : "",
-      working: arr(parsed.working),
-      cuts: arr(parsed.cuts),
-      missing: arr(parsed.missing),
+      working: strArr(parsed.working),
+      cuts: strArr(parsed.cuts),
+      missing: strArr(parsed.missing),
     };
     return NextResponse.json(result);
   } catch (e) {

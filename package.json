@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "mkdir -p /data && prisma db push && next start",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -25,6 +27,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.8"
   }
 }
