@@ -45,3 +45,4 @@ next-env.d.ts
 /app/generated/prisma
 dev.db
 dev.db-*
+.claude/scheduled_tasks.lock

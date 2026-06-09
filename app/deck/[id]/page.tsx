@@ -41,6 +41,19 @@ interface Deck {
   commander: string | null;
 }
 
+interface JudgeResult {
+  summary: string;
+  working: string[];
+  cuts: string[];
+  missing: string[];
+}
+
+// Preset quick-add lands & colorless staples for the bulk-land tool.
+const PRESET_LANDS = [
+  "Plains", "Island", "Swamp", "Mountain", "Forest",
+  "Command Tower", "Sol Ring", "Arcane Signet", "Evolving Wilds",
+];
+
 const COLORS = [
   { code: "w", label: "W" },
   { code: "u", label: "U" },
@@ -190,6 +203,26 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [edit, setEdit] = useState({ name: "", format: "commander", commander: "" });
   const [saving, setSaving] = useState(false);
+
+  // tools (all reachable from the settings sheet)
+  const [tool, setTool] = useState<null | "export" | "import" | "lands">(null);
+  const [copied, setCopied] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const [landSel, setLandSel] = useState<Record<string, number>>({});
+  const [landBusy, setLandBusy] = useState(false);
+  const [landSummary, setLandSummary] = useState<string | null>(null);
+
+  // review-with-swipe mode (snapshot of the pool so live reloads don't disturb it)
+  const [reviewCards, setReviewCards] = useState<PoolCard[] | null>(null);
+
+  // AI pool judge
+  const [judgeOpen, setJudgeOpen] = useState(false);
+  const [judgeLoading, setJudgeLoading] = useState(false);
+  const [judgeError, setJudgeError] = useState("");
+  const [judge, setJudge] = useState<JudgeResult | null>(null);
+  const [judgeAdds, setJudgeAdds] = useState<Record<string, "adding" | "added" | "exists" | "error">>({});
 
   const loadPool = useCallback(async () => {
     const res = await fetch(`/api/decks/${deckId}/cards`);
@@ -353,6 +386,174 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       setSettingsOpen(false);
     }
     setSaving(false);
+  }
+
+  // Resolve a loose card name on Scryfall and POST it to the pool. `seen` tracks
+  // both scryfall ids and lowercased card names already present, mutated as we go
+  // so a batch doesn't re-add the same card twice. We dedupe by NAME as well as id
+  // because Scryfall's fuzzy lookup may resolve to a different printing (different
+  // id) than the copy already in the pool. Shared by import, lands and AI suggest.
+  function poolSeen(): { ids: Set<string>; names: Set<string> } {
+    return {
+      ids: new Set(pool.map((c) => c.id)),
+      names: new Set(pool.map((c) => c.name.toLowerCase())),
+    };
+  }
+  async function resolveAndAdd(
+    name: string,
+    seen: { ids: Set<string>; names: Set<string> }
+  ): Promise<"added" | "exists" | "notfound" | "error"> {
+    try {
+      const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
+      if (!res.ok) return "notfound";
+      const data = await res.json();
+      if (!data?.id) return "notfound";
+      if (seen.ids.has(data.id) || seen.names.has(String(data.name).toLowerCase())) return "exists";
+      const imageUri = data.image_uris?.normal ?? data.card_faces?.[0]?.image_uris?.normal ?? "";
+      if (!imageUri) return "error";
+      const post = await fetch(`/api/decks/${deckId}/cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scryfallId: data.id,
+          name: data.name,
+          imageUri,
+          manaCost: data.mana_cost ?? null,
+          typeLine: data.type_line ?? null,
+          oracleText: data.oracle_text ?? null,
+        }),
+      });
+      if (post.status === 409) return "exists";
+      if (!post.ok) return "error";
+      seen.ids.add(data.id);
+      seen.names.add(String(data.name).toLowerCase());
+      return "added";
+    } catch {
+      return "error";
+    }
+  }
+
+  // ── Tool 1: export — standard "{qty} {name}" decklist (pool holds one of each).
+  const exportText = pool.map((c) => `1 ${c.name}`).join("\n");
+  async function copyExport() {
+    try {
+      await navigator.clipboard.writeText(exportText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // clipboard blocked — the textarea is already on screen to copy manually
+    }
+  }
+
+  // ── Tool 1: import — parse "{qty} {name}" lines, resolve each on Scryfall and
+  // add any not already in the pool.
+  async function runImport() {
+    const names = importText
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => line.replace(/^\s*\d+\s*[xX]?\s+/, "").replace(/\s*\([^)]*\).*$/, "").trim())
+      .filter(Boolean);
+    // de-dupe within the paste, case-insensitively, keeping first spelling
+    const pasteSeen = new Set<string>();
+    const unique = names.filter((n) => {
+      const k = n.toLowerCase();
+      if (pasteSeen.has(k)) return false;
+      pasteSeen.add(k);
+      return true;
+    });
+    if (unique.length === 0) {
+      setImportSummary("Nothing to import — paste a decklist first.");
+      return;
+    }
+    setImporting(true);
+    setImportSummary(null);
+    const seen = poolSeen();
+    let added = 0;
+    let already = 0;
+    const notFound: string[] = [];
+    for (const name of unique) {
+      const r = await resolveAndAdd(name, seen);
+      if (r === "added") added++;
+      else if (r === "exists") already++;
+      else notFound.push(name);
+    }
+    await loadPool();
+    const parts = [`Added ${added} card${added === 1 ? "" : "s"}`];
+    if (already) parts.push(`${already} already in pool`);
+    if (notFound.length) parts.push(`${notFound.length} not found: ${notFound.join(", ")}`);
+    setImportSummary(parts.join(", ") + ".");
+    setImportText("");
+    setImporting(false);
+  }
+
+  // ── Tool 2: bulk lands — add each selected preset land/staple once.
+  async function addLands() {
+    const chosen = PRESET_LANDS.filter((l) => (landSel[l] ?? 0) > 0);
+    if (chosen.length === 0) return;
+    setLandBusy(true);
+    setLandSummary(null);
+    const seen = poolSeen();
+    let added = 0;
+    let already = 0;
+    for (const name of chosen) {
+      const r = await resolveAndAdd(name, seen);
+      if (r === "added") added++;
+      else if (r === "exists") already++;
+    }
+    await loadPool();
+    setLandSel({});
+    const parts = [`Added ${added} card${added === 1 ? "" : "s"}`];
+    if (already) parts.push(`${already} already in pool`);
+    setLandSummary(parts.join(", ") + ".");
+    setLandBusy(false);
+  }
+
+  // ── Tool 3: review — snapshot the pool and open the swipe modal in review mode.
+  function startReview() {
+    if (pool.length === 0) return;
+    setSettingsOpen(false);
+    setReviewCards([...pool]);
+  }
+
+  // ── Tool 4: AI judge — send the pool to Claude for analysis.
+  async function runJudge() {
+    setSettingsOpen(false);
+    setJudgeOpen(true);
+    setJudge(null);
+    setJudgeError("");
+    setJudgeAdds({});
+    if (pool.length === 0) {
+      setJudgeError("Add some cards to the pool first.");
+      return;
+    }
+    setJudgeLoading(true);
+    try {
+      const res = await fetch(`/api/judge`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine })),
+          format: deck?.format,
+          commander: deck?.commander,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) setJudgeError(data.details ?? data.error ?? "AI judge failed");
+      else setJudge(data as JudgeResult);
+    } catch {
+      setJudgeError("Network error");
+    }
+    setJudgeLoading(false);
+  }
+
+  // Tap a suggested "missing" card to add it straight to the pool.
+  async function addSuggested(name: string) {
+    if (judgeAdds[name] === "adding" || judgeAdds[name] === "added") return;
+    setJudgeAdds((m) => ({ ...m, [name]: "adding" }));
+    const r = await resolveAndAdd(name, poolSeen());
+    setJudgeAdds((m) => ({ ...m, [name]: r === "added" ? "added" : r === "exists" ? "exists" : "error" }));
+    if (r === "added") loadPool();
   }
 
   const inPool = (cardId: string) => pool.some((c) => c.id === cardId);
@@ -802,6 +1003,232 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   </button>
                 </div>
               </form>
+
+              {/* Tools */}
+              <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(0,0,0,.25)" }}>
+                <div className="label-sc" style={{ fontSize: 11.5, color: "rgba(236,225,198,.75)", letterSpacing: ".1em", marginBottom: 10 }}>
+                  Tools
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <button type="button" onClick={() => { setTool("export"); setCopied(false); }} style={toolBtn}>
+                    ⤓ Export list
+                  </button>
+                  <button type="button" onClick={() => { setTool("import"); setImportSummary(null); }} style={toolBtn}>
+                    ⤒ Import list
+                  </button>
+                  <button type="button" onClick={() => { setTool("lands"); setLandSummary(null); }} style={toolBtn}>
+                    ⛰ Add lands
+                  </button>
+                  <button type="button" onClick={startReview} disabled={pool.length === 0} style={{ ...toolBtn, opacity: pool.length === 0 ? 0.5 : 1 }}>
+                    ⇄ Review pool
+                  </button>
+                  <button type="button" onClick={runJudge} style={{ ...toolBtn, gridColumn: "1 / -1", background: "var(--gold)", color: "#211705", boxShadow: "none", fontWeight: 700 }}>
+                    Ask AI to judge my pool ✨
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* export / import / lands tool sheet */}
+      {tool && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(8,6,4,0.74)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 72, animation: "sp-fade .15s ease" }}
+          onClick={(e) => e.target === e.currentTarget && setTool(null)}
+        >
+          <div className="cc-black" style={{ padding: 9, width: "100%", maxWidth: 460, animation: "sp-pop .18s ease" }}>
+            <div className="cc-brown" style={{ padding: "16px 18px 18px" }}>
+              <h2 style={{ margin: "0 0 14px", fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+                {tool === "export" ? "Export decklist" : tool === "import" ? "Import decklist" : "Add lands & staples"}
+              </h2>
+
+              {tool === "export" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <p style={{ margin: 0, fontSize: 13.5, fontStyle: "italic", color: "rgba(236,225,198,.8)" }}>
+                    {pool.length} cards · standard {`{qty} {name}`} format.
+                  </p>
+                  <textarea readOnly value={exportText} onFocus={(e) => e.currentTarget.select()} className="cc-paper" style={{ ...paperInput, minHeight: 220, fontFamily: "var(--font-mono, monospace)", fontSize: 13.5, resize: "vertical" }} />
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                    <button onClick={() => setTool(null)} style={ghostBtn}>Close</button>
+                    <button onClick={copyExport} disabled={pool.length === 0} style={goldBtn}>{copied ? "Copied ✓" : "Copy to clipboard"}</button>
+                  </div>
+                </div>
+              )}
+
+              {tool === "import" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <p style={{ margin: 0, fontSize: 13.5, fontStyle: "italic", color: "rgba(236,225,198,.8)" }}>
+                    Paste a decklist — one card per line (e.g. <code>1 Lightning Bolt</code>). Cards not already in the pool are added.
+                  </p>
+                  <textarea
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                    disabled={importing}
+                    placeholder={"1 Sol Ring\n1 Lightning Bolt\n1 Counterspell"}
+                    className="cc-paper"
+                    style={{ ...paperInput, minHeight: 200, fontFamily: "var(--font-mono, monospace)", fontSize: 13.5, resize: "vertical" }}
+                  />
+                  {importSummary && (
+                    <div style={{ fontSize: 13.5, color: "var(--frame-ink)", background: "rgba(0,0,0,.18)", borderRadius: 8, padding: "10px 14px" }}>
+                      {importSummary}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                    <button onClick={() => setTool(null)} style={ghostBtn}>Close</button>
+                    <button onClick={runImport} disabled={importing || !importText.trim()} style={goldBtn}>
+                      {importing ? "Importing…" : "Import"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {tool === "lands" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <p style={{ margin: 0, fontSize: 13.5, fontStyle: "italic", color: "rgba(236,225,198,.8)" }}>
+                    Tap to select, then add them all. (The pool holds one of each card.)
+                  </p>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {PRESET_LANDS.map((l) => {
+                      const on = (landSel[l] ?? 0) > 0;
+                      return (
+                        <button
+                          key={l}
+                          type="button"
+                          onClick={() => setLandSel((s) => ({ ...s, [l]: on ? 0 : 1 }))}
+                          aria-pressed={on}
+                          style={{
+                            padding: "7px 14px",
+                            borderRadius: 16,
+                            border: "none",
+                            cursor: "pointer",
+                            fontFamily: "var(--font-body)",
+                            fontSize: 14,
+                            fontWeight: on ? 700 : 500,
+                            background: on ? "var(--gold)" : "rgba(0,0,0,.22)",
+                            color: on ? "#211705" : "var(--frame-ink)",
+                            boxShadow: on ? "none" : "inset 0 0 0 1px rgba(236,225,198,.25)",
+                          }}
+                        >
+                          {l}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {landSummary && (
+                    <div style={{ fontSize: 13.5, color: "var(--frame-ink)", background: "rgba(0,0,0,.18)", borderRadius: 8, padding: "10px 14px" }}>
+                      {landSummary}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                    <button onClick={() => setTool(null)} style={ghostBtn}>Close</button>
+                    <button onClick={addLands} disabled={landBusy || PRESET_LANDS.every((l) => !(landSel[l] ?? 0))} style={goldBtn}>
+                      {landBusy ? "Adding…" : "Add to pool"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* review-pool swipe modal */}
+      {reviewCards && reviewCards.length > 0 && (
+        <SwipeModal
+          variant="review"
+          cards={reviewCards}
+          query="Reviewing your pool"
+          onAdd={() => {}}
+          onRemove={(card) => {
+            const pc = reviewCards.find((c) => c.id === card.id);
+            if (pc) fetch(`/api/decks/${deckId}/cards/${pc.dbId}`, { method: "DELETE" });
+          }}
+          onInfo={setPreview}
+          onClose={() => {
+            setReviewCards(null);
+            loadPool();
+          }}
+        />
+      )}
+
+      {/* AI pool judge */}
+      {judgeOpen && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(8,6,4,0.78)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 72, animation: "sp-fade .15s ease" }}
+          onClick={(e) => e.target === e.currentTarget && setJudgeOpen(false)}
+        >
+          <div className="cc-black" style={{ padding: 9, width: "100%", maxWidth: 520, maxHeight: "88vh", display: "flex", animation: "sp-pop .18s ease" }}>
+            <div className="cc-brown" style={{ padding: "16px 18px 18px", overflowY: "auto", width: "100%" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+                <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+                  AI Pool Judge ✨
+                </h2>
+                <button onClick={() => setJudgeOpen(false)} style={{ ...ghostBtn, padding: "6px 12px" }}>Close</button>
+              </div>
+
+              {judgeLoading && (
+                <p style={{ margin: 0, fontStyle: "italic", color: "rgba(236,225,198,.85)", fontSize: 15 }}>
+                  Consulting the oracle… analyzing {pool.length} cards.
+                </p>
+              )}
+              {judgeError && !judgeLoading && (
+                <div style={{ color: "#f4dccd", fontSize: 14, fontStyle: "italic", padding: "10px 14px", background: "rgba(207,125,94,.18)", borderRadius: 8 }}>
+                  {judgeError}
+                </div>
+              )}
+
+              {judge && !judgeLoading && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {judge.summary && (
+                    <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, color: "var(--frame-ink)" }}>{judge.summary}</p>
+                  )}
+                  {judge.working.length > 0 && (
+                    <JudgeSection title="Working well" color="#9bbf6e">
+                      {judge.working.map((w, i) => <JudgeLi key={i}>{w}</JudgeLi>)}
+                    </JudgeSection>
+                  )}
+                  {judge.cuts.length > 0 && (
+                    <JudgeSection title="Weakest — consider cutting" color="#cf7d5e">
+                      {judge.cuts.map((w, i) => <JudgeLi key={i}>{w}</JudgeLi>)}
+                    </JudgeSection>
+                  )}
+                  {judge.missing.length > 0 && (
+                    <JudgeSection title="Key cards missing — tap to add" color="var(--gold)">
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 2 }}>
+                        {judge.missing.map((name) => {
+                          const st = judgeAdds[name];
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              onClick={() => addSuggested(name)}
+                              disabled={st === "adding" || st === "added"}
+                              style={{
+                                padding: "7px 13px",
+                                borderRadius: 16,
+                                border: "none",
+                                cursor: st === "added" || st === "adding" ? "default" : "pointer",
+                                fontFamily: "var(--font-body)",
+                                fontSize: 14,
+                                background: st === "added" || st === "exists" ? "rgba(155,191,110,.25)" : "rgba(0,0,0,.22)",
+                                color: "var(--frame-ink)",
+                                boxShadow: "inset 0 0 0 1px rgba(236,225,198,.25)",
+                              }}
+                            >
+                              {name}{" "}
+                              <span style={{ opacity: 0.85 }}>
+                                {st === "adding" ? "…" : st === "added" ? "✓" : st === "exists" ? "✓ in pool" : st === "error" ? "✕" : "+"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </JudgeSection>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -859,6 +1286,26 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   );
 }
 
+function JudgeSection({ title, color, children }: { title: string; color: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="label-sc" style={{ fontSize: 12, color, letterSpacing: ".1em", marginBottom: 8 }}>
+        {title}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>{children}</div>
+    </div>
+  );
+}
+
+function JudgeLi({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: 8, fontSize: 14, lineHeight: 1.45, color: "var(--frame-ink)" }}>
+      <span style={{ color: "rgba(236,225,198,.5)", flexShrink: 0 }}>•</span>
+      <span>{children}</span>
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -907,6 +1354,20 @@ function goldSearchBtn(busy: boolean): React.CSSProperties {
     opacity: busy ? 0.7 : 1,
   };
 }
+
+const toolBtn: React.CSSProperties = {
+  background: "rgba(0,0,0,.22)",
+  border: "none",
+  boxShadow: "inset 0 0 0 1px rgba(236,225,198,.22)",
+  borderRadius: 8,
+  color: "var(--frame-ink)",
+  padding: "11px 12px",
+  cursor: "pointer",
+  fontFamily: "var(--font-display)",
+  fontSize: 15,
+  fontWeight: 600,
+  textAlign: "center",
+};
 
 const ghostBtn: React.CSSProperties = {
   background: "transparent",
