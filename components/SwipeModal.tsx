@@ -16,8 +16,9 @@ const THRESHOLD = 80;
 
 /* Full-screen swipe modal — review cards one classic card at a time.
    variant "search": swipe/→ adds the card to the pool, swipe/← skips.
-   variant "review": swipe/→ keeps the card, swipe/← removes it from the pool. */
-export default function SwipeModal({
+   variant "review": triage the pool — swipe/→ promotes the card to the deck
+   (onAdd), swipe/← leaves it in the pool. */
+export default function SwipeModal<T extends SwipeCard>({
   cards,
   query,
   intent,
@@ -25,20 +26,18 @@ export default function SwipeModal({
   onInfo,
   onClose,
   variant = "search",
-  onRemove,
 }: {
-  cards: SwipeCard[];
+  cards: T[];
   query: string;
   intent?: string;
-  onAdd: (card: SwipeCard) => void;
-  onInfo?: (card: SwipeCard) => void;
+  onAdd: (card: T) => void;
+  onInfo?: (card: T) => void;
   onClose: () => void;
   variant?: "search" | "review";
-  onRemove?: (card: SwipeCard) => void;
 }) {
   const review = variant === "review";
   const [i, setI] = useState(0);
-  // In search mode this counts cards added (→); in review mode, cards removed (←).
+  // Counts cards acted on (→): added in search mode, promoted in review mode.
   const [acted, setActed] = useState(0);
   const [exit, setExit] = useState<null | "left" | "right">(null);
   const [drag, setDrag] = useState(0);
@@ -53,14 +52,9 @@ export default function SwipeModal({
     (dir: "left" | "right") => {
       if (exit || done) return;
       setExit(dir);
-      if (card) {
-        if (!review && dir === "right") {
-          onAdd(card);
-          setActed((a) => a + 1);
-        } else if (review && dir === "left") {
-          onRemove?.(card);
-          setActed((a) => a + 1);
-        }
+      if (card && dir === "right") {
+        onAdd(card);
+        setActed((a) => a + 1);
       }
       setTimeout(() => {
         setExit(null);
@@ -68,7 +62,7 @@ export default function SwipeModal({
         setI((x) => x + 1);
       }, 280);
     },
-    [exit, done, card, onAdd, onRemove, review]
+    [exit, done, card, onAdd]
   );
 
   useEffect(() => {
@@ -175,8 +169,8 @@ export default function SwipeModal({
           <div style={{ flex: 1, height: 6, borderRadius: 4, background: "rgba(0,0,0,.4)", overflow: "hidden", boxShadow: "inset 0 0 0 1px rgba(200,155,65,.25)" }}>
             <div style={{ width: `${pct}%`, height: "100%", background: "var(--gold)", transition: "width .35s ease" }} />
           </div>
-          <span style={{ fontSize: 14, color: review ? "#cf7d5e" : "var(--gold-bright)", fontWeight: 600, width: 38, textAlign: "right", fontFamily: "var(--font-display)" }}>
-            {review ? "−" : "+"}{acted}
+          <span style={{ fontSize: 14, color: "var(--gold-bright)", fontWeight: 600, width: 38, textAlign: "right", fontFamily: "var(--font-display)" }}>
+            +{acted}
           </span>
         </div>
       </div>
@@ -185,14 +179,14 @@ export default function SwipeModal({
       <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
         {done ? (
           <div style={{ textAlign: "center", animation: "sp-pop .35s ease" }}>
-            <div style={{ fontSize: 40, color: review ? "#cf7d5e" : "var(--gold)", marginBottom: 6 }}>{review ? "✓" : "✦"}</div>
+            <div style={{ fontSize: 40, color: "var(--gold)", marginBottom: 6 }}>{review ? "✓" : "✦"}</div>
             <div style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>
               {review
-                ? `Removed ${acted} card${acted === 1 ? "" : "s"} from the pool`
+                ? `Moved ${acted} card${acted === 1 ? "" : "s"} to the deck`
                 : `Added ${acted} card${acted === 1 ? "" : "s"} to the pool`}
             </div>
             <div style={{ fontStyle: "italic", fontSize: 14.5, color: "var(--text-muted)", marginTop: 6 }}>
-              {review ? "You reviewed the whole pool." : "That is the end of this batch."}
+              {review ? "You triaged the whole pool." : "That is the end of this batch."}
             </div>
             <button
               onClick={onClose}
@@ -255,7 +249,7 @@ export default function SwipeModal({
             <SwBtn kind="add" onClick={() => act("right")} />
           </div>
           <div style={{ fontSize: 13, color: "var(--text-dim)", fontStyle: "italic" }}>
-            {review ? "← remove · → keep" : "← skip · → add to pool"}
+            {review ? "← leave in pool · → add to deck" : "← skip · → add to pool"}
           </div>
         </div>
       )}

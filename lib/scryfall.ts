@@ -10,6 +10,8 @@ export interface ScryfallCard {
   mana_cost?: string;
   type_line?: string;
   oracle_text?: string;
+  color_identity?: string[];
+  legalities?: Record<string, string>;
 }
 
 // The card shape the rest of the app speaks — API responses, pool rows, UI.
@@ -20,6 +22,10 @@ export interface OutCard {
   manaCost: string | null;
   typeLine: string | null;
   oracleText: string | null;
+  // WUBRG letters in canonical order; "" = colorless, null = unknown.
+  colorIdentity: string | null;
+  // Scryfall legalities map (format → "legal" | "not_legal" | …); null = unknown.
+  legalities: Record<string, string> | null;
 }
 
 export const SCRYFALL_HEADERS = { "User-Agent": "mtg-builder/1.0", Accept: "application/json" };
@@ -38,7 +44,36 @@ export function toOutCard(c: ScryfallCard): OutCard {
     manaCost: c.mana_cost ?? null,
     typeLine: c.type_line ?? null,
     oracleText: c.oracle_text ?? null,
+    colorIdentity: Array.isArray(c.color_identity)
+      ? "WUBRG".split("").filter((l) => c.color_identity!.includes(l)).join("")
+      : null,
+    legalities: c.legalities ?? null,
   };
+}
+
+// Bulk name → card lookup via /cards/collection (75 identifiers per request).
+// Returns a lowercase-name → OutCard map; names that don't resolve are absent.
+export async function collectionByName(names: string[]): Promise<Map<string, OutCard>> {
+  const out = new Map<string, OutCard>();
+  for (let i = 0; i < names.length; i += 75) {
+    const chunk = names.slice(i, i + 75);
+    try {
+      const res = await fetch("https://api.scryfall.com/cards/collection", {
+        method: "POST",
+        headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
+        body: JSON.stringify({ identifiers: chunk.map((name) => ({ name })) }),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      for (const c of (data.data ?? []) as ScryfallCard[]) {
+        if (c?.id) out.set(c.name.toLowerCase(), toOutCard(c));
+      }
+    } catch {
+      // skip the chunk — callers treat missing entries as unresolved
+    }
+    if (i + 75 < names.length) await new Promise((r) => setTimeout(r, 100));
+  }
+  return out;
 }
 
 // Resolve a loose card name to a full card object. Returns null when the name

@@ -489,6 +489,9 @@ export function ClassicCard({
   onClick,
   style,
   quantity,
+  warning,
+  onMove,
+  moveLabel,
 }: {
   card: FrameCard;
   variant?: "tile" | "full";
@@ -496,6 +499,11 @@ export function ClassicCard({
   onClick?: () => void;
   style?: CSSProperties;
   quantity?: number;
+  /** Legality warning text — renders a ⚠ badge with this as tooltip. */
+  warning?: string | null;
+  /** Board-move action — renders a hover button next to ✕. */
+  onMove?: () => void;
+  moveLabel?: string;
 }) {
   const [hover, setHover] = useState(false);
   const full = variant === "full";
@@ -589,6 +597,29 @@ export function ClassicCard({
         )}
       </div>
 
+      {!full && warning && (
+        <div
+          title={warning}
+          style={{
+            position: "absolute",
+            bottom: 5,
+            left: 5,
+            width: 24,
+            height: 24,
+            borderRadius: 7,
+            background: "rgba(160,60,40,.92)",
+            color: "#ffe9c9",
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 2px 6px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,220,160,.35)",
+          }}
+        >
+          ⚠
+        </div>
+      )}
+
       {!full && quantity && quantity > 1 && (
         <div
           style={{
@@ -613,6 +644,40 @@ export function ClassicCard({
         >
           ×{quantity}
         </div>
+      )}
+
+      {onMove && !full && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove();
+          }}
+          title={moveLabel}
+          aria-label={moveLabel}
+          style={{
+            position: "absolute",
+            top: 5,
+            right: onRemove ? 31 : 5,
+            height: 22,
+            padding: "0 7px",
+            borderRadius: 6,
+            border: "none",
+            cursor: "pointer",
+            background: "rgba(10,8,6,.82)",
+            color: "var(--gold, #d8b25e)",
+            fontSize: 12,
+            fontWeight: 700,
+            opacity: hover ? 1 : 0,
+            transition: "opacity .15s",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "inset 0 0 0 1px rgba(200,155,65,.4)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {moveLabel?.startsWith("Move to deck") ? "⇧" : "⇩"}
+        </button>
       )}
 
       {onRemove && !full && (
@@ -655,11 +720,17 @@ export function ClassicRow({
   onRemove,
   onClick,
   quantity,
+  warning,
+  onMove,
+  moveLabel,
 }: {
   card: FrameCard;
   onRemove?: () => void;
   onClick?: () => void;
   quantity?: number;
+  warning?: string | null;
+  onMove?: () => void;
+  moveLabel?: string;
 }) {
   const [hover, setHover] = useState(false);
   return (
@@ -669,7 +740,7 @@ export function ClassicRow({
       onClick={onClick}
       style={{
         display: "grid",
-        gridTemplateColumns: "30px 1fr auto auto 16px",
+        gridTemplateColumns: onMove ? "30px 1fr auto auto auto 16px" : "30px 1fr auto auto 16px",
         alignItems: "center",
         gap: 11,
         padding: "6px 10px 6px 7px",
@@ -685,6 +756,9 @@ export function ClassicRow({
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 16, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.15 }}>
+          {warning && (
+            <span title={warning} style={{ color: "#e0805f", marginRight: 6, cursor: "help" }}>⚠</span>
+          )}
           {card.name}
         </div>
         <div style={{ fontSize: 12.5, fontStyle: "italic", color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -697,6 +771,32 @@ export function ClassicRow({
         <span />
       )}
       <ManaCost cost={card.manaCost} size={15} />
+      {onMove && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove();
+          }}
+          title={moveLabel}
+          aria-label={moveLabel}
+          style={{
+            height: 22,
+            padding: "0 8px",
+            borderRadius: 6,
+            border: "none",
+            cursor: "pointer",
+            background: "rgba(20,14,8,.6)",
+            color: "var(--gold)",
+            fontSize: 12,
+            fontWeight: 700,
+            opacity: hover ? 1 : 0,
+            transition: "opacity .12s",
+            boxShadow: "inset 0 0 0 1px rgba(200,155,65,.35)",
+          }}
+        >
+          {moveLabel?.startsWith("Move to deck") ? "⇧" : "⇩"}
+        </button>
+      )}
       {onRemove && (
         <button
           onClick={(e) => {

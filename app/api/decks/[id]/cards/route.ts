@@ -44,6 +44,14 @@ export async function POST(
     Number.isFinite(body.quantity) && body.quantity > 0 ? Math.floor(body.quantity) : 1
   );
   const str = (v: unknown) => (typeof v === "string" ? v : null);
+  // legalities arrives as an object; stored JSON-encoded. colorIdentity is
+  // WUBRG letters ("" = colorless is meaningful, so keep empty strings).
+  const colorIdentity =
+    typeof body.colorIdentity === "string" ? body.colorIdentity.toUpperCase().slice(0, 5) : null;
+  const legalities =
+    body.legalities && typeof body.legalities === "object" && !Array.isArray(body.legalities)
+      ? JSON.stringify(body.legalities).slice(0, 4000)
+      : null;
   const card = await prisma.poolCard.upsert({
     where: { deckId_scryfallId: { deckId, scryfallId } },
     update: { quantity: { increment: qty } },
@@ -55,6 +63,8 @@ export async function POST(
       manaCost: str(manaCost),
       typeLine: str(typeLine),
       oracleText: str(oracleText),
+      colorIdentity,
+      legalities,
       quantity: qty,
     },
   });

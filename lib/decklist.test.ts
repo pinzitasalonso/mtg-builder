@@ -36,6 +36,10 @@ describe("parseDecklist", () => {
     expect(parseDecklist("")).toEqual([]);
   });
 
+  it("skips comments and section headers", () => {
+    expect(parseDecklist("// Pool\n# note\nSIDEBOARD:\n1 Plains")).toEqual([{ name: "Plains", qty: 1 }]);
+  });
+
   it("keeps card names that start with a number-like word intact", () => {
     // No leading count — the whole line is the name.
     expect(parseDecklist("Door to Nothingness")).toEqual([{ name: "Door to Nothingness", qty: 1 }]);

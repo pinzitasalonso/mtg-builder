@@ -13,6 +13,8 @@ export function parseDecklist(text: string): DecklistEntry[] {
   for (const raw of text.split("\n")) {
     const line = raw.trim();
     if (!line) continue;
+    // Comment / section markers ("// Pool", "# Sideboard", "SIDEBOARD:") — skip.
+    if (line.startsWith("//") || line.startsWith("#") || /^[A-Za-z ]+:$/.test(line)) continue;
     const m = line.match(/^\s*(\d+)\s*[xX]?\s+(.*)$/);
     const qty = m ? Math.max(1, parseInt(m[1], 10)) : 1;
     const name = (m ? m[2] : line).replace(/\s*\([^)]*\).*$/, "").trim();

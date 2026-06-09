@@ -50,8 +50,14 @@ export default function ToolSheet({
   const [landBusy, setLandBusy] = useState(false);
   const [landSummary, setLandSummary] = useState<string | null>(null);
 
-  // ── Export — standard "{qty} {name}" decklist.
-  const exportText = pool.map((c) => `${c.quantity} ${c.name}`).join("\n");
+  // ── Export — standard "{qty} {name}" decklist; deck board first, then the
+  // remaining pool as a commented section (the importer skips "//" lines).
+  const deckLines = pool.filter((c) => c.board === "deck").map((c) => `${c.quantity} ${c.name}`);
+  const poolLines = pool.filter((c) => c.board !== "deck").map((c) => `${c.quantity} ${c.name}`);
+  const exportText =
+    deckLines.length > 0 && poolLines.length > 0
+      ? [...deckLines, "", "// Pool", ...poolLines].join("\n")
+      : [...deckLines, ...poolLines].join("\n");
   async function copyExport() {
     try {
       await navigator.clipboard.writeText(exportText);

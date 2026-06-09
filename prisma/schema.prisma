@@ -16,17 +16,25 @@ model Deck {
 }
 
 model PoolCard {
-  id         Int      @id @default(autoincrement())
-  deckId     Int
-  deck       Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
-  scryfallId String
-  name       String
-  imageUri   String
-  manaCost   String?
-  typeLine   String?
-  oracleText String?
-  quantity   Int      @default(1)
-  addedAt    DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  deckId        Int
+  deck          Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  scryfallId    String
+  name          String
+  imageUri      String
+  manaCost      String?
+  typeLine      String?
+  oracleText    String?
+  quantity      Int      @default(1)
+  // "pool" = candidate pile, "deck" = promoted to the actual decklist.
+  board         String   @default("pool")
+  // Deck role (land/ramp/draw/removal/wincon/utility) — null until tagged.
+  role          String?
+  // Scryfall color identity as WUBRG letters ("" = colorless); null = not yet enriched.
+  colorIdentity String?
+  // Scryfall legalities map, JSON-encoded; null = not yet enriched.
+  legalities    String?
+  addedAt       DateTime @default(now())
 
   @@unique([deckId, scryfallId])
 }

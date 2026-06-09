@@ -1,14 +1,17 @@
 "use client";
 
-import { use, useEffect, useState, useCallback } from "react";
+import { use, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import SwipeModal from "@/components/SwipeModal";
 import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import JudgeModal from "@/components/deck/JudgeModal";
+import HandSimModal from "@/components/deck/HandSimModal";
+import ComboModal from "@/components/deck/ComboModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, actionBtn } from "@/components/deck/ui";
-import { OutCard } from "@/lib/scryfall";
-import { PoolEntry, poolByName, resolveAndAdd } from "@/lib/pool-client";
+import { OutCard, resolveNamed } from "@/lib/scryfall";
+import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard } from "@/lib/pool-client";
+import { cardWarnings } from "@/lib/legality";
 import {
   CardArt,
   ManaCost,
@@ -196,21 +199,42 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // AI pool judge — runs in <JudgeModal> while open
   const [judgeOpen, setJudgeOpen] = useState(false);
 
+  // sample-hand simulator & combo finder
+  const [handSimOpen, setHandSimOpen] = useState(false);
+  const [combosOpen, setCombosOpen] = useState(false);
+
+  // commander's color identity (resolved from Scryfall) for legality checks
+  const [cmdrIdentity, setCmdrIdentity] = useState<string | null>(null);
+
   const loadPool = useCallback(async () => {
     const res = await fetch(`/api/decks/${deckId}/cards`);
     if (!res.ok) return;
     const data = await res.json();
     setPool(
-      data.map((c: { id: number; scryfallId: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null; quantity?: number }) => ({
-        dbId: c.id,
-        id: c.scryfallId,
-        name: c.name,
-        imageUri: c.imageUri,
-        manaCost: c.manaCost,
-        typeLine: c.typeLine,
-        oracleText: c.oracleText,
-        quantity: c.quantity ?? 1,
-      }))
+      data.map((c: { id: number; scryfallId: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null; quantity?: number; board?: string; role?: string | null; colorIdentity?: string | null; legalities?: string | null }) => {
+        let legalities: Record<string, string> | null = null;
+        if (c.legalities) {
+          try {
+            legalities = JSON.parse(c.legalities);
+          } catch {
+            legalities = null;
+          }
+        }
+        return {
+          dbId: c.id,
+          id: c.scryfallId,
+          name: c.name,
+          imageUri: c.imageUri,
+          manaCost: c.manaCost,
+          typeLine: c.typeLine,
+          oracleText: c.oracleText,
+          quantity: c.quantity ?? 1,
+          board: c.board === "deck" ? "deck" : "pool",
+          role: c.role ?? null,
+          colorIdentity: c.colorIdentity ?? null,
+          legalities,
+        };
+      })
     );
   }, [deckId]);
 
@@ -223,6 +247,46 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       .catch(() => {});
     loadPool();
   }, [deckId, loadPool]);
+
+  // Backfill legality data and AI role tags for rows that still lack them.
+  // One attempt each per page load — both routes are idempotent.
+  const enrichTried = useRef(false);
+  const rolesTried = useRef(false);
+  useEffect(() => {
+    if (pool.length === 0) return;
+    if (!enrichTried.current && pool.some((c) => c.colorIdentity === null)) {
+      enrichTried.current = true;
+      fetch(`/api/decks/${deckId}/enrich`, { method: "POST" })
+        .then((r) => {
+          if (r.ok) loadPool();
+        })
+        .catch(() => {});
+    }
+    if (!rolesTried.current && pool.some((c) => c.role === null)) {
+      rolesTried.current = true;
+      fetch(`/api/decks/${deckId}/roles`, { method: "POST" })
+        .then((r) => {
+          if (r.ok) loadPool();
+        })
+        .catch(() => {});
+    }
+  }, [pool, deckId, loadPool]);
+
+  // Resolve the commander's color identity once per commander change.
+  useEffect(() => {
+    const name = deck?.commander?.trim();
+    if (!name || (deck?.format ?? "").toLowerCase() !== "commander") {
+      setCmdrIdentity(null);
+      return;
+    }
+    let cancelled = false;
+    resolveNamed(name).then((c) => {
+      if (!cancelled) setCmdrIdentity(c?.colorIdentity ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [deck?.commander, deck?.format]);
 
   function clearAllFilters() {
     setQuery((q) =>
@@ -298,6 +362,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           manaCost: card.manaCost,
           typeLine: card.typeLine,
           oracleText: card.oracleText,
+          colorIdentity: card.colorIdentity,
+          legalities: card.legalities,
         }),
       });
       loadPool();
@@ -349,22 +415,52 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     setSaving(false);
   }
 
-  // Review — snapshot the pool and open the swipe modal in review mode.
-  function startReview() {
-    if (pool.length === 0) return;
-    setSettingsOpen(false);
-    setReviewCards([...pool]);
+  async function moveTo(dbId: number, board: Board) {
+    await moveCard(deckId, dbId, board);
+    loadPool();
   }
 
   const inPool = (cardId: string) => pool.some((c) => c.id === cardId);
 
-  const stats = deckStats(pool);
+  // ── Boards: "deck" = the actual decklist, "pool" = candidates.
+  const deckCards = pool.filter((c) => c.board === "deck");
+  const poolCards = pool.filter((c) => c.board !== "deck");
+  const deckCount = deckCards.reduce((s, c) => s + c.quantity, 0);
+
+  // Review — triage the pool board: swipe right to promote into the deck.
+  function startReview() {
+    if (poolCards.length === 0) return;
+    setSettingsOpen(false);
+    setReviewCards([...poolCards]);
+  }
+
+  // Sidebar stats describe the deck once it has cards; before that, the pool.
+  const statsOnDeck = deckCards.length > 0;
+  const statsSource = statsOnDeck ? deckCards : pool;
+  const stats = deckStats(statsSource);
   const poolColors = ["W", "U", "B", "R", "G"].filter((c) => stats.colors[c] > 0);
   const target = deckTarget(deck?.format);
-  const grouped = TYPE_ORDER.map((t) => ({
-    t,
-    cards: pool.filter((c) => categoryOf(c.typeLine) === t),
-  })).filter((g) => g.cards.length);
+
+  // Legality warnings (format + commander color identity).
+  const warningOf = (c: PoolCard): string | undefined => {
+    const ws = cardWarnings(c, deck?.format, cmdrIdentity);
+    return ws.length ? ws.map((w) => w.message).join(" · ") : undefined;
+  };
+  const warningCount = pool.reduce((n, c) => n + (warningOf(c) ? 1 : 0), 0);
+
+  // Role breakdown over the stats source (commander targets when relevant).
+  const roleCounts: Record<string, number> = {};
+  for (const c of statsSource) {
+    const k = c.role ?? "untagged";
+    roleCounts[k] = (roleCounts[k] ?? 0) + c.quantity;
+  }
+  const isCommander = (deck?.format ?? "").toLowerCase() === "commander";
+
+  const groupedFor = (cards: PoolCard[]) =>
+    TYPE_ORDER.map((t) => ({
+      t,
+      cards: cards.filter((c) => categoryOf(c.typeLine) === t),
+    })).filter((g) => g.cards.length);
 
   if (deckMissing) {
     return (
@@ -676,77 +772,78 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
 
-          {/* pool */}
+          {/* boards — the deck proper, then the candidate pool */}
           <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-              <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--text)" }}>
-                The Pool <span style={{ color: "var(--text-dim)", fontWeight: 500, fontStyle: "italic", fontSize: 19 }}>· {stats.count} cards</span>
-              </h2>
-              {pool.length > 0 && (
-                <div style={{ display: "inline-flex", gap: 4 }}>
-                  {([["grid", "▦"], ["list", "≣"]] as const).map(([v, ic]) => (
-                    <button
-                      key={v}
-                      onClick={() => setView(v)}
-                      style={{
-                        width: 36,
-                        height: 32,
-                        borderRadius: 8,
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: 16,
-                        background: view === v ? "var(--gold)" : "rgba(20,14,8,.5)",
-                        color: view === v ? "#211705" : "var(--text-muted)",
-                        boxShadow: view === v ? "none" : "inset 0 0 0 1px rgba(200,155,65,.2)",
-                      }}
-                    >
-                      {ic}
-                    </button>
-                  ))}
+            <SectionHeader
+              title="The Deck"
+              count={deckCount}
+              right={
+                pool.length > 0 && (
+                  <div style={{ display: "inline-flex", gap: 4 }}>
+                    {([["grid", "▦"], ["list", "≣"]] as const).map(([v, ic]) => (
+                      <button
+                        key={v}
+                        onClick={() => setView(v)}
+                        style={{
+                          width: 36,
+                          height: 32,
+                          borderRadius: 8,
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: 16,
+                          background: view === v ? "var(--gold)" : "rgba(20,14,8,.5)",
+                          color: view === v ? "#211705" : "var(--text-muted)",
+                          boxShadow: view === v ? "none" : "inset 0 0 0 1px rgba(200,155,65,.2)",
+                        }}
+                      >
+                        {ic}
+                      </button>
+                    ))}
+                  </div>
+                )
+              }
+            />
+            <div style={{ marginTop: 14 }}>
+              {deckCards.length === 0 ? (
+                <div className="cc-paper" style={{ padding: "26px 20px", textAlign: "center", fontStyle: "italic", color: "var(--ink-soft)" }}>
+                  Nothing in the deck yet — promote cards from the pool with ⇧, or swipe right in “Review pool”.
                 </div>
+              ) : (
+                <BoardCards cards={deckCards} dest="pool" view={view} warningOf={warningOf} onMove={moveTo} onRemove={removeCard} onPreview={setPreview} groupedFor={groupedFor} />
               )}
             </div>
 
-            <div style={{ marginTop: 16 }}>
-              {pool.length === 0 ? (
-                <div className="cc-paper" style={{ padding: "50px 20px", textAlign: "center", fontStyle: "italic", color: "var(--ink-soft)" }}>
-                  No cards yet — search above to begin filling the pool.
-                </div>
-              ) : view === "grid" ? (
-                <div className="card-grid">
-                  {pool.map((card) => (
-                    <ClassicCard key={card.dbId} card={card} variant="tile" quantity={card.quantity} onRemove={() => removeCard(card.dbId)} onClick={() => setPreview(card)} />
-                  ))}
+            <div style={{ marginTop: 26 }}>
+              <SectionHeader title="The Pool" count={poolCards.reduce((s, c) => s + c.quantity, 0)} />
+            </div>
+            <div style={{ marginTop: 14 }}>
+              {poolCards.length === 0 ? (
+                <div className="cc-paper" style={{ padding: "26px 20px", textAlign: "center", fontStyle: "italic", color: "var(--ink-soft)" }}>
+                  {pool.length === 0
+                    ? "No cards yet — search above to begin filling the pool."
+                    : "Pool is empty — every card has been promoted to the deck."}
                 </div>
               ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                  {grouped.map((g) => (
-                    <div key={g.t}>
-                      <div className="label-sc" style={{ fontSize: 13, color: "var(--gold)", padding: "0 4px 7px", letterSpacing: ".12em" }}>
-                        {g.t}{" "}
-                        <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-body)", textTransform: "none", letterSpacing: 0 }}>· {g.cards.reduce((s, c) => s + c.quantity, 0)}</span>
-                      </div>
-                      <div style={{ background: "var(--app-bg2)", borderRadius: 7, padding: 5, boxShadow: "inset 0 0 0 1px rgba(200,155,65,.16)" }}>
-                        {g.cards.map((c) => (
-                          <ClassicRow key={c.dbId} card={c} quantity={c.quantity} onRemove={() => removeCard(c.dbId)} onClick={() => setPreview(c)} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <BoardCards cards={poolCards} dest="deck" view={view} warningOf={warningOf} onMove={moveTo} onRemove={removeCard} onPreview={setPreview} groupedFor={groupedFor} />
               )}
             </div>
 
             {/* quick actions — always one tap from the deck */}
             <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
-              <button onClick={() => setJudgeOpen(true)} style={{ ...actionBtn, flex: "1 1 160px", background: "var(--gold)", color: "#211705", boxShadow: "none" }}>
+              <button onClick={() => setJudgeOpen(true)} style={{ ...actionBtn, flex: "1 1 150px", background: "var(--gold)", color: "#211705", boxShadow: "none" }}>
                 ✨ Judge pool
               </button>
-              <button onClick={() => setTool("lands")} style={{ ...actionBtn, flex: "1 1 130px" }}>
+              <button onClick={() => setTool("lands")} style={{ ...actionBtn, flex: "1 1 120px" }}>
                 🌲 Add lands
               </button>
-              <button onClick={startReview} disabled={pool.length === 0} style={{ ...actionBtn, flex: "1 1 130px", opacity: pool.length === 0 ? 0.5 : 1 }}>
+              <button onClick={startReview} disabled={poolCards.length === 0} style={{ ...actionBtn, flex: "1 1 120px", opacity: poolCards.length === 0 ? 0.5 : 1 }}>
                 ↩ Review pool
+              </button>
+              <button onClick={() => setHandSimOpen(true)} disabled={pool.length === 0} style={{ ...actionBtn, flex: "1 1 120px", opacity: pool.length === 0 ? 0.5 : 1 }}>
+                🎲 Sample hand
+              </button>
+              <button onClick={() => setCombosOpen(true)} disabled={pool.length === 0} style={{ ...actionBtn, flex: "1 1 120px", opacity: pool.length === 0 ? 0.5 : 1 }}>
+                ♾ Combos
               </button>
             </div>
           </div>
@@ -763,14 +860,34 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             }
           >
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <CountRing count={stats.count} target={target} accent="var(--gold)" />
+              <CountRing count={deckCount} target={target} accent="var(--gold)" />
               <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 14 }}>
                 <span style={{ color: "var(--text-dim)", fontStyle: "italic" }}>{deck?.format ?? "—"} deck</span>
                 <span style={{ color: "var(--text)", fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 600 }}>
-                  {target - stats.count > 0 ? `${target - stats.count} to go` : "Deck complete"}
+                  {target - deckCount > 0 ? `${target - deckCount} to go` : "Deck complete"}
+                </span>
+                <span style={{ color: "var(--text-dim)", fontStyle: "italic", fontSize: 12.5 }}>
+                  + {poolCards.reduce((s, c) => s + c.quantity, 0)} in the pool
                 </span>
               </div>
             </div>
+            {warningCount > 0 && (
+              <div style={{ marginTop: 12, fontSize: 13, color: "#e0805f", fontStyle: "italic" }}>
+                ⚠ {warningCount} card{warningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ badge.
+              </div>
+            )}
+            {!statsOnDeck && pool.length > 0 && (
+              <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-dim)", fontStyle: "italic" }}>
+                Stats show the pool until the deck has cards.
+              </div>
+            )}
+          </StatCard>
+          <StatCard label="Roles">
+            {statsSource.length > 0 ? (
+              <RoleBreakdown counts={roleCounts} commander={isCommander} />
+            ) : (
+              <span style={{ fontSize: 13.5, fontStyle: "italic", color: "var(--text-dim)" }}>No cards yet.</span>
+            )}
           </StatCard>
           <StatCard label="Mana Curve">
             <ManaCurve curve={stats.curve} accent="var(--gold)" />
@@ -853,22 +970,41 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         <ToolSheet tool={tool} deckId={deckId} pool={pool} onClose={() => setTool(null)} onChanged={loadPool} />
       )}
 
-      {/* review-pool swipe modal */}
+      {/* review-pool swipe modal — triage: right promotes to the deck */}
       {reviewCards && reviewCards.length > 0 && (
         <SwipeModal
           variant="review"
           cards={reviewCards}
-          query="Reviewing your pool"
-          onAdd={() => {}}
-          onRemove={(card) => {
+          query="Building your deck"
+          onAdd={(card) => {
             const pc = reviewCards.find((c) => c.id === card.id);
-            if (pc) fetch(`/api/decks/${deckId}/cards/${pc.dbId}`, { method: "DELETE" });
+            if (pc) moveCard(deckId, pc.dbId, "deck");
           }}
           onInfo={setPreview}
           onClose={() => {
             setReviewCards(null);
             loadPool();
           }}
+        />
+      )}
+
+      {/* sample-hand simulator */}
+      {handSimOpen && (
+        <HandSimModal
+          cards={statsOnDeck ? deckCards : pool}
+          sourceLabel={statsOnDeck ? "the deck" : "the whole pool"}
+          onClose={() => setHandSimOpen(false)}
+        />
+      )}
+
+      {/* combo finder */}
+      {combosOpen && (
+        <ComboModal
+          deckId={deckId}
+          pool={pool}
+          commander={deck?.commander}
+          onClose={() => setCombosOpen(false)}
+          onPoolChanged={loadPool}
         />
       )}
 
@@ -933,6 +1069,121 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
     </main>
+  );
+}
+
+function SectionHeader({ title, count, right }: { title: string; count: number; right?: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+      <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--text)" }}>
+        {title} <span style={{ color: "var(--text-dim)", fontWeight: 500, fontStyle: "italic", fontSize: 19 }}>· {count} card{count === 1 ? "" : "s"}</span>
+      </h2>
+      {right}
+    </div>
+  );
+}
+
+/* One board's cards in the active view. `dest` is where the move button sends
+   a card (the other board). */
+function BoardCards({
+  cards,
+  dest,
+  view,
+  warningOf,
+  onMove,
+  onRemove,
+  onPreview,
+  groupedFor,
+}: {
+  cards: PoolCard[];
+  dest: Board;
+  view: "grid" | "list";
+  warningOf: (c: PoolCard) => string | undefined;
+  onMove: (dbId: number, board: Board) => void;
+  onRemove: (dbId: number) => void;
+  onPreview: (c: PoolCard) => void;
+  groupedFor: (cards: PoolCard[]) => { t: string; cards: PoolCard[] }[];
+}) {
+  const moveLabel = dest === "deck" ? "Move to deck" : "Move to pool";
+  if (view === "grid") {
+    return (
+      <div className="card-grid">
+        {cards.map((card) => (
+          <ClassicCard
+            key={card.dbId}
+            card={card}
+            variant="tile"
+            quantity={card.quantity}
+            warning={warningOf(card)}
+            onMove={() => onMove(card.dbId, dest)}
+            moveLabel={moveLabel}
+            onRemove={() => onRemove(card.dbId)}
+            onClick={() => onPreview(card)}
+          />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {groupedFor(cards).map((g) => (
+        <div key={g.t}>
+          <div className="label-sc" style={{ fontSize: 13, color: "var(--gold)", padding: "0 4px 7px", letterSpacing: ".12em" }}>
+            {g.t}{" "}
+            <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-body)", textTransform: "none", letterSpacing: 0 }}>· {g.cards.reduce((s, c) => s + c.quantity, 0)}</span>
+          </div>
+          <div style={{ background: "var(--app-bg2)", borderRadius: 7, padding: 5, boxShadow: "inset 0 0 0 1px rgba(200,155,65,.16)" }}>
+            {g.cards.map((c) => (
+              <ClassicRow
+                key={c.dbId}
+                card={c}
+                quantity={c.quantity}
+                warning={warningOf(c)}
+                onMove={() => onMove(c.dbId, dest)}
+                moveLabel={moveLabel}
+                onRemove={() => onRemove(c.dbId)}
+                onClick={() => onPreview(c)}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* Role counts vs the usual commander quotas. */
+const ROLE_META: { key: string; label: string; target: number | null }[] = [
+  { key: "land", label: "Lands", target: 36 },
+  { key: "ramp", label: "Ramp", target: 10 },
+  { key: "draw", label: "Draw", target: 10 },
+  { key: "removal", label: "Removal", target: 8 },
+  { key: "wincon", label: "Wincons", target: 3 },
+  { key: "utility", label: "Utility", target: null },
+  { key: "untagged", label: "Untagged", target: null },
+];
+
+function RoleBreakdown({ counts, commander }: { counts: Record<string, number>; commander: boolean }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      {ROLE_META.filter((r) => (counts[r.key] ?? 0) > 0 || (commander && r.target !== null)).map((r) => {
+        const n = counts[r.key] ?? 0;
+        const short = commander && r.target !== null && n < r.target;
+        return (
+          <div key={r.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13.5 }}>
+            <span style={{ color: r.key === "untagged" ? "var(--text-dim)" : "var(--text-muted)", fontStyle: r.key === "untagged" ? "italic" : "normal" }}>
+              {r.label}
+            </span>
+            <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: short ? "#e0805f" : "var(--text)" }}>
+              {n}
+              {commander && r.target !== null && (
+                <span style={{ color: "var(--text-dim)", fontWeight: 500 }}> / {r.target}</span>
+              )}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

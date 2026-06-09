@@ -3,10 +3,14 @@
 
 import { OutCard, resolveNamed } from "./scryfall";
 
+export type Board = "pool" | "deck";
+
 // A pool row as the client sees it: card data + DB row id + copies held.
 export interface PoolEntry extends OutCard {
   dbId: number;
   quantity: number;
+  board: Board;
+  role: string | null;
 }
 
 // Build a lowercase-name → card map of the current pool. Matching by NAME (not
@@ -22,6 +26,8 @@ export function poolByName(pool: OutCard[]): Map<string, OutCard> {
       manaCost: c.manaCost,
       typeLine: c.typeLine,
       oracleText: c.oracleText,
+      colorIdentity: c.colorIdentity,
+      legalities: c.legalities,
     });
   }
   return m;
@@ -38,10 +44,22 @@ export async function postCard(deckId: number, card: OutCard, qty: number): Prom
       manaCost: card.manaCost,
       typeLine: card.typeLine,
       oracleText: card.oracleText,
+      colorIdentity: card.colorIdentity,
+      legalities: card.legalities,
       quantity: qty,
     }),
   });
   return post.ok;
+}
+
+// Move a pool row between boards ("pool" ↔ "deck").
+export async function moveCard(deckId: number, dbId: number, board: Board): Promise<boolean> {
+  const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ board }),
+  });
+  return res.ok;
 }
 
 // Add `qty` copies of a card by name. If a card of that name is already in the
