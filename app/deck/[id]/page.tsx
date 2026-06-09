@@ -8,7 +8,7 @@ import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import JudgeModal from "@/components/deck/JudgeModal";
 import HandSimModal from "@/components/deck/HandSimModal";
 import ComboModal from "@/components/deck/ComboModal";
-import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, actionBtn } from "@/components/deck/ui";
+import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
 import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard } from "@/lib/pool-client";
 import { cardWarnings } from "@/lib/legality";
@@ -779,26 +779,31 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               count={deckCount}
               right={
                 pool.length > 0 && (
-                  <div style={{ display: "inline-flex", gap: 4 }}>
-                    {([["grid", "▦"], ["list", "≣"]] as const).map(([v, ic]) => (
-                      <button
-                        key={v}
-                        onClick={() => setView(v)}
-                        style={{
-                          width: 36,
-                          height: 32,
-                          borderRadius: 8,
-                          border: "none",
-                          cursor: "pointer",
-                          fontSize: 16,
-                          background: view === v ? "var(--gold)" : "rgba(20,14,8,.5)",
-                          color: view === v ? "#211705" : "var(--text-muted)",
-                          boxShadow: view === v ? "none" : "inset 0 0 0 1px rgba(200,155,65,.2)",
-                        }}
-                      >
-                        {ic}
-                      </button>
-                    ))}
+                  <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <HeaderAction onClick={() => setHandSimOpen(true)} title="Draw sample opening hands">
+                      🎲 Sample hand
+                    </HeaderAction>
+                    <div style={{ display: "inline-flex", gap: 4 }}>
+                      {([["grid", "▦"], ["list", "≣"]] as const).map(([v, ic]) => (
+                        <button
+                          key={v}
+                          onClick={() => setView(v)}
+                          style={{
+                            width: 36,
+                            height: 32,
+                            borderRadius: 8,
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: 16,
+                            background: view === v ? "var(--gold)" : "rgba(20,14,8,.5)",
+                            color: view === v ? "#211705" : "var(--text-muted)",
+                            boxShadow: view === v ? "none" : "inset 0 0 0 1px rgba(200,155,65,.2)",
+                          }}
+                        >
+                          {ic}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )
               }
@@ -814,7 +819,26 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
 
             <div style={{ marginTop: 26 }}>
-              <SectionHeader title="The Pool" count={poolCards.reduce((s, c) => s + c.quantity, 0)} />
+              <SectionHeader
+                title="The Pool"
+                count={poolCards.reduce((s, c) => s + c.quantity, 0)}
+                right={
+                  <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                    <HeaderAction gold onClick={() => setJudgeOpen(true)} disabled={pool.length === 0} title="AI judge — review the pool">
+                      ✨ Judge
+                    </HeaderAction>
+                    <HeaderAction onClick={startReview} disabled={poolCards.length === 0} title="Swipe through the pool — right promotes to the deck">
+                      ↩ Review
+                    </HeaderAction>
+                    <HeaderAction onClick={() => setCombosOpen(true)} disabled={pool.length === 0} title="Find combos in the pool">
+                      ♾ Combos
+                    </HeaderAction>
+                    <HeaderAction onClick={() => setTool("lands")} title="Bulk-add lands & staples">
+                      🌲 Add lands
+                    </HeaderAction>
+                  </div>
+                }
+              />
             </div>
             <div style={{ marginTop: 14 }}>
               {poolCards.length === 0 ? (
@@ -828,24 +852,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               )}
             </div>
 
-            {/* quick actions — always one tap from the deck */}
-            <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
-              <button onClick={() => setJudgeOpen(true)} style={{ ...actionBtn, flex: "1 1 150px", background: "var(--gold)", color: "#211705", boxShadow: "none" }}>
-                ✨ Judge pool
-              </button>
-              <button onClick={() => setTool("lands")} style={{ ...actionBtn, flex: "1 1 120px" }}>
-                🌲 Add lands
-              </button>
-              <button onClick={startReview} disabled={poolCards.length === 0} style={{ ...actionBtn, flex: "1 1 120px", opacity: poolCards.length === 0 ? 0.5 : 1 }}>
-                ↩ Review pool
-              </button>
-              <button onClick={() => setHandSimOpen(true)} disabled={pool.length === 0} style={{ ...actionBtn, flex: "1 1 120px", opacity: pool.length === 0 ? 0.5 : 1 }}>
-                🎲 Sample hand
-              </button>
-              <button onClick={() => setCombosOpen(true)} disabled={pool.length === 0} style={{ ...actionBtn, flex: "1 1 120px", opacity: pool.length === 0 ? 0.5 : 1 }}>
-                ♾ Combos
-              </button>
-            </div>
           </div>
         </div>
 
@@ -1069,6 +1075,46 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         </div>
       )}
     </main>
+  );
+}
+
+/* Compact action button for section headers — gold variant for the primary action. */
+function HeaderAction({
+  onClick,
+  disabled,
+  gold,
+  title,
+  children,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+  gold?: boolean;
+  title?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        padding: "7px 13px",
+        borderRadius: 8,
+        border: "none",
+        cursor: disabled ? "default" : "pointer",
+        fontFamily: "var(--font-display)",
+        fontSize: 14.5,
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+        background: gold ? "var(--gold)" : "rgba(20,14,8,.5)",
+        color: gold ? "#211705" : "var(--text)",
+        boxShadow: gold ? "none" : "inset 0 0 0 1px rgba(200,155,65,.3)",
+        opacity: disabled ? 0.45 : 1,
+        transition: "all .12s",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
