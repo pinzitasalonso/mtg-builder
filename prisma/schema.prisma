@@ -25,6 +25,7 @@ model PoolCard {
   manaCost   String?
   typeLine   String?
   oracleText String?
+  quantity   Int      @default(1)
   addedAt    DateTime @default(now())
 
   @@unique([deckId, scryfallId])

@@ -32,6 +32,7 @@ interface SearchCard {
 
 interface PoolCard extends SearchCard {
   dbId: number;
+  quantity: number;
 }
 
 interface Deck {
@@ -222,13 +223,13 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [judgeLoading, setJudgeLoading] = useState(false);
   const [judgeError, setJudgeError] = useState("");
   const [judge, setJudge] = useState<JudgeResult | null>(null);
-  const [judgeAdds, setJudgeAdds] = useState<Record<string, "adding" | "added" | "exists" | "error">>({});
+  const [judgeAdds, setJudgeAdds] = useState<Record<string, "adding" | "added" | "error">>({});
 
   const loadPool = useCallback(async () => {
     const res = await fetch(`/api/decks/${deckId}/cards`);
     const data = await res.json();
     setPool(
-      data.map((c: { id: number; scryfallId: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null }) => ({
+      data.map((c: { id: number; scryfallId: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null; quantity?: number }) => ({
         dbId: c.id,
         id: c.scryfallId,
         name: c.name,
@@ -236,6 +237,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         manaCost: c.manaCost,
         typeLine: c.typeLine,
         oracleText: c.oracleText,
+        quantity: c.quantity ?? 1,
       }))
     );
   }, [deckId]);
@@ -388,53 +390,69 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     setSaving(false);
   }
 
-  // Resolve a loose card name on Scryfall and POST it to the pool. `seen` tracks
-  // both scryfall ids and lowercased card names already present, mutated as we go
-  // so a batch doesn't re-add the same card twice. We dedupe by NAME as well as id
-  // because Scryfall's fuzzy lookup may resolve to a different printing (different
-  // id) than the copy already in the pool. Shared by import, lands and AI suggest.
-  function poolSeen(): { ids: Set<string>; names: Set<string> } {
-    return {
-      ids: new Set(pool.map((c) => c.id)),
-      names: new Set(pool.map((c) => c.name.toLowerCase())),
-    };
+  // Add `qty` copies of a card by name. If a card of that name is already in the
+  // pool we increment THAT row (matched by name, since Scryfall's fuzzy lookup may
+  // resolve to a different printing/id than the pooled copy); otherwise we resolve
+  // it on Scryfall and create it. `known` is mutated so repeats within a batch
+  // merge. Shared by import, bulk lands and AI suggestions.
+  function poolByName(): Map<string, { id: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null }> {
+    const m = new Map<string, { id: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null }>();
+    for (const c of pool) m.set(c.name.toLowerCase(), { id: c.id, name: c.name, imageUri: c.imageUri, manaCost: c.manaCost, typeLine: c.typeLine, oracleText: c.oracleText });
+    return m;
+  }
+  async function postCard(
+    card: { id: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null },
+    qty: number
+  ): Promise<boolean> {
+    const post = await fetch(`/api/decks/${deckId}/cards`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scryfallId: card.id,
+        name: card.name,
+        imageUri: card.imageUri,
+        manaCost: card.manaCost,
+        typeLine: card.typeLine,
+        oracleText: card.oracleText,
+        quantity: qty,
+      }),
+    });
+    return post.ok;
   }
   async function resolveAndAdd(
     name: string,
-    seen: { ids: Set<string>; names: Set<string> }
-  ): Promise<"added" | "exists" | "notfound" | "error"> {
+    qty: number,
+    known: ReturnType<typeof poolByName>
+  ): Promise<"added" | "notfound" | "error"> {
     try {
+      const existing = known.get(name.toLowerCase());
+      if (existing) {
+        return (await postCard(existing, qty)) ? "added" : "error";
+      }
       const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`);
       if (!res.ok) return "notfound";
       const data = await res.json();
       if (!data?.id) return "notfound";
-      if (seen.ids.has(data.id) || seen.names.has(String(data.name).toLowerCase())) return "exists";
       const imageUri = data.image_uris?.normal ?? data.card_faces?.[0]?.image_uris?.normal ?? "";
       if (!imageUri) return "error";
-      const post = await fetch(`/api/decks/${deckId}/cards`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scryfallId: data.id,
-          name: data.name,
-          imageUri,
-          manaCost: data.mana_cost ?? null,
-          typeLine: data.type_line ?? null,
-          oracleText: data.oracle_text ?? null,
-        }),
-      });
-      if (post.status === 409) return "exists";
-      if (!post.ok) return "error";
-      seen.ids.add(data.id);
-      seen.names.add(String(data.name).toLowerCase());
+      const card = {
+        id: data.id,
+        name: data.name,
+        imageUri,
+        manaCost: data.mana_cost ?? null,
+        typeLine: data.type_line ?? null,
+        oracleText: data.oracle_text ?? null,
+      };
+      if (!(await postCard(card, qty))) return "error";
+      known.set(String(data.name).toLowerCase(), card);
       return "added";
     } catch {
       return "error";
     }
   }
 
-  // ── Tool 1: export — standard "{qty} {name}" decklist (pool holds one of each).
-  const exportText = pool.map((c) => `1 ${c.name}`).join("\n");
+  // ── Tool 1: export — standard "{qty} {name}" decklist.
+  const exportText = pool.map((c) => `${c.quantity} ${c.name}`).join("\n");
   async function copyExport() {
     try {
       await navigator.clipboard.writeText(exportText);
@@ -446,66 +464,64 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   }
 
   // ── Tool 1: import — parse "{qty} {name}" lines, resolve each on Scryfall and
-  // add any not already in the pool.
+  // add the copies (merging quantities for repeated names).
   async function runImport() {
-    const names = importText
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => line.replace(/^\s*\d+\s*[xX]?\s+/, "").replace(/\s*\([^)]*\).*$/, "").trim())
-      .filter(Boolean);
-    // de-dupe within the paste, case-insensitively, keeping first spelling
-    const pasteSeen = new Set<string>();
-    const unique = names.filter((n) => {
-      const k = n.toLowerCase();
-      if (pasteSeen.has(k)) return false;
-      pasteSeen.add(k);
-      return true;
-    });
-    if (unique.length === 0) {
+    const entries: { name: string; qty: number }[] = [];
+    const byName = new Map<string, number>();
+    for (const raw of importText.split("\n")) {
+      const line = raw.trim();
+      if (!line) continue;
+      const m = line.match(/^\s*(\d+)\s*[xX]?\s+(.*)$/);
+      const qty = m ? Math.max(1, parseInt(m[1], 10)) : 1;
+      const name = (m ? m[2] : line).replace(/\s*\([^)]*\).*$/, "").trim();
+      if (!name) continue;
+      const k = name.toLowerCase();
+      if (byName.has(k)) {
+        entries[byName.get(k)!].qty += qty;
+      } else {
+        byName.set(k, entries.length);
+        entries.push({ name, qty });
+      }
+    }
+    if (entries.length === 0) {
       setImportSummary("Nothing to import — paste a decklist first.");
       return;
     }
     setImporting(true);
     setImportSummary(null);
-    const seen = poolSeen();
+    const known = poolByName();
     let added = 0;
-    let already = 0;
     const notFound: string[] = [];
-    for (const name of unique) {
-      const r = await resolveAndAdd(name, seen);
-      if (r === "added") added++;
-      else if (r === "exists") already++;
-      else notFound.push(name);
+    for (const { name, qty } of entries) {
+      const r = await resolveAndAdd(name, qty, known);
+      if (r === "added") added += qty;
+      else if (r === "notfound") notFound.push(name);
     }
     await loadPool();
     const parts = [`Added ${added} card${added === 1 ? "" : "s"}`];
-    if (already) parts.push(`${already} already in pool`);
     if (notFound.length) parts.push(`${notFound.length} not found: ${notFound.join(", ")}`);
     setImportSummary(parts.join(", ") + ".");
     setImportText("");
     setImporting(false);
   }
 
-  // ── Tool 2: bulk lands — add each selected preset land/staple once.
+  // ── Tool 2: bulk lands — add the chosen quantity of each preset land/staple.
+  const landTotal = PRESET_LANDS.reduce((s, l) => s + (landSel[l] ?? 0), 0);
   async function addLands() {
-    const chosen = PRESET_LANDS.filter((l) => (landSel[l] ?? 0) > 0);
-    if (chosen.length === 0) return;
+    if (landTotal === 0) return;
     setLandBusy(true);
     setLandSummary(null);
-    const seen = poolSeen();
+    const known = poolByName();
     let added = 0;
-    let already = 0;
-    for (const name of chosen) {
-      const r = await resolveAndAdd(name, seen);
-      if (r === "added") added++;
-      else if (r === "exists") already++;
+    for (const name of PRESET_LANDS) {
+      const qty = landSel[name] ?? 0;
+      if (qty <= 0) continue;
+      const r = await resolveAndAdd(name, qty, known);
+      if (r === "added") added += qty;
     }
     await loadPool();
     setLandSel({});
-    const parts = [`Added ${added} card${added === 1 ? "" : "s"}`];
-    if (already) parts.push(`${already} already in pool`);
-    setLandSummary(parts.join(", ") + ".");
+    setLandSummary(`Added ${added} card${added === 1 ? "" : "s"} to the pool.`);
     setLandBusy(false);
   }
 
@@ -533,7 +549,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine })),
+          cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine, quantity: c.quantity })),
           format: deck?.format,
           commander: deck?.commander,
         }),
@@ -551,8 +567,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   async function addSuggested(name: string) {
     if (judgeAdds[name] === "adding" || judgeAdds[name] === "added") return;
     setJudgeAdds((m) => ({ ...m, [name]: "adding" }));
-    const r = await resolveAndAdd(name, poolSeen());
-    setJudgeAdds((m) => ({ ...m, [name]: r === "added" ? "added" : r === "exists" ? "exists" : "error" }));
+    const r = await resolveAndAdd(name, 1, poolByName());
+    setJudgeAdds((m) => ({ ...m, [name]: r === "added" ? "added" : "error" }));
     if (r === "added") loadPool();
   }
 
@@ -861,7 +877,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
               <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--text)" }}>
-                The Pool <span style={{ color: "var(--text-dim)", fontWeight: 500, fontStyle: "italic", fontSize: 19 }}>· {pool.length} cards</span>
+                The Pool <span style={{ color: "var(--text-dim)", fontWeight: 500, fontStyle: "italic", fontSize: 19 }}>· {stats.count} cards</span>
               </h2>
               {pool.length > 0 && (
                 <div style={{ display: "inline-flex", gap: 4 }}>
@@ -896,7 +912,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               ) : view === "grid" ? (
                 <div className="card-grid">
                   {pool.map((card) => (
-                    <ClassicCard key={card.dbId} card={card} variant="tile" onRemove={() => removeCard(card.dbId)} onClick={() => setPreview(card)} />
+                    <ClassicCard key={card.dbId} card={card} variant="tile" quantity={card.quantity} onRemove={() => removeCard(card.dbId)} onClick={() => setPreview(card)} />
                   ))}
                 </div>
               ) : (
@@ -905,17 +921,30 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                     <div key={g.t}>
                       <div className="label-sc" style={{ fontSize: 13, color: "var(--gold)", padding: "0 4px 7px", letterSpacing: ".12em" }}>
                         {g.t}{" "}
-                        <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-body)", textTransform: "none", letterSpacing: 0 }}>· {g.cards.length}</span>
+                        <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-body)", textTransform: "none", letterSpacing: 0 }}>· {g.cards.reduce((s, c) => s + c.quantity, 0)}</span>
                       </div>
                       <div style={{ background: "var(--app-bg2)", borderRadius: 7, padding: 5, boxShadow: "inset 0 0 0 1px rgba(200,155,65,.16)" }}>
                         {g.cards.map((c) => (
-                          <ClassicRow key={c.dbId} card={c} onRemove={() => removeCard(c.dbId)} onClick={() => setPreview(c)} />
+                          <ClassicRow key={c.dbId} card={c} quantity={c.quantity} onRemove={() => removeCard(c.dbId)} onClick={() => setPreview(c)} />
                         ))}
                       </div>
                     </div>
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* quick actions — always one tap from the deck */}
+            <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+              <button onClick={runJudge} style={{ ...actionBtn, flex: "1 1 160px", background: "var(--gold)", color: "#211705", boxShadow: "none" }}>
+                ✨ Judge pool
+              </button>
+              <button onClick={() => { setTool("lands"); setLandSummary(null); }} style={{ ...actionBtn, flex: "1 1 130px" }}>
+                🌲 Add lands
+              </button>
+              <button onClick={startReview} disabled={pool.length === 0} style={{ ...actionBtn, flex: "1 1 130px", opacity: pool.length === 0 ? 0.5 : 1 }}>
+                ↩ Review pool
+              </button>
             </div>
           </div>
         </div>
@@ -1004,10 +1033,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 </div>
               </form>
 
-              {/* Tools */}
+              {/* Tools — import/export live here; judge, lands & review are on the deck screen */}
               <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(0,0,0,.25)" }}>
                 <div className="label-sc" style={{ fontSize: 11.5, color: "rgba(236,225,198,.75)", letterSpacing: ".1em", marginBottom: 10 }}>
-                  Tools
+                  Import / Export
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   <button type="button" onClick={() => { setTool("export"); setCopied(false); }} style={toolBtn}>
@@ -1015,15 +1044,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   </button>
                   <button type="button" onClick={() => { setTool("import"); setImportSummary(null); }} style={toolBtn}>
                     ⤒ Import list
-                  </button>
-                  <button type="button" onClick={() => { setTool("lands"); setLandSummary(null); }} style={toolBtn}>
-                    ⛰ Add lands
-                  </button>
-                  <button type="button" onClick={startReview} disabled={pool.length === 0} style={{ ...toolBtn, opacity: pool.length === 0 ? 0.5 : 1 }}>
-                    ⇄ Review pool
-                  </button>
-                  <button type="button" onClick={runJudge} style={{ ...toolBtn, gridColumn: "1 / -1", background: "var(--gold)", color: "#211705", boxShadow: "none", fontWeight: 700 }}>
-                    Ask AI to judge my pool ✨
                   </button>
                 </div>
               </div>
@@ -1085,34 +1105,23 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               )}
 
               {tool === "lands" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   <p style={{ margin: 0, fontSize: 13.5, fontStyle: "italic", color: "rgba(236,225,198,.8)" }}>
-                    Tap to select, then add them all. (The pool holds one of each card.)
+                    Set a quantity for each, then add your whole mana base in one tap.
                   </p>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     {PRESET_LANDS.map((l) => {
-                      const on = (landSel[l] ?? 0) > 0;
+                      const n = landSel[l] ?? 0;
+                      const bump = (d: number) => setLandSel((s) => ({ ...s, [l]: Math.max(0, (s[l] ?? 0) + d) }));
                       return (
-                        <button
-                          key={l}
-                          type="button"
-                          onClick={() => setLandSel((s) => ({ ...s, [l]: on ? 0 : 1 }))}
-                          aria-pressed={on}
-                          style={{
-                            padding: "7px 14px",
-                            borderRadius: 16,
-                            border: "none",
-                            cursor: "pointer",
-                            fontFamily: "var(--font-body)",
-                            fontSize: 14,
-                            fontWeight: on ? 700 : 500,
-                            background: on ? "var(--gold)" : "rgba(0,0,0,.22)",
-                            color: on ? "#211705" : "var(--frame-ink)",
-                            boxShadow: on ? "none" : "inset 0 0 0 1px rgba(236,225,198,.25)",
-                          }}
-                        >
-                          {l}
-                        </button>
+                        <div key={l} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 8, background: n > 0 ? "rgba(200,155,65,.12)" : "transparent" }}>
+                          <span style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "var(--frame-ink)" }}>{l}</span>
+                          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <button type="button" onClick={() => bump(-1)} disabled={n === 0} style={stepBtn(n === 0)}>−</button>
+                            <span style={{ width: 30, textAlign: "center", fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, color: n > 0 ? "var(--gold)" : "rgba(236,225,198,.55)" }}>{n}</span>
+                            <button type="button" onClick={() => bump(1)} style={stepBtn(false)}>+</button>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>
@@ -1121,10 +1130,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       {landSummary}
                     </div>
                   )}
-                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", alignItems: "center" }}>
                     <button onClick={() => setTool(null)} style={ghostBtn}>Close</button>
-                    <button onClick={addLands} disabled={landBusy || PRESET_LANDS.every((l) => !(landSel[l] ?? 0))} style={goldBtn}>
-                      {landBusy ? "Adding…" : "Add to pool"}
+                    <button onClick={addLands} disabled={landBusy || landTotal === 0} style={goldBtn}>
+                      {landBusy ? "Adding…" : landTotal > 0 ? `Add ${landTotal} land${landTotal === 1 ? "" : "s"}` : "Add to pool"}
                     </button>
                   </div>
                 </div>
@@ -1212,14 +1221,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                                 cursor: st === "added" || st === "adding" ? "default" : "pointer",
                                 fontFamily: "var(--font-body)",
                                 fontSize: 14,
-                                background: st === "added" || st === "exists" ? "rgba(155,191,110,.25)" : "rgba(0,0,0,.22)",
+                                background: st === "added" ? "rgba(155,191,110,.25)" : "rgba(0,0,0,.22)",
                                 color: "var(--frame-ink)",
                                 boxShadow: "inset 0 0 0 1px rgba(236,225,198,.25)",
                               }}
                             >
                               {name}{" "}
                               <span style={{ opacity: 0.85 }}>
-                                {st === "adding" ? "…" : st === "added" ? "✓" : st === "exists" ? "✓ in pool" : st === "error" ? "✕" : "+"}
+                                {st === "adding" ? "…" : st === "added" ? "✓" : st === "error" ? "✕" : "+"}
                               </span>
                             </button>
                           );
@@ -1352,6 +1361,36 @@ function goldSearchBtn(busy: boolean): React.CSSProperties {
     justifyContent: "center",
     whiteSpace: "nowrap",
     opacity: busy ? 0.7 : 1,
+  };
+}
+
+const actionBtn: React.CSSProperties = {
+  background: "var(--app-bg2)",
+  border: "none",
+  boxShadow: "inset 0 0 0 1px rgba(200,155,65,.3)",
+  borderRadius: 9,
+  color: "var(--text)",
+  padding: "13px 16px",
+  cursor: "pointer",
+  fontFamily: "var(--font-display)",
+  fontSize: 16,
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+};
+
+function stepBtn(disabled: boolean): React.CSSProperties {
+  return {
+    width: 30,
+    height: 30,
+    borderRadius: 7,
+    border: "none",
+    cursor: disabled ? "default" : "pointer",
+    background: disabled ? "rgba(0,0,0,.15)" : "rgba(0,0,0,.28)",
+    color: disabled ? "rgba(236,225,198,.35)" : "var(--frame-ink)",
+    fontSize: 19,
+    fontWeight: 700,
+    lineHeight: 1,
+    boxShadow: "inset 0 0 0 1px rgba(236,225,198,.22)",
   };
 }
 

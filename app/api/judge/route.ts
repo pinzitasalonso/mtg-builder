@@ -7,6 +7,7 @@ interface JudgeCard {
   name: string;
   manaCost?: string | null;
   typeLine?: string | null;
+  quantity?: number;
 }
 
 interface JudgeResult {
@@ -47,10 +48,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "no cards to judge — add some first" }, { status: 400 });
   }
 
-  // Compact, deterministic card list: "Name — {cost} — {type}" per line.
+  // Compact, deterministic card list: "{qty}x Name — {cost} — {type}" per line.
+  let totalCopies = 0;
   const list = (cards as JudgeCard[])
     .map((c) => {
-      const bits = [c.name];
+      const qty = Number.isFinite(c.quantity) && (c.quantity as number) > 0 ? Math.floor(c.quantity as number) : 1;
+      totalCopies += qty;
+      const bits = [qty > 1 ? `${qty}x ${c.name}` : c.name];
       if (c.manaCost) bits.push(c.manaCost);
       if (c.typeLine) bits.push(c.typeLine);
       return "- " + bits.join("  ·  ");
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
   const context = [
     format ? `Format: ${format}.` : "",
     commander ? `Commander: ${commander}.` : "",
-    `Pool size: ${cards.length} cards.`,
+    `Pool size: ${totalCopies} cards (${cards.length} distinct).`,
   ]
     .filter(Boolean)
     .join(" ");

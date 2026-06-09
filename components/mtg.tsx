@@ -186,6 +186,7 @@ export function CardArt({
 export interface StatCardInput {
   manaCost: string | null;
   typeLine: string | null;
+  quantity?: number;
 }
 
 export function categoryOf(typeLine: string | null): string {
@@ -224,18 +225,21 @@ export function deckStats(pool: StatCardInput[]): DeckStats {
   const colors: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
   let mvSum = 0;
   let mvCount = 0;
+  let total = 0;
   for (const c of pool) {
+    const qty = c.quantity && c.quantity > 0 ? c.quantity : 1;
+    total += qty;
     const cat = categoryOf(c.typeLine);
-    types[cat] = (types[cat] || 0) + 1;
+    types[cat] = (types[cat] || 0) + qty;
     if (cat !== "Lands") {
       const mv = manaValue(c.manaCost);
-      curve[Math.min(mv, 7)]++;
-      mvSum += mv;
-      mvCount++;
+      curve[Math.min(mv, 7)] += qty;
+      mvSum += mv * qty;
+      mvCount += qty;
     }
     const cs = colorsOf(c.manaCost);
     (cs.length ? cs : ["C"]).forEach((col) => {
-      if (colors[col] != null) colors[col]++;
+      if (colors[col] != null) colors[col] += qty;
     });
   }
   return {
@@ -243,7 +247,7 @@ export function deckStats(pool: StatCardInput[]): DeckStats {
     types: TYPE_ORDER.filter((t) => types[t]).map((t) => ({ name: t, n: types[t] })),
     colors,
     avgMv: mvCount ? mvSum / mvCount : 0,
-    count: pool.length,
+    count: total,
   };
 }
 
@@ -484,12 +488,14 @@ export function ClassicCard({
   onRemove,
   onClick,
   style,
+  quantity,
 }: {
   card: FrameCard;
   variant?: "tile" | "full";
   onRemove?: () => void;
   onClick?: () => void;
   style?: CSSProperties;
+  quantity?: number;
 }) {
   const [hover, setHover] = useState(false);
   const full = variant === "full";
@@ -583,6 +589,32 @@ export function ClassicCard({
         )}
       </div>
 
+      {!full && quantity && quantity > 1 && (
+        <div
+          style={{
+            position: "absolute",
+            top: 5,
+            left: 5,
+            minWidth: 24,
+            height: 24,
+            padding: "0 6px",
+            borderRadius: 7,
+            background: "var(--gold)",
+            color: "#211705",
+            fontFamily: "var(--font-display)",
+            fontWeight: 800,
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 2px 6px rgba(0,0,0,.5)",
+            pointerEvents: "none",
+          }}
+        >
+          ×{quantity}
+        </div>
+      )}
+
       {onRemove && !full && (
         <button
           onClick={(e) => {
@@ -622,10 +654,12 @@ export function ClassicRow({
   card,
   onRemove,
   onClick,
+  quantity,
 }: {
   card: FrameCard;
   onRemove?: () => void;
   onClick?: () => void;
+  quantity?: number;
 }) {
   const [hover, setHover] = useState(false);
   return (
@@ -635,7 +669,7 @@ export function ClassicRow({
       onClick={onClick}
       style={{
         display: "grid",
-        gridTemplateColumns: "30px 1fr auto 16px",
+        gridTemplateColumns: "30px 1fr auto auto 16px",
         alignItems: "center",
         gap: 11,
         padding: "6px 10px 6px 7px",
@@ -657,6 +691,11 @@ export function ClassicRow({
           {card.typeLine}
         </div>
       </div>
+      {quantity && quantity > 1 ? (
+        <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 13, color: "var(--gold)" }}>×{quantity}</span>
+      ) : (
+        <span />
+      )}
       <ManaCost cost={card.manaCost} size={15} />
       {onRemove && (
         <button
