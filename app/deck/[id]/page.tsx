@@ -8,6 +8,7 @@ import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import JudgeModal from "@/components/deck/JudgeModal";
 import HandSimModal from "@/components/deck/HandSimModal";
 import ComboModal from "@/components/deck/ComboModal";
+import OrderModal from "@/components/deck/OrderModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
 import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard } from "@/lib/pool-client";
@@ -203,8 +204,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [handSimOpen, setHandSimOpen] = useState(false);
   const [combosOpen, setCombosOpen] = useState(false);
 
-  // "Order on CardTrader" — brief confirmation after the list is copied
-  const [orderCopied, setOrderCopied] = useState(false);
+  // "Order on CardTrader" — runs in <OrderModal> while open
+  const [orderOpen, setOrderOpen] = useState(false);
 
   // commander's color identity (resolved from Scryfall) for legality checks
   const [cmdrIdentity, setCmdrIdentity] = useState<string | null>(null);
@@ -421,22 +422,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   async function moveTo(dbId: number, board: Board) {
     await moveCard(deckId, dbId, board);
     loadPool();
-  }
-
-  /* CardTrader has no URL to prefill a list, but its Shop Optimizer accepts a
-     pasted decklist — so copy the deck board to the clipboard, then open it.
-     (Copy first: the new tab steals focus, and an unfocused page can't write
-     to the clipboard.) */
-  async function orderOnCardTrader() {
-    const text = deckCards.map((c) => `${c.quantity} ${c.name}`).join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
-      setOrderCopied(true);
-      setTimeout(() => setOrderCopied(false), 4000);
-    } catch {
-      // clipboard blocked — the tab still opens; export sheet has the list
-    }
-    window.open("https://www.cardtrader.com/en/wishlists/new", "_blank", "noopener");
   }
 
   const inPool = (cardId: string) => pool.some((c) => c.id === cardId);
@@ -800,11 +785,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 pool.length > 0 && (
                   <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <HeaderAction
-                      onClick={orderOnCardTrader}
+                      onClick={() => setOrderOpen(true)}
                       disabled={deckCards.length === 0}
-                      title="Copies the decklist, then opens CardTrader's Shop Optimizer — paste the list there"
+                      title="Fill your CardTrader Zero cart with the deck"
                     >
-                      {orderCopied ? "✓ List copied — paste it there" : "🛒 Order"}
+                      🛒 Order
                     </HeaderAction>
                     <HeaderAction onClick={() => setHandSimOpen(true)} title="Draw sample opening hands">
                       🎲 Sample hand
@@ -1028,6 +1013,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           onClose={() => setHandSimOpen(false)}
         />
       )}
+
+      {/* CardTrader order */}
+      {orderOpen && <OrderModal cards={deckCards} onClose={() => setOrderOpen(false)} />}
 
       {/* combo finder */}
       {combosOpen && (
