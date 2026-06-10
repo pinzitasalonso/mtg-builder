@@ -21,6 +21,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Wrong email or password." }, { status: 401 });
   }
 
+  // Only revealed after a correct password, so this leaks nothing new.
+  if (!user.emailVerifiedAt) {
+    return NextResponse.json(
+      { error: "Verify your email first — check your inbox.", unverified: true },
+      { status: 403 }
+    );
+  }
+
   await createSession(user.id);
   return NextResponse.json({ id: user.id, email: user.email });
 }

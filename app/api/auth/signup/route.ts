@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { EMAIL_RE, MIN_PASSWORD, createSession, hashPassword } from "@/lib/auth";
+import { EMAIL_RE, MIN_PASSWORD, createVerifyToken, hashPassword, requestOrigin } from "@/lib/auth";
+import { sendVerificationEmail } from "@/lib/email";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,18 @@ export async function POST(req: Request) {
     await prisma.deck.updateMany({ where: { userId: null }, data: { userId: user.id } });
   }
 
-  await createSession(user.id);
-  return NextResponse.json({ id: user.id, email: user.email }, { status: 201 });
+  // No session yet — sign-in is blocked until the emailed link is clicked.
+  const token = await createVerifyToken(user.id);
+  const url = `${requestOrigin(req)}/api/auth/verify?token=${token}`;
+  let emailSent = true;
+  try {
+    await sendVerificationEmail(user.email, url);
+  } catch (e) {
+    emailSent = false;
+    console.error("verification email failed:", e instanceof Error ? e.message : e);
+  }
+  return NextResponse.json(
+    { verifyRequired: true, email: user.email, emailSent },
+    { status: 201 }
+  );
 }

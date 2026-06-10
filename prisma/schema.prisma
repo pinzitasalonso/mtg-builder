@@ -11,6 +11,11 @@ model User {
   email        String    @unique
   passwordHash String
   createdAt    DateTime  @default(now())
+  // Email verification: null until the emailed link is clicked. The token is
+  // stored as its SHA-256 (same discipline as Session ids) with a 24h expiry.
+  emailVerifiedAt   DateTime?
+  verifyTokenHash   String?   @unique
+  verifyTokenExpiry DateTime?
   decks        Deck[]
   sessions     Session[]
 }

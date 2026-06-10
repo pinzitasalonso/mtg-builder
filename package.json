@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "mkdir -p /data && prisma db push && next start",
+    "start": "mkdir -p /data && prisma db push --accept-data-loss && next start",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate"

@@ -80,3 +80,42 @@ export async function ownedDeck(deckId: number, userId: number) {
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const MIN_PASSWORD = 8;
+
+/* ---- email verification ----------------------------------------------- */
+
+const VERIFY_HOURS = 24;
+
+/* Issue a fresh verification token for the user (replacing any prior one)
+   and return the raw token for the email link. Only the SHA-256 is stored. */
+export async function createVerifyToken(userId: number): Promise<string> {
+  const token = randomBytes(32).toString("base64url");
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      verifyTokenHash: tokenHash(token),
+      verifyTokenExpiry: new Date(Date.now() + VERIFY_HOURS * 3600_000),
+    },
+  });
+  return token;
+}
+
+/* Consume a verification token: marks the user verified and clears the
+   token. Returns the user, or null if the token is unknown or expired. */
+export async function consumeVerifyToken(token: string) {
+  if (!token) return null;
+  const user = await prisma.user.findUnique({ where: { verifyTokenHash: tokenHash(token) } });
+  if (!user || !user.verifyTokenExpiry || user.verifyTokenExpiry < new Date()) return null;
+  return prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerifiedAt: new Date(), verifyTokenHash: null, verifyTokenExpiry: null },
+  });
+}
+
+/* Public origin for links in emails. APP_URL wins (set it in production);
+   otherwise reconstructed from proxy headers (Railway) or the Host header. */
+export function requestOrigin(req: Request): string {
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, "");
+  const proto = req.headers.get("x-forwarded-proto") ?? "http";
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "localhost:3000";
+  return `${proto}://${host}`;
+}
