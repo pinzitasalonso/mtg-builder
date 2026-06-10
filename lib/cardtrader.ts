@@ -21,15 +21,6 @@ export interface CtProduct {
   user?: { username?: string; can_sell_via_hub?: boolean };
 }
 
-export interface CtWishlistItem {
-  quantity: number;
-  blueprint_id?: number;
-  meta_name?: string;
-  name?: string;
-  expansion_code?: string;
-  collector_number?: string;
-}
-
 interface CtExpansion {
   id: number;
   code: string;
@@ -65,12 +56,12 @@ export async function ct<T>(path: string, init?: RequestInit & { json?: unknown 
   return res.json() as Promise<T>;
 }
 
-// ── Name → blueprint resolution ─────────────────────────────────────────────
-// The Full API has no card-name search, but POST /wishlists accepts a plain
-// text decklist and resolves it server-side. Wishlist items may come back
-// without a blueprint_id though (just meta_name + expansion_code +
-// collector_number) — in that case we look the blueprint up in the
-// expansion's export, cached per process.
+// ── Printing → blueprint resolution ─────────────────────────────────────────
+// The Full API has no card-name search, so callers resolve names to concrete
+// printings (set code + collector number) via Scryfall first, then map those
+// onto CardTrader's catalog here. Expansion codes match Scryfall set codes,
+// and blueprints are matched by collector number (with a normalized-name
+// fallback for codes that drift). Both catalogs are cached per process.
 
 let expansionsByCode: Map<string, number> | null = null;
 const blueprintCache = new Map<number, CtBlueprint[]>();
@@ -93,39 +84,23 @@ async function blueprintsFor(expId: number): Promise<CtBlueprint[]> {
   return bps;
 }
 
-export async function blueprintIdFor(item: CtWishlistItem): Promise<number | null> {
-  if (item.blueprint_id) return item.blueprint_id;
-  if (!item.expansion_code) return null;
-  const expId = await expansionId(item.expansion_code);
+// Collapse name variants ("Sol Ring" / "sol-ring" / "Fire // Ice") to one form.
+export const normalizeCardName = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+export async function findBlueprintId(setCode: string, collectorNumber: string, name: string): Promise<number | null> {
+  const expId = await expansionId(setCode);
   if (expId === null) return null;
   const bps = await blueprintsFor(expId);
-  if (item.collector_number) {
-    const byNum = bps.find(
-      (b) => (b.fixed_properties?.collector_number ?? b.collector_number) === item.collector_number
-    );
-    if (byNum) return byNum.id;
-  }
-  const nm = (item.meta_name ?? item.name ?? "").toLowerCase();
-  return bps.find((b) => b.name.toLowerCase() === nm)?.id ?? null;
-}
-
-/* Resolve a decklist to wishlist items via a throwaway wishlist. Lines that
-   match nothing are silently dropped by CardTrader — the caller diffs the
-   returned names against what it asked for. */
-export async function resolveDecklist(text: string): Promise<CtWishlistItem[]> {
-  const created = await ct<Record<string, unknown>>("/wishlists", {
-    method: "POST",
-    json: {
-      deck: { game_id: MAGIC_GAME_ID, name: "Spellpool order (temp)", public: false, deck_items_from_text_deck: text },
-    },
-  });
-  // The response may be the wishlist itself or wrapped — normalise both.
-  const wl = (created.deck ?? created.wishlist ?? created) as { id?: number; items?: CtWishlistItem[]; deck_items?: CtWishlistItem[] };
-  let items: CtWishlistItem[] = wl.items ?? wl.deck_items ?? [];
-  if (items.length === 0 && wl.id) {
-    const got = await ct<{ items?: CtWishlistItem[]; deck_items?: CtWishlistItem[] }>(`/wishlists/${wl.id}`);
-    items = got.items ?? got.deck_items ?? [];
-  }
-  if (wl.id) ct(`/wishlists/${wl.id}`, { method: "DELETE" }).catch(() => {});
-  return items;
+  const byNum = bps.find((b) => (b.fixed_properties?.collector_number ?? b.collector_number) === collectorNumber);
+  if (byNum) return byNum.id;
+  const full = normalizeCardName(name);
+  const front = normalizeCardName(name.split(" // ")[0]);
+  return bps.find((b) => {
+    const n = normalizeCardName(b.name);
+    return n === full || n === front;
+  })?.id ?? null;
 }
