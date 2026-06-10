@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { currentUser } from "@/lib/auth";
 import { extractJson, messageText, strArr } from "@/lib/ai";
 
 export const runtime = "nodejs";
@@ -35,6 +36,9 @@ function toJudgeCard(v: unknown): JudgeCard | null {
 }
 
 export async function POST(req: Request) {
+  if (!(await currentUser())) {
+    return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  }
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: "AI is not configured" }, { status: 503 });
   }

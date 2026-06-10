@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import SwipeModal from "@/components/SwipeModal";
 import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
@@ -166,6 +167,7 @@ const plateBtn: React.CSSProperties = {
 export default function DeckPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const deckId = Number(id);
+  const router = useRouter();
 
   const [deck, setDeck] = useState<Deck | null>(null);
   const [deckMissing, setDeckMissing] = useState(false);
@@ -246,11 +248,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     fetch(`/api/decks/${deckId}`)
       .then(async (r) => {
         if (r.ok) setDeck(await r.json());
+        else if (r.status === 401) router.replace("/login");
         else setDeckMissing(true);
       })
       .catch(() => {});
     loadPool();
-  }, [deckId, loadPool]);
+  }, [deckId, loadPool, router]);
 
   // Backfill legality data and AI role tags for rows that still lack them.
   // One attempt each per page load — both routes are idempotent.

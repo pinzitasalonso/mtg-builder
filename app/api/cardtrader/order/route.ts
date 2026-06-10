@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mapPool } from "@/lib/async";
+import { currentUser } from "@/lib/auth";
 import { CtProduct, blueprintIdFor, ct, ctConfigured, resolveDecklist } from "@/lib/cardtrader";
 
 export const runtime = "nodejs";
@@ -24,6 +25,9 @@ interface AddedLine {
    names → blueprints (throwaway wishlist) → cheapest Zero-eligible listing
    per card → POST /cart/add with via_cardtrader_zero. */
 export async function POST(req: NextRequest) {
+  if (!(await currentUser())) {
+    return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  }
   if (!ctConfigured()) {
     return NextResponse.json(
       { configured: false, error: "CardTrader is not configured — add CARDTRADER_API_TOKEN to .env (cardtrader.com → Settings → API)." },

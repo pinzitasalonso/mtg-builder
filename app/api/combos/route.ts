@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { currentUser } from "@/lib/auth";
 import { strArr } from "@/lib/ai";
 
 export const runtime = "nodejs";
@@ -36,6 +37,9 @@ function trimCombo(c: SpellbookCombo, owned: Set<string>): ComboOut {
 // Find combos in a card list via Commander Spellbook. Proxied server-side so
 // the client only ever talks to our API.
 export async function POST(req: Request) {
+  if (!(await currentUser())) {
+    return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  }
   const body = await req.json();
   const names = strArr(body.cards).slice(0, MAX_NAMES);
   const commanders = strArr(body.commanders).slice(0, 2);

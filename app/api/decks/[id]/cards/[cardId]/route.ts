@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseId } from "@/lib/api";
+import { currentUser, ownedDeck } from "@/lib/auth";
 
 // Move a card between boards ("pool" ↔ "deck").
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string; cardId: string }> }
 ) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const { id, cardId } = await params;
   const deckId = parseId(id);
   const cid = parseId(cardId);
   if (!deckId || !cid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
+  if (!(await ownedDeck(deckId, user.id))) {
+    return NextResponse.json({ error: "deck not found" }, { status: 404 });
+  }
   const body = await req.json();
   if (body.board !== "pool" && body.board !== "deck") {
     return NextResponse.json({ error: "board must be 'pool' or 'deck'" }, { status: 400 });
@@ -28,10 +34,15 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string; cardId: string }> }
 ) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const { id, cardId } = await params;
   const deckId = parseId(id);
   const cid = parseId(cardId);
   if (!deckId || !cid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
+  if (!(await ownedDeck(deckId, user.id))) {
+    return NextResponse.json({ error: "deck not found" }, { status: 404 });
+  }
   // Scoped to the deck so a card id from another deck can't be deleted through
   // this URL; deleteMany also makes a missing row a 404 instead of a 500.
   const { count } = await prisma.poolCard.deleteMany({ where: { id: cid, deckId } });

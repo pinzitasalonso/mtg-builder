@@ -6,12 +6,35 @@ datasource db {
   provider = "sqlite"
 }
 
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  decks        Deck[]
+  sessions     Session[]
+}
+
+// Server-side sessions; id is the SHA-256 of the cookie token, so a DB leak
+// alone can't be replayed as a login.
+model Session {
+  id        String   @id
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
 model Deck {
   id        Int        @id @default(autoincrement())
   name      String
   format    String     @default("commander")
   commander String?
   createdAt DateTime   @default(now())
+  // Nullable so pre-auth decks survive the migration; the first user to sign
+  // up adopts them (they belong to whoever ran the instance before auth).
+  userId    Int?
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards     PoolCard[]
 }
 

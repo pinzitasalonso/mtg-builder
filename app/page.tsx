@@ -21,16 +21,31 @@ export default function HomePage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
   const [creating, setCreating] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   async function loadDecks() {
     const res = await fetch("/api/decks");
+    if (res.status === 401) {
+      router.replace("/login");
+      return;
+    }
     setDecks(await res.json());
     setLoaded(true);
   }
 
   useEffect(() => {
     loadDecks();
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => setUserEmail(d?.user?.email ?? null))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.replace("/login");
+  }
 
   async function createDeck(e: React.FormEvent) {
     e.preventDefault();
@@ -80,26 +95,64 @@ export default function HomePage() {
         }}
       >
         <Logo />
-        <button
-          onClick={() => setShowModal(true)}
-          style={{
-            padding: "10px 18px",
-            borderRadius: 9,
-            border: "none",
-            cursor: "pointer",
-            background: "var(--gold)",
-            color: "var(--accent-ink)",
-            fontFamily: "var(--font-display)",
-            fontWeight: 700,
-            fontSize: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            whiteSpace: "nowrap",
-          }}
-        >
-          <span style={{ fontSize: 19, lineHeight: 1 }}>+</span> New Deck
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          {userEmail && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+              <span
+                title={userEmail}
+                style={{
+                  fontSize: 13.5,
+                  color: "var(--text-dim)",
+                  maxWidth: 180,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {userEmail}
+              </span>
+              <button
+                onClick={signOut}
+                title="Sign out"
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: "none",
+                  cursor: "pointer",
+                  background: "transparent",
+                  boxShadow: "inset 0 0 0 1px rgba(200,155,65,.35)",
+                  color: "var(--text-muted)",
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 600,
+                  fontSize: 13.5,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              padding: "10px 18px",
+              borderRadius: 9,
+              border: "none",
+              cursor: "pointer",
+              background: "var(--gold)",
+              color: "var(--accent-ink)",
+              fontFamily: "var(--font-display)",
+              fontWeight: 700,
+              fontSize: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              whiteSpace: "nowrap",
+            }}
+          >
+            <span style={{ fontSize: 19, lineHeight: 1 }}>+</span> New Deck
+          </button>
+        </div>
       </header>
 
       {/* hero */}

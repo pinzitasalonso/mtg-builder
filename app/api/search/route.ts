@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { mapPool } from "@/lib/async";
+import { currentUser } from "@/lib/auth";
 import { extractJson, messageText, strArr } from "@/lib/ai";
 import { OutCard, resolveNamed, scryfallSearch } from "@/lib/scryfall";
 
@@ -270,6 +271,10 @@ async function aiRecommend(anthropic: Anthropic, prompt: string): Promise<AiReco
 }
 
 export async function POST(req: Request) {
+  // App is deployed publicly — AI search burns the Anthropic key, so gate it.
+  if (!(await currentUser())) {
+    return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  }
   const { prompt, filters, mode } = await req.json();
   if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return NextResponse.json({ error: "prompt required" }, { status: 400 });

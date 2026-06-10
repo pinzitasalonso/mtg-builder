@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import prisma from "@/lib/prisma";
 import { parseId } from "@/lib/api";
+import { currentUser, ownedDeck } from "@/lib/auth";
 import { extractJson, messageText } from "@/lib/ai";
 
 export const runtime = "nodejs";
@@ -21,8 +22,13 @@ export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const deckId = parseId((await params).id);
   if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
+  if (!(await ownedDeck(deckId, user.id))) {
+    return NextResponse.json({ error: "deck not found" }, { status: 404 });
+  }
 
   const untagged = await prisma.poolCard.findMany({
     where: { deckId, role: null },

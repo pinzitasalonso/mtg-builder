@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseId } from "@/lib/api";
+import { currentUser } from "@/lib/auth";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const deckId = parseId((await params).id);
   if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
-  const deck = await prisma.deck.findUnique({
-    where: { id: deckId },
+  const deck = await prisma.deck.findFirst({
+    where: { id: deckId, userId: user.id },
     include: { _count: { select: { cards: true } } },
   });
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
@@ -20,6 +23,8 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const deckId = parseId((await params).id);
   if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
   const body = await req.json();
@@ -33,7 +38,7 @@ export async function PATCH(
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "no fields to update" }, { status: 400 });
   }
-  const { count } = await prisma.deck.updateMany({ where: { id: deckId }, data });
+  const { count } = await prisma.deck.updateMany({ where: { id: deckId, userId: user.id }, data });
   if (count === 0) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const deck = await prisma.deck.findUnique({ where: { id: deckId } });
   return NextResponse.json(deck);
@@ -43,9 +48,11 @@ export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const deckId = parseId((await params).id);
   if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
-  const { count } = await prisma.deck.deleteMany({ where: { id: deckId } });
+  const { count } = await prisma.deck.deleteMany({ where: { id: deckId, userId: user.id } });
   if (count === 0) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   return new NextResponse(null, { status: 204 });
 }
