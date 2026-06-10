@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseId } from "@/lib/api";
-import { currentUser, ownedDeck } from "@/lib/auth";
+import { accessibleDeck, currentUser } from "@/lib/auth";
 
 // Move a card between boards ("pool" ↔ "deck").
 export async function PATCH(
@@ -9,12 +9,11 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; cardId: string }> }
 ) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const { id, cardId } = await params;
   const deckId = parseId(id);
   const cid = parseId(cardId);
   if (!deckId || !cid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
-  if (!(await ownedDeck(deckId, user.id))) {
+  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
     return NextResponse.json({ error: "deck not found" }, { status: 404 });
   }
   const body = await req.json();
@@ -35,12 +34,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; cardId: string }> }
 ) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const { id, cardId } = await params;
   const deckId = parseId(id);
   const cid = parseId(cardId);
   if (!deckId || !cid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
-  if (!(await ownedDeck(deckId, user.id))) {
+  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
     return NextResponse.json({ error: "deck not found" }, { status: 404 });
   }
   // Scoped to the deck so a card id from another deck can't be deleted through

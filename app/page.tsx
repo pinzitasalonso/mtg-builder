@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
-import { CardArt, ColorPips, RarityGem, FrameText, relativeTime } from "@/components/mtg";
+import { CardArt, RarityGem, FrameText, relativeTime } from "@/components/mtg";
 
 interface Deck {
   id: number;
@@ -14,37 +15,44 @@ interface Deck {
   _count: { cards: number };
 }
 
+type Me = { id: number; email: string } | null;
+
 export default function HomePage() {
   const router = useRouter();
+  // undefined = still resolving the session; null = signed out.
+  const [me, setMe] = useState<Me | undefined>(undefined);
   const [decks, setDecks] = useState<Deck[]>([]);
+  const [publicDecks, setPublicDecks] = useState<Deck[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
   const [creating, setCreating] = useState(false);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  async function loadDecks() {
-    const res = await fetch("/api/decks");
-    if (res.status === 401) {
-      router.replace("/login");
-      return;
-    }
-    setDecks(await res.json());
+  async function loadAll() {
+    const meBody = await fetch("/api/auth/me")
+      .then((r) => r.json())
+      .catch(() => ({ user: null }));
+    const user: Me = meBody?.user ?? null;
+    setMe(user);
+    const [own, pub] = await Promise.all([
+      user ? fetch("/api/decks").then((r) => (r.ok ? r.json() : [])) : Promise.resolve([]),
+      fetch("/api/decks?public=1").then((r) => (r.ok ? r.json() : [])),
+    ]);
+    setDecks(own);
+    setPublicDecks(pub);
     setLoaded(true);
   }
 
   useEffect(() => {
-    loadDecks();
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d) => setUserEmail(d?.user?.email ?? null))
-      .catch(() => {});
+    loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.replace("/login");
+    setMe(null);
+    setDecks([]);
+    loadAll();
   }
 
   async function createDeck(e: React.FormEvent) {
@@ -65,13 +73,13 @@ export default function HomePage() {
     setShowModal(false);
     setCreating(false);
     if (created?.id) router.push(`/deck/${created.id}`);
-    else loadDecks();
+    else loadAll();
   }
 
   async function deleteDeck(id: number) {
     if (!confirm("Delete this deck?")) return;
     await fetch(`/api/decks/${id}`, { method: "DELETE" });
-    loadDecks();
+    loadAll();
   }
 
   const totalCards = decks.reduce((s, d) => s + (d._count?.cards || 0), 0);
@@ -96,10 +104,10 @@ export default function HomePage() {
       >
         <Logo />
         <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
-          {userEmail && (
+          {me ? (
             <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
               <span
-                title={userEmail}
+                title={me.email}
                 style={{
                   fontSize: 13.5,
                   color: "var(--text-dim)",
@@ -109,28 +117,18 @@ export default function HomePage() {
                   whiteSpace: "nowrap",
                 }}
               >
-                {userEmail}
+                {me.email}
               </span>
-              <button
-                onClick={signOut}
-                title="Sign out"
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  border: "none",
-                  cursor: "pointer",
-                  background: "transparent",
-                  boxShadow: "inset 0 0 0 1px rgba(200,155,65,.35)",
-                  color: "var(--text-muted)",
-                  fontFamily: "var(--font-display)",
-                  fontWeight: 600,
-                  fontSize: 13.5,
-                  whiteSpace: "nowrap",
-                }}
-              >
+              <button onClick={signOut} title="Sign out" style={outlineBtn}>
                 Sign out
               </button>
             </div>
+          ) : (
+            me === null && (
+              <Link href="/login" style={{ ...outlineBtn, textDecoration: "none", display: "inline-block" }}>
+                Sign in
+              </Link>
+            )
           )}
           <button
             onClick={() => setShowModal(true)}
@@ -155,46 +153,125 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* hero */}
-      <div style={{ maxWidth: 1160, width: "100%", margin: "0 auto", padding: "30px 22px 0" }}>
-        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
-          <div>
-            <div className="label-sc" style={{ fontSize: 13, color: "var(--gold)", letterSpacing: ".22em", marginBottom: 8 }}>
-              The Spellbook
+      {me ? (
+        <>
+          {/* signed in: your decks */}
+          <div style={{ maxWidth: 1160, width: "100%", margin: "0 auto", padding: "30px 22px 0" }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+              <div>
+                <div className="label-sc" style={{ fontSize: 13, color: "var(--gold)", letterSpacing: ".22em", marginBottom: 8 }}>
+                  The Spellbook
+                </div>
+                <h1 style={h1Style}>Your decks</h1>
+                <p style={ledeStyle}>
+                  Build and brew Magic: The Gathering decks — describe what you seek and let the Oracle surface the cards.
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 26, paddingBottom: 4 }}>
+                <CStat n={decks.length} label="Decks" />
+                <CStat n={totalCards} label="Cards" />
+                <CStat n={formatCount} label="Formats" gold />
+              </div>
             </div>
-            <h1
-              style={{
-                margin: 0,
-                fontFamily: "var(--font-display)",
-                fontSize: "clamp(34px, 7vw, 46px)",
-                fontWeight: 700,
-                color: "var(--text)",
-                letterSpacing: "-.01em",
-                lineHeight: 1,
-              }}
-            >
-              Your decks
+          </div>
+
+          <div style={{ maxWidth: 1160, width: "100%", margin: "0 auto", padding: "30px 22px 10px" }}>
+            <div className="deck-grid">
+              {decks.map((d) => (
+                <ClassicDeckCard key={d.id} deck={d} onOpen={() => router.push(`/deck/${d.id}`)} onDelete={() => deleteDeck(d.id)} />
+              ))}
+              {loaded && <ClassicNewDeck onClick={() => setShowModal(true)} />}
+            </div>
+          </div>
+        </>
+      ) : (
+        /* signed out: landing */
+        <div style={{ maxWidth: 1160, width: "100%", margin: "0 auto", padding: "44px 22px 0" }}>
+          <div style={{ maxWidth: 660, margin: "0 auto", textAlign: "center" }}>
+            <div className="label-sc" style={{ fontSize: 13, color: "var(--gold)", letterSpacing: ".22em", marginBottom: 10 }}>
+              The Spellbook, open to all
+            </div>
+            <h1 style={{ ...h1Style, fontSize: "clamp(36px, 8vw, 54px)", lineHeight: 1.04 }}>
+              Brew Magic decks with an Oracle at your side
             </h1>
-            <p style={{ margin: "12px 0 0", fontSize: 17, fontStyle: "italic", color: "var(--text-muted)", maxWidth: 480, lineHeight: 1.45 }}>
-              Build and brew Magic: The Gathering decks — describe what you seek and let the Oracle surface the cards.
+            <p style={{ ...ledeStyle, maxWidth: 560, margin: "14px auto 0", fontSize: 18 }}>
+              Describe the deck you seek in plain words. The Oracle gathers real cards from the
+              community&apos;s wisdom — you swipe, judge, and shuffle up.
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", marginTop: 26, flexWrap: "wrap" }}>
+              <button
+                onClick={() => setShowModal(true)}
+                style={{
+                  padding: "13px 26px",
+                  borderRadius: 10,
+                  border: "none",
+                  cursor: "pointer",
+                  background: "var(--gold)",
+                  color: "var(--accent-ink)",
+                  fontFamily: "var(--font-display)",
+                  fontWeight: 700,
+                  fontSize: 18,
+                }}
+              >
+                Start brewing — no account needed
+              </button>
+              <Link
+                href="/login"
+                style={{ ...outlineBtn, padding: "13px 22px", fontSize: 16, textDecoration: "none", display: "inline-block" }}
+              >
+                Sign in for private decks
+              </Link>
+            </div>
+            <p style={{ margin: "14px 0 0", fontSize: 13.5, fontStyle: "italic", color: "var(--text-dim)" }}>
+              Guest decks are public — anyone can view them, anyone can tinker with them.
             </p>
           </div>
-          <div style={{ display: "flex", gap: 26, paddingBottom: 4 }}>
-            <CStat n={decks.length} label="Decks" />
-            <CStat n={totalCards} label="Cards" />
-            <CStat n={formatCount} label="Formats" gold />
+
+          {/* feature trio */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))",
+              gap: 16,
+              margin: "42px auto 0",
+              maxWidth: 920,
+            }}
+          >
+            <FeatureCard icon="✦" title="Ask the Oracle">
+              “Cheap blue card draw.” “Token doublers.” Plain words in — real candidates out, drawn
+              from EDHREC, Reddit and Scryfall.
+            </FeatureCard>
+            <FeatureCard icon="🃏" title="Swipe your pool">
+              Review candidates like opening packs: keep what sings, skip what doesn&apos;t, promote
+              the keepers into the deck.
+            </FeatureCard>
+            <FeatureCard icon="✨" title="Judge &amp; combos">
+              An AI judge scores the brew, Commander Spellbook flags infinite combos, and sample
+              hands tell you if it actually works.
+            </FeatureCard>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* deck grid */}
-      <div style={{ maxWidth: 1160, width: "100%", margin: "0 auto", padding: "30px 22px 60px", flex: 1 }}>
+      {/* public brews */}
+      <div style={{ maxWidth: 1160, width: "100%", margin: "0 auto", padding: "34px 22px 60px", flex: 1 }}>
+        {(publicDecks.length > 0 || !me) && (
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 18 }}>
+            <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: "var(--text)" }}>
+              Public brews
+            </h2>
+            <span style={{ fontSize: 13.5, fontStyle: "italic", color: "var(--text-dim)" }}>
+              open decks anyone can edit
+            </span>
+          </div>
+        )}
         <div className="deck-grid">
-          {decks.map((d) => (
+          {publicDecks.map((d) => (
             <ClassicDeckCard key={d.id} deck={d} onOpen={() => router.push(`/deck/${d.id}`)} onDelete={() => deleteDeck(d.id)} />
           ))}
-          {loaded && <ClassicNewDeck onClick={() => setShowModal(true)} />}
+          {loaded && !me && <ClassicNewDeck onClick={() => setShowModal(true)} />}
         </div>
+        {loaded && me && publicDecks.length === 0 && null}
       </div>
 
       {showModal && (
@@ -222,7 +299,9 @@ export default function HomePage() {
                 Begin a new deck
               </h2>
               <p style={{ margin: "0 0 16px", fontStyle: "italic", fontSize: 14, color: "rgba(236,225,198,.7)" }}>
-                Name your brew and choose a format.
+                {me
+                  ? "Name your brew and choose a format."
+                  : "You're brewing as a guest — this deck will be public, and anyone can edit it."}
               </p>
               <form onSubmit={createDeck} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <input className="cc-paper" placeholder="Deck name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus style={modalInput} />
@@ -251,6 +330,55 @@ export default function HomePage() {
         </div>
       )}
     </main>
+  );
+}
+
+const h1Style: React.CSSProperties = {
+  margin: 0,
+  fontFamily: "var(--font-display)",
+  fontSize: "clamp(34px, 7vw, 46px)",
+  fontWeight: 700,
+  color: "var(--text)",
+  letterSpacing: "-.01em",
+  lineHeight: 1,
+};
+
+const ledeStyle: React.CSSProperties = {
+  margin: "12px 0 0",
+  fontSize: 17,
+  fontStyle: "italic",
+  color: "var(--text-muted)",
+  maxWidth: 480,
+  lineHeight: 1.45,
+};
+
+const outlineBtn: React.CSSProperties = {
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: "none",
+  cursor: "pointer",
+  background: "transparent",
+  boxShadow: "inset 0 0 0 1px rgba(200,155,65,.35)",
+  color: "var(--text-muted)",
+  fontFamily: "var(--font-display)",
+  fontWeight: 600,
+  fontSize: 13.5,
+  whiteSpace: "nowrap",
+};
+
+function FeatureCard({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="cc-black" style={{ padding: 7 }}>
+      <div className="cc-brown" style={{ padding: 7, height: "100%" }}>
+        <div className="cc-paper" style={{ padding: "16px 16px 18px", height: "100%" }}>
+          <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 8 }}>{icon}</div>
+          <div style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 18, color: "var(--ink)", marginBottom: 6 }}>
+            {title}
+          </div>
+          <div style={{ fontStyle: "italic", fontSize: 14, color: "var(--ink-soft)", lineHeight: 1.45 }}>{children}</div>
+        </div>
+      </div>
+    </div>
   );
 }
 

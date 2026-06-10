@@ -2,25 +2,29 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 
-export async function GET() {
+// Public decks (userId null) are listed for everyone; signed-in users see
+// their own private decks by default. ?public=1 forces the public gallery
+// (used for the "public brews" section while signed in).
+export async function GET(req: Request) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  const wantPublic = new URL(req.url).searchParams.get("public") === "1";
   const decks = await prisma.deck.findMany({
-    where: { userId: user.id },
+    where: user && !wantPublic ? { userId: user.id } : { userId: null },
     include: { _count: { select: { cards: true } } },
     orderBy: { createdAt: "desc" },
+    take: 100,
   });
   return NextResponse.json(decks);
 }
 
 export async function POST(req: Request) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
   const format = typeof body.format === "string" && body.format.trim() ? body.format.trim() : "commander";
   const commander = typeof body.commander === "string" && body.commander.trim() ? body.commander.trim() : null;
-  const deck = await prisma.deck.create({ data: { name, format, commander, userId: user.id } });
+  // Signed out → a public deck, owned by nobody and editable by anybody.
+  const deck = await prisma.deck.create({ data: { name, format, commander, userId: user?.id ?? null } });
   return NextResponse.json(deck, { status: 201 });
 }

@@ -71,11 +71,17 @@ export async function currentUser(): Promise<AuthUser | null> {
   return session.user;
 }
 
-/* Ownership check for deck-scoped routes: the deck, but only if `userId`
-   owns it. Returns null for other users' decks — callers 404, never 403,
-   so deck ids aren't probeable. */
-export async function ownedDeck(deckId: number, userId: number) {
-  return prisma.deck.findFirst({ where: { id: deckId, userId } });
+/* Access check for deck-scoped routes. Public decks (userId null) are open
+   to everyone — viewing AND editing, by design. Private decks only resolve
+   for their owner; for anyone else this returns null and callers 404 (never
+   403), so private deck ids aren't probeable. */
+export async function accessibleDeck(deckId: number, userId: number | null) {
+  return prisma.deck.findFirst({
+    where:
+      userId === null
+        ? { id: deckId, userId: null }
+        : { id: deckId, OR: [{ userId: null }, { userId }] },
+  });
 }
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

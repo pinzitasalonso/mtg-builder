@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseId } from "@/lib/api";
-import { currentUser, ownedDeck } from "@/lib/auth";
+import { accessibleDeck, currentUser } from "@/lib/auth";
 
 const MAX_QTY = 999;
 
@@ -10,10 +10,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const deckId = parseId((await params).id);
   if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
-  if (!(await ownedDeck(deckId, user.id))) {
+  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
     return NextResponse.json({ error: "deck not found" }, { status: 404 });
   }
   const cards = await prisma.poolCard.findMany({
@@ -28,7 +27,6 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   const deckId = parseId((await params).id);
   if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
   const body = await req.json();
@@ -41,7 +39,7 @@ export async function POST(
     return NextResponse.json({ error: "scryfallId, name, imageUri required" }, { status: 400 });
   }
 
-  if (!(await ownedDeck(deckId, user.id))) {
+  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
     return NextResponse.json({ error: "deck not found" }, { status: 404 });
   }
 

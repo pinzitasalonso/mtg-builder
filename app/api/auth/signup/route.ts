@@ -26,14 +26,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "An account with that email already exists." }, { status: 409 });
   }
 
-  const isFirstUser = (await prisma.user.count()) === 0;
+  // Ownerless decks are PUBLIC decks now — no adoption on signup.
   const user = await prisma.user.create({ data: { email, passwordHash: hashPassword(password) } });
-
-  // Decks created before auth existed have no owner; they belong to whoever
-  // was running the instance — i.e. the first account created.
-  if (isFirstUser) {
-    await prisma.deck.updateMany({ where: { userId: null }, data: { userId: user.id } });
-  }
 
   // No session yet — sign-in is blocked until the emailed link is clicked.
   const token = await createVerifyToken(user.id);
