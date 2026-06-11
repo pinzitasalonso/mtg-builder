@@ -35,6 +35,8 @@ model Deck {
   name      String
   format    String     @default("commander")
   commander String?
+  // Free-form play notes: mulligans, lines, win routes.
+  notes     String?
   createdAt DateTime   @default(now())
   // Nullable so pre-auth decks survive the migration; the first user to sign
   // up adopts them (they belong to whoever ran the instance before auth).

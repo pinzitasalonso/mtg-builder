@@ -39,6 +39,7 @@ interface Deck {
   name: string;
   format: string;
   commander: string | null;
+  notes: string | null;
 }
 
 const COLORS = [
@@ -212,6 +213,37 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // commander's color identity (resolved from Scryfall) for legality checks
   const [cmdrIdentity, setCmdrIdentity] = useState<string | null>(null);
 
+  // play notes — autosaved, debounced
+  const [notes, setNotes] = useState("");
+  const [noteStatus, setNoteStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedNotes = useRef("");
+
+  const saveNotes = useCallback(
+    async (text: string) => {
+      if (text === lastSavedNotes.current) return;
+      setNoteStatus("saving");
+      const res = await fetch(`/api/decks/${deckId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes: text }),
+      });
+      if (res.ok) {
+        lastSavedNotes.current = text;
+        setNoteStatus("saved");
+      } else {
+        setNoteStatus("idle");
+      }
+    },
+    [deckId]
+  );
+
+  function onNotesChange(text: string) {
+    setNotes(text);
+    if (noteTimer.current) clearTimeout(noteTimer.current);
+    noteTimer.current = setTimeout(() => saveNotes(text), 900);
+  }
+
   const loadPool = useCallback(async () => {
     const res = await fetch(`/api/decks/${deckId}/cards`);
     if (!res.ok) return;
@@ -247,8 +279,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     fetch(`/api/decks/${deckId}`)
       .then(async (r) => {
-        if (r.ok) setDeck(await r.json());
-        else if (r.status === 401) router.replace("/login");
+        if (r.ok) {
+          const d: Deck = await r.json();
+          setDeck(d);
+          setNotes(d.notes ?? "");
+          lastSavedNotes.current = d.notes ?? "";
+        } else if (r.status === 401) router.replace("/login");
         else setDeckMissing(true);
       })
       .catch(() => {});
@@ -899,6 +935,38 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 Stats show the pool until the deck has cards.
               </div>
             )}
+          </StatCard>
+          <StatCard
+            label="Play Notes"
+            right={
+              <span className="mn-label" style={{ fontSize: 10, color: noteStatus === "saving" ? "var(--t3)" : "#0d8a5f" }}>
+                {noteStatus === "saving" ? "Saving…" : noteStatus === "saved" ? "Saved" : ""}
+              </span>
+            }
+          >
+            <textarea
+              value={notes}
+              onChange={(e) => onNotesChange(e.target.value)}
+              onBlur={() => {
+                if (noteTimer.current) clearTimeout(noteTimer.current);
+                saveNotes(notes);
+              }}
+              placeholder="How does this deck play? Mulligans, key lines, win routes…"
+              rows={6}
+              style={{
+                width: "100%",
+                border: "none",
+                outline: "none",
+                resize: "vertical",
+                background: "transparent",
+                fontFamily: "var(--font-body)",
+                fontSize: 14,
+                lineHeight: 1.55,
+                color: "var(--t1)",
+                minHeight: 110,
+                padding: 0,
+              }}
+            />
           </StatCard>
           <StatCard label="Roles">
             {statsSource.length > 0 ? (

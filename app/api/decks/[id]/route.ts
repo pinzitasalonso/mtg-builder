@@ -30,12 +30,16 @@ export async function PATCH(
     return NextResponse.json({ error: "deck not found" }, { status: 404 });
   }
   const body = await req.json();
-  const data: { name?: string; format?: string; commander?: string | null } = {};
+  const data: { name?: string; format?: string; commander?: string | null; notes?: string | null } = {};
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
   if (typeof body.format === "string" && body.format.trim()) data.format = body.format.trim();
   if ("commander" in body) {
     const c = typeof body.commander === "string" ? body.commander.trim() : "";
     data.commander = c || null;
+  }
+  if ("notes" in body) {
+    const n = typeof body.notes === "string" ? body.notes.slice(0, 20_000) : "";
+    data.notes = n.trim() ? n : null;
   }
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "no fields to update" }, { status: 400 });
