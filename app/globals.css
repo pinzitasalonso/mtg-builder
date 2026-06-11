@@ -283,7 +283,8 @@ button {
   }
 }
 
-/* Deck view two-column layout: main + sticky stats sidebar */
+/* Deck view two-column layout: the pool front and center, the decklist in a
+   sticky sidebar that scrolls internally when it outgrows the viewport. */
 .deck-layout {
   display: grid;
   grid-template-columns: 1fr;
@@ -292,10 +293,12 @@ button {
 }
 @media (min-width: 1024px) {
   .deck-layout {
-    grid-template-columns: 1fr 318px;
+    grid-template-columns: 1fr 340px;
   }
   .deck-sidebar {
     position: sticky;
     top: 86px;
+    max-height: calc(100vh - 102px);
+    overflow-y: auto;
   }
 }
