@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mapPool } from "@/lib/async";
 import { currentUser } from "@/lib/auth";
-import { CtProduct, blueprintIdFor, ct, ctConfigured, resolveDecklist } from "@/lib/cardtrader";
+import { CtProduct, ct, ctConfigured, findBlueprintId } from "@/lib/cardtrader";
+import { ScryfallPrinting, defaultPrintingsByName, printingsOf } from "@/lib/scryfall";
 
 export const runtime = "nodejs";
 
 const MAX_CARDS = 200;
 const LOOKUP_CONCURRENCY = 4;
+// When the default printing has no Zero listing, how many other printings
+// (newest first) to try before giving up on the card.
+const MAX_FALLBACK_PRINTINGS = 6;
 
 interface ReqCard {
   name: string;
@@ -22,8 +26,8 @@ interface AddedLine {
 }
 
 /* Fill the user's CardTrader Zero cart with the deck:
-   names → blueprints (throwaway wishlist) → cheapest Zero-eligible listing
-   per card → POST /cart/add with via_cardtrader_zero. */
+   names → printings (Scryfall) → blueprints (CardTrader catalog) → cheapest
+   Zero-eligible listing per card → POST /cart/add with via_cardtrader_zero. */
 export async function POST(req: NextRequest) {
   if (!(await currentUser())) {
     return NextResponse.json({ error: "Sign in required" }, { status: 401 });
@@ -53,25 +57,51 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // 1 — resolve names on CardTrader's side; unmatched lines vanish silently.
-    const text = cards.map((c) => `${c.quantity} ${c.name}`).join("\n");
-    const items = await resolveDecklist(text);
-    const resolvedNames = new Set(items.map((i) => (i.meta_name ?? i.name ?? "").toLowerCase()));
-    const notFound = cards.filter((c) => !resolvedNames.has(c.name.toLowerCase())).map((c) => c.name);
+    // 1 — resolve names to concrete printings via Scryfall (batched).
+    const printings = await defaultPrintingsByName(cards.map((c) => c.name));
+    const notFound: string[] = [];
+    const resolved: { card: ReqCard; printing: ScryfallPrinting }[] = [];
+    for (const c of cards) {
+      const p = printings.get(c.name.toLowerCase());
+      if (p) resolved.push({ card: c, printing: p });
+      else notFound.push(c.name);
+    }
 
     // 2 — cheapest CardTrader Zero listing per card (bounded concurrency).
-    const looked = await mapPool(items, LOOKUP_CONCURRENCY, async (item) => {
-      const name = item.meta_name ?? item.name ?? "?";
-      try {
-        const bpId = await blueprintIdFor(item);
-        if (bpId === null) return { name, status: "notfound" as const };
+    // Try the default printing first; if it isn't on CardTrader or has no
+    // Zero listing, walk other printings newest-first.
+    type Looked =
+      | { name: string; status: "ok"; product: CtProduct; quantity: number }
+      | { name: string; status: "nozero" }
+      | { name: string; status: "notfound" }
+      | { name: string; status: "failed" };
+    const looked = await mapPool(resolved, LOOKUP_CONCURRENCY, async ({ card, printing }): Promise<Looked> => {
+      const name = printing.name;
+      let sawBlueprint = false;
+      const cheapestZero = async (p: ScryfallPrinting): Promise<CtProduct | null> => {
+        const bpId = await findBlueprintId(p.set, p.collectorNumber, p.name);
+        if (bpId === null) return null;
+        sawBlueprint = true;
         const byBlueprint = await ct<Record<string, CtProduct[]>>(`/marketplace/products?blueprint_id=${bpId}`);
-        const products = Object.values(byBlueprint).flat();
-        const eligible = products
-          .filter((p) => p.user?.can_sell_via_hub && p.quantity > 0 && (p.bundle_size ?? 1) === 1)
+        const eligible = Object.values(byBlueprint)
+          .flat()
+          .filter((pr) => pr.user?.can_sell_via_hub && pr.quantity > 0 && (pr.bundle_size ?? 1) === 1)
           .sort((a, b) => a.price.cents - b.price.cents);
-        if (eligible.length === 0) return { name, status: "nozero" as const };
-        return { name, status: "ok" as const, product: eligible[0], quantity: item.quantity };
+        return eligible[0] ?? null;
+      };
+      try {
+        let product = await cheapestZero(printing);
+        if (!product) {
+          const others = (await printingsOf(name))
+            .filter((p) => !(p.set === printing.set && p.collectorNumber === printing.collectorNumber))
+            .slice(0, MAX_FALLBACK_PRINTINGS);
+          for (const p of others) {
+            product = await cheapestZero(p);
+            if (product) break;
+          }
+        }
+        if (product) return { name, status: "ok" as const, product, quantity: card.quantity };
+        return { name, status: sawBlueprint ? ("nozero" as const) : ("notfound" as const) };
       } catch {
         return { name, status: "failed" as const };
       }
@@ -87,7 +117,7 @@ export async function POST(req: NextRequest) {
         continue;
       }
       if (r.status === "notfound") {
-        if (!notFound.includes(r.name)) notFound.push(r.name);
+        notFound.push(r.name);
         continue;
       }
       if (r.status === "nozero") {
@@ -123,7 +153,7 @@ export async function POST(req: NextRequest) {
       failed,
       totalCents,
       currency: currencies.length === 1 ? currencies[0] : null,
-      cartUrl: "https://www.cardtrader.com/cart",
+      cartUrl: "https://www.cardtrader.com/cart/edit",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "CardTrader request failed";

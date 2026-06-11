@@ -12,6 +12,9 @@ export interface ScryfallCard {
   oracle_text?: string;
   color_identity?: string[];
   legalities?: Record<string, string>;
+  set?: string;
+  collector_number?: string;
+  digital?: boolean;
 }
 
 // The card shape the rest of the app speaks — API responses, pool rows, UI.
@@ -90,6 +93,67 @@ export async function resolveNamed(name: string): Promise<OutCard | null> {
     return toOutCard(c);
   } catch {
     return null;
+  }
+}
+
+// A concrete printing of a card — what's needed to locate it in another
+// marketplace's catalog (set code + collector number).
+export interface ScryfallPrinting {
+  name: string;
+  set: string;
+  collectorNumber: string;
+}
+
+const toPrinting = (c: ScryfallCard): ScryfallPrinting | null =>
+  c.set && c.collector_number ? { name: c.name, set: c.set, collectorNumber: c.collector_number } : null;
+
+// Bulk name → default printing via /cards/collection. Keys are lowercase: the
+// full card name plus the front-face name for double-faced/split cards, so
+// callers can look up whichever form they hold.
+export async function defaultPrintingsByName(names: string[]): Promise<Map<string, ScryfallPrinting>> {
+  const out = new Map<string, ScryfallPrinting>();
+  for (let i = 0; i < names.length; i += 75) {
+    const chunk = names.slice(i, i + 75);
+    try {
+      const res = await fetch("https://api.scryfall.com/cards/collection", {
+        method: "POST",
+        headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
+        body: JSON.stringify({ identifiers: chunk.map((name) => ({ name })) }),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      for (const c of (data.data ?? []) as ScryfallCard[]) {
+        const p = toPrinting(c);
+        if (!p) continue;
+        out.set(c.name.toLowerCase(), p);
+        const front = c.name.split(" // ")[0].toLowerCase();
+        if (!out.has(front)) out.set(front, p);
+      }
+    } catch {
+      // skip the chunk — callers treat missing entries as unresolved
+    }
+    if (i + 75 < names.length) await new Promise((r) => setTimeout(r, 100));
+  }
+  return out;
+}
+
+// All paper printings of an exactly-named card, newest first (first page only —
+// 175 printings is plenty for fallback lookups).
+export async function printingsOf(name: string): Promise<ScryfallPrinting[]> {
+  try {
+    const q = `!"${name}" game:paper`;
+    const res = await fetch(
+      `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=released&dir=desc`,
+      { headers: SCRYFALL_HEADERS }
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return ((data.data ?? []) as ScryfallCard[])
+      .filter((c) => !c.digital)
+      .map(toPrinting)
+      .filter((p): p is ScryfallPrinting => p !== null);
+  } catch {
+    return [];
   }
 }
 
