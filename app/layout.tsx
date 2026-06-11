@@ -1,29 +1,21 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, EB_Garamond, Cormorant_SC } from "next/font/google";
+import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import "./globals.css";
 
-const cormorant = Cormorant_Garamond({
+const instrument = Instrument_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   style: ["normal", "italic"],
-  variable: "--font-cormorant",
+  variable: "--font-instrument",
   display: "swap",
 });
 
-const ebGaramond = EB_Garamond({
+const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-ebgaramond",
-  display: "swap",
-});
-
-const cormorantSC = Cormorant_SC({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-cormorant-sc",
+  weight: ["400", "500"],
+  variable: "--font-plexmono",
   display: "swap",
 });
 
@@ -48,22 +40,19 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#14100a",
+  themeColor: "#fbfbf8",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="en"
-      className={`h-full ${cormorant.variable} ${ebGaramond.variable} ${cormorantSC.variable}`}
-    >
+    <html lang="en" className={`h-full ${instrument.variable} ${plexMono.variable}`}>
       <body className="min-h-full flex flex-col">
         {children}
         <footer
           style={{
             marginTop: "auto",
             borderTop: "1px solid var(--line)",
-            padding: "22px 20px",
+            padding: "20px 22px",
           }}
         >
           <div
@@ -78,11 +67,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             }}
           >
             <Link href="/" aria-label="Spellpool home" style={{ textDecoration: "none" }}>
-              <Logo size={19} />
+              <Logo size={16} />
             </Link>
-            <span style={{ fontSize: 14, fontStyle: "italic", color: "var(--text-dim)" }}>
-              Powered by Claude + Scryfall
-            </span>
+            <span className="mn-label">Powered by Claude + Scryfall</span>
           </div>
         </footer>
       </body>

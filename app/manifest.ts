@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Build and brew your Magic: The Gathering decks.",
     start_url: "/",
     display: "standalone",
-    background_color: "#111214",
-    theme_color: "#111214",
+    background_color: "#fbfbf8",
+    theme_color: "#fbfbf8",
     icons: [
       {
         src: "/icon.svg",

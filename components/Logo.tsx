@@ -20,8 +20,8 @@ export default function Logo({
         <span
           style={{
             fontFamily: "var(--font-display)",
-            fontSize: size * 0.92,
-            fontWeight: 800,
+            fontSize: size * 0.95,
+            fontWeight: 700,
             letterSpacing: "-0.02em",
           }}
         >

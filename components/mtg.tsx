@@ -3,13 +3,15 @@
 import { useState, type CSSProperties } from "react";
 
 /* ---------- mana / color palette ---------- */
+/* Stylized-minimal mana palette: flat colored discs, glyph/letter cut in
+   near-white (reads as a cut-out on the light page). */
 export const MANA: Record<string, { bg: string; fg: string; ring: string }> = {
-  W: { bg: "#f6f3e1", fg: "#6a5d34", ring: "#e6e0c4" },
-  U: { bg: "#a9def5", fg: "#0a3a57", ring: "#84c8e8" },
-  B: { bg: "#c9bfb9", fg: "#2a221d", ring: "#a99e96" },
-  R: { bg: "#f6a283", fg: "#6e1810", ring: "#e87f5c" },
-  G: { bg: "#9bd3ad", fg: "#114a28", ring: "#73bd8c" },
-  C: { bg: "#c8c3bd", fg: "#3a352d", ring: "#aaa49c" },
+  W: { bg: "#dcd1a4", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
+  U: { bg: "#4a90c9", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
+  B: { bg: "#9b85b5", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
+  R: { bg: "#d96b45", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
+  G: { bg: "#58a877", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
+  C: { bg: "#b8b6ae", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
 };
 export const COLOR_NAME: Record<string, string> = {
   W: "White",
@@ -64,10 +66,10 @@ export function Pip({ sym, size = 18 }: { sym: string; size?: number }) {
         background: m.bg,
         color: m.fg,
         fontSize: size * (isMulti ? 0.42 : 0.62),
-        fontWeight: 800,
+        fontWeight: 700,
         lineHeight: 1,
         fontFamily: "var(--font-ui)",
-        boxShadow: `inset 0 0 0 1px ${m.ring}, inset 0 -2px 3px rgba(0,0,0,.18), 0 1px 1px rgba(0,0,0,.25)`,
+        boxShadow: `inset 0 0 0 1px ${m.ring}`,
       }}
     >
       {isMulti ? sym.replace("/", "") : sym}
@@ -145,7 +147,7 @@ export function CardArt({
           <span
             style={{
               fontFamily: "var(--font-display)",
-              fontWeight: 800,
+              fontWeight: 700,
               fontSize: 30,
               color: m.bg,
               opacity: 0.5,
@@ -161,6 +163,10 @@ export function CardArt({
         <img
           src={url}
           alt={name || ""}
+          ref={(el) => {
+            // Cached images can complete before React attaches onLoad.
+            if (el && el.complete && el.naturalWidth > 0) setLoaded(true);
+          }}
           onLoad={() => setLoaded(true)}
           onError={() => {
             setLoaded(false);
@@ -278,7 +284,7 @@ export function ManaCurve({ curve, accent }: { curve: number[]; accent: string }
               width: "100%",
               height: `${(n / max) * 100}%`,
               minHeight: n ? 4 : 0,
-              background: n ? `linear-gradient(180deg, ${accent}, color-mix(in srgb, ${accent} 60%, transparent))` : "transparent",
+              background: n ? accent : "transparent",
               borderRadius: 4,
               transition: "height .5s cubic-bezier(.2,.8,.2,1)",
             }}
@@ -319,7 +325,7 @@ export function TypeBreakdown({ types, accent }: { types: { name: string; n: num
       {types.map((t) => (
         <div key={t.name} style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ width: 92, fontSize: 12.5, color: "var(--text-muted)", flex: "none" }}>{t.name}</span>
-          <div style={{ flex: 1, height: 7, borderRadius: 4, background: "rgba(255,255,255,.05)", overflow: "hidden" }}>
+          <div style={{ flex: 1, height: 7, borderRadius: 4, background: "var(--bar-track)", overflow: "hidden" }}>
             <div style={{ width: `${(t.n / max) * 100}%`, height: "100%", background: accent, borderRadius: 4, opacity: 0.85 }} />
           </div>
           <span
@@ -347,7 +353,7 @@ export function CountRing({ count, target, accent }: { count: number; target: nu
   return (
     <div style={{ position: "relative", width: 76, height: 76, flex: "none" }}>
       <svg width="76" height="76" style={{ transform: "rotate(-90deg)" }}>
-        <circle cx="38" cy="38" r={r} fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="6" />
+        <circle cx="38" cy="38" r={r} fill="none" stroke="var(--ring-track)" strokeWidth="6" />
         <circle
           cx="38"
           cy="38"
@@ -371,7 +377,7 @@ export function CountRing({ count, target, accent }: { count: number; target: nu
           justifyContent: "center",
         }}
       >
-        <span style={{ fontSize: 19, fontWeight: 800, color: "var(--text)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
+        <span style={{ fontSize: 19, fontWeight: 700, color: "var(--text)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
           {count}
         </span>
         <span style={{ fontSize: 10.5, color: "var(--text-dim)", marginTop: 1 }}>/ {target}</span>
@@ -390,17 +396,17 @@ export function StatCard({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ background: "var(--app-bg2)", borderRadius: 8, boxShadow: "inset 0 0 0 1px rgba(200,155,65,.16)" }}>
+    <div style={{ background: "var(--bg2)", borderRadius: 14, border: "1px solid var(--line)" }}>
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "11px 15px 10px",
-          borderBottom: "1px solid rgba(200,155,65,.16)",
+          borderBottom: "1px solid var(--line)",
         }}
       >
-        <span className="label-sc" style={{ fontSize: 13, color: "var(--gold)", letterSpacing: ".14em" }}>
+        <span className="mn-label" style={{ color: "var(--t2)" }}>
           {label}
         </span>
         {right}
@@ -459,12 +465,11 @@ export function FrameText({
         fontWeight: 600,
         fontSize: size,
         color: ink || "var(--frame-ink)",
-        letterSpacing: ".005em",
+        letterSpacing: "-.01em",
         lineHeight: 1.12,
         whiteSpace: "nowrap",
         overflow: "hidden",
         textOverflow: "ellipsis",
-        textShadow: "0 1px 2px rgba(0,0,0,.6), 0 0 1px rgba(0,0,0,.5)",
         minWidth: 0,
       }}
     >
@@ -521,8 +526,8 @@ export function ClassicCard({
         transform: hover && onClick ? "translateY(-2px)" : "none",
         boxShadow:
           hover && onClick
-            ? "0 8px 18px -6px rgba(0,0,0,.65), 0 0 0 1.5px var(--gold)"
-            : "0 5px 13px -4px rgba(0,0,0,.6)",
+            ? "0 10px 24px -12px rgba(21,21,26,.25)"
+            : "0 1px 2px rgba(21,21,26,.04)",
         transition: "transform .15s ease, box-shadow .15s",
         ...style,
       }}
@@ -575,7 +580,7 @@ export function ClassicCard({
             {card.oracleText}
           </p>
           {full && (
-            <div style={{ marginTop: 10, fontStyle: "italic", fontSize: 12.5, color: "var(--ink-soft)" }}>
+            <div style={{ marginTop: 10, fontStyle: "normal", fontSize: 12.5, color: "var(--ink-soft)" }}>
               Illus. — Spellpool · Scryfall
             </div>
           )}
@@ -588,7 +593,7 @@ export function ClassicCard({
               justifyContent: "space-between",
               padding: "1px 4px 0",
               fontSize: 10.5,
-              color: "rgba(244,233,205,.55)",
+              color: "var(--t3)",
             }}
           >
             <span>SPL · EN</span>
@@ -607,13 +612,13 @@ export function ClassicCard({
             width: 24,
             height: 24,
             borderRadius: 7,
-            background: "rgba(160,60,40,.92)",
-            color: "#ffe9c9",
+            background: "var(--danger)",
+            color: "#fff",
             fontSize: 13,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "0 2px 6px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,220,160,.35)",
+            boxShadow: "0 2px 6px rgba(21,21,26,.18)",
           }}
         >
           ⚠
@@ -631,14 +636,14 @@ export function ClassicCard({
             padding: "0 6px",
             borderRadius: 7,
             background: "var(--gold)",
-            color: "#211705",
+            color: "#ffffff",
             fontFamily: "var(--font-display)",
-            fontWeight: 800,
+            fontWeight: 700,
             fontSize: 13,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "0 2px 6px rgba(0,0,0,.5)",
+            boxShadow: "0 2px 6px rgba(21,21,26,.18)",
             pointerEvents: "none",
           }}
         >
@@ -663,7 +668,7 @@ export function ClassicCard({
             borderRadius: 6,
             border: "none",
             cursor: "pointer",
-            background: "rgba(10,8,6,.82)",
+            background: "rgba(255,255,255,.95)",
             color: "var(--gold, #d8b25e)",
             fontSize: 12,
             fontWeight: 700,
@@ -672,7 +677,7 @@ export function ClassicCard({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "inset 0 0 0 1px rgba(200,155,65,.4)",
+            boxShadow: "inset 0 0 0 1px var(--line)",
             whiteSpace: "nowrap",
           }}
         >
@@ -695,15 +700,15 @@ export function ClassicCard({
             borderRadius: 6,
             border: "none",
             cursor: "pointer",
-            background: "rgba(10,8,6,.82)",
-            color: "#e8d8b4",
+            background: "rgba(255,255,255,.95)",
+            color: "var(--t2)",
             fontSize: 12,
             opacity: hover ? 1 : 0,
             transition: "opacity .15s",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            boxShadow: "inset 0 0 0 1px rgba(200,155,65,.4)",
+            boxShadow: "inset 0 0 0 1px var(--line)",
           }}
           aria-label="Remove"
         >
@@ -746,8 +751,8 @@ export function ClassicRow({
         padding: "6px 10px 6px 7px",
         borderRadius: 5,
         cursor: onClick ? "pointer" : "default",
-        background: hover ? "rgba(200,155,65,.08)" : "transparent",
-        boxShadow: hover ? "inset 0 0 0 1px rgba(200,155,65,.18)" : "none",
+        background: hover ? "rgba(21,21,26,.04)" : "transparent",
+        boxShadow: hover ? "inset 0 0 0 1px var(--line)" : "none",
         transition: "background .12s",
       }}
     >
@@ -757,16 +762,16 @@ export function ClassicRow({
       <div style={{ minWidth: 0 }}>
         <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 16, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.15 }}>
           {warning && (
-            <span title={warning} style={{ color: "#e0805f", marginRight: 6, cursor: "help" }}>⚠</span>
+            <span title={warning} style={{ color: "var(--danger)", marginRight: 6, cursor: "help" }}>⚠</span>
           )}
           {card.name}
         </div>
-        <div style={{ fontSize: 12.5, fontStyle: "italic", color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        <div style={{ fontSize: 12.5, fontStyle: "normal", color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {card.typeLine}
         </div>
       </div>
       {quantity && quantity > 1 ? (
-        <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: 13, color: "var(--gold)" }}>×{quantity}</span>
+        <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 13, color: "var(--gold)" }}>×{quantity}</span>
       ) : (
         <span />
       )}
@@ -785,13 +790,13 @@ export function ClassicRow({
             borderRadius: 6,
             border: "none",
             cursor: "pointer",
-            background: "rgba(20,14,8,.6)",
+            background: "var(--bg3)",
             color: "var(--gold)",
             fontSize: 12,
             fontWeight: 700,
             opacity: hover ? 1 : 0,
             transition: "opacity .12s",
-            boxShadow: "inset 0 0 0 1px rgba(200,155,65,.35)",
+            boxShadow: "inset 0 0 0 1px var(--line)",
           }}
         >
           {moveLabel?.startsWith("Move to deck") ? "⇧" : "⇩"}

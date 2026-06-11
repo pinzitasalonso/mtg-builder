@@ -27,7 +27,7 @@ const SHOP_OPTIMIZER = "https://www.cardtrader.com/en/wishlists/new";
 const money = (cents: number, currency: string | null) =>
   `${(cents / 100).toFixed(2)} ${currency ?? ""}`.trim();
 
-const dimList: React.CSSProperties = { fontSize: 13.5, color: "rgba(236,225,198,.85)", lineHeight: 1.5 };
+const dimList: React.CSSProperties = { fontSize: 13.5, color: "var(--t2)", lineHeight: 1.5 };
 
 /* Orders the deck on CardTrader: fills the Zero cart via the API when a
    token is configured, otherwise falls back to copy-the-list + Shop
@@ -79,21 +79,21 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
   return (
     <ModalShell onDismiss={onClose} maxWidth={520}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)" }}>
           Order on CardTrader 🛒
         </h2>
         <button onClick={onClose} style={{ ...ghostBtn, padding: "6px 12px" }}>Close</button>
       </div>
 
       {loading && (
-        <p style={{ margin: 0, fontStyle: "italic", color: "rgba(236,225,198,.85)", fontSize: 15 }}>
+        <p style={{ margin: 0, fontStyle: "normal", color: "var(--t2)", fontSize: 15 }}>
           Filling your CardTrader Zero cart… {cards.length} card{cards.length === 1 ? "" : "s"}.
         </p>
       )}
 
       {!loading && !configured && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <p style={{ margin: 0, ...dimList, fontStyle: "italic" }}>
+          <p style={{ margin: 0, ...dimList, fontStyle: "normal" }}>
             No CardTrader API token is configured, so the cart can&apos;t be filled automatically.
             Add <code>CARDTRADER_API_TOKEN</code> to <code>.env</code> (cardtrader.com → Settings → API) and restart —
             or use the manual route:
@@ -106,7 +106,7 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
 
       {!loading && error && configured && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ color: "#f4dccd", fontSize: 14, fontStyle: "italic", padding: "10px 14px", background: "rgba(207,125,94,.18)", borderRadius: 8 }}>
+          <div style={{ color: "var(--danger)", fontSize: 14, padding: "10px 14px", background: "rgba(194,64,42,.07)", borderRadius: 10, boxShadow: "inset 0 0 0 1px rgba(194,64,42,.25)" }}>
             {error}
           </div>
           <button onClick={copyAndOpen} style={ghostBtn}>
@@ -119,7 +119,7 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {result.added.length > 0 ? (
             <>
-              <div className="label-sc" style={{ fontSize: 12, color: "#9bbf6e", letterSpacing: ".1em" }}>
+              <div className="label-sc" style={{ fontSize: 12, color: "#0d8a5f", letterSpacing: ".1em" }}>
                 Added to your Zero cart · {result.added.length}
               </div>
               <div style={{ background: "rgba(0,0,0,.2)", borderRadius: 8, padding: "8px 13px", maxHeight: 220, overflowY: "auto" }}>
@@ -127,7 +127,7 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
                   <div key={a.name} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 13.5, color: "var(--frame-ink)", padding: "2px 0" }}>
                     <span>
                       {a.quantity} {a.name}
-                      {a.seller && <span style={{ color: "rgba(236,225,198,.55)", fontStyle: "italic" }}> · {a.seller}</span>}
+                      {a.seller && <span style={{ color: "var(--t3)", fontStyle: "normal" }}> · {a.seller}</span>}
                     </span>
                     <span style={{ fontVariantNumeric: "tabular-nums" }}>{money(a.priceCents, a.currency)}</span>
                   </div>
@@ -141,7 +141,7 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
               )}
             </>
           ) : (
-            <p style={{ margin: 0, ...dimList, fontStyle: "italic" }}>
+            <p style={{ margin: 0, ...dimList, fontStyle: "normal" }}>
               Nothing could be added — see below.
             </p>
           )}
@@ -153,12 +153,12 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
           )}
           {result.notFound.length > 0 && (
             <div style={dimList}>
-              <b style={{ color: "#e0805f" }}>Not found on CardTrader:</b> {result.notFound.join(", ")}
+              <b style={{ color: "var(--danger)" }}>Not found on CardTrader:</b> {result.notFound.join(", ")}
             </div>
           )}
           {result.failed.length > 0 && (
             <div style={dimList}>
-              <b style={{ color: "#e0805f" }}>Failed to add:</b> {result.failed.join(", ")}
+              <b style={{ color: "var(--danger)" }}>Failed to add:</b> {result.failed.join(", ")}
             </div>
           )}
 

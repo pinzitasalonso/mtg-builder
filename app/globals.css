@@ -1,47 +1,50 @@
 @import "tailwindcss";
 
 :root {
-  /* Spellpool "classic" design tokens — warm card-frame / parchment palette.
-     Generic names (--bg, --surface, --accent, --text…) are mapped to the
-     classic palette so existing components reskin through them. */
-  --app-bg: #14100a;
-  --app-bg2: #1d1710;
+  /* Spellpool "modern minimal" design tokens — Swiss index, hairlines, one
+     accent. Generic names (--bg, --surface, --accent, --text…) are mapped to
+     the minimal palette so existing components reskin through them. */
+  --app-bg: #fbfbf8;
+  --app-bg2: #ffffff;
 
-  --bg: #14100a;
-  --surface: #1d1710;
-  --surface2: #2d2113;
-  --bg3: #2d2113;
-  --border: rgba(201, 164, 92, 0.16);
-  --line: rgba(201, 164, 92, 0.16);
+  --bg: #fbfbf8;
+  --surface: #ffffff;
+  --surface2: #f1f1ec;
+  --bg2: #ffffff;
+  --bg3: #f1f1ec;
+  --border: #e6e6df;
+  --line: #e6e6df;
 
-  --accent: #c89b41;
-  --accent-hover: #e0bb63;
-  --accent-ink: #211705;
+  --accent: #2742d6;
+  --accent-hover: #1d35b8;
+  --accent-ink: #ffffff;
 
-  --text: #ece0c0;
-  --text-muted: #b6a37c;
-  --text-dim: #8a7a57;
-  --danger: #cf7d5e;
+  --text: #15151a;
+  --text-muted: #5c5c64;
+  --text-dim: #9a9aa2;
+  --t1: #15151a;
+  --t2: #5c5c64;
+  --t3: #9a9aa2;
+  --danger: #c2402a;
 
-  /* classic card-frame specifics */
-  --frame-hi: #8d6f47;
-  --frame-base: #6d4a2e;
-  --frame-dark: #462d1b;
-  --frame-light: #8c6238;
-  --frame-ink: #ece1c6;
-  --plate: #6e5634;
-  --paper: #ece6d3;
-  --paper-hi: #f6efda;
-  --paper-lo: #c2b48f;
-  --paper-edge: #9c8d63;
-  --ink: #1b140a;
-  --ink-soft: #4a3c26;
-  --gold: #c89b41;
-  --gold-bright: #e0bb63;
+  --bar-track: #ececE6;
+  --ring-track: #e9e9e2;
 
-  --tex-blotch: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyNjAnIGhlaWdodD0nMzQwJz48ZmlsdGVyIGlkPSdhJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC4wMTQnIG51bU9jdGF2ZXM9JzQnIHNlZWQ9JzYnLz48ZmVDb2xvck1hdHJpeCB0eXBlPSdzYXR1cmF0ZScgdmFsdWVzPScwJy8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9JzEwMCUnIGhlaWdodD0nMTAwJScgZmlsdGVyPSd1cmwoI2EpJyBvcGFjaXR5PScwLjYnLz48L3N2Zz4=");
-  --tex-grain: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMTIwJz48ZmlsdGVyIGlkPSdiJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC43JyBudW1PY3RhdmVzPScyJyBzZWVkPSczJy8+PGZlQ29sb3JNYXRyaXggdHlwZT0nc2F0dXJhdGUnIHZhbHVlcz0nMCcvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPScxMDAlJyBoZWlnaHQ9JzEwMCUnIGZpbHRlcj0ndXJsKCNiKScgb3BhY2l0eT0nMC41Jy8+PC9zdmc+");
-  --tex-confetti: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScyMDAnIGhlaWdodD0nMjQwJz48ZmlsdGVyIGlkPSdwJz48ZmVUdXJidWxlbmNlIHR5cGU9J2ZyYWN0YWxOb2lzZScgYmFzZUZyZXF1ZW5jeT0nMC4wMzUnIG51bU9jdGF2ZXM9JzQnIHNlZWQ9JzgnLz48ZmVDb2xvck1hdHJpeCB0eXBlPSdzYXR1cmF0ZScgdmFsdWVzPScwLjQnLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0nMTAwJScgaGVpZ2h0PScxMDAlJyBmaWx0ZXI9J3VybCgjcCknIG9wYWNpdHk9JzAuMicvPjwvc3ZnPg==");
+  /* legacy card-frame names — remapped flat so old components reskin */
+  --frame-hi: #ffffff;
+  --frame-base: #ffffff;
+  --frame-dark: #e6e6df;
+  --frame-light: #f1f1ec;
+  --frame-ink: #15151a;
+  --plate: #ffffff;
+  --paper: #ffffff;
+  --paper-hi: #ffffff;
+  --paper-lo: #f1f1ec;
+  --paper-edge: #e6e6df;
+  --ink: #15151a;
+  --ink-soft: #5c5c64;
+  --gold: #2742d6;
+  --gold-bright: #1d35b8;
 }
 
 * {
@@ -55,21 +58,17 @@ html {
 body {
   /* Font tokens defined here (not :root) because next/font sets the family
      vars on <html>; a same-element var() chain on :root resolves to empty. */
-  --font-ui: var(--font-ebgaramond), Georgia, serif;
-  --font-body: var(--font-ebgaramond), Georgia, serif;
-  --font-display: var(--font-cormorant), Georgia, serif;
-  --font-sc: var(--font-cormorant-sc), Georgia, serif;
-  --font-mono: var(--font-ebgaramond), Georgia, serif;
+  --font-ui: var(--font-instrument), system-ui, sans-serif;
+  --font-body: var(--font-instrument), system-ui, sans-serif;
+  --font-display: var(--font-instrument), system-ui, sans-serif;
+  --font-sc: var(--font-plexmono), monospace;
+  --font-mono: var(--font-plexmono), monospace;
 
   margin: 0;
   color: var(--text);
   font-family: var(--font-body);
   min-height: 100dvh;
-  background:
-    radial-gradient(130% 90% at 50% -8%, #241a0f 0%, transparent 55%),
-    radial-gradient(150% 130% at 50% 120%, #090706 0%, transparent 58%),
-    var(--app-bg);
-  background-attachment: fixed;
+  background: var(--app-bg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -81,8 +80,7 @@ button {
 }
 
 ::selection {
-  background: rgba(200, 155, 65, 0.34);
-  color: #fff;
+  background: rgba(39, 66, 214, 0.16);
 }
 
 ::-webkit-scrollbar {
@@ -93,58 +91,97 @@ button {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #3a2c19;
+  background: #d8d8d0;
   border-radius: 7px;
   border: 3px solid var(--app-bg);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #503d22;
+  background: #c6c6bc;
 }
 
-/* ---- classic frame primitives (textured, real-card anatomy) ---- */
+/* ---- minimal primitives ---- */
+.mn-btn {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  background: var(--t1);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: background 0.14s;
+}
+.mn-btn:hover {
+  background: #34343c;
+}
+.mn-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.mn-ghost {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  background: transparent;
+  color: var(--t2);
+  border: 1px solid var(--line);
+  cursor: pointer;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: all 0.14s;
+}
+.mn-ghost:hover {
+  color: var(--t1);
+  border-color: #c9c9c0;
+}
+.mn-label {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--t3);
+}
+
+/* ---- legacy frame primitives, reskinned flat ----
+   The classic card anatomy (cc-black > cc-brown > cc-paper) collapses into a
+   single white tile with hairline borders; nested layers go transparent. */
 .cc-black {
-  background: #0b0907;
+  background: var(--bg2);
+  border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow: 0 5px 13px -4px rgba(0, 0, 0, 0.62), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow: 0 1px 2px rgba(21, 21, 26, 0.04);
 }
 .cc-brown {
   position: relative;
-  background-color: var(--frame-base);
-  background-image: var(--tex-blotch), var(--tex-grain),
-    radial-gradient(135% 95% at 50% 24%, rgba(152, 108, 64, 0.42), rgba(36, 21, 11, 0.6) 88%);
-  background-blend-mode: overlay, soft-light, normal;
-  border-radius: 5px;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55), inset 0 0 0 2px rgba(188, 142, 94, 0.16);
+  background: transparent;
+  border-radius: 8px;
 }
 .cc-plate {
-  background: rgba(20, 14, 8, 0.55);
-  border-radius: 8px;
-  color: #ecdcb6;
-  box-shadow: inset 0 0 0 1px rgba(200, 155, 65, 0.25);
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--t2);
 }
 .cc-art {
   position: relative;
   overflow: hidden;
-  border-radius: 2px;
-  background: #0e0b07;
-  box-shadow: 0 0 0 1px #120c06, 0 0 0 2px rgba(176, 134, 86, 0.34), inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  background: var(--bg3);
+  box-shadow: inset 0 0 0 1px rgba(21, 21, 26, 0.06);
 }
 .cc-paper {
   position: relative;
-  background-color: var(--paper);
-  background-image: var(--tex-confetti), var(--tex-grain);
-  background-blend-mode: soft-light, soft-light;
-  color: var(--ink);
-  border-radius: 2px;
-  border: 1px solid #b3a884;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5), inset 0 1px 4px rgba(0, 0, 0, 0.1);
+  background-color: var(--bg2);
+  color: var(--t1);
+  border-radius: 10px;
+  border: 1px solid var(--line);
   font-family: var(--font-body);
 }
 .label-sc {
   font-family: var(--font-sc);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 600;
+  letter-spacing: 0.14em;
+  font-weight: 500;
+  font-size: 11px;
 }
 
 @keyframes sp-fade {
@@ -158,7 +195,7 @@ button {
 @keyframes sp-pop {
   from {
     opacity: 0;
-    transform: scale(0.94);
+    transform: scale(0.96);
   }
   to {
     opacity: 1;
@@ -175,6 +212,27 @@ button {
     transform: none;
   }
 }
+@keyframes mn-blink {
+  0%,
+  60% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 /* Responsive page container */
 .container {
@@ -189,7 +247,7 @@ button {
   }
 }
 
-/* Grid of framed card tiles (pool) */
+/* Grid of card tiles (pool) */
 .card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -202,11 +260,27 @@ button {
   }
 }
 
-/* Grid of framed deck cards on the home page */
-.deck-grid {
+/* Swiss index table for decks (home page) */
+.mn-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(244px, 1fr));
-  gap: 24px;
+  grid-template-columns: 32px 64px minmax(0, 1fr) 110px 150px 28px;
+  align-items: center;
+  gap: 18px;
+}
+.mn-col-format,
+.mn-col-colors,
+.mn-col-updated {
+  display: none;
+}
+@media (min-width: 900px) {
+  .mn-row {
+    grid-template-columns: 44px 64px minmax(0, 1fr) 110px 100px 150px 110px 28px;
+  }
+  .mn-col-format,
+  .mn-col-colors,
+  .mn-col-updated {
+    display: block;
+  }
 }
 
 /* Deck view two-column layout: main + sticky stats sidebar */

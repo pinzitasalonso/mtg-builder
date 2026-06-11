@@ -1,9 +1,9 @@
 // Brand constants shared by generated images (apple-icon, opengraph-image).
 export const BRAND = {
-  bg: "#111214",
-  accent: "#c89b3c",
-  text: "#e8e8e8",
-  muted: "#8b9099",
+  bg: "#fbfbf8",
+  accent: "#2742d6",
+  text: "#15151a",
+  muted: "#9a9aa2",
 };
 
 /** The Spellpool mark (spark + pool ripples) as a standalone SVG string. */

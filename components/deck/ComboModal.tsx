@@ -93,7 +93,7 @@ export default function ComboModal({
             const st = adds[name];
             return (
               <span key={name} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                {i > 0 && <span style={{ color: "rgba(236,225,198,.45)" }}>+</span>}
+                {i > 0 && <span style={{ color: "var(--t3)" }}>+</span>}
                 {miss && almost ? (
                   <button
                     type="button"
@@ -109,9 +109,9 @@ export default function ComboModal({
                       cursor: st === "added" || st === "adding" ? "default" : "pointer",
                       fontFamily: "var(--font-body)",
                       fontSize: 13.5,
-                      background: st === "added" ? "rgba(155,191,110,.25)" : "rgba(200,155,65,.18)",
+                      background: st === "added" ? "rgba(13,138,95,.12)" : "rgba(39,66,214,.08)",
                       color: "var(--frame-ink)",
-                      boxShadow: "inset 0 0 0 1px rgba(200,155,65,.5)",
+                      boxShadow: "inset 0 0 0 1px var(--line)",
                     }}
                   >
                     {name} <span style={{ opacity: 0.85 }}>{st === "adding" ? "…" : st === "added" ? "✓" : st === "error" ? "✕" : "+"}</span>
@@ -124,12 +124,12 @@ export default function ComboModal({
           })}
         </div>
         {combo.produces.length > 0 && (
-          <div style={{ fontSize: 13, fontStyle: "italic", color: "rgba(236,225,198,.75)", marginTop: 5 }}>
+          <div style={{ fontSize: 13, fontStyle: "normal", color: "var(--t2)", marginTop: 5 }}>
             → {combo.produces.join(" · ")}
           </div>
         )}
         {expanded && combo.description && (
-          <div style={{ fontSize: 13, color: "rgba(236,225,198,.85)", marginTop: 8, whiteSpace: "pre-line", lineHeight: 1.45 }}>
+          <div style={{ fontSize: 13, color: "var(--t2)", marginTop: 8, whiteSpace: "pre-line", lineHeight: 1.45 }}>
             {combo.description}
           </div>
         )}
@@ -140,19 +140,19 @@ export default function ComboModal({
   return (
     <ModalShell onDismiss={onClose} maxWidth={560}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)" }}>
           Combos ♾
         </h2>
         <button onClick={onClose} style={{ ...ghostBtn, padding: "6px 12px" }}>Close</button>
       </div>
 
       {loading && (
-        <p style={{ margin: 0, fontStyle: "italic", color: "rgba(236,225,198,.85)", fontSize: 15 }}>
+        <p style={{ margin: 0, fontStyle: "normal", color: "var(--t2)", fontSize: 15 }}>
           Searching Commander Spellbook… checking {pool.length} cards.
         </p>
       )}
       {error && !loading && (
-        <div style={{ color: "#f4dccd", fontSize: 14, fontStyle: "italic", padding: "10px 14px", background: "rgba(207,125,94,.18)", borderRadius: 8 }}>
+        <div style={{ color: "var(--danger)", fontSize: 14, padding: "10px 14px", background: "rgba(194,64,42,.07)", borderRadius: 10, boxShadow: "inset 0 0 0 1px rgba(194,64,42,.25)" }}>
           {error}
         </div>
       )}
@@ -160,13 +160,13 @@ export default function ComboModal({
       {combos && !loading && (
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           {combos.included.length === 0 && combos.almostIncluded.length === 0 && (
-            <p style={{ margin: 0, fontStyle: "italic", color: "rgba(236,225,198,.8)", fontSize: 14.5 }}>
+            <p style={{ margin: 0, fontStyle: "normal", color: "var(--t2)", fontSize: 14.5 }}>
               No known combos in this pool yet — and none within one card. Keep brewing!
             </p>
           )}
           {combos.included.length > 0 && (
             <div>
-              <div className="label-sc" style={{ fontSize: 12, color: "#9bbf6e", letterSpacing: ".1em", marginBottom: 8 }}>
+              <div className="label-sc" style={{ fontSize: 12, color: "#0d8a5f", letterSpacing: ".1em", marginBottom: 8 }}>
                 In your pool · {combos.totalIncluded}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -184,7 +184,7 @@ export default function ComboModal({
               </div>
             </div>
           )}
-          <div style={{ fontSize: 11.5, fontStyle: "italic", color: "rgba(236,225,198,.5)" }}>
+          <div style={{ fontSize: 11.5, fontStyle: "normal", color: "var(--t3)" }}>
             Data: Commander Spellbook.
           </div>
         </div>

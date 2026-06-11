@@ -72,17 +72,17 @@ export default function HandSimModal({
   return (
     <ModalShell onDismiss={onClose} maxWidth={560}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)" }}>
           Sample hand 🎲
         </h2>
         <button onClick={onClose} style={{ ...ghostBtn, padding: "6px 12px" }}>Close</button>
       </div>
-      <p style={{ margin: "0 0 12px", fontSize: 13.5, fontStyle: "italic", color: "rgba(236,225,198,.8)" }}>
+      <p style={{ margin: "0 0 12px", fontSize: 13.5, fontStyle: "normal", color: "var(--t2)" }}>
         Drawing from {sourceLabel} — {N} cards, {landCount} lands.
       </p>
 
       {N < 7 ? (
-        <div style={{ color: "#f4dccd", fontSize: 14, fontStyle: "italic", padding: "10px 14px", background: "rgba(207,125,94,.18)", borderRadius: 8 }}>
+        <div style={{ color: "var(--danger)", fontSize: 14, padding: "10px 14px", background: "rgba(194,64,42,.07)", borderRadius: 10, boxShadow: "inset 0 0 0 1px rgba(194,64,42,.25)" }}>
           Not enough cards to draw a hand — you need at least 7.
         </div>
       ) : (
@@ -90,11 +90,11 @@ export default function HandSimModal({
           {/* hand */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(86px, 1fr))", gap: 8 }}>
             {hand.map((c, i) => (
-              <div key={i} style={{ position: "relative", borderRadius: 6, overflow: "hidden", boxShadow: i >= handSize ? "0 0 0 2px var(--gold)" : "0 2px 6px rgba(0,0,0,.5)" }} title={c.name}>
+              <div key={i} style={{ position: "relative", borderRadius: 6, overflow: "hidden", boxShadow: i >= handSize ? "0 0 0 2px var(--gold)" : "0 2px 6px rgba(21,21,26,.15)" }} title={c.name}>
                 {c.imageUri ? (
                   <Image src={c.imageUri} alt={c.name} width={86} height={120} style={{ width: "100%", height: "auto", display: "block" }} unoptimized />
                 ) : (
-                  <div style={{ aspectRatio: "0.716", background: "rgba(0,0,0,.4)", color: "var(--frame-ink)", fontSize: 11, padding: 6 }}>{c.name}</div>
+                  <div style={{ aspectRatio: "0.716", background: "var(--bg3)", color: "var(--t1)", fontSize: 11, padding: 6 }}>{c.name}</div>
                 )}
               </div>
             ))}
@@ -116,12 +116,12 @@ export default function HandSimModal({
 
           {/* odds */}
           <div style={{ background: "rgba(0,0,0,.18)", borderRadius: 8, padding: "10px 14px" }}>
-            <div className="label-sc" style={{ fontSize: 11.5, color: "rgba(236,225,198,.75)", letterSpacing: ".1em", marginBottom: 8 }}>
+            <div className="label-sc" style={{ fontSize: 11.5, color: "var(--t2)", letterSpacing: ".1em", marginBottom: 8 }}>
               Land odds
             </div>
             <table style={{ width: "100%", fontSize: 13.5, color: "var(--frame-ink)", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ textAlign: "right", color: "rgba(236,225,198,.65)" }}>
+                <tr style={{ textAlign: "right", color: "var(--t3)" }}>
                   <th style={{ textAlign: "left", fontWeight: 500, paddingBottom: 4 }}></th>
                   <th style={{ fontWeight: 500 }}>Opening 7</th>
                   <th style={{ fontWeight: 500 }}>By turn 3*</th>
@@ -142,7 +142,7 @@ export default function HandSimModal({
                 </tr>
               </tbody>
             </table>
-            <div style={{ fontSize: 11.5, fontStyle: "italic", color: "rgba(236,225,198,.55)", marginTop: 6 }}>
+            <div style={{ fontSize: 11.5, fontStyle: "normal", color: "var(--t3)", marginTop: 6 }}>
               *top 10 cards — 7 + three draws, on the draw.
             </div>
           </div>

@@ -25,7 +25,7 @@ const summaryBox: React.CSSProperties = {
   padding: "10px 14px",
 };
 
-const noteP: React.CSSProperties = { margin: 0, fontSize: 13.5, fontStyle: "italic", color: "rgba(236,225,198,.8)" };
+const noteP: React.CSSProperties = { margin: 0, fontSize: 13.5, fontStyle: "normal", color: "var(--t2)" };
 
 /* Export / import / bulk-lands tool sheet. State lives here, so closing the
    sheet resets it — each open starts fresh. */
@@ -118,7 +118,7 @@ export default function ToolSheet({
 
   return (
     <ModalShell onDismiss={onClose} maxWidth={460}>
-      <h2 style={{ margin: "0 0 14px", fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+      <h2 style={{ margin: "0 0 14px", fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)" }}>
         {tool === "export" ? "Export decklist" : tool === "import" ? "Import decklist" : "Add lands & staples"}
       </h2>
 
@@ -167,7 +167,7 @@ export default function ToolSheet({
             {PRESET_LANDS.map((l) => {
               const n = landSel[l] ?? 0;
               return (
-                <div key={l} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 8, background: n > 0 ? "rgba(200,155,65,.12)" : "transparent" }}>
+                <div key={l} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 8, background: n > 0 ? "rgba(39,66,214,.07)" : "transparent" }}>
                   <span style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 600, color: "var(--frame-ink)" }}>{l}</span>
                   <input
                     type="number"

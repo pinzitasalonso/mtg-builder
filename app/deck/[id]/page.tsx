@@ -130,9 +130,9 @@ function Chip({ active, onClick, children, title }: { active: boolean; onClick: 
         fontSize: 14,
         fontWeight: active ? 600 : 500,
         whiteSpace: "nowrap",
-        background: active ? "var(--gold)" : "rgba(20,14,8,.5)",
-        color: active ? "#211705" : "var(--text-muted)",
-        boxShadow: active ? "none" : "inset 0 0 0 1px rgba(200,155,65,.2)",
+        background: active ? "var(--gold)" : "var(--bg3)",
+        color: active ? "#ffffff" : "var(--text-muted)",
+        boxShadow: active ? "none" : "inset 0 0 0 1px var(--line)",
         transition: "all .12s",
       }}
     >
@@ -156,7 +156,7 @@ const plateBtn: React.CSSProperties = {
   borderRadius: 9,
   border: "none",
   cursor: "pointer",
-  color: "#f0e3c4",
+  color: "var(--t1)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -477,7 +477,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           <h1 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 700, color: "var(--text)" }}>
             Deck not found
           </h1>
-          <p style={{ fontStyle: "italic", color: "var(--text-muted)", marginTop: 8 }}>
+          <p style={{ fontStyle: "normal", color: "var(--text-muted)", marginTop: 8 }}>
             It may have been deleted, or the link is wrong.
           </p>
           <Link href="/" className="cc-plate" style={{ ...plateBtn, display: "inline-flex", marginTop: 18, padding: "11px 24px", fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 16 }}>
@@ -500,9 +500,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           position: "sticky",
           top: 0,
           zIndex: 20,
-          background: "color-mix(in srgb, var(--app-bg) 84%, transparent)",
-          backdropFilter: "blur(12px)",
-          boxShadow: "0 1px 0 rgba(200,155,65,.12)",
+          background: "var(--bg)",
+          borderBottom: "1px solid var(--line)",
           gap: 12,
         }}
       >
@@ -531,7 +530,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               {poolColors.length > 0 && <ColorPips colors={poolColors} size={16} />}
             </div>
             {deck && (
-              <div style={{ fontSize: 13.5, fontStyle: "italic", color: "var(--text-dim)", marginTop: -1 }}>
+              <div style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)", marginTop: -1 }}>
                 {deck.format}
                 {deck.commander ? ` · ${deck.commander}` : ""}
               </div>
@@ -547,29 +546,28 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         {/* main column */}
         <div style={{ display: "flex", flexDirection: "column", gap: 22, minWidth: 0 }}>
           {/* search panel */}
-          <div style={{ background: "var(--app-bg2)", borderRadius: 9, padding: 16, boxShadow: "inset 0 0 0 1px rgba(200,155,65,.16)" }}>
-            {/* segmented control */}
-            <div style={{ display: "inline-flex", gap: 5, marginBottom: 14 }}>
+          <div style={{ background: "var(--bg2)", borderRadius: 16, padding: 18, border: "1px solid var(--line)" }}>
+            {/* mode tabs — underline style */}
+            <div style={{ display: "flex", gap: 22, borderBottom: "1px solid var(--line)", marginBottom: 16 }}>
               {(["ai", "scryfall", "name"] as const).map((mode) => (
                 <button
                   key={mode}
                   onClick={() => setSearchMode(mode)}
                   style={{
-                    padding: "7px 16px",
-                    borderRadius: 8,
+                    padding: "8px 2px 12px",
                     border: "none",
                     cursor: "pointer",
-                    fontFamily: "var(--font-display)",
-                    fontSize: 16,
-                    fontWeight: 600,
+                    background: "transparent",
+                    fontFamily: "var(--font-ui)",
+                    fontSize: 14,
+                    fontWeight: searchMode === mode ? 600 : 500,
                     whiteSpace: "nowrap",
-                    background: searchMode === mode ? "var(--gold)" : "rgba(20,14,8,.5)",
-                    color: searchMode === mode ? "#211705" : "var(--text-muted)",
-                    boxShadow: searchMode === mode ? "none" : "inset 0 0 0 1px rgba(200,155,65,.2)",
+                    color: searchMode === mode ? "var(--t1)" : "var(--t3)",
+                    boxShadow: searchMode === mode ? "inset 0 -2px 0 var(--accent)" : "none",
                     transition: "all .12s",
                   }}
                 >
-                  {mode === "ai" ? "✦ AI" : mode === "scryfall" ? "⚡ Scryfall" : "Name"}
+                  {mode === "ai" ? "AI" : mode === "scryfall" ? "Scryfall" : "Name"}
                 </button>
               ))}
             </div>
@@ -580,7 +578,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <span className="label-sc" style={{ fontSize: 12, color: "var(--text-dim)", letterSpacing: ".12em" }}>Colors</span>
                   {activeFilterCount > 0 && (
-                    <button onClick={clearAllFilters} style={{ background: "transparent", border: "none", color: "var(--gold)", fontSize: 13, fontStyle: "italic", cursor: "pointer" }}>
+                    <button onClick={clearAllFilters} style={{ background: "transparent", border: "none", color: "var(--gold)", fontSize: 13, fontStyle: "normal", cursor: "pointer" }}>
                       Clear all ({activeFilterCount})
                     </button>
                   )}
@@ -615,11 +613,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                             width: 32,
                             height: 32,
                             borderRadius: "50%",
-                            background: { w: "#f6f3e1", u: "#a9def5", b: "#c9bfb9", r: "#f6a283", g: "#9bd3ad" }[c.code],
-                            color: { w: "#6a5d34", u: "#0a3a57", b: "#2a221d", r: "#6e1810", g: "#114a28" }[c.code],
-                            fontWeight: 800,
+                            background: { w: "#dcd1a4", u: "#4a90c9", b: "#9b85b5", r: "#d96b45", g: "#58a877" }[c.code],
+                            color: "#fbfbf8",
+                            fontWeight: 700,
                             fontSize: 14,
-                            boxShadow: "inset 0 0 0 1px rgba(0,0,0,.25), inset 0 -2px 3px rgba(0,0,0,.18)",
+                            boxShadow: "inset 0 0 0 1px rgba(21,21,26,.08)",
                           }}
                         >
                           {c.label}
@@ -659,9 +657,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                               fontFamily: "var(--font-display)",
                               fontSize: 15,
                               fontWeight: 600,
-                              background: on ? "var(--gold)" : "rgba(20,14,8,.5)",
-                              color: on ? "#211705" : "var(--text-muted)",
-                              boxShadow: on ? "none" : "inset 0 0 0 1px rgba(200,155,65,.2)",
+                              background: on ? "var(--gold)" : "var(--bg3)",
+                              color: on ? "#ffffff" : "var(--text-muted)",
+                              boxShadow: on ? "none" : "inset 0 0 0 1px var(--line)",
                               transition: "all .12s",
                             }}
                           >
@@ -738,7 +736,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 </form>
                 {searchMode === "ai" && (
                   <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
-                    <span style={{ fontStyle: "italic", fontSize: 13, color: "var(--text-dim)" }}>Try:</span>
+                    <span style={{ fontStyle: "normal", fontSize: 13, color: "var(--text-dim)" }}>Try:</span>
                     {AI_SUGGESTIONS.map((s) => (
                       <button
                         key={s}
@@ -746,7 +744,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                         disabled={searching}
                         style={{
                           fontFamily: "var(--font-body)",
-                          fontStyle: "italic",
+                          fontStyle: "normal",
                           fontSize: 14,
                           padding: "3px 11px",
                           borderRadius: 14,
@@ -754,7 +752,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                           cursor: searching ? "default" : "pointer",
                           background: "transparent",
                           color: "var(--gold)",
-                          boxShadow: "inset 0 0 0 1px rgba(200,155,65,.3)",
+                          boxShadow: "inset 0 0 0 1px var(--line)",
                         }}
                       >
                         {s}
@@ -768,7 +766,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             {searchError && <div style={{ marginTop: 12 }}><ErrorNote>{searchError}</ErrorNote></div>}
             {!swipeOpen && searchResults.length > 0 && (
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, color: "var(--text-muted)" }}>
-                <span style={{ fontStyle: "italic" }}>
+                <span style={{ fontStyle: "normal" }}>
                   {searchResults.length} cards found{truncated ? " (first batch)" : ""}
                   {sources.length > 0 ? ` · via ${sources.join(", ")}` : ""}.
                 </span>
@@ -809,9 +807,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                             border: "none",
                             cursor: "pointer",
                             fontSize: 16,
-                            background: view === v ? "var(--gold)" : "rgba(20,14,8,.5)",
-                            color: view === v ? "#211705" : "var(--text-muted)",
-                            boxShadow: view === v ? "none" : "inset 0 0 0 1px rgba(200,155,65,.2)",
+                            background: view === v ? "var(--gold)" : "var(--bg3)",
+                            color: view === v ? "#ffffff" : "var(--text-muted)",
+                            boxShadow: view === v ? "none" : "inset 0 0 0 1px var(--line)",
                           }}
                         >
                           {ic}
@@ -824,7 +822,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             />
             <div style={{ marginTop: 14 }}>
               {deckCards.length === 0 ? (
-                <div className="cc-paper" style={{ padding: "26px 20px", textAlign: "center", fontStyle: "italic", color: "var(--ink-soft)" }}>
+                <div className="cc-paper" style={{ padding: "26px 20px", textAlign: "center", fontStyle: "normal", color: "var(--ink-soft)" }}>
                   Nothing in the deck yet — promote cards from the pool with ⇧, or swipe right in “Review pool”.
                 </div>
               ) : (
@@ -856,7 +854,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
             <div style={{ marginTop: 14 }}>
               {poolCards.length === 0 ? (
-                <div className="cc-paper" style={{ padding: "26px 20px", textAlign: "center", fontStyle: "italic", color: "var(--ink-soft)" }}>
+                <div className="cc-paper" style={{ padding: "26px 20px", textAlign: "center", fontStyle: "normal", color: "var(--ink-soft)" }}>
                   {pool.length === 0
                     ? "No cards yet — search above to begin filling the pool."
                     : "Pool is empty — every card has been promoted to the deck."}
@@ -874,7 +872,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           <StatCard
             label="Overview"
             right={
-              <span style={{ fontSize: 13.5, fontStyle: "italic", color: "var(--text-dim)" }}>
+              <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>
                 avg MV <b style={{ color: "var(--text)", fontStyle: "normal" }}>{stats.avgMv.toFixed(1)}</b>
               </span>
             }
@@ -882,22 +880,22 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <CountRing count={deckCount} target={target} accent="var(--gold)" />
               <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 14 }}>
-                <span style={{ color: "var(--text-dim)", fontStyle: "italic" }}>{deck?.format ?? "—"} deck</span>
+                <span style={{ color: "var(--text-dim)", fontStyle: "normal" }}>{deck?.format ?? "—"} deck</span>
                 <span style={{ color: "var(--text)", fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 600 }}>
                   {target - deckCount > 0 ? `${target - deckCount} to go` : "Deck complete"}
                 </span>
-                <span style={{ color: "var(--text-dim)", fontStyle: "italic", fontSize: 12.5 }}>
+                <span style={{ color: "var(--text-dim)", fontStyle: "normal", fontSize: 12.5 }}>
                   + {poolCards.reduce((s, c) => s + c.quantity, 0)} in the pool
                 </span>
               </div>
             </div>
             {warningCount > 0 && (
-              <div style={{ marginTop: 12, fontSize: 13, color: "#e0805f", fontStyle: "italic" }}>
+              <div style={{ marginTop: 12, fontSize: 13, color: "var(--danger)", fontStyle: "normal" }}>
                 ⚠ {warningCount} card{warningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ badge.
               </div>
             )}
             {!statsOnDeck && pool.length > 0 && (
-              <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-dim)", fontStyle: "italic" }}>
+              <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-dim)", fontStyle: "normal" }}>
                 Stats show the pool until the deck has cards.
               </div>
             )}
@@ -906,17 +904,17 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             {statsSource.length > 0 ? (
               <RoleBreakdown counts={roleCounts} commander={isCommander} />
             ) : (
-              <span style={{ fontSize: 13.5, fontStyle: "italic", color: "var(--text-dim)" }}>No cards yet.</span>
+              <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>No cards yet.</span>
             )}
           </StatCard>
           <StatCard label="Mana Curve">
             <ManaCurve curve={stats.curve} accent="var(--gold)" />
           </StatCard>
           <StatCard label="Colors">
-            {stats.count > 0 ? <ColorBar colors={stats.colors} /> : <span style={{ fontSize: 13.5, fontStyle: "italic", color: "var(--text-dim)" }}>No cards yet.</span>}
+            {stats.count > 0 ? <ColorBar colors={stats.colors} /> : <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>No cards yet.</span>}
           </StatCard>
           <StatCard label="Card Types">
-            {stats.types.length > 0 ? <TypeBreakdown types={stats.types} accent="var(--gold)" /> : <span style={{ fontSize: 13.5, fontStyle: "italic", color: "var(--text-dim)" }}>No cards yet.</span>}
+            {stats.types.length > 0 ? <TypeBreakdown types={stats.types} accent="var(--gold)" /> : <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>No cards yet.</span>}
           </StatCard>
         </aside>
       </div>
@@ -939,7 +937,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {/* settings modal */}
       {settingsOpen && (
         <ModalShell onDismiss={() => setSettingsOpen(false)} maxWidth={420} zIndex={70}>
-          <h2 style={{ margin: "0 0 16px", fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: "var(--frame-ink)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+          <h2 style={{ margin: "0 0 16px", fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: "var(--frame-ink)" }}>
             Deck settings
           </h2>
           <form onSubmit={saveSettings} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -969,8 +967,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           </form>
 
           {/* Tools — import/export live here; judge, lands & review are on the deck screen */}
-          <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(0,0,0,.25)" }}>
-            <div className="label-sc" style={{ fontSize: 11.5, color: "rgba(236,225,198,.75)", letterSpacing: ".1em", marginBottom: 10 }}>
+          <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+            <div className="label-sc" style={{ fontSize: 11.5, color: "var(--t3)", letterSpacing: ".1em", marginBottom: 10 }}>
               Import / Export
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1046,7 +1044,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {/* card preview modal */}
       {preview && (
         <div
-          style={{ position: "fixed", inset: 0, background: "rgba(8,6,4,0.82)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 65, animation: "sp-fade .15s ease" }}
+          style={{ position: "fixed", inset: 0, background: "rgba(21,21,26,.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 65, animation: "sp-fade .15s ease" }}
           onClick={() => setPreview(null)}
         >
           <div
@@ -1115,17 +1113,16 @@ function HeaderAction({
       disabled={disabled}
       title={title}
       style={{
-        padding: "7px 13px",
-        borderRadius: 8,
-        border: "none",
+        padding: "8px 16px",
+        borderRadius: 999,
+        border: gold ? "none" : "1px solid var(--line)",
         cursor: disabled ? "default" : "pointer",
-        fontFamily: "var(--font-display)",
-        fontSize: 14.5,
-        fontWeight: 700,
+        fontFamily: "var(--font-ui)",
+        fontSize: 13.5,
+        fontWeight: gold ? 600 : 500,
         whiteSpace: "nowrap",
-        background: gold ? "var(--gold)" : "rgba(20,14,8,.5)",
-        color: gold ? "#211705" : "var(--text)",
-        boxShadow: gold ? "none" : "inset 0 0 0 1px rgba(200,155,65,.3)",
+        background: gold ? "var(--accent)" : "var(--bg2)",
+        color: gold ? "#ffffff" : "var(--t2)",
         opacity: disabled ? 0.45 : 1,
         transition: "all .12s",
       }}
@@ -1139,7 +1136,7 @@ function SectionHeader({ title, count, right }: { title: string; count: number; 
   return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
       <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--text)" }}>
-        {title} <span style={{ color: "var(--text-dim)", fontWeight: 500, fontStyle: "italic", fontSize: 19 }}>· {count} card{count === 1 ? "" : "s"}</span>
+        {title} <span style={{ color: "var(--text-dim)", fontWeight: 500, fontStyle: "normal", fontSize: 19 }}>· {count} card{count === 1 ? "" : "s"}</span>
       </h2>
       {right}
     </div>
@@ -1195,7 +1192,7 @@ function BoardCards({
             {g.t}{" "}
             <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-body)", textTransform: "none", letterSpacing: 0 }}>· {g.cards.reduce((s, c) => s + c.quantity, 0)}</span>
           </div>
-          <div style={{ background: "var(--app-bg2)", borderRadius: 7, padding: 5, boxShadow: "inset 0 0 0 1px rgba(200,155,65,.16)" }}>
+          <div style={{ background: "var(--app-bg2)", borderRadius: 7, padding: 5, boxShadow: "inset 0 0 0 1px var(--line)" }}>
             {g.cards.map((c) => (
               <ClassicRow
                 key={c.dbId}
@@ -1237,7 +1234,7 @@ function RoleBreakdown({ counts, commander }: { counts: Record<string, number>; 
             <span style={{ color: r.key === "untagged" ? "var(--text-dim)" : "var(--text-muted)", fontStyle: r.key === "untagged" ? "italic" : "normal" }}>
               {r.label}
             </span>
-            <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: short ? "#e0805f" : "var(--text)" }}>
+            <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: short ? "var(--danger)" : "var(--text)" }}>
               {n}
               {commander && r.target !== null && (
                 <span style={{ color: "var(--text-dim)", fontWeight: 500 }}> / {r.target}</span>
@@ -1252,15 +1249,15 @@ function RoleBreakdown({ counts, commander }: { counts: Record<string, number>; 
 
 function goldSearchBtn(busy: boolean): React.CSSProperties {
   return {
-    padding: "0 24px",
-    borderRadius: 8,
+    padding: "0 26px",
+    borderRadius: 999,
     border: "none",
     cursor: busy ? "wait" : "pointer",
-    background: "var(--gold)",
-    color: "#211705",
-    fontFamily: "var(--font-display)",
-    fontWeight: 700,
-    fontSize: 17,
+    background: "var(--t1)",
+    color: "#ffffff",
+    fontFamily: "var(--font-ui)",
+    fontWeight: 600,
+    fontSize: 14.5,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",

@@ -111,7 +111,7 @@ export default function SwipeModal<T extends SwipeCard>({
         inset: 0,
         zIndex: 60,
         animation: "sp-fade .2s ease",
-        background: "radial-gradient(120% 90% at 50% 0%, rgba(40,28,14,.9), rgba(8,6,4,.94))",
+        background: "color-mix(in srgb, var(--bg) 94%, transparent)",
         backdropFilter: "blur(8px)",
         display: "flex",
         flexDirection: "column",
@@ -122,7 +122,7 @@ export default function SwipeModal<T extends SwipeCard>({
       {/* header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 28px", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
-          <div className="label-sc" style={{ fontSize: 12, color: "var(--gold)", letterSpacing: ".16em" }}>
+          <div className="mn-label" style={{ color: "var(--accent)" }}>
             {review ? "Review Pool" : "Oracle Search"}
           </div>
           <div
@@ -143,7 +143,7 @@ export default function SwipeModal<T extends SwipeCard>({
         <button
           onClick={onClose}
           className="cc-plate"
-          style={{ width: 40, height: 40, borderRadius: 10, border: "none", cursor: "pointer", color: "#f0e3c4", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+          style={{ width: 40, height: 40, borderRadius: 999, cursor: "pointer", color: "var(--t2)", fontSize: 15, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
           aria-label="Close"
         >
           ✕
@@ -154,8 +154,8 @@ export default function SwipeModal<T extends SwipeCard>({
       <div style={{ maxWidth: 440, width: "92%", margin: "0 auto" }}>
         {intent && (
           <div className="cc-paper" style={{ padding: "11px 16px", marginBottom: 14 }}>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "var(--ink)", textAlign: "center", fontStyle: "italic" }}>
-              <span className="label-sc" style={{ fontStyle: "normal", fontSize: 11, color: "#7a5a1e", letterSpacing: ".1em" }}>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: "var(--t1)", textAlign: "center" }}>
+              <span className="mn-label" style={{ color: "var(--accent)" }}>
                 What I sought ·{" "}
               </span>
               {intent}
@@ -166,10 +166,10 @@ export default function SwipeModal<T extends SwipeCard>({
           <span style={{ fontSize: 13.5, color: "var(--text-muted)", width: 46, fontVariantNumeric: "tabular-nums" }}>
             {Math.min(i + (done ? 0 : 1), cards.length)} / {cards.length}
           </span>
-          <div style={{ flex: 1, height: 6, borderRadius: 4, background: "rgba(0,0,0,.4)", overflow: "hidden", boxShadow: "inset 0 0 0 1px rgba(200,155,65,.25)" }}>
-            <div style={{ width: `${pct}%`, height: "100%", background: "var(--gold)", transition: "width .35s ease" }} />
+          <div style={{ flex: 1, height: 5, borderRadius: 99, background: "var(--bar-track)", overflow: "hidden" }}>
+            <div style={{ width: `${pct}%`, height: "100%", background: "var(--accent)", transition: "width .35s ease" }} />
           </div>
-          <span style={{ fontSize: 14, color: "var(--gold-bright)", fontWeight: 600, width: 38, textAlign: "right", fontFamily: "var(--font-display)" }}>
+          <span style={{ fontSize: 14, color: "var(--accent)", fontWeight: 600, width: 38, textAlign: "right", fontFamily: "var(--font-mono)" }}>
             +{acted}
           </span>
         </div>
@@ -179,19 +179,19 @@ export default function SwipeModal<T extends SwipeCard>({
       <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
         {done ? (
           <div style={{ textAlign: "center", animation: "sp-pop .35s ease" }}>
-            <div style={{ fontSize: 40, color: "var(--gold)", marginBottom: 6 }}>{review ? "✓" : "✦"}</div>
+            <div style={{ fontSize: 40, color: "var(--accent)", marginBottom: 6 }}>{review ? "✓" : "✦"}</div>
             <div style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>
               {review
                 ? `Moved ${acted} card${acted === 1 ? "" : "s"} to the deck`
                 : `Added ${acted} card${acted === 1 ? "" : "s"} to the pool`}
             </div>
-            <div style={{ fontStyle: "italic", fontSize: 14.5, color: "var(--text-muted)", marginTop: 6 }}>
+            <div style={{ fontSize: 14.5, color: "var(--t2)", marginTop: 6 }}>
               {review ? "You triaged the whole pool." : "That is the end of this batch."}
             </div>
             <button
               onClick={onClose}
               className="cc-plate"
-              style={{ marginTop: 20, padding: "11px 24px", borderRadius: 9, border: "none", cursor: "pointer", fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 16, color: "#f4e9cd" }}
+              style={{ marginTop: 20, padding: "11px 24px", borderRadius: 999, cursor: "pointer", fontFamily: "var(--font-ui)", fontWeight: 600, fontSize: 15, color: "var(--t1)" }}
             >
               Return to deck
             </button>
@@ -199,7 +199,7 @@ export default function SwipeModal<T extends SwipeCard>({
         ) : (
           <>
             {cards[i + 1] && (
-              <div style={{ position: "absolute", width: 320, transform: "scale(.92) translateY(14px)", opacity: 0.45, filter: "brightness(.7)", pointerEvents: "none" }}>
+              <div style={{ position: "absolute", width: 320, transform: "scale(.92) translateY(14px)", opacity: 0.5, filter: "saturate(.4)", pointerEvents: "none" }}>
                 <ClassicCard card={cards[i + 1]} variant="full" />
               </div>
             )}
@@ -228,9 +228,9 @@ export default function SwipeModal<T extends SwipeCard>({
                   pointerEvents: "none",
                   boxShadow:
                     decision === "right"
-                      ? "0 0 60px rgba(120,200,120,.5)"
+                      ? "0 0 60px rgba(13,138,95,.45)"
                       : decision === "left"
-                        ? "0 0 60px rgba(200,110,90,.5)"
+                        ? "0 0 60px rgba(194,64,42,.45)"
                         : "none",
                   transition: "box-shadow .1s",
                 }}
@@ -248,7 +248,7 @@ export default function SwipeModal<T extends SwipeCard>({
             <SwBtn kind="info" onClick={() => card && onInfo?.(card)} />
             <SwBtn kind="add" onClick={() => act("right")} />
           </div>
-          <div style={{ fontSize: 13, color: "var(--text-dim)", fontStyle: "italic" }}>
+          <div style={{ fontSize: 13, color: "var(--t3)" }}>
             {review ? "← leave in pool · → add to deck" : "← skip · → add to pool"}
           </div>
         </div>
@@ -259,9 +259,9 @@ export default function SwipeModal<T extends SwipeCard>({
 
 function SwBtn({ kind, onClick }: { kind: "skip" | "info" | "add"; onClick?: () => void }) {
   const cfg = {
-    skip: { ic: "✕", color: "#cf7d5e", size: 58 },
-    info: { ic: "i", color: "#b6a37c", size: 46 },
-    add: { ic: "✦", color: "#9bbf6e", size: 58 },
+    skip: { ic: "✕", color: "#c2402a", size: 58 },
+    info: { ic: "i", color: "#9a9aa2", size: 46 },
+    add: { ic: "✦", color: "#0d8a5f", size: 58 },
   }[kind];
   const [h, setH] = useState(false);
   return (
@@ -276,12 +276,12 @@ function SwBtn({ kind, onClick }: { kind: "skip" | "info" | "add"; onClick?: () 
         borderRadius: "50%",
         cursor: "pointer",
         border: "none",
-        background: h ? `${cfg.color}26` : "rgba(20,14,8,.6)",
+        background: h ? `${cfg.color}14` : "var(--bg2)",
         color: cfg.color,
         fontSize: cfg.size * 0.36,
         fontFamily: kind === "info" ? "var(--font-display)" : "inherit",
-        fontStyle: kind === "info" ? "italic" : "normal",
-        boxShadow: `inset 0 0 0 2px ${cfg.color}99, 0 4px 10px rgba(0,0,0,.4)`,
+        
+        boxShadow: `inset 0 0 0 2px ${cfg.color}55, 0 4px 12px rgba(21,21,26,.12)`,
         transform: h ? "scale(1.08)" : "scale(1)",
         transition: "transform .15s, background .15s",
         display: "flex",

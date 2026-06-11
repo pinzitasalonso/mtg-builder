@@ -80,19 +80,19 @@ export default function JudgeModal({
   return (
     <ModalShell onDismiss={onClose} maxWidth={520} zIndex={72}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)", textShadow: "0 1px 2px rgba(0,0,0,.5)" }}>
+        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)" }}>
           AI Pool Judge ✨
         </h2>
         <button onClick={onClose} style={{ ...ghostBtn, padding: "6px 12px" }}>Close</button>
       </div>
 
       {loading && (
-        <p style={{ margin: 0, fontStyle: "italic", color: "rgba(236,225,198,.85)", fontSize: 15 }}>
+        <p style={{ margin: 0, fontStyle: "normal", color: "var(--t2)", fontSize: 15 }}>
           Consulting the oracle… analyzing {pool.length} cards.
         </p>
       )}
       {error && !loading && (
-        <div style={{ color: "#f4dccd", fontSize: 14, fontStyle: "italic", padding: "10px 14px", background: "rgba(207,125,94,.18)", borderRadius: 8 }}>
+        <div style={{ color: "var(--danger)", fontSize: 14, padding: "10px 14px", background: "rgba(194,64,42,.07)", borderRadius: 10, boxShadow: "inset 0 0 0 1px rgba(194,64,42,.25)" }}>
           {error}
         </div>
       )}
@@ -103,7 +103,7 @@ export default function JudgeModal({
             <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, color: "var(--frame-ink)" }}>{judge.summary}</p>
           )}
           {judge.working.length > 0 && (
-            <JudgeSection title="Working well" color="#9bbf6e">
+            <JudgeSection title="Working well" color="#0d8a5f">
               {judge.working.map((w, i) => <JudgeLi key={i}>{w}</JudgeLi>)}
             </JudgeSection>
           )}
@@ -130,9 +130,9 @@ export default function JudgeModal({
                         cursor: st === "added" || st === "adding" ? "default" : "pointer",
                         fontFamily: "var(--font-body)",
                         fontSize: 14,
-                        background: st === "added" ? "rgba(155,191,110,.25)" : "rgba(0,0,0,.22)",
+                        background: st === "added" ? "rgba(13,138,95,.12)" : "rgba(0,0,0,.22)",
                         color: "var(--frame-ink)",
-                        boxShadow: "inset 0 0 0 1px rgba(236,225,198,.25)",
+                        boxShadow: "inset 0 0 0 1px var(--line)",
                       }}
                     >
                       {name}{" "}
@@ -165,7 +165,7 @@ function JudgeSection({ title, color, children }: { title: string; color: string
 function JudgeLi({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", gap: 8, fontSize: 14, lineHeight: 1.45, color: "var(--frame-ink)" }}>
-      <span style={{ color: "rgba(236,225,198,.5)", flexShrink: 0 }}>•</span>
+      <span style={{ color: "var(--t3)", flexShrink: 0 }}>•</span>
       <span>{children}</span>
     </div>
   );

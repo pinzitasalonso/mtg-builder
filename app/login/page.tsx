@@ -102,16 +102,16 @@ function LoginInner() {
             <>
               <h1 style={h1}>Check your inbox</h1>
               <p style={lede}>
-                We sent a verification link to <strong style={{ color: "var(--frame-ink)" }}>{pendingEmail}</strong>.
+                We sent a verification link to <strong style={{ color: "var(--t1)" }}>{pendingEmail}</strong>.
                 Open it to finish creating your account — the link signs you straight in.
               </p>
               {error && <div style={errorBox}>{error}</div>}
               {resent && !error && (
-                <div style={{ ...errorBox, background: "rgba(122,158,107,.16)", boxShadow: "inset 0 0 0 1px rgba(122,158,107,.4)", color: "#dbe8cf" }}>
+                <div style={{ ...errorBox, background: "rgba(13,138,95,.08)", boxShadow: "inset 0 0 0 1px rgba(13,138,95,.3)", color: "#0d8a5f" }}>
                   Sent — give it a minute, and peek in spam.
                 </div>
               )}
-              <p style={{ margin: "16px 0 0", fontSize: 13.5, color: "rgba(236,225,198,.7)", textAlign: "center" }}>
+              <p style={{ margin: "16px 0 0", fontSize: 13.5, color: "var(--t2)", textAlign: "center" }}>
                 Nothing arrived?{" "}
                 <button type="button" disabled={busy} onClick={() => resend(pendingEmail)} style={linkBtn}>
                   Send it again
@@ -176,7 +176,7 @@ function LoginInner() {
                 </button>
               </form>
 
-              <p style={{ margin: "16px 0 0", fontSize: 13.5, color: "rgba(236,225,198,.7)", textAlign: "center" }}>
+              <p style={{ margin: "16px 0 0", fontSize: 13.5, color: "var(--t2)", textAlign: "center" }}>
                 {mode === "login" ? (
                   <>
                     New here?{" "}
@@ -204,51 +204,50 @@ function LoginInner() {
 const h1: React.CSSProperties = {
   margin: "0 0 4px",
   fontFamily: "var(--font-display)",
-  fontSize: 27,
+  fontSize: 26,
   fontWeight: 700,
-  color: "var(--frame-ink)",
-  textShadow: "0 1px 2px rgba(0,0,0,.5)",
+  letterSpacing: "-.02em",
+  color: "var(--t1)",
 };
 
 const lede: React.CSSProperties = {
   margin: "0 0 16px",
-  fontStyle: "italic",
-  fontSize: 14,
-  color: "rgba(236,225,198,.7)",
-  lineHeight: 1.45,
+  fontSize: 14.5,
+  color: "var(--t2)",
+  lineHeight: 1.5,
 };
 
 const errorBox: React.CSSProperties = {
-  color: "#f4dccd",
+  color: "var(--danger)",
   fontSize: 13.5,
-  fontStyle: "italic",
   padding: "10px 14px",
-  background: "rgba(207,125,94,.16)",
-  borderRadius: 8,
-  boxShadow: "inset 0 0 0 1px rgba(207,125,94,.4)",
+  background: "rgba(194,64,42,.07)",
+  borderRadius: 10,
+  boxShadow: "inset 0 0 0 1px rgba(194,64,42,.25)",
 };
 
 const input: React.CSSProperties = {
-  padding: "11px 13px",
-  border: "none",
+  padding: "12px 15px",
+  border: "1px solid var(--line)",
   outline: "none",
-  borderRadius: 5,
+  borderRadius: 12,
   fontFamily: "var(--font-body)",
   fontSize: 15,
-  color: "var(--ink)",
+  color: "var(--t1)",
+  background: "var(--bg2)",
   width: "100%",
 };
 
 const goldBtn: React.CSSProperties = {
-  background: "var(--gold)",
+  background: "var(--t1)",
   border: "none",
-  borderRadius: 7,
-  color: "var(--accent-ink)",
-  padding: "11px 20px",
+  borderRadius: 999,
+  color: "#fff",
+  padding: "12px 20px",
   cursor: "pointer",
-  fontFamily: "var(--font-display)",
-  fontWeight: 700,
-  fontSize: 15,
+  fontFamily: "var(--font-ui)",
+  fontWeight: 600,
+  fontSize: 14.5,
 };
 
 const linkBtn: React.CSSProperties = {

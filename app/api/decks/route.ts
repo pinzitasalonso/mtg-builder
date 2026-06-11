@@ -14,7 +14,24 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  return NextResponse.json(decks);
+  // Aggregate each deck's color identity (WUBRG order) for the index table.
+  const cards = await prisma.poolCard.findMany({
+    where: { deckId: { in: decks.map((d) => d.id) } },
+    select: { deckId: true, colorIdentity: true },
+  });
+  const colorsByDeck = new Map<number, Set<string>>();
+  for (const c of cards) {
+    if (!c.colorIdentity) continue;
+    const set = colorsByDeck.get(c.deckId) ?? new Set<string>();
+    for (const ch of c.colorIdentity) if ("WUBRG".includes(ch)) set.add(ch);
+    colorsByDeck.set(c.deckId, set);
+  }
+  return NextResponse.json(
+    decks.map((d) => ({
+      ...d,
+      colors: ["W", "U", "B", "R", "G"].filter((ch) => colorsByDeck.get(d.id)?.has(ch)),
+    }))
+  );
 }
 
 export async function POST(req: Request) {
