@@ -22,9 +22,8 @@ export default function OpengraphImage() {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img width={160} height={160} src={markDataUri(160)} alt="" />
-        <div style={{ display: "flex", fontSize: 112, fontWeight: 800, letterSpacing: -2 }}>
-          <span style={{ color: BRAND.text }}>Spell</span>
-          <span style={{ color: BRAND.accent }}>pool</span>
+        <div style={{ display: "flex", fontSize: 112, fontWeight: 700, letterSpacing: -3, color: BRAND.text }}>
+          Spellpool
         </div>
         <div style={{ fontSize: 34, color: BRAND.muted }}>
           Build and brew your Magic: The Gathering decks

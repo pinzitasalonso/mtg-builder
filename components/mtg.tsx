@@ -49,10 +49,76 @@ export function colorsOf(manaCost: string | null | undefined): string[] {
 }
 
 /* ---------- pips ---------- */
+/* Stylized-minimal MTG mana glyphs — cut in the page background color so they
+   read as cut-outs on the colored discs. */
+export function ManaGlyph({ type, color, size }: { type: string; color: string; size: number }) {
+  let body: React.ReactNode;
+  switch (type) {
+    case "W": // sun
+      body = (
+        <g fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
+          <circle cx="12" cy="12" r="3.6" fill={color} stroke="none" />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
+            const r = (a * Math.PI) / 180;
+            return (
+              <line
+                key={a}
+                x1={12 + 6.2 * Math.cos(r)}
+                y1={12 + 6.2 * Math.sin(r)}
+                x2={12 + 8.6 * Math.cos(r)}
+                y2={12 + 8.6 * Math.sin(r)}
+              />
+            );
+          })}
+        </g>
+      );
+      break;
+    case "U": // water drop
+      body = <path fill={color} d="M12 3.2c2.6 4 5.6 7.2 5.6 10.4a5.6 5.6 0 1 1-11.2 0C6.4 10.4 9.4 7.2 12 3.2z" />;
+      break;
+    case "B": // skull
+      body = (
+        <g fill={color}>
+          <path d="M12 3.6a6.6 6.6 0 0 0-6.6 6.6c0 2.5 1.2 4.3 2.7 5.4v3h7.8v-3c1.5-1.1 2.7-2.9 2.7-5.4A6.6 6.6 0 0 0 12 3.6z" />
+          <circle cx="9.4" cy="10.6" r="1.7" fill={MANA.B.bg} />
+          <circle cx="14.6" cy="10.6" r="1.7" fill={MANA.B.bg} />
+          <path d="M12 12.6l1.2 2.2h-2.4z" fill={MANA.B.bg} />
+        </g>
+      );
+      break;
+    case "R": // flame
+      body = (
+        <path
+          fill={color}
+          d="M12.6 3.4c.3 2.9-2.1 4.5-3.4 6.3-1.2 1.7-1.6 3.6-.9 5.5a5.9 5.9 0 0 0 3 3.3c-.7-1.2-.8-2.5-.2-3.7.5-1 1.4-1.7 1.8-2.8.8 1 1.9 2 2.4 3.3.4 1.1.3 2.3-.3 3.2a5.9 5.9 0 0 0 3.2-5.2c0-2.4-1.6-4-3-5.5-1.2-1.3-2.4-2.6-2.6-4.4z"
+        />
+      );
+      break;
+    case "G": // tree
+      body = (
+        <g fill={color}>
+          <path d="M12 3.6l4.6 6.4h-2.4l3.4 5H6.4l3.4-5H7.4L12 3.6z" />
+          <rect x="10.9" y="14.6" width="2.2" height="4" rx="1" />
+        </g>
+      );
+      break;
+    default: // colorless — diamond
+      body = <path fill={color} d="M12 4.5L18.5 12 12 19.5 5.5 12z" />;
+  }
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: "block" }} aria-hidden="true">
+      {body}
+    </svg>
+  );
+}
+
+const GLYPHS = new Set(["W", "U", "B", "R", "G", "C"]);
+
 export function Pip({ sym, size = 18 }: { sym: string; size?: number }) {
   const key = sym.length === 1 && MANA[sym] ? sym : "C";
   const m = MANA[key];
   const isMulti = sym.length > 1;
+  const isGlyph = !isMulti && GLYPHS.has(sym);
   return (
     <span
       style={{
@@ -72,7 +138,7 @@ export function Pip({ sym, size = 18 }: { sym: string; size?: number }) {
         boxShadow: `inset 0 0 0 1px ${m.ring}`,
       }}
     >
-      {isMulti ? sym.replace("/", "") : sym}
+      {isGlyph ? <ManaGlyph type={sym} color={m.fg} size={size * 0.86} /> : isMulti ? sym.replace("/", "") : sym}
     </span>
   );
 }
@@ -522,93 +588,90 @@ export function ClassicCard({
       style={{
         position: "relative",
         padding: full ? 11 : 8,
+        borderRadius: 14,
         cursor: onClick ? "pointer" : "default",
         transform: hover && onClick ? "translateY(-2px)" : "none",
         boxShadow:
           hover && onClick
             ? "0 10px 24px -12px rgba(21,21,26,.25)"
             : "0 1px 2px rgba(21,21,26,.04)",
-        transition: "transform .15s ease, box-shadow .15s",
+        transition: "transform .16s ease, box-shadow .16s",
         ...style,
       }}
     >
-      <div
-        className="cc-brown"
-        style={{ padding: full ? "8px 9px" : "6px 7px", display: "flex", flexDirection: "column", gap: full ? 6 : 4 }}
-      >
-        {/* title — engraved on frame */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: full ? "1px 4px 2px" : "0 3px 1px" }}>
-          <FrameText flex size={full ? 22 : 15}>
-            {card.name}
-          </FrameText>
-          <ManaCost cost={card.manaCost} size={full ? 19 : 14} />
-        </div>
-
-        {/* art window */}
-        <div className="cc-art" style={{ aspectRatio: full ? "1 / 0.64" : "1 / 0.76" }}>
+      {full ? (
+        /* full — a readable proxy card (swipe modal, preview fallback) */
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 4px 0" }}>
+            <FrameText flex size={20}>
+              {card.name}
+            </FrameText>
+            <ManaCost cost={card.manaCost} size={17} />
+          </div>
           <CardArt
             name={card.name}
             src={card.imageUri || undefined}
             colors={colors}
-            version={full ? "normal" : "art_crop"}
-            radius={0}
-            style={{ position: "absolute", inset: 0 }}
+            version="normal"
+            radius={10}
+            style={{ aspectRatio: "1 / 0.66" }}
           />
+          <div style={{ padding: "0 4px", fontSize: 13.5, color: "var(--t3)" }}>{card.typeLine}</div>
+          <div style={{ background: "var(--bg3)", borderRadius: 10, padding: "11px 13px 12px", minHeight: 92 }}>
+            <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5, color: "var(--t1)" }}>{card.oracleText}</p>
+            <div style={{ marginTop: 10, fontSize: 12, color: "var(--t3)" }}>Spellpool · Scryfall</div>
+          </div>
         </div>
-
-        {/* type line — engraved on frame */}
-        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: full ? "0 4px" : "0 3px" }}>
-          <FrameText flex size={full ? 15 : 11.5}>
-            {card.typeLine}
-          </FrameText>
-          <RarityGem rarity="rare" size={full ? 13 : 10} />
-        </div>
-
-        {/* text box — confetti cardstock */}
-        <div className="cc-paper" style={{ padding: full ? "11px 13px 13px" : "6px 8px 7px", minHeight: full ? 92 : 46 }}>
-          <p
-            style={{
-              margin: 0,
-              fontSize: full ? 15 : 11,
-              lineHeight: full ? 1.48 : 1.32,
-              color: "var(--ink)",
-              ...(full
-                ? {}
-                : { display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden" }),
-            }}
-          >
-            {card.oracleText}
-          </p>
-          {full && (
-            <div style={{ marginTop: 10, fontStyle: "normal", fontSize: 12.5, color: "var(--ink-soft)" }}>
-              Illus. — Spellpool · Scryfall
-            </div>
-          )}
-        </div>
-
-        {full && (
+      ) : (
+        /* tile — minimal: art, then name + cost, then type */
+        <>
+          <CardArt
+            name={card.name}
+            src={card.imageUri || undefined}
+            colors={colors}
+            version="art_crop"
+            radius={8}
+            style={{ aspectRatio: "1 / 0.72" }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 10, padding: "0 4px" }}>
+            <span
+              style={{
+                flex: 1,
+                fontWeight: 600,
+                fontSize: 14,
+                letterSpacing: "-.01em",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                minWidth: 0,
+              }}
+            >
+              {card.name}
+            </span>
+            <ManaCost cost={card.manaCost} size={13} />
+          </div>
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              padding: "1px 4px 0",
-              fontSize: 10.5,
+              fontSize: 12,
               color: "var(--t3)",
+              padding: "2px 4px 3px",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
-            <span>SPL · EN</span>
-            <span>™ &amp; © Spellpool</span>
+            {card.typeLine}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {!full && warning && (
         <div
           title={warning}
           style={{
             position: "absolute",
-            bottom: 5,
-            left: 5,
+            bottom: 62,
+            left: 13,
             width: 24,
             height: 24,
             borderRadius: 7,
