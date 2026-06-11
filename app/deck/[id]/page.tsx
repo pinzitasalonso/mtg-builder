@@ -210,6 +210,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // "Order on CardTrader" — runs in <OrderModal> while open
   const [orderOpen, setOrderOpen] = useState(false);
 
+  // deck analysis modal — curve, colors, types & roles
+  const [analyzeOpen, setAnalyzeOpen] = useState(false);
+
   // commander's color identity (resolved from Scryfall) for legality checks
   const [cmdrIdentity, setCmdrIdentity] = useState<string | null>(null);
 
@@ -469,6 +472,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const deckCards = pool.filter((c) => c.board === "deck");
   const poolCards = pool.filter((c) => c.board !== "deck");
   const deckCount = deckCards.reduce((s, c) => s + c.quantity, 0);
+  const poolCount = poolCards.reduce((s, c) => s + c.quantity, 0);
 
   // Review — triage the pool board: swipe right to promote into the deck.
   function startReview() {
@@ -813,81 +817,49 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
 
-          {/* boards — the deck proper, then the candidate pool */}
+          {/* the candidate pool — the centerpiece */}
           <div>
             <SectionHeader
-              title="The Deck"
-              count={deckCount}
+              title="The Pool"
+              count={poolCount}
               right={
-                pool.length > 0 && (
-                  <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <HeaderAction
-                      onClick={() => setOrderOpen(true)}
-                      disabled={deckCards.length === 0}
-                      title="Fill your CardTrader Zero cart with the deck"
-                    >
-                      🛒 Order
-                    </HeaderAction>
-                    <HeaderAction onClick={() => setHandSimOpen(true)} title="Draw sample opening hands">
-                      🎲 Sample hand
-                    </HeaderAction>
-                    <div style={{ display: "inline-flex", gap: 4 }}>
-                      {([["grid", "▦"], ["list", "≣"]] as const).map(([v, ic]) => (
-                        <button
-                          key={v}
-                          onClick={() => setView(v)}
-                          style={{
-                            width: 36,
-                            height: 32,
-                            borderRadius: 8,
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: 16,
-                            background: view === v ? "var(--gold)" : "var(--bg3)",
-                            color: view === v ? "#ffffff" : "var(--text-muted)",
-                            boxShadow: view === v ? "none" : "inset 0 0 0 1px var(--line)",
-                          }}
-                        >
-                          {ic}
-                        </button>
-                      ))}
-                    </div>
+                <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <HeaderAction gold onClick={() => setJudgeOpen(true)} disabled={pool.length === 0} title="AI judge — review the pool">
+                    ✨ Judge
+                  </HeaderAction>
+                  <HeaderAction onClick={startReview} disabled={poolCards.length === 0} title="Swipe through the pool — right promotes to the deck">
+                    ↩ Review
+                  </HeaderAction>
+                  <HeaderAction onClick={() => setCombosOpen(true)} disabled={pool.length === 0} title="Find combos in the pool">
+                    ♾ Combos
+                  </HeaderAction>
+                  <HeaderAction onClick={() => setTool("lands")} title="Bulk-add lands & staples">
+                    🌲 Add lands
+                  </HeaderAction>
+                  <div style={{ display: "inline-flex", gap: 4 }}>
+                    {([["grid", "▦"], ["list", "≣"]] as const).map(([v, ic]) => (
+                      <button
+                        key={v}
+                        onClick={() => setView(v)}
+                        style={{
+                          width: 36,
+                          height: 32,
+                          borderRadius: 8,
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: 16,
+                          background: view === v ? "var(--gold)" : "var(--bg3)",
+                          color: view === v ? "#ffffff" : "var(--text-muted)",
+                          boxShadow: view === v ? "none" : "inset 0 0 0 1px var(--line)",
+                        }}
+                      >
+                        {ic}
+                      </button>
+                    ))}
                   </div>
-                )
+                </div>
               }
             />
-            <div style={{ marginTop: 14 }}>
-              {deckCards.length === 0 ? (
-                <div className="cc-paper" style={{ padding: "26px 20px", textAlign: "center", fontStyle: "normal", color: "var(--ink-soft)" }}>
-                  Nothing in the deck yet — promote cards from the pool with ⇧, or swipe right in “Review pool”.
-                </div>
-              ) : (
-                <BoardCards cards={deckCards} dest="pool" view={view} warningOf={warningOf} onMove={moveTo} onRemove={removeCard} onPreview={setPreview} groupedFor={groupedFor} />
-              )}
-            </div>
-
-            <div style={{ marginTop: 26 }}>
-              <SectionHeader
-                title="The Pool"
-                count={poolCards.reduce((s, c) => s + c.quantity, 0)}
-                right={
-                  <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <HeaderAction gold onClick={() => setJudgeOpen(true)} disabled={pool.length === 0} title="AI judge — review the pool">
-                      ✨ Judge
-                    </HeaderAction>
-                    <HeaderAction onClick={startReview} disabled={poolCards.length === 0} title="Swipe through the pool — right promotes to the deck">
-                      ↩ Review
-                    </HeaderAction>
-                    <HeaderAction onClick={() => setCombosOpen(true)} disabled={pool.length === 0} title="Find combos in the pool">
-                      ♾ Combos
-                    </HeaderAction>
-                    <HeaderAction onClick={() => setTool("lands")} title="Bulk-add lands & staples">
-                      🌲 Add lands
-                    </HeaderAction>
-                  </div>
-                }
-              />
-            </div>
             <div style={{ marginTop: 14 }}>
               {poolCards.length === 0 ? (
                 <div className="cc-paper" style={{ padding: "26px 20px", textAlign: "center", fontStyle: "normal", color: "var(--ink-soft)" }}>
@@ -899,43 +871,91 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 <BoardCards cards={poolCards} dest="deck" view={view} warningOf={warningOf} onMove={moveTo} onRemove={removeCard} onPreview={setPreview} groupedFor={groupedFor} />
               )}
             </div>
-
           </div>
         </div>
 
-        {/* stats sidebar */}
+        {/* deck sidebar — the decklist proper, compact */}
         <aside className="deck-sidebar" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <StatCard
-            label="Overview"
-            right={
-              <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>
-                avg MV <b style={{ color: "var(--text)", fontStyle: "normal" }}>{stats.avgMv.toFixed(1)}</b>
+          <div style={{ background: "var(--bg2)", borderRadius: 14, border: "1px solid var(--line)" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "11px 15px 10px",
+                borderBottom: "1px solid var(--line)",
+              }}
+            >
+              <span className="mn-label" style={{ color: "var(--t2)" }}>
+                The Deck
               </span>
-            }
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <CountRing count={deckCount} target={target} accent="var(--gold)" />
-              <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 14 }}>
-                <span style={{ color: "var(--text-dim)", fontStyle: "normal" }}>{deck?.format ?? "—"} deck</span>
-                <span style={{ color: "var(--text)", fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 600 }}>
-                  {target - deckCount > 0 ? `${target - deckCount} to go` : "Deck complete"}
-                </span>
-                <span style={{ color: "var(--text-dim)", fontStyle: "normal", fontSize: 12.5 }}>
-                  + {poolCards.reduce((s, c) => s + c.quantity, 0)} in the pool
-                </span>
-              </div>
+              <span style={{ fontSize: 13.5, color: "var(--text-dim)" }}>
+                <b style={{ color: "var(--text)", fontVariantNumeric: "tabular-nums" }}>{deckCount}</b> / {target}
+              </span>
+            </div>
+            <div style={{ padding: "12px 15px 0", display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <HeaderAction
+                gold
+                onClick={() => setOrderOpen(true)}
+                disabled={deckCards.length === 0}
+                title="Fill your CardTrader Zero cart with the deck"
+              >
+                🛒 Order
+              </HeaderAction>
+              <HeaderAction onClick={() => setHandSimOpen(true)} disabled={pool.length === 0} title="Draw sample opening hands">
+                🎲 Hand
+              </HeaderAction>
+              <HeaderAction onClick={() => setAnalyzeOpen(true)} disabled={pool.length === 0} title="Mana curve, colors, types & roles">
+                📊 Analyze
+              </HeaderAction>
+            </div>
+            <div style={{ padding: "10px 15px 0", fontSize: 13, color: "var(--text-dim)" }}>
+              {target - deckCount > 0 ? `${target - deckCount} to go` : "Deck complete"}
+              {statsOnDeck && (
+                <>
+                  {" "}· avg MV <b style={{ color: "var(--text)" }}>{stats.avgMv.toFixed(1)}</b>
+                </>
+              )}{" "}
+              · {poolCount} in the pool
             </div>
             {warningCount > 0 && (
-              <div style={{ marginTop: 12, fontSize: 13, color: "var(--danger)", fontStyle: "normal" }}>
+              <div style={{ padding: "8px 15px 0", fontSize: 13, color: "var(--danger)" }}>
                 ⚠ {warningCount} card{warningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ badge.
               </div>
             )}
-            {!statsOnDeck && pool.length > 0 && (
-              <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-dim)", fontStyle: "normal" }}>
-                Stats show the pool until the deck has cards.
-              </div>
-            )}
-          </StatCard>
+            <div style={{ padding: "12px 7px 10px" }}>
+              {deckCards.length === 0 ? (
+                <div style={{ padding: "4px 8px 6px", fontSize: 13.5, color: "var(--text-dim)" }}>
+                  Nothing in the deck yet — promote cards from the pool with ⇧, or swipe right in “Review”.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {groupedFor(deckCards).map((g) => (
+                    <div key={g.t}>
+                      <div className="mn-label" style={{ fontSize: 10.5, color: "var(--t3)", padding: "0 8px 5px" }}>
+                        {g.t}{" "}
+                        <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-body)", textTransform: "none", letterSpacing: 0 }}>
+                          · {g.cards.reduce((s, c) => s + c.quantity, 0)}
+                        </span>
+                      </div>
+                      {g.cards.map((c) => (
+                        <ClassicRow
+                          key={c.dbId}
+                          card={c}
+                          quantity={c.quantity}
+                          warning={warningOf(c)}
+                          onMove={() => moveTo(c.dbId, "pool")}
+                          moveLabel="Move to pool"
+                          onRemove={() => removeCard(c.dbId)}
+                          onClick={() => setPreview(c)}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <StatCard
             label="Play Notes"
             right={
@@ -967,22 +987,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 padding: 0,
               }}
             />
-          </StatCard>
-          <StatCard label="Roles">
-            {statsSource.length > 0 ? (
-              <RoleBreakdown counts={roleCounts} commander={isCommander} />
-            ) : (
-              <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>No cards yet.</span>
-            )}
-          </StatCard>
-          <StatCard label="Mana Curve">
-            <ManaCurve curve={stats.curve} accent="var(--gold)" />
-          </StatCard>
-          <StatCard label="Colors">
-            {stats.count > 0 ? <ColorBar colors={stats.colors} /> : <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>No cards yet.</span>}
-          </StatCard>
-          <StatCard label="Card Types">
-            {stats.types.length > 0 ? <TypeBreakdown types={stats.types} accent="var(--gold)" /> : <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>No cards yet.</span>}
           </StatCard>
         </aside>
       </div>
@@ -1085,6 +1089,49 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {/* CardTrader order */}
       {orderOpen && <OrderModal cards={deckCards} onClose={() => setOrderOpen(false)} />}
+
+      {/* deck analysis — curve, colors, types & roles */}
+      {analyzeOpen && (
+        <ModalShell onDismiss={() => setAnalyzeOpen(false)} maxWidth={440}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)" }}>
+              Deck analysis
+            </h2>
+            <button onClick={() => setAnalyzeOpen(false)} style={{ ...ghostBtn, padding: "6px 12px" }}>Close</button>
+          </div>
+          {!statsOnDeck && (
+            <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--text-dim)" }}>
+              The deck is empty — these numbers describe the pool.
+            </p>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <CountRing count={deckCount} target={target} accent="var(--gold)" />
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 14 }}>
+                <span style={{ color: "var(--text-dim)" }}>{deck?.format ?? "—"} deck</span>
+                <span style={{ color: "var(--text)", fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 600 }}>
+                  {target - deckCount > 0 ? `${target - deckCount} to go` : "Deck complete"}
+                </span>
+                <span style={{ color: "var(--text-dim)", fontSize: 12.5 }}>
+                  avg MV {stats.avgMv.toFixed(1)}
+                </span>
+              </div>
+            </div>
+            <AnalysisSection label="Roles">
+              <RoleBreakdown counts={roleCounts} commander={isCommander} />
+            </AnalysisSection>
+            <AnalysisSection label="Mana Curve">
+              <ManaCurve curve={stats.curve} accent="var(--gold)" />
+            </AnalysisSection>
+            <AnalysisSection label="Colors">
+              <ColorBar colors={stats.colors} />
+            </AnalysisSection>
+            <AnalysisSection label="Card Types">
+              <TypeBreakdown types={stats.types} accent="var(--gold)" />
+            </AnalysisSection>
+          </div>
+        </ModalShell>
+      )}
 
       {/* combo finder */}
       {combosOpen && (
@@ -1276,6 +1323,18 @@ function BoardCards({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/* Labelled block inside the analysis modal. */
+function AnalysisSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mn-label" style={{ color: "var(--t3)", marginBottom: 8 }}>
+        {label}
+      </div>
+      {children}
     </div>
   );
 }
