@@ -24,6 +24,55 @@ interface Intent {
   mechanics: string[];
 }
 
+// Snapshot of the caller's current deck sent with the search request so Claude
+// can avoid suggesting duplicates and spot synergies / missing combo pieces.
+interface DeckContext {
+  cards: { name: string; manaCost: string | null; typeLine: string | null }[];
+  commander: string | null;
+}
+
+interface AlmostCombo {
+  cards: string[];
+  missing: string[];
+  produces: string[];
+}
+
+// Calls Commander Spellbook directly from the server to find combos that are
+// one card away from being complete. Returns at most MAX_ALMOST results.
+// Silently returns [] on any failure — this is best-effort context.
+async function fetchAlmostCombos(ctx: DeckContext): Promise<AlmostCombo[]> {
+  if (ctx.cards.length === 0) return [];
+  const MAX_ALMOST = 10;
+  try {
+    const names = ctx.cards.map((c) => c.name).slice(0, 500);
+    const commanders = ctx.commander ? [ctx.commander] : [];
+    const res = await fetch("https://backend.commanderspellbook.com/find-my-combos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        main: names.map((card) => ({ card, quantity: 1 })),
+        commanders: commanders.map((card) => ({ card, quantity: 1 })),
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    const owned = new Set([...names, ...commanders].map((n) => n.toLowerCase()));
+    const almost: { uses?: { card?: { name?: string } }[]; produces?: { feature?: { name?: string } }[] }[] =
+      data?.results?.almostIncluded ?? [];
+    return almost.slice(0, MAX_ALMOST).map((c) => {
+      const cards = (c.uses ?? []).map((u) => u.card?.name).filter((n): n is string => Boolean(n));
+      return {
+        cards,
+        missing: cards.filter((n) => !owned.has(n.toLowerCase())),
+        produces: (c.produces ?? []).map((p) => p.feature?.name).filter((n): n is string => Boolean(n)),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 // Raw card-name pools gathered from each community source in step 2.
 interface SourceData {
   edhrec: string[];
@@ -207,11 +256,14 @@ async function fetchMoxfield(intent: Intent, prompt: string): Promise<string[]> 
 // ── Step 3 — Claude synthesizes. Given the raw card pools from every source, it
 // picks the 15-20 that satisfy EVERY constraint in the original prompt, acting as
 // the ranker/filter over real community data. With no source data it falls back
-// to its own MTG knowledge.
+// to its own MTG knowledge. When deck context is available, Claude uses it to
+// avoid duplicates, surface synergies, and prioritize combo-completing cards.
 async function synthesize(
   anthropic: Anthropic,
   prompt: string,
-  data: SourceData
+  data: SourceData,
+  deckCtx: DeckContext,
+  almostCombos: AlmostCombo[]
 ): Promise<{ summary: string; cards: string[] }> {
   const total = data.edhrec.length + data.reddit.length + data.moxfield.length;
   const sourceBlock =
@@ -226,6 +278,34 @@ async function synthesize(
       : "No community data could be retrieved for this request. Fall back entirely on your own expert Magic " +
         "knowledge to pick cards that satisfy EVERY constraint in the request.";
 
+  // Deck context block — only appended when caller sent pool data.
+  let deckBlock = "";
+  if (deckCtx.cards.length > 0 || deckCtx.commander) {
+    const commanderLine = deckCtx.commander ? `COMMANDER: ${deckCtx.commander}\n` : "";
+    const cardLines = deckCtx.cards
+      .map((c) => `  ${c.name}${c.typeLine ? ` (${c.typeLine})` : ""}`)
+      .join("\n");
+    deckBlock =
+      "\n\nCURRENT DECK COMPOSITION — these cards are ALREADY in the player's pool. " +
+      "Do NOT suggest any of them. Use this list to understand the deck's strategy, mana curve, " +
+      "and synergies so your suggestions complement what's already built:\n" +
+      commanderLine +
+      `${deckCtx.cards.length} cards:\n${cardLines}`;
+  }
+
+  // Combo context — only appended when Spellbook found near-complete combos.
+  let comboBlock = "";
+  if (almostCombos.length > 0) {
+    const lines = almostCombos.map((c) =>
+      `  Missing: ${c.missing.join(", ")} | Full combo: ${c.cards.join(" + ")} → ${c.produces.join(", ")}`
+    );
+    comboBlock =
+      "\n\nALMOST-COMPLETE COMBOS — Commander Spellbook found these combos where the player has all " +
+      "pieces EXCEPT the listed missing card(s). If any missing card also satisfies the user's request, " +
+      "strongly prefer it and mention the combo in your summary:\n" +
+      lines.join("\n");
+  }
+
   const msg = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 2000,
@@ -234,10 +314,13 @@ async function synthesize(
       "The user describes the cards they want — possibly multi-faceted (color + type + mechanic + theme + " +
       "commander + budget). Pick the BEST 15-20 real cards that satisfy ALL of those constraints together.\n\n" +
       sourceBlock +
+      deckBlock +
+      comboBlock +
       "\n\nRespond with ONLY a JSON object — no prose, no markdown fences — in exactly this shape:\n" +
       '{"summary": string, "cards": string[]}\n' +
       "- cards: 15-20 exact English card names as printed on the card. Real cards only. Order best-first.\n" +
-      "- summary: one short sentence on how you interpreted the request and why these cards fit.",
+      "- summary: one short sentence on how you interpreted the request and why these cards fit. " +
+      "If a combo-completing card is included, mention it briefly.",
     messages: [{ role: "user", content: prompt }],
   });
 
@@ -245,19 +328,29 @@ async function synthesize(
   return { summary: typeof parsed?.summary === "string" ? parsed.summary : "", cards: strArr(parsed?.cards) };
 }
 
-// Deterministic multi-source pipeline: analyze the prompt → fetch EDHREC, Reddit
-// and Moxfield in parallel → let Claude rank/filter over the real data → resolve
-// names on Scryfall (done by the caller). Every source degrades gracefully; if
-// all come back empty, synthesis falls back to Claude's own knowledge.
-async function aiRecommend(anthropic: Anthropic, prompt: string): Promise<AiRecommendation> {
-  // Step 1 — structured intent.
-  const intent = await analyzeIntent(anthropic, prompt);
+// Deterministic multi-source pipeline: analyze the prompt → fetch EDHREC, Reddit,
+// Moxfield, and Commander Spellbook combos in parallel → let Claude rank/filter
+// over the real data with full awareness of the current deck → resolve names on
+// Scryfall (done by the caller). Every source degrades gracefully; if all come
+// back empty, synthesis falls back to Claude's own knowledge.
+async function aiRecommend(
+  anthropic: Anthropic,
+  prompt: string,
+  deckCtx: DeckContext
+): Promise<AiRecommendation> {
+  // Step 1 — structured intent (use commander from deck context as a hint if present).
+  const intentPrompt =
+    deckCtx.commander ? `${prompt} (commander: ${deckCtx.commander})` : prompt;
+  const intent = await analyzeIntent(anthropic, intentPrompt);
+  if (!intent.commander && deckCtx.commander) intent.commander = deckCtx.commander;
 
   // Step 2 — every source in parallel; a thrown source becomes an empty list.
-  const [edhrec, reddit, moxfield] = await Promise.all([
+  // Also fetch almost-complete combos from Commander Spellbook in the same wave.
+  const [edhrec, reddit, moxfield, almostCombos] = await Promise.all([
     fetchEdhrec(intent).catch(() => [] as string[]),
     fetchReddit(prompt).catch(() => [] as string[]),
     fetchMoxfield(intent, prompt).catch(() => [] as string[]),
+    fetchAlmostCombos(deckCtx).catch(() => [] as AlmostCombo[]),
   ]);
 
   const data: SourceData = { edhrec, reddit, moxfield };
@@ -266,8 +359,8 @@ async function aiRecommend(anthropic: Anthropic, prompt: string): Promise<AiReco
   if (reddit.length) sources.push("Reddit");
   if (moxfield.length) sources.push("Moxfield");
 
-  // Step 3 — synthesize/rank over the gathered data.
-  const rec = await synthesize(anthropic, prompt, data);
+  // Step 3 — synthesize/rank over the gathered data with deck context.
+  const rec = await synthesize(anthropic, prompt, data, deckCtx, almostCombos);
   return { ...rec, sources };
 }
 
@@ -277,13 +370,28 @@ export async function POST(req: Request) {
   if (!(await currentUser()) && !anonAiAllowed()) {
     return NextResponse.json({ error: ANON_LIMIT_MSG }, { status: 429 });
   }
-  const { prompt, filters, mode } = await req.json();
+  const { prompt, filters, mode, currentDeck } = await req.json();
   if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return NextResponse.json({ error: "prompt required" }, { status: 400 });
   }
   if (prompt.length > 1000) {
     return NextResponse.json({ error: "prompt too long (max 1000 characters)" }, { status: 400 });
   }
+
+  // Build deck context from the caller's current pool (best-effort; no error if absent).
+  const deckCtx: DeckContext = {
+    commander: typeof currentDeck?.commander === "string" ? currentDeck.commander : null,
+    cards: Array.isArray(currentDeck?.cards)
+      ? (currentDeck.cards as { name?: unknown; manaCost?: unknown; typeLine?: unknown }[])
+          .filter((c) => typeof c?.name === "string" && c.name)
+          .map((c) => ({
+            name: c.name as string,
+            manaCost: typeof c.manaCost === "string" ? c.manaCost : null,
+            typeLine: typeof c.typeLine === "string" ? c.typeLine : null,
+          }))
+          .slice(0, 500)
+      : [],
+  };
 
   const filterTerms = strArr(filters);
   const useAi = mode !== "scryfall" && Boolean(process.env.ANTHROPIC_API_KEY);
@@ -294,7 +402,7 @@ export async function POST(req: Request) {
   if (useAi) {
     try {
       const anthropic = new Anthropic();
-      const rec = await aiRecommend(anthropic, prompt);
+      const rec = await aiRecommend(anthropic, prompt, deckCtx);
 
       // Dedupe the names Claude recommended (case-insensitive), preserving its
       // ordering. Resolve a few extra so Scryfall misses still leave us ~20.

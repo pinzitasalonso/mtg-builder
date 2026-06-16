@@ -356,7 +356,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         const res = await fetch("/api/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: text, mode: searchMode }),
+          body: JSON.stringify({
+            prompt: text,
+            mode: searchMode,
+            currentDeck: {
+              commander: deck?.commander ?? null,
+              cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine })),
+            },
+          }),
         });
         const data = await res.json();
         if (!res.ok) {
