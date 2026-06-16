@@ -14,10 +14,45 @@ export interface SwipeCard {
 
 const THRESHOLD = 80;
 
+/* Per-variant copy + behaviour. `hasPass` means a left swipe is a real action
+   (drop the card) rather than a passive skip. */
+const VARIANTS = {
+  search: {
+    eyebrow: "Oracle Search",
+    hint: "← skip · → add to pool",
+    doneIcon: "✦",
+    doneTitle: (acted: number) => `Added ${acted} card${acted === 1 ? "" : "s"} to the pool`,
+    doneSub: () => "That is the end of this batch.",
+    hasPass: false,
+  },
+  review: {
+    eyebrow: "Review Pool",
+    hint: "← remove from pool · → add to deck",
+    doneIcon: "✓",
+    doneTitle: (acted: number) => `Moved ${acted} card${acted === 1 ? "" : "s"} to the deck`,
+    doneSub: (passed: number) =>
+      passed > 0 ? `Removed ${passed} card${passed === 1 ? "" : "s"} from the pool.` : "You triaged the whole pool.",
+    hasPass: true,
+  },
+  "deck-review": {
+    eyebrow: "Review Deck",
+    hint: "← remove from deck · → keep",
+    doneIcon: "✓",
+    doneTitle: (acted: number) => `Kept ${acted} card${acted === 1 ? "" : "s"}`,
+    doneSub: (passed: number) =>
+      passed > 0 ? `Removed ${passed} card${passed === 1 ? "" : "s"} from the deck.` : "You reviewed the whole deck.",
+    hasPass: true,
+  },
+} as const;
+
+export type SwipeVariant = keyof typeof VARIANTS;
+
 /* Full-screen swipe modal — review cards one full-scan card at a time.
    variant "search": swipe/→ adds the card to the pool, swipe/← skips.
    variant "review": triage the pool — swipe/→ promotes the card to the deck
-   (onAdd), swipe/← passes on it, removing it from the pool (onPass). */
+   (onAdd), swipe/← passes on it, removing it from the pool (onPass).
+   variant "deck-review": triage the deck — swipe/→ keeps the card (onAdd, a
+   no-op), swipe/← discards it from the deck entirely (onPass). */
 export default function SwipeModal<T extends SwipeCard>({
   cards,
   query,
@@ -33,19 +68,19 @@ export default function SwipeModal<T extends SwipeCard>({
   query: string;
   intent?: string;
   onAdd: (card: T) => void;
-  /** Called when a card is passed (swipe/←) — used in review to drop it from the pool. */
+  /** Called when a card is passed (swipe/←) — used to drop it from the pool or deck. */
   onPass?: (card: T) => void;
   onInfo?: (card: T) => void;
   onClose: () => void;
-  variant?: "search" | "review";
-  /** Card index to open on — lets the deck start review from a tapped card. */
+  variant?: SwipeVariant;
+  /** Card index to open on — lets a tapped tile start review from that card. */
   startIndex?: number;
 }) {
-  const review = variant === "review";
+  const copy = VARIANTS[variant];
   const [i, setI] = useState(startIndex);
-  // Counts cards acted on (→): added in search mode, promoted in review mode.
+  // Counts cards acted on (→): added in search, promoted in pool review, kept in deck review.
   const [acted, setActed] = useState(0);
-  // Counts cards passed (←) in review mode — these are removed from the pool.
+  // Counts cards passed (←) — removed from the pool or deck.
   const [passed, setPassed] = useState(0);
   const [exit, setExit] = useState<null | "left" | "right">(null);
   const [drag, setDrag] = useState(0);
@@ -63,7 +98,7 @@ export default function SwipeModal<T extends SwipeCard>({
       if (card && dir === "right") {
         onAdd(card);
         setActed((a) => a + 1);
-      } else if (card && dir === "left" && review) {
+      } else if (card && dir === "left" && copy.hasPass) {
         onPass?.(card);
         setPassed((p) => p + 1);
       }
@@ -73,7 +108,7 @@ export default function SwipeModal<T extends SwipeCard>({
         setI((x) => x + 1);
       }, 280);
     },
-    [exit, done, card, review, onAdd, onPass]
+    [exit, done, card, copy.hasPass, onAdd, onPass]
   );
 
   useEffect(() => {
@@ -134,7 +169,7 @@ export default function SwipeModal<T extends SwipeCard>({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 28px", gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div className="mn-label" style={{ color: "var(--accent)" }}>
-            {review ? "Review Pool" : "Oracle Search"}
+            {copy.eyebrow}
           </div>
           <div
             style={{
@@ -190,18 +225,12 @@ export default function SwipeModal<T extends SwipeCard>({
       <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
         {done ? (
           <div style={{ textAlign: "center", animation: "sp-pop .35s ease" }}>
-            <div style={{ fontSize: 40, color: "var(--accent)", marginBottom: 6 }}>{review ? "✓" : "✦"}</div>
+            <div style={{ fontSize: 40, color: "var(--accent)", marginBottom: 6 }}>{copy.doneIcon}</div>
             <div style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>
-              {review
-                ? `Moved ${acted} card${acted === 1 ? "" : "s"} to the deck`
-                : `Added ${acted} card${acted === 1 ? "" : "s"} to the pool`}
+              {copy.doneTitle(acted)}
             </div>
             <div style={{ fontSize: 14.5, color: "var(--t2)", marginTop: 6 }}>
-              {review
-                ? passed > 0
-                  ? `Removed ${passed} card${passed === 1 ? "" : "s"} from the pool.`
-                  : "You triaged the whole pool."
-                : "That is the end of this batch."}
+              {copy.doneSub(passed)}
             </div>
             <button
               onClick={onClose}
@@ -264,7 +293,7 @@ export default function SwipeModal<T extends SwipeCard>({
             <SwBtn kind="add" onClick={() => act("right")} />
           </div>
           <div style={{ fontSize: 13, color: "var(--t3)" }}>
-            {review ? "← remove from pool · → add to deck" : "← skip · → add to pool"}
+            {copy.hint}
           </div>
         </div>
       )}

@@ -196,6 +196,15 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // Index the review opens on — tapping a pool card starts review from that card.
   const [reviewStart, setReviewStart] = useState(0);
 
+  // deck review — same swipe UI over the deck board: keep (→) or discard (←,
+  // removes from the deck entirely; not returned to the pool).
+  const [deckReviewCards, setDeckReviewCards] = useState<PoolCard[] | null>(null);
+  const [deckReviewStart, setDeckReviewStart] = useState(0);
+
+  // On mobile the pool and deck stack; this toggles which one is shown so you
+  // don't have to scroll the whole pool to reach the deck. Ignored ≥1024px.
+  const [mobileView, setMobileView] = useState<"pool" | "deck">("pool");
+
   // AI pool judge — runs in <JudgeModal> while open
   const [judgeOpen, setJudgeOpen] = useState(false);
 
@@ -476,6 +485,18 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     setReviewCards([...poolCards]);
   }
 
+  // Deck review — triage the decklist: keep a card or discard it from the deck.
+  // Opens on `startCard` when a deck row is tapped. Cards are ordered the same
+  // way the rail groups them so the swipe order matches what's on screen.
+  function startDeckReview(startCard?: PoolCard) {
+    if (deckCards.length === 0) return;
+    setSettingsOpen(false);
+    const ordered = groupedFor(deckCards).flatMap((g) => g.cards);
+    const idx = startCard ? ordered.findIndex((c) => c.dbId === startCard.dbId) : 0;
+    setDeckReviewStart(idx < 0 ? 0 : idx);
+    setDeckReviewCards(ordered);
+  }
+
   // Sidebar stats describe the deck once it has cards; before that, the pool.
   const statsOnDeck = deckCards.length > 0;
   const statsSource = statsOnDeck ? deckCards : pool;
@@ -574,9 +595,35 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
 
-          <div className="deck-layout">
+          {/* mobile pool/deck switcher — sticky segmented control, hidden ≥1024px */}
+          <div className="deck-mobile-tabs">
+            <button
+              type="button"
+              aria-pressed={mobileView === "pool"}
+              className={mobileView === "pool" ? "is-active" : ""}
+              onClick={() => {
+                setMobileView("pool");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              Pool <span>{poolCards.reduce((s, c) => s + c.quantity, 0)}</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={mobileView === "deck"}
+              className={mobileView === "deck" ? "is-active" : ""}
+              onClick={() => {
+                setMobileView("deck");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              Deck <span>{deckCount}</span>
+            </button>
+          </div>
+
+          <div className="deck-layout" data-mobile-view={mobileView}>
             {/* ── left: YOUR POOL ── */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
+            <div className="deck-pool" style={{ display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
               <span className="mn-label" style={{ color: "var(--text-muted)" }}>Your pool</span>
               {/* search panel */}
           <div style={{ background: "var(--bg2)", borderRadius: 16, padding: 18, border: "1px solid var(--line)" }}>
@@ -889,32 +936,55 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             />
           </div>
 
-          {/* your deck header + buy */}
+          {/* your deck header + review + buy */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
             <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--text)" }}>
               Your deck
             </span>
-            <button
-              onClick={() => setOrderOpen(true)}
-              disabled={deckCards.length === 0}
-              title="Order the deck on CardTrader"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "7px 15px",
-                borderRadius: 999,
-                border: "none",
-                cursor: deckCards.length ? "pointer" : "default",
-                background: "var(--accent)",
-                color: "var(--accent-ink)",
-                fontWeight: 700,
-                fontSize: 13.5,
-                opacity: deckCards.length ? 1 : 0.5,
-              }}
-            >
-              🛒 Buy
-            </button>
+            <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+              <button
+                onClick={() => startDeckReview()}
+                disabled={deckCards.length === 0}
+                title="Swipe through the deck — right keeps, left removes from the deck"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 13px",
+                  borderRadius: 999,
+                  border: "1px solid var(--line)",
+                  cursor: deckCards.length ? "pointer" : "default",
+                  background: "var(--bg3)",
+                  color: "var(--text)",
+                  fontWeight: 600,
+                  fontSize: 13.5,
+                  opacity: deckCards.length ? 1 : 0.5,
+                }}
+              >
+                ✓ Review
+              </button>
+              <button
+                onClick={() => setOrderOpen(true)}
+                disabled={deckCards.length === 0}
+                title="Order the deck on CardTrader"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 15px",
+                  borderRadius: 999,
+                  border: "none",
+                  cursor: deckCards.length ? "pointer" : "default",
+                  background: "var(--accent)",
+                  color: "var(--accent-ink)",
+                  fontWeight: 700,
+                  fontSize: 13.5,
+                  opacity: deckCards.length ? 1 : 0.5,
+                }}
+              >
+                🛒 Buy
+              </button>
+            </div>
           </div>
 
           {/* mana curve + dot-grid meter */}
@@ -960,7 +1030,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                         key={c.dbId}
                         card={c}
                         warning={warningOf(c)}
-                        onPreview={() => setPreview(c)}
+                        onOpen={() => startDeckReview(c)}
                         onMove={() => moveTo(c.dbId, "pool")}
                         onRemove={() => removeCard(c.dbId)}
                       />
@@ -1064,6 +1134,29 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           onInfo={setPreview}
           onClose={() => {
             setReviewCards(null);
+            loadPool();
+          }}
+        />
+      )}
+
+      {/* deck review swipe modal — triage the decklist: right keeps the card,
+          left discards it from the deck entirely (not returned to the pool). */}
+      {deckReviewCards && deckReviewCards.length > 0 && (
+        <SwipeModal
+          variant="deck-review"
+          cards={deckReviewCards}
+          query="Reviewing your deck"
+          startIndex={deckReviewStart}
+          onAdd={() => {
+            /* keep — the card stays in the deck, nothing to do */
+          }}
+          onPass={(card) => {
+            const dc = deckReviewCards.find((c) => c.id === card.id);
+            if (dc) fetch(`/api/decks/${deckId}/cards/${dc.dbId}`, { method: "DELETE" });
+          }}
+          onInfo={setPreview}
+          onClose={() => {
+            setDeckReviewCards(null);
             loadPool();
           }}
         />
@@ -1395,13 +1488,13 @@ const poolIconBtn: React.CSSProperties = {
 function DeckRailRow({
   card,
   warning,
-  onPreview,
+  onOpen,
   onMove,
   onRemove,
 }: {
   card: PoolCard;
   warning?: string;
-  onPreview: () => void;
+  onOpen: () => void;
   onMove: () => void;
   onRemove: () => void;
 }) {
@@ -1410,7 +1503,7 @@ function DeckRailRow({
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      onClick={onPreview}
+      onClick={onOpen}
       style={{
         display: "grid",
         gridTemplateColumns: "30px 1fr auto",
