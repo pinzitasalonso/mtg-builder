@@ -193,6 +193,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   // review-with-swipe mode (snapshot of the pool so live reloads don't disturb it)
   const [reviewCards, setReviewCards] = useState<PoolCard[] | null>(null);
+  // Index the review opens on — tapping a pool card starts review from that card.
+  const [reviewStart, setReviewStart] = useState(0);
 
   // AI pool judge — runs in <JudgeModal> while open
   const [judgeOpen, setJudgeOpen] = useState(false);
@@ -464,10 +466,13 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const poolCards = pool.filter((c) => c.board !== "deck");
   const deckCount = deckCards.reduce((s, c) => s + c.quantity, 0);
 
-  // Review — triage the pool board: swipe right to promote into the deck.
-  function startReview() {
+  // Review — triage the pool board: swipe right to promote into the deck, left
+  // to drop from the pool. Opens on `startCard` when a pool tile is tapped.
+  function startReview(startCard?: PoolCard) {
     if (poolCards.length === 0) return;
     setSettingsOpen(false);
+    const idx = startCard ? poolCards.findIndex((c) => c.dbId === startCard.dbId) : 0;
+    setReviewStart(idx < 0 ? 0 : idx);
     setReviewCards([...poolCards]);
   }
 
@@ -811,7 +816,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               {poolCards.reduce((s, c) => s + c.quantity, 0)} cards
             </span>
             <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <HeaderAction onClick={startReview} disabled={poolCards.length === 0} title="Swipe through the pool — right promotes to the deck">
+              <HeaderAction onClick={() => startReview()} disabled={poolCards.length === 0} title="Swipe through the pool — right promotes to the deck, left removes from the pool">
                 ✓ Review pool
               </HeaderAction>
               <HeaderAction gold onClick={() => setJudgeOpen(true)} disabled={pool.length === 0} title="AI judge — review the pool">
@@ -839,7 +844,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                     key={card.dbId}
                     card={card}
                     warning={warningOf(card)}
-                    onPreview={() => setPreview(card)}
+                    onOpen={() => startReview(card)}
                     onMove={() => moveTo(card.dbId, "deck")}
                     onRemove={() => removeCard(card.dbId)}
                   />
@@ -1039,15 +1044,22 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         <ToolSheet tool={tool} deckId={deckId} pool={pool} onClose={() => setTool(null)} onChanged={loadPool} />
       )}
 
-      {/* review-pool swipe modal — triage: right promotes to the deck */}
+      {/* review-pool swipe modal — triage: right promotes to the deck, left
+          drops the card from the pool. Loads the pool on close so the fire-and-
+          forget moves/removes are reflected once. */}
       {reviewCards && reviewCards.length > 0 && (
         <SwipeModal
           variant="review"
           cards={reviewCards}
           query="Building your deck"
+          startIndex={reviewStart}
           onAdd={(card) => {
             const pc = reviewCards.find((c) => c.id === card.id);
             if (pc) moveCard(deckId, pc.dbId, "deck");
+          }}
+          onPass={(card) => {
+            const pc = reviewCards.find((c) => c.id === card.id);
+            if (pc) fetch(`/api/decks/${deckId}/cards/${pc.dbId}`, { method: "DELETE" });
           }}
           onInfo={setPreview}
           onClose={() => {
@@ -1304,17 +1316,17 @@ function DotGrid({ count, target, empty }: { count: number; target: number; empt
   );
 }
 
-/* Pool tile — full card scan, with hover actions. */
+/* Pool tile — full card scan, with hover actions. Tapping opens review. */
 function PoolImageCard({
   card,
   warning,
-  onPreview,
+  onOpen,
   onMove,
   onRemove,
 }: {
   card: PoolCard;
   warning?: string;
-  onPreview: () => void;
+  onOpen: () => void;
   onMove: () => void;
   onRemove: () => void;
 }) {
@@ -1323,7 +1335,7 @@ function PoolImageCard({
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      onClick={onPreview}
+      onClick={onOpen}
       style={{
         position: "relative",
         borderRadius: "4.8%/3.5%",
