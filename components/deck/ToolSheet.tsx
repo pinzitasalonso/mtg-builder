@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { mapPool } from "@/lib/async";
 import { parseDecklist } from "@/lib/decklist";
-import { PoolEntry, poolByName, resolveAndAdd } from "@/lib/pool-client";
+import { PoolEntry, poolByName, resolveAndAdd, setQuantity, deleteCard } from "@/lib/pool-client";
 import { ModalShell, ghostBtn, goldBtn, paperInput } from "./ui";
 
 export type Tool = "export" | "import" | "lands";
@@ -27,6 +27,23 @@ const summaryBox: React.CSSProperties = {
 
 const noteP: React.CSSProperties = { margin: 0, fontSize: 13.5, fontStyle: "normal", color: "var(--t2)" };
 
+const stepBtn: React.CSSProperties = {
+  width: 30,
+  height: 30,
+  borderRadius: 7,
+  border: "none",
+  cursor: "pointer",
+  background: "rgba(0,0,0,.12)",
+  color: "var(--frame-ink)",
+  fontFamily: "var(--font-display)",
+  fontSize: 18,
+  fontWeight: 700,
+  lineHeight: 1,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
 /* Export / import / bulk-lands tool sheet. State lives here, so closing the
    sheet resets it — each open starts fresh. */
 export default function ToolSheet({
@@ -49,6 +66,8 @@ export default function ToolSheet({
   const [landSel, setLandSel] = useState<Record<string, number>>({});
   const [landBusy, setLandBusy] = useState(false);
   const [landSummary, setLandSummary] = useState<string | null>(null);
+  // dbId of the land whose count is currently being saved (disables its stepper).
+  const [qtyBusy, setQtyBusy] = useState<number | null>(null);
 
   // ── Export — standard "{qty} {name}" decklist; deck board first, then the
   // remaining pool as a commented section (the importer skips "//" lines).
@@ -94,6 +113,26 @@ export default function ToolSheet({
     setImportSummary(parts.join(", ") + ".");
     setImportText("");
     setImporting(false);
+  }
+
+  // Lands already in the pool, so their counts can be edited in place. Matches on
+  // the type line ("Basic Land — Forest", "Artifact Land", …) — basics by name
+  // aren't reliable, but every land's type line carries the word "Land".
+  const landsInPool = pool
+    .filter((c) => /\bland\b/i.test(c.typeLine ?? ""))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const landCount = landsInPool.reduce((s, c) => s + c.quantity, 0);
+
+  // ── Edit count — set the exact number of copies of a land already in the pool.
+  // Dropping to 0 removes the row entirely.
+  async function editLandQty(card: PoolEntry, next: number) {
+    if (next === card.quantity) return;
+    setQtyBusy(card.dbId);
+    setLandSummary(null);
+    if (next <= 0) await deleteCard(deckId, card.dbId);
+    else await setQuantity(deckId, card.dbId, next);
+    await onChanged();
+    setQtyBusy(null);
   }
 
   // ── Bulk lands — add the chosen quantity of each preset land/staple.
@@ -160,6 +199,41 @@ export default function ToolSheet({
 
       {tool === "lands" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {landsInPool.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <p style={{ ...noteP, fontWeight: 600 }}>
+                {landCount} land{landCount === 1 ? "" : "s"} in your pool — tap − / + to adjust.
+              </p>
+              {landsInPool.map((c) => (
+                <div key={c.dbId} style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 10, padding: "5px 6px", borderRadius: 8, background: "rgba(39,66,214,.05)" }}>
+                  <span style={{ fontFamily: "var(--font-display)", fontSize: 15, fontWeight: 600, color: "var(--frame-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button
+                      type="button"
+                      aria-label={`Remove one ${c.name}`}
+                      disabled={qtyBusy === c.dbId}
+                      onClick={() => editLandQty(c, c.quantity - 1)}
+                      style={stepBtn}
+                    >
+                      −
+                    </button>
+                    <span style={{ minWidth: 24, textAlign: "center", fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, color: "var(--ink)" }}>
+                      {qtyBusy === c.dbId ? "…" : c.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={`Add one ${c.name}`}
+                      disabled={qtyBusy === c.dbId}
+                      onClick={() => editLandQty(c, c.quantity + 1)}
+                      style={stepBtn}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <p style={noteP}>
             Set a quantity for each, then add your whole mana base in one tap.
           </p>
