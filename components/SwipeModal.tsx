@@ -14,31 +14,39 @@ export interface SwipeCard {
 
 const THRESHOLD = 80;
 
-/* Full-screen swipe modal — review cards one classic card at a time.
+/* Full-screen swipe modal — review cards one full-scan card at a time.
    variant "search": swipe/→ adds the card to the pool, swipe/← skips.
    variant "review": triage the pool — swipe/→ promotes the card to the deck
-   (onAdd), swipe/← leaves it in the pool. */
+   (onAdd), swipe/← passes on it, removing it from the pool (onPass). */
 export default function SwipeModal<T extends SwipeCard>({
   cards,
   query,
   intent,
   onAdd,
+  onPass,
   onInfo,
   onClose,
   variant = "search",
+  startIndex = 0,
 }: {
   cards: T[];
   query: string;
   intent?: string;
   onAdd: (card: T) => void;
+  /** Called when a card is passed (swipe/←) — used in review to drop it from the pool. */
+  onPass?: (card: T) => void;
   onInfo?: (card: T) => void;
   onClose: () => void;
   variant?: "search" | "review";
+  /** Card index to open on — lets the deck start review from a tapped card. */
+  startIndex?: number;
 }) {
   const review = variant === "review";
-  const [i, setI] = useState(0);
+  const [i, setI] = useState(startIndex);
   // Counts cards acted on (→): added in search mode, promoted in review mode.
   const [acted, setActed] = useState(0);
+  // Counts cards passed (←) in review mode — these are removed from the pool.
+  const [passed, setPassed] = useState(0);
   const [exit, setExit] = useState<null | "left" | "right">(null);
   const [drag, setDrag] = useState(0);
 
@@ -55,6 +63,9 @@ export default function SwipeModal<T extends SwipeCard>({
       if (card && dir === "right") {
         onAdd(card);
         setActed((a) => a + 1);
+      } else if (card && dir === "left" && review) {
+        onPass?.(card);
+        setPassed((p) => p + 1);
       }
       setTimeout(() => {
         setExit(null);
@@ -62,7 +73,7 @@ export default function SwipeModal<T extends SwipeCard>({
         setI((x) => x + 1);
       }, 280);
     },
-    [exit, done, card, onAdd]
+    [exit, done, card, review, onAdd, onPass]
   );
 
   useEffect(() => {
@@ -186,7 +197,11 @@ export default function SwipeModal<T extends SwipeCard>({
                 : `Added ${acted} card${acted === 1 ? "" : "s"} to the pool`}
             </div>
             <div style={{ fontSize: 14.5, color: "var(--t2)", marginTop: 6 }}>
-              {review ? "You triaged the whole pool." : "That is the end of this batch."}
+              {review
+                ? passed > 0
+                  ? `Removed ${passed} card${passed === 1 ? "" : "s"} from the pool.`
+                  : "You triaged the whole pool."
+                : "That is the end of this batch."}
             </div>
             <button
               onClick={onClose}
@@ -200,7 +215,7 @@ export default function SwipeModal<T extends SwipeCard>({
           <>
             {cards[i + 1] && (
               <div style={{ position: "absolute", width: 320, transform: "scale(.92) translateY(14px)", opacity: 0.5, filter: "saturate(.4)", pointerEvents: "none" }}>
-                <ClassicCard card={cards[i + 1]} variant="full" />
+                <CardFace card={cards[i + 1]} />
               </div>
             )}
             <div
@@ -219,7 +234,7 @@ export default function SwipeModal<T extends SwipeCard>({
                 opacity: exit ? 0 : 1,
               }}
             >
-              <ClassicCard card={card} variant="full" />
+              <CardFace card={card} />
               <div
                 style={{
                   position: "absolute",
@@ -249,12 +264,32 @@ export default function SwipeModal<T extends SwipeCard>({
             <SwBtn kind="add" onClick={() => act("right")} />
           </div>
           <div style={{ fontSize: 13, color: "var(--t3)" }}>
-            {review ? "← leave in pool · → add to deck" : "← skip · → add to pool"}
+            {review ? "← remove from pool · → add to deck" : "← skip · → add to pool"}
           </div>
         </div>
       )}
     </div>
   );
+}
+
+/* The card face shown in the swipe stack — matches the card detail screen:
+   the real Scryfall scan in a clean white frame, with the readable proxy as a
+   fallback when no image is stored. */
+function CardFace({ card }: { card: SwipeCard }) {
+  if (card.imageUri) {
+    return (
+      <div className="cc-black" style={{ padding: 10 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={card.imageUri}
+          alt={card.name}
+          draggable={false}
+          style={{ borderRadius: 8, width: "100%", height: "auto", display: "block", userSelect: "none" }}
+        />
+      </div>
+    );
+  }
+  return <ClassicCard card={card} variant="full" />;
 }
 
 function SwBtn({ kind, onClick }: { kind: "skip" | "info" | "add"; onClick?: () => void }) {
