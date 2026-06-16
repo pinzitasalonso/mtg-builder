@@ -62,6 +62,23 @@ export async function moveCard(deckId: number, dbId: number, board: Board): Prom
   return res.ok;
 }
 
+// Set the exact copy count of a pool row. To drop the last copy, delete the row
+// instead — the API rejects a quantity below 1.
+export async function setQuantity(deckId: number, dbId: number, quantity: number): Promise<boolean> {
+  const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ quantity }),
+  });
+  return res.ok;
+}
+
+// Remove a pool row entirely.
+export async function deleteCard(deckId: number, dbId: number): Promise<boolean> {
+  const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, { method: "DELETE" });
+  return res.ok;
+}
+
 // Add `qty` copies of a card by name. If a card of that name is already in the
 // pool we increment THAT row; otherwise we resolve it on Scryfall and create
 // it. `known` is mutated so repeats within a batch merge.
