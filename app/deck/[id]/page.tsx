@@ -19,12 +19,7 @@ import {
   ManaCost,
   ColorPips,
   ClassicCard,
-  ClassicRow,
-  StatCard,
   ManaCurve,
-  ColorBar,
-  TypeBreakdown,
-  CountRing,
   deckStats,
   categoryOf,
   deckTarget,
@@ -187,7 +182,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
   const [nameAdding, setNameAdding] = useState(false);
-  const [view, setView] = useState<"grid" | "list">("grid");
 
   // settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -484,6 +478,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const poolColors = ["W", "U", "B", "R", "G"].filter((c) => stats.colors[c] > 0);
   const target = deckTarget(deck?.format);
 
+  // Deck-view theme driven by the deck's colour identity (commander identity
+  // when known, else the colours actually present).
+  const identityStr = cmdrIdentity != null && cmdrIdentity !== "" ? cmdrIdentity : poolColors.join("");
+  const theme = getIdentityTheme(identityStr);
+  const identityPips = (identityStr.toUpperCase().replace(/[^WUBRG]/g, "").split("").filter(Boolean));
+
   // Legality warnings (format + commander color identity).
   const warningOf = (c: PoolCard): string | undefined => {
     const ws = cardWarnings(c, deck?.format, cmdrIdentity);
@@ -491,13 +491,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   };
   const warningCount = pool.reduce((n, c) => n + (warningOf(c) ? 1 : 0), 0);
 
-  // Role breakdown over the stats source (commander targets when relevant).
-  const roleCounts: Record<string, number> = {};
-  for (const c of statsSource) {
-    const k = c.role ?? "untagged";
-    roleCounts[k] = (roleCounts[k] ?? 0) + c.quantity;
-  }
-  const isCommander = (deck?.format ?? "").toLowerCase() === "commander";
 
   const groupedFor = (cards: PoolCard[]) =>
     TYPE_ORDER.map((t) => ({
@@ -526,62 +519,61 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   return (
     <main style={{ flex: 1 }}>
-      {/* top bar */}
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "16px 22px",
-          position: "sticky",
-          top: 0,
-          zIndex: 20,
-          background: "var(--bg)",
-          borderBottom: "1px solid var(--line)",
-          gap: 12,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
-          <Link href="/" aria-label="Back to decks" className="cc-plate" style={{ ...plateBtn, width: 38, height: 38, fontSize: 18 }}>
+      <div className="deck-theme" style={{ ...theme.vars, background: theme.bg, color: theme.text, minHeight: "100vh" }}>
+        {/* slim top bar */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "16px 22px",
+            position: "sticky",
+            top: 0,
+            zIndex: 20,
+            background: theme.bg,
+            gap: 12,
+          }}
+        >
+          <Link href="/" aria-label="Back to decks" style={{ ...plateBtn, width: 36, height: 36, fontSize: 18, background: "var(--bg3)", color: "var(--text)" }}>
             ‹
           </Link>
-          <div className="cc-art" style={{ width: 40, height: 40, borderRadius: 7, flexShrink: 0 }}>
-            <CardArt name={deck?.commander || deck?.name} colors={poolColors} radius={0} style={{ position: "absolute", inset: 0 }} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-              <span
+          <button onClick={openSettings} style={{ ...plateBtn, width: 36, height: 36, fontSize: 15, background: "var(--bg3)", color: "var(--text)" }} title="Deck settings" aria-label="Deck settings">
+            ⚙
+          </button>
+        </div>
+
+        <div style={{ maxWidth: 1240, margin: "0 auto", padding: "10px 22px 80px" }}>
+          {/* title */}
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28, minWidth: 0 }}>
+            {identityPips.length > 0 && <ColorPips colors={identityPips} size={28} />}
+            <div style={{ minWidth: 0 }}>
+              <h1
                 style={{
+                  margin: 0,
                   fontFamily: "var(--font-display)",
-                  fontSize: 23,
-                  fontWeight: 700,
+                  fontSize: "clamp(28px, 5vw, 46px)",
+                  fontWeight: 800,
+                  letterSpacing: ".01em",
+                  textTransform: "uppercase",
+                  lineHeight: 1.02,
                   color: "var(--text)",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
                 }}
               >
-                {deck?.name ?? "…"}
-              </span>
-              {poolColors.length > 0 && <ColorPips colors={poolColors} size={16} />}
+                {deck?.commander || deck?.name || "…"}
+              </h1>
+              {deck && (
+                <div style={{ marginTop: 5, fontSize: 14, color: "var(--text-muted)" }}>
+                  {deck.name} · {deck.format}
+                </div>
+              )}
             </div>
-            {deck && (
-              <div style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)", marginTop: -1 }}>
-                {deck.format}
-                {deck.commander ? ` · ${deck.commander}` : ""}
-              </div>
-            )}
           </div>
-        </div>
-        <button onClick={openSettings} className="cc-plate" style={{ ...plateBtn, width: 38, height: 38, fontSize: 16 }} title="Deck settings" aria-label="Deck settings">
-          ⚙
-        </button>
-      </header>
 
-      <div className="deck-layout" style={{ maxWidth: 1240, margin: "0 auto", padding: "24px 22px 80px" }}>
-        {/* main column */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 22, minWidth: 0 }}>
-          {/* search panel */}
+          <div className="deck-layout">
+            {/* ── left: YOUR POOL ── */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
+              <span className="mn-label" style={{ color: "var(--text-muted)" }}>Your pool</span>
+              {/* search panel */}
           <div style={{ background: "var(--bg2)", borderRadius: 16, padding: 18, border: "1px solid var(--line)" }}>
             {/* mode tabs — underline style */}
             <div style={{ display: "flex", gap: 22, borderBottom: "1px solid var(--line)", marginBottom: 16 }}>
@@ -813,137 +805,60 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
 
-          {/* boards — the deck proper, then the candidate pool */}
+          {/* pool actions */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--text)" }}>
+              {poolCards.reduce((s, c) => s + c.quantity, 0)} cards
+            </span>
+            <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <HeaderAction onClick={startReview} disabled={poolCards.length === 0} title="Swipe through the pool — right promotes to the deck">
+                ✓ Review pool
+              </HeaderAction>
+              <HeaderAction gold onClick={() => setJudgeOpen(true)} disabled={pool.length === 0} title="AI judge — review the pool">
+                ✨ Judge
+              </HeaderAction>
+              <HeaderAction onClick={() => setCombosOpen(true)} disabled={pool.length === 0} title="Find combos in the pool">
+                ♾ Combos
+              </HeaderAction>
+              <HeaderAction onClick={() => setTool("lands")} title="Bulk-add lands & staples">
+                🌲 Lands
+              </HeaderAction>
+            </div>
+          </div>
           <div>
-            <SectionHeader
-              title="The Deck"
-              count={deckCount}
-              right={
-                pool.length > 0 && (
-                  <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <HeaderAction
-                      onClick={() => setOrderOpen(true)}
-                      disabled={deckCards.length === 0}
-                      title="Fill your CardTrader Zero cart with the deck"
-                    >
-                      🛒 Order
-                    </HeaderAction>
-                    <HeaderAction onClick={() => setHandSimOpen(true)} title="Draw sample opening hands">
-                      🎲 Sample hand
-                    </HeaderAction>
-                    <div style={{ display: "inline-flex", gap: 4 }}>
-                      {([["grid", "▦"], ["list", "≣"]] as const).map(([v, ic]) => (
-                        <button
-                          key={v}
-                          onClick={() => setView(v)}
-                          style={{
-                            width: 36,
-                            height: 32,
-                            borderRadius: 8,
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: 16,
-                            background: view === v ? "var(--gold)" : "var(--bg3)",
-                            color: view === v ? "#ffffff" : "var(--text-muted)",
-                            boxShadow: view === v ? "none" : "inset 0 0 0 1px var(--line)",
-                          }}
-                        >
-                          {ic}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )
-              }
-            />
-            <div style={{ marginTop: 14 }}>
-              {deckCards.length === 0 ? (
-                <div className="cc-paper" style={{ padding: "26px 20px", textAlign: "center", fontStyle: "normal", color: "var(--ink-soft)" }}>
-                  Nothing in the deck yet — promote cards from the pool with ⇧, or swipe right in “Review pool”.
-                </div>
-              ) : (
-                <BoardCards cards={deckCards} dest="pool" view={view} warningOf={warningOf} onMove={moveTo} onRemove={removeCard} onPreview={setPreview} groupedFor={groupedFor} />
-              )}
-            </div>
-
-            <div style={{ marginTop: 26 }}>
-              <SectionHeader
-                title="The Pool"
-                count={poolCards.reduce((s, c) => s + c.quantity, 0)}
-                right={
-                  <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                    <HeaderAction gold onClick={() => setJudgeOpen(true)} disabled={pool.length === 0} title="AI judge — review the pool">
-                      ✨ Judge
-                    </HeaderAction>
-                    <HeaderAction onClick={startReview} disabled={poolCards.length === 0} title="Swipe through the pool — right promotes to the deck">
-                      ↩ Review
-                    </HeaderAction>
-                    <HeaderAction onClick={() => setCombosOpen(true)} disabled={pool.length === 0} title="Find combos in the pool">
-                      ♾ Combos
-                    </HeaderAction>
-                    <HeaderAction onClick={() => setTool("lands")} title="Bulk-add lands & staples">
-                      🌲 Add lands
-                    </HeaderAction>
-                  </div>
-                }
-              />
-            </div>
-            <div style={{ marginTop: 14 }}>
-              {poolCards.length === 0 ? (
-                <div className="cc-paper" style={{ padding: "26px 20px", textAlign: "center", fontStyle: "normal", color: "var(--ink-soft)" }}>
-                  {pool.length === 0
-                    ? "No cards yet — search above to begin filling the pool."
-                    : "Pool is empty — every card has been promoted to the deck."}
-                </div>
-              ) : (
-                <BoardCards cards={poolCards} dest="deck" view={view} warningOf={warningOf} onMove={moveTo} onRemove={removeCard} onPreview={setPreview} groupedFor={groupedFor} />
-              )}
-            </div>
-
+            {poolCards.length === 0 ? (
+              <div style={{ padding: "44px 20px", textAlign: "center", color: "var(--text-muted)", borderRadius: 14, border: "1px dashed var(--line)" }}>
+                {pool.length === 0
+                  ? "No cards yet — search above to begin filling the pool."
+                  : "Pool is empty — every card has been promoted to the deck."}
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 14 }}>
+                {poolCards.map((card) => (
+                  <PoolImageCard
+                    key={card.dbId}
+                    card={card}
+                    warning={warningOf(card)}
+                    onPreview={() => setPreview(card)}
+                    onMove={() => moveTo(card.dbId, "deck")}
+                    onRemove={() => removeCard(card.dbId)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* stats sidebar */}
-        <aside className="deck-sidebar" style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-          <StatCard
-            label="Overview"
-            right={
-              <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>
-                avg MV <b style={{ color: "var(--text)", fontStyle: "normal" }}>{stats.avgMv.toFixed(1)}</b>
-              </span>
-            }
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <CountRing count={deckCount} target={target} accent="var(--gold)" />
-              <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: 14 }}>
-                <span style={{ color: "var(--text-dim)", fontStyle: "normal" }}>{deck?.format ?? "—"} deck</span>
-                <span style={{ color: "var(--text)", fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 600 }}>
-                  {target - deckCount > 0 ? `${target - deckCount} to go` : "Deck complete"}
-                </span>
-                <span style={{ color: "var(--text-dim)", fontStyle: "normal", fontSize: 12.5 }}>
-                  + {poolCards.reduce((s, c) => s + c.quantity, 0)} in the pool
-                </span>
-              </div>
-            </div>
-            {warningCount > 0 && (
-              <div style={{ marginTop: 12, fontSize: 13, color: "var(--danger)", fontStyle: "normal" }}>
-                ⚠ {warningCount} card{warningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ badge.
-              </div>
-            )}
-            {!statsOnDeck && pool.length > 0 && (
-              <div style={{ marginTop: 10, fontSize: 12, color: "var(--text-dim)", fontStyle: "normal" }}>
-                Stats show the pool until the deck has cards.
-              </div>
-            )}
-          </StatCard>
-          <StatCard
-            label="Play Notes"
-            right={
-              <span className="mn-label" style={{ fontSize: 10, color: noteStatus === "saving" ? "var(--t3)" : "#0d8a5f" }}>
+        {/* ── right: YOUR DECK rail ── */}
+        <aside className="deck-sidebar" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* play guide (notes) */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <span className="mn-label" style={{ color: "var(--text-muted)" }}>Play guide</span>
+              <span className="mn-label" style={{ fontSize: 10, color: noteStatus === "saving" ? "var(--text-dim)" : "var(--accent)" }}>
                 {noteStatus === "saving" ? "Saving…" : noteStatus === "saved" ? "Saved" : ""}
               </span>
-            }
-          >
+            </div>
             <textarea
               value={notes}
               onChange={(e) => onNotesChange(e.target.value)}
@@ -952,7 +867,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 saveNotes(notes);
               }}
               placeholder="How does this deck play? Mulligans, key lines, win routes…"
-              rows={6}
+              rows={4}
               style={{
                 width: "100%",
                 border: "none",
@@ -960,31 +875,99 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 resize: "vertical",
                 background: "transparent",
                 fontFamily: "var(--font-body)",
-                fontSize: 14,
+                fontSize: 14.5,
                 lineHeight: 1.55,
-                color: "var(--t1)",
-                minHeight: 110,
+                color: "var(--text)",
+                minHeight: 76,
                 padding: 0,
               }}
             />
-          </StatCard>
-          <StatCard label="Roles">
-            {statsSource.length > 0 ? (
-              <RoleBreakdown counts={roleCounts} commander={isCommander} />
-            ) : (
-              <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>No cards yet.</span>
-            )}
-          </StatCard>
-          <StatCard label="Mana Curve">
-            <ManaCurve curve={stats.curve} accent="var(--gold)" />
-          </StatCard>
-          <StatCard label="Colors">
-            {stats.count > 0 ? <ColorBar colors={stats.colors} /> : <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>No cards yet.</span>}
-          </StatCard>
-          <StatCard label="Card Types">
-            {stats.types.length > 0 ? <TypeBreakdown types={stats.types} accent="var(--gold)" /> : <span style={{ fontSize: 13.5, fontStyle: "normal", color: "var(--text-dim)" }}>No cards yet.</span>}
-          </StatCard>
+          </div>
+
+          {/* your deck header + buy */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--text)" }}>
+              Your deck
+            </span>
+            <button
+              onClick={() => setOrderOpen(true)}
+              disabled={deckCards.length === 0}
+              title="Order the deck on CardTrader"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 15px",
+                borderRadius: 999,
+                border: "none",
+                cursor: deckCards.length ? "pointer" : "default",
+                background: "var(--accent)",
+                color: "var(--accent-ink)",
+                fontWeight: 700,
+                fontSize: 13.5,
+                opacity: deckCards.length ? 1 : 0.5,
+              }}
+            >
+              🛒 Buy
+            </button>
+          </div>
+
+          {/* mana curve + dot-grid meter */}
+          <div style={{ display: "flex", gap: 16, alignItems: "flex-end", justifyContent: "space-between" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <ManaCurve curve={stats.curve} accent="rgba(255,255,255,.9)" />
+            </div>
+            <DotGrid count={deckCount} target={target} empty={theme.dotEmpty} />
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13, color: "var(--text-muted)", marginTop: -6 }}>
+            <span>
+              <b style={{ color: "var(--text)" }}>{deckCount}</b> / {target}
+            </span>
+            <span>
+              avg MV <b style={{ color: "var(--text)" }}>{stats.avgMv.toFixed(1)}</b>
+            </span>
+            <button onClick={() => setHandSimOpen(true)} title="Draw sample opening hands" style={{ background: "transparent", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, padding: 0 }}>
+              🎲 Hand
+            </button>
+          </div>
+          {warningCount > 0 && (
+            <div style={{ fontSize: 12.5, color: "var(--accent)" }}>
+              ⚠ {warningCount} card{warningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ on a card.
+            </div>
+          )}
+
+          {/* grouped decklist */}
+          {deckCards.length === 0 ? (
+            <div style={{ padding: "26px 16px", textAlign: "center", color: "var(--text-muted)", border: "1px dashed var(--line)", borderRadius: 12, fontSize: 13.5 }}>
+              Nothing here yet — promote cards from the pool with ⤴, or use “Review pool”.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {groupedFor(deckCards).map((g) => (
+                <div key={g.t}>
+                  <div className="mn-label" style={{ color: "var(--text-muted)", marginBottom: 8, display: "flex", gap: 8, alignItems: "baseline" }}>
+                    {g.t}
+                    <span style={{ color: "var(--text-dim)" }}>{g.cards.reduce((s, c) => s + c.quantity, 0)}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                    {g.cards.map((c) => (
+                      <DeckRailRow
+                        key={c.dbId}
+                        card={c}
+                        warning={warningOf(c)}
+                        onPreview={() => setPreview(c)}
+                        onMove={() => moveTo(c.dbId, "pool")}
+                        onRemove={() => removeCard(c.dbId)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </aside>
+        </div>
+        </div>
       </div>
 
       {/* swipe-to-add modal */}
@@ -1190,7 +1173,7 @@ function HeaderAction({
         fontWeight: gold ? 600 : 500,
         whiteSpace: "nowrap",
         background: gold ? "var(--accent)" : "var(--bg2)",
-        color: gold ? "#ffffff" : "var(--t2)",
+        color: gold ? "var(--accent-ink)" : "var(--t2)",
         opacity: disabled ? 0.45 : 1,
         transition: "all .12s",
       }}
@@ -1200,131 +1183,16 @@ function HeaderAction({
   );
 }
 
-function SectionHeader({ title, count, right }: { title: string; count: number; right?: React.ReactNode }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-      <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--text)" }}>
-        {title} <span style={{ color: "var(--text-dim)", fontWeight: 500, fontStyle: "normal", fontSize: 19 }}>· {count} card{count === 1 ? "" : "s"}</span>
-      </h2>
-      {right}
-    </div>
-  );
-}
-
-/* One board's cards in the active view. `dest` is where the move button sends
-   a card (the other board). */
-function BoardCards({
-  cards,
-  dest,
-  view,
-  warningOf,
-  onMove,
-  onRemove,
-  onPreview,
-  groupedFor,
-}: {
-  cards: PoolCard[];
-  dest: Board;
-  view: "grid" | "list";
-  warningOf: (c: PoolCard) => string | undefined;
-  onMove: (dbId: number, board: Board) => void;
-  onRemove: (dbId: number) => void;
-  onPreview: (c: PoolCard) => void;
-  groupedFor: (cards: PoolCard[]) => { t: string; cards: PoolCard[] }[];
-}) {
-  const moveLabel = dest === "deck" ? "Move to deck" : "Move to pool";
-  if (view === "grid") {
-    return (
-      <div className="card-grid">
-        {cards.map((card) => (
-          <ClassicCard
-            key={card.dbId}
-            card={card}
-            variant="tile"
-            quantity={card.quantity}
-            warning={warningOf(card)}
-            onMove={() => onMove(card.dbId, dest)}
-            moveLabel={moveLabel}
-            onRemove={() => onRemove(card.dbId)}
-            onClick={() => onPreview(card)}
-          />
-        ))}
-      </div>
-    );
-  }
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {groupedFor(cards).map((g) => (
-        <div key={g.t}>
-          <div className="label-sc" style={{ fontSize: 13, color: "var(--gold)", padding: "0 4px 7px", letterSpacing: ".12em" }}>
-            {g.t}{" "}
-            <span style={{ color: "var(--text-dim)", fontFamily: "var(--font-body)", textTransform: "none", letterSpacing: 0 }}>· {g.cards.reduce((s, c) => s + c.quantity, 0)}</span>
-          </div>
-          <div style={{ background: "var(--app-bg2)", borderRadius: 7, padding: 5, boxShadow: "inset 0 0 0 1px var(--line)" }}>
-            {g.cards.map((c) => (
-              <ClassicRow
-                key={c.dbId}
-                card={c}
-                quantity={c.quantity}
-                warning={warningOf(c)}
-                onMove={() => onMove(c.dbId, dest)}
-                moveLabel={moveLabel}
-                onRemove={() => onRemove(c.dbId)}
-                onClick={() => onPreview(c)}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* Role counts vs the usual commander quotas. */
-const ROLE_META: { key: string; label: string; target: number | null }[] = [
-  { key: "land", label: "Lands", target: 36 },
-  { key: "ramp", label: "Ramp", target: 10 },
-  { key: "draw", label: "Draw", target: 10 },
-  { key: "removal", label: "Removal", target: 8 },
-  { key: "wincon", label: "Wincons", target: 3 },
-  { key: "utility", label: "Utility", target: null },
-  { key: "untagged", label: "Untagged", target: null },
-];
-
-function RoleBreakdown({ counts, commander }: { counts: Record<string, number>; commander: boolean }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-      {ROLE_META.filter((r) => (counts[r.key] ?? 0) > 0 || (commander && r.target !== null)).map((r) => {
-        const n = counts[r.key] ?? 0;
-        const short = commander && r.target !== null && n < r.target;
-        return (
-          <div key={r.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13.5 }}>
-            <span style={{ color: r.key === "untagged" ? "var(--text-dim)" : "var(--text-muted)", fontStyle: r.key === "untagged" ? "italic" : "normal" }}>
-              {r.label}
-            </span>
-            <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, color: short ? "var(--danger)" : "var(--text)" }}>
-              {n}
-              {commander && r.target !== null && (
-                <span style={{ color: "var(--text-dim)", fontWeight: 500 }}> / {r.target}</span>
-              )}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function goldSearchBtn(busy: boolean): React.CSSProperties {
   return {
     padding: "0 26px",
     borderRadius: 999,
     border: "none",
     cursor: busy ? "wait" : "pointer",
-    background: "var(--t1)",
-    color: "#ffffff",
+    background: "var(--accent)",
+    color: "var(--accent-ink)",
     fontFamily: "var(--font-ui)",
-    fontWeight: 600,
+    fontWeight: 700,
     fontSize: 14.5,
     display: "flex",
     alignItems: "center",
@@ -1333,3 +1201,250 @@ function goldSearchBtn(busy: boolean): React.CSSProperties {
     opacity: busy ? 0.7 : 1,
   };
 }
+
+/* ── identity → deck-view theme ─────────────────────────────────────────────
+   The deck/pool view background is driven by the deck's colour identity
+   (mono-blue → blue, etc). Returns CSS-variable overrides applied on a wrapper
+   so every existing component reskins through the same tokens. */
+type IdentityTheme = {
+  bg: string;
+  text: string;
+  dotEmpty: string;
+  vars: React.CSSProperties;
+};
+
+const IDENTITY_BG: Record<string, { bg: string; light?: boolean }> = {
+  W: { bg: "#d9cda2", light: true },
+  U: { bg: "#3f3ce6" },
+  B: { bg: "#191921" },
+  R: { bg: "#b22f33" },
+  G: { bg: "#2b7a48" },
+  multi: { bg: "#8a6f2c" },
+  c: { bg: "#45464f" },
+};
+
+function getIdentityTheme(identity: string | null | undefined): IdentityTheme {
+  const set = new Set((identity ?? "").toUpperCase().replace(/[^WUBRG]/g, "").split(""));
+  const key = set.size === 0 ? "c" : set.size === 1 ? [...set][0] : "multi";
+  const { bg, light } = IDENTITY_BG[key] ?? IDENTITY_BG.c;
+
+  if (light) {
+    const text = "#211d12";
+    return {
+      bg,
+      text,
+      dotEmpty: "rgba(33,29,18,.16)",
+      vars: {
+        ["--bg" as string]: bg,
+        "--bg2": bg,
+        "--bg3": "rgba(33,29,18,.07)",
+        "--surface": "#ffffff",
+        "--surface2": "rgba(33,29,18,.05)",
+        "--text": text,
+        "--t1": text,
+        "--text-muted": "rgba(33,29,18,.7)",
+        "--t2": "rgba(33,29,18,.7)",
+        "--text-dim": "rgba(33,29,18,.46)",
+        "--t3": "rgba(33,29,18,.46)",
+        "--accent": "#2742d6",
+        "--accent-hover": "#1d35b8",
+        "--gold": "#2742d6",
+        "--gold-bright": "#1d35b8",
+        "--accent-ink": "#ffffff",
+        "--line": "rgba(33,29,18,.16)",
+        "--border": "rgba(33,29,18,.16)",
+      } as React.CSSProperties,
+    };
+  }
+
+  return {
+    bg,
+    text: "#ffffff",
+    dotEmpty: "rgba(255,255,255,.18)",
+    vars: {
+      ["--bg" as string]: bg,
+      "--bg2": bg,
+      "--bg3": "rgba(255,255,255,.14)",
+      "--surface": "rgba(255,255,255,.08)",
+      "--surface2": "rgba(255,255,255,.06)",
+      "--text": "#ffffff",
+      "--t1": "#ffffff",
+      "--text-muted": "rgba(255,255,255,.74)",
+      "--t2": "rgba(255,255,255,.74)",
+      "--text-dim": "rgba(255,255,255,.52)",
+      "--t3": "rgba(255,255,255,.52)",
+      "--accent": "#ffd23f",
+      "--accent-hover": "#ffdf6b",
+      "--gold": "#ffd23f",
+      "--gold-bright": "#ffdf6b",
+      "--accent-ink": "#2a2205",
+      "--line": "rgba(255,255,255,.18)",
+      "--border": "rgba(255,255,255,.18)",
+    } as React.CSSProperties,
+  };
+}
+
+/* Dot-grid deck-size meter (filled = cards in the deck). */
+function DotGrid({ count, target, empty }: { count: number; target: number; empty: string }) {
+  const dots = Math.max(target, count);
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 5, maxWidth: 150 }}>
+      {Array.from({ length: dots }).map((_, i) => (
+        <span
+          key={i}
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            background: i < count ? "var(--accent)" : empty,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/* Pool tile — full card scan, with hover actions. */
+function PoolImageCard({
+  card,
+  warning,
+  onPreview,
+  onMove,
+  onRemove,
+}: {
+  card: PoolCard;
+  warning?: string;
+  onPreview: () => void;
+  onMove: () => void;
+  onRemove: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={onPreview}
+      style={{
+        position: "relative",
+        borderRadius: "4.8%/3.5%",
+        overflow: "hidden",
+        cursor: "pointer",
+        aspectRatio: "5 / 7",
+        background: "rgba(0,0,0,.25)",
+        boxShadow: hover ? "0 14px 30px -10px rgba(0,0,0,.6)" : "0 4px 12px -4px rgba(0,0,0,.45)",
+        transform: hover ? "translateY(-3px)" : "none",
+        transition: "transform .16s ease, box-shadow .16s ease",
+      }}
+    >
+      {card.imageUri ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={card.imageUri} alt={card.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+      ) : (
+        <CardArt name={card.name} src={card.imageUri || undefined} radius={0} style={{ position: "absolute", inset: 0 }} />
+      )}
+      {card.quantity > 1 && (
+        <span style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,.72)", color: "#fff", fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 999 }}>
+          ×{card.quantity}
+        </span>
+      )}
+      {warning && (
+        <span title={warning} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,.72)", color: "#ffd23f", fontSize: 13, width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          ⚠
+        </span>
+      )}
+      <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6, opacity: hover ? 1 : 0, transition: "opacity .15s" }}>
+        <button onClick={(e) => { e.stopPropagation(); onMove(); }} title="Move to deck" aria-label="Move to deck" style={poolIconBtn}>
+          ⤴
+        </button>
+        <button onClick={(e) => { e.stopPropagation(); onRemove(); }} title="Remove" aria-label="Remove" style={poolIconBtn}>
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const poolIconBtn: React.CSSProperties = {
+  width: 26,
+  height: 26,
+  borderRadius: 7,
+  border: "none",
+  cursor: "pointer",
+  background: "rgba(10,8,6,.7)",
+  color: "#fff",
+  fontSize: 13,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  backdropFilter: "blur(4px)",
+};
+
+/* Deck-rail row — white pill: thumbnail + name + type + mana pips. */
+function DeckRailRow({
+  card,
+  warning,
+  onPreview,
+  onMove,
+  onRemove,
+}: {
+  card: PoolCard;
+  warning?: string;
+  onPreview: () => void;
+  onMove: () => void;
+  onRemove: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={onPreview}
+      style={{
+        display: "grid",
+        gridTemplateColumns: "30px 1fr auto",
+        alignItems: "center",
+        gap: 10,
+        padding: "7px 11px 7px 8px",
+        borderRadius: 10,
+        cursor: "pointer",
+        background: "#ffffff",
+        boxShadow: hover ? "0 6px 16px -6px rgba(0,0,0,.4)" : "0 1px 2px rgba(0,0,0,.18)",
+        transition: "box-shadow .14s ease",
+      }}
+    >
+      <div style={{ position: "relative", width: 30, height: 30, borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
+        <CardArt name={card.name} src={card.imageUri || undefined} radius={0} style={{ position: "absolute", inset: 0 }} />
+      </div>
+      <div style={{ minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {card.quantity > 1 && <span style={{ fontSize: 12, fontWeight: 700, color: "#5c5c64" }}>{card.quantity}×</span>}
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#15151a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
+          {warning && <span title={warning} style={{ color: "#c2402a", fontSize: 12 }}>⚠</span>}
+        </div>
+        <div style={{ fontSize: 11.5, color: "#8a8a92", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
+      </div>
+      {hover ? (
+        <div style={{ display: "flex", gap: 4 }}>
+          <button onClick={(e) => { e.stopPropagation(); onMove(); }} title="Move to pool" aria-label="Move to pool" style={railIconBtn}>↓</button>
+          <button onClick={(e) => { e.stopPropagation(); onRemove(); }} title="Remove" aria-label="Remove" style={railIconBtn}>✕</button>
+        </div>
+      ) : (
+        <ManaCost cost={card.manaCost} size={15} />
+      )}
+    </div>
+  );
+}
+
+const railIconBtn: React.CSSProperties = {
+  width: 24,
+  height: 24,
+  borderRadius: 6,
+  border: "none",
+  cursor: "pointer",
+  background: "#f1f1ec",
+  color: "#5c5c64",
+  fontSize: 12,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
