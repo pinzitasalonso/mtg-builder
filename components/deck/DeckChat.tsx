@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PoolEntry, poolByName, resolveAndAdd } from "@/lib/pool-client";
+import { PoolEntry, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
 import { Block, InlineToken, parseBlocks } from "@/lib/chat-markdown";
 
 interface ChatMessage {
@@ -16,11 +16,23 @@ const STARTERS = [
   "How can I lower my mana curve?",
 ];
 
+// Full-card image straight from Scryfall by name — used to preview cards that
+// aren't in the pool yet (pool cards reuse their stored image).
+function namedImageUrl(name: string): string {
+  return `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}&format=image&version=normal`;
+}
+
+interface Preview {
+  src: string;
+  rect: DOMRect;
+}
+
 /* Conversational AI deck assistant. The player describes an idea or change and
-   gets a streamed, ChatGPT-style Markdown answer (combos woven in) where every
-   recommended card is a one-click add-to-pool link. Conversation is multi-turn
-   for the session — it persists while the deck page is mounted, including across
-   search-mode tab switches, and resets on reload. */
+   gets a streamed, ChatGPT-style Markdown answer (combos woven in). Every card
+   the assistant names is an interactive link: hover to preview it, click to add
+   it to the pool — or, if it's already in the deck, click to remove it.
+   Conversation is multi-turn for the session — it persists while the deck page
+   is mounted, including across search-mode tab switches, and resets on reload. */
 export default function DeckChat({
   deckId,
   pool,
@@ -36,27 +48,42 @@ export default function DeckChat({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
-  const [adding, setAdding] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [preview, setPreview] = useState<Preview | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const poolNames = new Set(pool.map((c) => c.name.toLowerCase()));
+  // lowercase name → pool row, for membership, dbId (remove) and stored image.
+  const poolByLower = new Map(pool.map((c) => [c.name.toLowerCase(), c]));
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  async function addCardByName(name: string) {
+  // Click a card link: add it if it's not in the pool, otherwise remove that row
+  // from the deck. Either way the pool reloads so the link's state flips.
+  async function toggleCard(name: string) {
     const key = name.toLowerCase();
-    if (poolNames.has(key) || adding.has(key)) return;
-    setAdding((prev) => new Set(prev).add(key));
-    const result = await resolveAndAdd(deckId, name, 1, poolByName(pool));
-    setAdding((prev) => {
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
-    if (result === "added") onPoolChanged();
-    else setError(result === "notfound" ? `Couldn't find "${name}" on Scryfall.` : `Couldn't add "${name}".`);
+    if (busy.has(key)) return;
+    setPreview(null);
+    setError("");
+    setBusy((prev) => new Set(prev).add(key));
+    try {
+      const entry = poolByLower.get(key);
+      if (entry) {
+        if (await deleteCard(deckId, entry.dbId)) onPoolChanged();
+        else setError(`Couldn't remove "${name}".`);
+      } else {
+        const result = await resolveAndAdd(deckId, name, 1, poolByName(pool));
+        if (result === "added") onPoolChanged();
+        else setError(result === "notfound" ? `Couldn't find "${name}" on Scryfall.` : `Couldn't add "${name}".`);
+      }
+    } finally {
+      setBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
   }
 
   async function send(text: string) {
@@ -118,6 +145,7 @@ export default function DeckChat({
       {!empty && (
         <div
           ref={scrollRef}
+          onScroll={() => setPreview(null)}
           style={{
             maxHeight: 460,
             overflowY: "auto",
@@ -149,9 +177,10 @@ export default function DeckChat({
               <div key={i}>
                 <ChatMarkdown
                   text={m.content}
-                  poolNames={poolNames}
-                  adding={adding}
-                  onCard={addCardByName}
+                  poolByLower={poolByLower}
+                  busy={busy}
+                  onCard={toggleCard}
+                  onPreview={setPreview}
                 />
               </div>
             ) : (
@@ -169,8 +198,8 @@ export default function DeckChat({
       {empty && (
         <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
           <p style={{ margin: 0, fontSize: 14, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            Describe an idea or a change to your deck. I&apos;ll talk it through, suggest cards (and combos),
-            and you can tap any card to add it to your pool.
+            Describe an idea or a change to your deck. I&apos;ll talk it through, suggest cards (and combos).
+            Hover any card to preview it, tap to add it to your pool — or tap a card you already run to remove it.
           </p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {STARTERS.map((s) => (
@@ -253,6 +282,8 @@ export default function DeckChat({
           {streaming ? "…" : "Send"}
         </button>
       </form>
+
+      {preview && <CardPreview preview={preview} />}
     </div>
   );
 }
@@ -274,18 +305,54 @@ function Thinking() {
   );
 }
 
+/* Floating card image anchored to the hovered link — placed above it when there's
+   room, otherwise below, and clamped to the viewport. Non-interactive. */
+function CardPreview({ preview }: { preview: Preview }) {
+  const W = 224;
+  const H = 312;
+  const { rect } = preview;
+  const above = rect.top > H + 16;
+  const top = above ? rect.top - H - 10 : rect.bottom + 10;
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - W - 8));
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top,
+        left,
+        width: W,
+        zIndex: 80,
+        pointerEvents: "none",
+        animation: "sp-fade .12s ease",
+      }}
+    >
+      <div className="cc-black" style={{ padding: 6 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={preview.src}
+          alt=""
+          draggable={false}
+          style={{ width: "100%", height: "auto", display: "block", borderRadius: 8 }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /* Renders the assistant's Markdown answer: headings, bold, bullet/numbered
-   lists, paragraphs, and [[Card Name]] tokens as click-to-add card links. */
+   lists, paragraphs, and [[Card Name]] tokens as interactive card links. */
 function ChatMarkdown({
   text,
-  poolNames,
-  adding,
+  poolByLower,
+  busy,
   onCard,
+  onPreview,
 }: {
   text: string;
-  poolNames: Set<string>;
-  adding: Set<string>;
+  poolByLower: Map<string, PoolEntry>;
+  busy: Set<string>;
   onCard: (name: string) => void;
+  onPreview: (p: Preview | null) => void;
 }) {
   const blocks = parseBlocks(text);
   const renderInline = (tokens: InlineToken[], keyPrefix: string) =>
@@ -298,13 +365,16 @@ function ChatMarkdown({
             {t.value}
           </strong>
         );
+      const entry = poolByLower.get(t.value.toLowerCase());
       return (
         <CardLink
           key={key}
           name={t.value}
-          added={poolNames.has(t.value.toLowerCase())}
-          adding={adding.has(t.value.toLowerCase())}
+          inPool={Boolean(entry)}
+          busy={busy.has(t.value.toLowerCase())}
+          imageUri={entry?.imageUri || null}
           onClick={() => onCard(t.value)}
+          onPreview={onPreview}
         />
       );
     });
@@ -350,25 +420,47 @@ function ChatMarkdown({
   );
 }
 
-/* Inline card reference — a dotted-underline link that adds the card to the
-   pool on click, showing a ✓ once it's there. */
+/* Inline card reference. Hover previews the card; click adds it to the pool, or
+   removes it if it's already in the deck. In-pool links read green with a ✓ and
+   turn red ("remove") on hover. */
 function CardLink({
   name,
-  added,
-  adding,
+  inPool,
+  busy,
+  imageUri,
   onClick,
+  onPreview,
 }: {
   name: string;
-  added: boolean;
-  adding: boolean;
+  inPool: boolean;
+  busy: boolean;
+  imageUri: string | null;
   onClick: () => void;
+  onPreview: (p: Preview | null) => void;
 }) {
+  const [hover, setHover] = useState(false);
+  const color = busy
+    ? "var(--text-muted)"
+    : inPool
+      ? hover
+        ? "var(--danger)"
+        : "#0d8a5f"
+      : "var(--accent)";
+  const suffix = busy ? " …" : inPool ? (hover ? " ✕" : " ✓") : "";
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={added || adding}
-      title={added ? "Already in your pool" : `Add ${name} to your pool`}
+      disabled={busy}
+      title={inPool ? `Remove ${name} from your deck` : `Add ${name} to your pool`}
+      onMouseEnter={(e) => {
+        setHover(true);
+        onPreview({ src: imageUri || namedImageUrl(name), rect: e.currentTarget.getBoundingClientRect() });
+      }}
+      onMouseLeave={() => {
+        setHover(false);
+        onPreview(null);
+      }}
       style={{
         display: "inline",
         border: "none",
@@ -376,17 +468,17 @@ function CardLink({
         padding: 0,
         margin: 0,
         font: "inherit",
-        cursor: added ? "default" : "pointer",
-        color: added ? "var(--text-muted)" : "var(--accent)",
+        cursor: busy ? "default" : "pointer",
+        color,
         fontWeight: 600,
         textDecoration: "underline",
         textDecorationStyle: "dotted",
         textUnderlineOffset: 2,
-        opacity: adding ? 0.6 : 1,
+        opacity: busy ? 0.6 : 1,
       }}
     >
       {name}
-      {added ? " ✓" : adding ? " …" : ""}
+      {suffix}
     </button>
   );
 }
