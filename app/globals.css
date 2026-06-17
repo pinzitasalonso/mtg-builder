@@ -365,4 +365,17 @@ button {
     max-height: calc(100vh - 102px);
     overflow-y: auto;
   }
+  /* Scroll without a visible scrollbar — on the sidebar itself and the play
+     guide textarea inside it. */
+  .deck-sidebar,
+  .deck-sidebar textarea {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* legacy Edge/IE */
+  }
+  .deck-sidebar::-webkit-scrollbar,
+  .deck-sidebar textarea::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+    display: none; /* WebKit */
+  }
 }
