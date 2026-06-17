@@ -15,6 +15,7 @@ import { OutCard, resolveNamed } from "@/lib/scryfall";
 import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard } from "@/lib/pool-client";
 import { cardWarnings } from "@/lib/legality";
 import { getIdentityTheme } from "@/lib/identity-theme";
+import { fetchCollection } from "@/lib/collection-client";
 import {
   CardArt,
   ManaCost,
@@ -223,6 +224,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // commander's color identity (resolved from Scryfall) for legality checks
   const [cmdrIdentity, setCmdrIdentity] = useState<string | null>(null);
 
+  // The signed-in user's owned-card collection (lowercased names). Drives the
+  // "owned" badges on pool/deck cards and grounds the AI in what they have.
+  const [ownedNames, setOwnedNames] = useState<string[]>([]);
+  const ownedSet = new Set(ownedNames.map((n) => n.toLowerCase()));
+
   // play notes — autosaved, debounced
   const [notes, setNotes] = useState("");
   const [noteStatus, setNoteStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -299,6 +305,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       })
       .catch(() => {});
     loadPool();
+    fetchCollection().then((c) => setOwnedNames(c.cards.map((card) => card.name)));
   }, [deckId, loadPool, router]);
 
   // Backfill legality data and AI role tags for rows that still lack them.
@@ -829,6 +836,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 deckId={deckId}
                 pool={pool}
                 commander={deck?.commander}
+                ownedNames={ownedNames}
                 onPoolChanged={loadPool}
               />
             ) : searchMode === "name" ? (
@@ -914,6 +922,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                     key={card.dbId}
                     card={card}
                     warning={warningOf(card)}
+                    owned={ownedSet.has(card.name.toLowerCase())}
                     onOpen={() => startReview(card)}
                     onMove={() => moveTo(card.dbId, "deck")}
                     onRemove={() => removeCard(card.dbId)}
@@ -1078,6 +1087,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                           key={c.dbId}
                           card={c}
                           warning={warningOf(c)}
+                          owned={ownedSet.has(c.name.toLowerCase())}
                           onOpen={() => startDeckReview(c)}
                           onMove={() => moveTo(c.dbId, "pool")}
                           onRemove={() => removeCard(c.dbId)}
@@ -1426,12 +1436,14 @@ function DotGrid({
 function PoolImageCard({
   card,
   warning,
+  owned,
   onOpen,
   onMove,
   onRemove,
 }: {
   card: PoolCard;
   warning?: string;
+  owned?: boolean;
   onOpen: () => void;
   onMove: () => void;
   onRemove: () => void;
@@ -1459,6 +1471,14 @@ function PoolImageCard({
         <img src={card.imageUri} alt={card.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
       ) : (
         <CardArt name={card.name} src={card.imageUri || undefined} radius={0} style={{ position: "absolute", inset: 0 }} />
+      )}
+      {owned && (
+        <span
+          title="In your collection"
+          style={{ position: "absolute", top: 8, left: 8, background: "rgba(13,138,95,.92)", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, letterSpacing: ".02em", boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}
+        >
+          ✓ Owned
+        </span>
       )}
       {card.quantity > 1 && (
         <span style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,.72)", color: "#fff", fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 999 }}>
@@ -1501,12 +1521,14 @@ const poolIconBtn: React.CSSProperties = {
 function DeckRailRow({
   card,
   warning,
+  owned,
   onOpen,
   onMove,
   onRemove,
 }: {
   card: PoolCard;
   warning?: string;
+  owned?: boolean;
   onOpen: () => void;
   onMove: () => void;
   onRemove: () => void;
@@ -1537,6 +1559,7 @@ function DeckRailRow({
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {card.quantity > 1 && <span style={{ fontSize: 12, fontWeight: 700, color: "#5c5c64" }}>{card.quantity}×</span>}
           <span style={{ fontSize: 14, fontWeight: 600, color: "#15151a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
+          {owned && <span title="In your collection" style={{ color: "#0d8a5f", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>✓</span>}
           {warning && <span title={warning} style={{ color: "#c2402a", fontSize: 12 }}>⚠</span>}
         </div>
         <div style={{ fontSize: 11.5, color: "#8a8a92", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>

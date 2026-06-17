@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import CollectionModal from "@/components/CollectionModal";
 import { CardArt, ColorPips, deckTarget, relativeTime } from "@/components/mtg";
 import { getIdentityTheme, LIGHT_VARS } from "@/lib/identity-theme";
 
@@ -77,6 +78,7 @@ export default function HomePage() {
   const [publicDecks, setPublicDecks] = useState<Deck[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showCollection, setShowCollection] = useState(false);
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
   const [creating, setCreating] = useState(false);
 
@@ -170,6 +172,9 @@ export default function HomePage() {
               >
                 {me.email}
               </span>
+              <button onClick={() => setShowCollection(true)} title="Manage your owned-card collection" className="mn-ghost" style={{ padding: "8px 16px", fontSize: 13.5 }}>
+                Collection
+              </button>
               <button onClick={signOut} title="Sign out" className="mn-ghost" style={{ padding: "8px 16px", fontSize: 13.5 }}>
                 Sign out
               </button>
@@ -281,6 +286,8 @@ export default function HomePage() {
         </div>
         <DeckTable decks={publicDecks} noHeadRule onOpen={(d) => router.push(`/deck/${d.id}`)} onDelete={deleteDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
       </div>
+
+      {showCollection && <CollectionModal onClose={() => setShowCollection(false)} />}
 
       {showModal && (
         <div

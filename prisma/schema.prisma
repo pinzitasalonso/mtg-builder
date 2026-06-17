@@ -18,6 +18,23 @@ model User {
   verifyTokenExpiry DateTime?
   decks        Deck[]
   sessions     Session[]
+  collection   CollectionCard[]
+}
+
+// A card the user physically owns, for "do I have this?" checks across their
+// decks and to ground the AI in their real collection. Stored as name + quantity
+// only (no Scryfall resolution) so importing a large collection stays instant;
+// ownership is matched by name. nameKey is the lowercased name for case-insensitive
+// dedupe and lookups.
+model CollectionCard {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name     String
+  nameKey  String
+  quantity Int    @default(1)
+
+  @@unique([userId, nameKey])
 }
 
 // Server-side sessions; id is the SHA-256 of the cookie token, so a DB leak

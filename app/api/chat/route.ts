@@ -3,10 +3,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { currentUser } from "@/lib/auth";
 import { ANON_LIMIT_MSG, anonAiAllowed } from "@/lib/ratelimit";
 import {
+  buildCollectionBlock,
   buildComboBlock,
   buildDeckBlock,
   buildSourceBlock,
   gatherContext,
+  parseCollection,
   parseDeckContext,
 } from "@/lib/research";
 
@@ -59,6 +61,7 @@ export async function POST(req: Request) {
   }
 
   const deckCtx = parseDeckContext(body?.currentDeck);
+  const collection = parseCollection(body?.collection);
   const latestUser = messages[messages.length - 1].content;
 
   const anthropic = new Anthropic();
@@ -87,6 +90,7 @@ export async function POST(req: Request) {
     buildSourceBlock(data) +
     buildDeckBlock(deckCtx) +
     buildComboBlock(almostCombos) +
+    buildCollectionBlock(collection) +
     (sources.length ? `\n\n(You may mention these sources informed you: ${sources.join(", ")}.)` : "");
 
   const encoder = new TextEncoder();

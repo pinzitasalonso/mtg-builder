@@ -37,11 +37,14 @@ export default function DeckChat({
   deckId,
   pool,
   commander,
+  ownedNames,
   onPoolChanged,
 }: {
   deckId: number;
   pool: PoolEntry[];
   commander: string | null | undefined;
+  /** Card names from the player's collection — marks suggestions they own. */
+  ownedNames: string[];
   onPoolChanged: () => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -54,6 +57,8 @@ export default function DeckChat({
   const scrollRef = useRef<HTMLDivElement>(null);
   // lowercase name → pool row, for membership, dbId (remove) and stored image.
   const poolByLower = new Map(pool.map((c) => [c.name.toLowerCase(), c]));
+  // lowercase names the player owns, for the "owned" hint on suggestions.
+  const ownedLower = new Set(ownedNames.map((n) => n.toLowerCase()));
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -105,6 +110,7 @@ export default function DeckChat({
             commander: commander ?? null,
             cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine })),
           },
+          collection: ownedNames,
         }),
       });
       if (!res.ok || !res.body) {
@@ -178,6 +184,7 @@ export default function DeckChat({
                 <ChatMarkdown
                   text={m.content}
                   poolByLower={poolByLower}
+                  ownedLower={ownedLower}
                   busy={busy}
                   onCard={toggleCard}
                   onPreview={setPreview}
@@ -344,12 +351,14 @@ function CardPreview({ preview }: { preview: Preview }) {
 function ChatMarkdown({
   text,
   poolByLower,
+  ownedLower,
   busy,
   onCard,
   onPreview,
 }: {
   text: string;
   poolByLower: Map<string, PoolEntry>;
+  ownedLower: Set<string>;
   busy: Set<string>;
   onCard: (name: string) => void;
   onPreview: (p: Preview | null) => void;
@@ -371,6 +380,7 @@ function ChatMarkdown({
           key={key}
           name={t.value}
           inPool={Boolean(entry)}
+          owned={ownedLower.has(t.value.toLowerCase())}
           busy={busy.has(t.value.toLowerCase())}
           imageUri={entry?.imageUri || null}
           onClick={() => onCard(t.value)}
@@ -426,6 +436,7 @@ function ChatMarkdown({
 function CardLink({
   name,
   inPool,
+  owned,
   busy,
   imageUri,
   onClick,
@@ -433,6 +444,7 @@ function CardLink({
 }: {
   name: string;
   inPool: boolean;
+  owned: boolean;
   busy: boolean;
   imageUri: string | null;
   onClick: () => void;
@@ -447,12 +459,19 @@ function CardLink({
         : "#0d8a5f"
       : "var(--accent)";
   const suffix = busy ? " …" : inPool ? (hover ? " ✕" : " ✓") : "";
+  // Owned but not yet in the pool — flag that it's a free add from their collection.
+  const showOwned = owned && !inPool && !busy;
+  const title = inPool
+    ? `Remove ${name} from your deck`
+    : owned
+      ? `Add ${name} — you own a copy`
+      : `Add ${name} to your pool`;
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={busy}
-      title={inPool ? `Remove ${name} from your deck` : `Add ${name} to your pool`}
+      title={title}
       onMouseEnter={(e) => {
         setHover(true);
         onPreview({ src: imageUri || namedImageUrl(name), rect: e.currentTarget.getBoundingClientRect() });
@@ -479,6 +498,13 @@ function CardLink({
     >
       {name}
       {suffix}
+      {showOwned && (
+        <span
+          style={{ color: "#0d8a5f", fontSize: "0.82em", fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}
+        >
+          {" "}· owned
+        </span>
+      )}
     </button>
   );
 }
