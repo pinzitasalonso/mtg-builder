@@ -22,6 +22,7 @@ import {
   ManaCurve,
   deckStats,
   categoryOf,
+  manaValue,
   deckTarget,
   TYPE_ORDER,
 } from "@/components/mtg";
@@ -204,6 +205,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // On mobile the pool and deck stack; this toggles which one is shown so you
   // don't have to scroll the whole pool to reach the deck. Ignored ≥1024px.
   const [mobileView, setMobileView] = useState<"pool" | "deck">("pool");
+
+  // Hovering a mana-curve bar or a type dot filters the decklist below to that
+  // selection. null = no filter (show the whole deck).
+  const [deckFilter, setDeckFilter] = useState<
+    { kind: "mv"; value: number } | { kind: "type"; value: string } | null
+  >(null);
 
   // AI pool judge — runs in <JudgeModal> while open
   const [judgeOpen, setJudgeOpen] = useState(false);
@@ -530,6 +537,15 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       t,
       cards: cards.filter((c) => categoryOf(c.typeLine) === t),
     })).filter((g) => g.cards.length);
+
+  // Does a card match the active hover filter? Mana-value buckets mirror the
+  // curve (lands excluded, anything ≥7 lands in the "7+" bucket).
+  const matchesDeckFilter = (c: PoolCard): boolean => {
+    if (!deckFilter) return true;
+    if (deckFilter.kind === "type") return categoryOf(c.typeLine) === deckFilter.value;
+    if (categoryOf(c.typeLine) === "Lands") return false;
+    return Math.min(manaValue(c.manaCost), 7) === deckFilter.value;
+  };
 
   if (deckMissing) {
     return (
@@ -994,12 +1010,23 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
 
-          {/* mana curve + dot-grid meter */}
+          {/* mana curve + dot-grid meter — hovering a bar or dot filters the
+              decklist below to that mana value / card type */}
           <div style={{ display: "flex", gap: 16, alignItems: "flex-end", justifyContent: "space-between" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <ManaCurve curve={stats.curve} accent="rgba(255,255,255,.9)" />
+              <ManaCurve
+                curve={stats.curve}
+                accent="rgba(255,255,255,.9)"
+                onHoverBar={(i) => setDeckFilter(i === null ? null : { kind: "mv", value: i })}
+              />
             </div>
-            <DotGrid types={deckStats(deckCards).types} count={deckCount} target={target} empty={theme.dotEmpty} />
+            <DotGrid
+              types={deckStats(deckCards).types}
+              count={deckCount}
+              target={target}
+              empty={theme.dotEmpty}
+              onHoverType={(name) => setDeckFilter(name === null ? null : { kind: "type", value: name })}
+            />
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13, color: "var(--text-muted)", marginTop: -6 }}>
             <span>
@@ -1025,26 +1052,29 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {groupedFor(deckCards).map((g) => (
-                <div key={g.t}>
-                  <div className="mn-label" style={{ color: "var(--text-muted)", marginBottom: 8, display: "flex", gap: 8, alignItems: "baseline" }}>
-                    {g.t}
-                    <span style={{ color: "var(--text-dim)" }}>{g.cards.reduce((s, c) => s + c.quantity, 0)}</span>
+              {groupedFor(deckCards)
+                .map((g) => ({ t: g.t, cards: g.cards.filter(matchesDeckFilter) }))
+                .filter((g) => g.cards.length)
+                .map((g) => (
+                  <div key={g.t}>
+                    <div className="mn-label" style={{ color: "var(--text-muted)", marginBottom: 8, display: "flex", gap: 8, alignItems: "baseline" }}>
+                      {g.t}
+                      <span style={{ color: "var(--text-dim)" }}>{g.cards.reduce((s, c) => s + c.quantity, 0)}</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                      {g.cards.map((c) => (
+                        <DeckRailRow
+                          key={c.dbId}
+                          card={c}
+                          warning={warningOf(c)}
+                          onOpen={() => startDeckReview(c)}
+                          onMove={() => moveTo(c.dbId, "pool")}
+                          onRemove={() => removeCard(c.dbId)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                    {g.cards.map((c) => (
-                      <DeckRailRow
-                        key={c.dbId}
-                        card={c}
-                        warning={warningOf(c)}
-                        onOpen={() => startDeckReview(c)}
-                        onMove={() => moveTo(c.dbId, "pool")}
-                        onRemove={() => removeCard(c.dbId)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+                ))}
             </div>
           )}
         </aside>
@@ -1416,11 +1446,14 @@ function DotGrid({
   count,
   target,
   empty,
+  onHoverType,
 }: {
   types: { name: string; n: number }[];
   count: number;
   target: number;
   empty: string;
+  /** Fires with a type name on hover of a filled dot, null on leave. */
+  onHoverType?: (name: string | null) => void;
 }) {
   // Expand the type breakdown (already in TYPE_ORDER) into one entry per card,
   // capped at the deck size so colours never outrun the filled dots.
@@ -1430,6 +1463,17 @@ function DotGrid({
     for (let k = 0; k < t.n && colored.length < count; k++) colored.push({ color, name: t.name });
   }
   const dots = Math.max(target, count);
+  const [hover, setHover] = useState<string | null>(null);
+  const enter = (name?: string) => {
+    if (!name || !onHoverType) return;
+    setHover(name);
+    onHoverType(name);
+  };
+  const leave = () => {
+    if (!onHoverType) return;
+    setHover(null);
+    onHoverType(null);
+  };
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 5, maxWidth: 150 }}>
       {Array.from({ length: dots }).map((_, i) => {
@@ -1438,11 +1482,16 @@ function DotGrid({
           <span
             key={i}
             title={c?.name}
+            onMouseEnter={() => enter(c?.name)}
+            onMouseLeave={leave}
             style={{
               width: 8,
               height: 8,
               borderRadius: "50%",
               background: c ? c.color : empty,
+              cursor: onHoverType && c ? "pointer" : "default",
+              opacity: hover === null || hover === c?.name ? 1 : 0.3,
+              transition: "opacity .12s",
             }}
           />
         );
