@@ -999,7 +999,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             <div style={{ flex: 1, minWidth: 0 }}>
               <ManaCurve curve={stats.curve} accent="rgba(255,255,255,.9)" />
             </div>
-            <DotGrid count={deckCount} target={target} empty={theme.dotEmpty} />
+            <DotGrid types={deckStats(deckCards).types} count={deckCount} target={target} empty={theme.dotEmpty} />
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13, color: "var(--text-muted)", marginTop: -6 }}>
             <span>
@@ -1396,22 +1396,57 @@ function getIdentityTheme(identity: string | null | undefined): IdentityTheme {
   };
 }
 
-/* Dot-grid deck-size meter (filled = cards in the deck). */
-function DotGrid({ count, target, empty }: { count: number; target: number; empty: string }) {
+/* Card-type colours for the deck dot-grid — one hue per category, distinct on
+   both light and dark identity backgrounds. */
+const TYPE_DOT_COLORS: Record<string, string> = {
+  Creatures: "#52a675",
+  Instants: "#4a90c9",
+  Sorceries: "#a86fc4",
+  Artifacts: "#9aa6b2",
+  Enchantments: "#e0b341",
+  Planeswalkers: "#d9743f",
+  Lands: "#b08d57",
+  Other: "#c2655a",
+};
+
+/* Dot-grid deck-size meter — one dot per card coloured by its type, then empty
+   slots up to the format's target so you see the deck's composition at a glance. */
+function DotGrid({
+  types,
+  count,
+  target,
+  empty,
+}: {
+  types: { name: string; n: number }[];
+  count: number;
+  target: number;
+  empty: string;
+}) {
+  // Expand the type breakdown (already in TYPE_ORDER) into one entry per card,
+  // capped at the deck size so colours never outrun the filled dots.
+  const colored: { color: string; name: string }[] = [];
+  for (const t of types) {
+    const color = TYPE_DOT_COLORS[t.name] ?? TYPE_DOT_COLORS.Other;
+    for (let k = 0; k < t.n && colored.length < count; k++) colored.push({ color, name: t.name });
+  }
   const dots = Math.max(target, count);
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 5, maxWidth: 150 }}>
-      {Array.from({ length: dots }).map((_, i) => (
-        <span
-          key={i}
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: "50%",
-            background: i < count ? "var(--accent)" : empty,
-          }}
-        />
-      ))}
+      {Array.from({ length: dots }).map((_, i) => {
+        const c = colored[i];
+        return (
+          <span
+            key={i}
+            title={c?.name}
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              background: c ? c.color : empty,
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
