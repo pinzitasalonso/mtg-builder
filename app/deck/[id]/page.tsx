@@ -411,6 +411,22 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     runSearch(s);
   }
 
+  // Switching modes clears the inputs and any errors/results — the three modes
+  // speak different languages (AI prose, Scryfall syntax, exact names), so
+  // carrying text across them mostly produces errors (e.g. a prompt run as
+  // Scryfall syntax 404s).
+  function switchMode(mode: SearchMode) {
+    if (mode === searchMode) return;
+    setSearchMode(mode);
+    setQuery("");
+    setNameInput("");
+    setSearchError("");
+    setNameError("");
+    setSearchResults([]);
+    setGeneratedQuery("");
+    setSources([]);
+  }
+
   const addCard = useCallback(
     async (card: SearchCard) => {
       if (pool.some((c) => c.id === card.id)) return;
@@ -668,7 +684,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               {(["ai", "scryfall", "name"] as const).map((mode) => (
                 <button
                   key={mode}
-                  onClick={() => setSearchMode(mode)}
+                  onClick={() => switchMode(mode)}
                   style={{
                     padding: "8px 2px 12px",
                     border: "none",
