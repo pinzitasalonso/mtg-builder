@@ -8,7 +8,7 @@ import SwipeModal from "@/components/SwipeModal";
 import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import JudgeModal from "@/components/deck/JudgeModal";
 import HandSimModal from "@/components/deck/HandSimModal";
-import ComboModal from "@/components/deck/ComboModal";
+import DeckChat from "@/components/deck/DeckChat";
 import OrderModal from "@/components/deck/OrderModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
@@ -71,8 +71,6 @@ const FORMATS = [
 ];
 
 const EDIT_FORMATS = ["commander", "standard", "modern", "pioneer", "legacy", "vintage", "pauper", "draft"];
-
-const AI_SUGGESTIONS = ["blue clones", "cheap card draw", "board wipes", "ramp"];
 
 type SearchMode = "ai" | "scryfall" | "name";
 
@@ -215,9 +213,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // AI pool judge — runs in <JudgeModal> while open
   const [judgeOpen, setJudgeOpen] = useState(false);
 
-  // sample-hand simulator & combo finder
+  // sample-hand simulator
   const [handSimOpen, setHandSimOpen] = useState(false);
-  const [combosOpen, setCombosOpen] = useState(false);
 
   // "Order on CardTrader" — runs in <OrderModal> while open
   const [orderOpen, setOrderOpen] = useState(false);
@@ -405,10 +402,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   function onSubmitSearch(e: React.FormEvent) {
     e.preventDefault();
     runSearch(query);
-  }
-  function onSuggestion(s: string) {
-    setQuery(s);
-    runSearch(s);
   }
 
   // Switching modes clears the inputs and any errors/results — the three modes
@@ -829,8 +822,15 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </div>
             )}
 
-            {/* name mode vs search */}
-            {searchMode === "name" ? (
+            {/* AI chat · name add · scryfall search */}
+            {searchMode === "ai" ? (
+              <DeckChat
+                deckId={deckId}
+                pool={pool}
+                commander={deck?.commander}
+                onPoolChanged={loadPool}
+              />
+            ) : searchMode === "name" ? (
               <form onSubmit={addByName} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", gap: 10 }}>
                   <input
@@ -851,52 +851,25 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 {nameError && <ErrorNote>{nameError}</ErrorNote>}
               </form>
             ) : (
-              <>
-                <form onSubmit={onSubmitSearch} style={{ display: "flex", gap: 10 }}>
-                  <input
-                    className="cc-paper"
-                    placeholder={searchMode === "ai" ? "Describe the cards you seek…" : "Scryfall syntax:  t:wizard id:u…"}
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    disabled={searching}
-                    style={paperInput}
-                  />
-                  <button type="submit" disabled={searching || !query.trim()} style={goldSearchBtn(searching)}>
-                    {searchMode === "ai" && <span style={{ marginRight: 6 }}>✦</span>}
-                    {searching ? "Seeking…" : "Search"}
-                  </button>
-                </form>
-                {searchMode === "ai" && (
-                  <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
-                    <span style={{ fontStyle: "normal", fontSize: 13, color: "var(--text-dim)" }}>Try:</span>
-                    {AI_SUGGESTIONS.map((s) => (
-                      <button
-                        key={s}
-                        onClick={() => onSuggestion(s)}
-                        disabled={searching}
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontStyle: "normal",
-                          fontSize: 14,
-                          padding: "3px 11px",
-                          borderRadius: 14,
-                          border: "none",
-                          cursor: searching ? "default" : "pointer",
-                          background: "transparent",
-                          color: "var(--gold)",
-                          boxShadow: "inset 0 0 0 1px var(--line)",
-                        }}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </>
+              <form onSubmit={onSubmitSearch} style={{ display: "flex", gap: 10 }}>
+                <input
+                  className="cc-paper"
+                  placeholder="Scryfall syntax:  t:wizard id:u…"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  disabled={searching}
+                  style={paperInput}
+                />
+                <button type="submit" disabled={searching || !query.trim()} style={goldSearchBtn(searching)}>
+                  {searching ? "Seeking…" : "Search"}
+                </button>
+              </form>
             )}
 
-            {searchError && <div style={{ marginTop: 12 }}><ErrorNote>{searchError}</ErrorNote></div>}
-            {!swipeOpen && searchResults.length > 0 && (
+            {searchMode === "scryfall" && searchError && (
+              <div style={{ marginTop: 12 }}><ErrorNote>{searchError}</ErrorNote></div>
+            )}
+            {searchMode === "scryfall" && !swipeOpen && searchResults.length > 0 && (
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, color: "var(--text-muted)" }}>
                 <span style={{ fontStyle: "normal" }}>
                   {searchResults.length} cards found{truncated ? " (first batch)" : ""}
@@ -920,9 +893,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </HeaderAction>
               <HeaderAction gold onClick={() => setJudgeOpen(true)} disabled={pool.length === 0} title="AI judge — review the pool">
                 ✨ Judge
-              </HeaderAction>
-              <HeaderAction onClick={() => setCombosOpen(true)} disabled={pool.length === 0} title="Find combos in the pool">
-                ♾ Combos
               </HeaderAction>
               <HeaderAction onClick={() => setTool("lands")} title="Bulk-add lands & staples">
                 🌲 Lands
@@ -1250,17 +1220,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {/* CardTrader order */}
       {orderOpen && <OrderModal cards={deckCards} onClose={() => setOrderOpen(false)} />}
-
-      {/* combo finder */}
-      {combosOpen && (
-        <ComboModal
-          deckId={deckId}
-          pool={pool}
-          commander={deck?.commander}
-          onClose={() => setCombosOpen(false)}
-          onPoolChanged={loadPool}
-        />
-      )}
 
       {/* AI pool judge */}
       {judgeOpen && (
