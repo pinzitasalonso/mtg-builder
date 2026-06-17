@@ -291,6 +291,13 @@ button {
   gap: 26px;
   align-items: start;
 }
+/* Both columns are flex stacks. Declaring `display` here (not inline) lets the
+   mobile media query below override it with `display: none` to hide a side. */
+.deck-pool,
+.deck-sidebar {
+  display: flex;
+  flex-direction: column;
+}
 
 /* Mobile pool/deck switcher — a sticky segmented control so you can flip
    between the pool and the decklist instead of scrolling the whole pool. */

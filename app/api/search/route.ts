@@ -4,7 +4,7 @@ import { mapPool } from "@/lib/async";
 import { currentUser } from "@/lib/auth";
 import { ANON_LIMIT_MSG, anonAiAllowed } from "@/lib/ratelimit";
 import { extractJson, messageText, strArr } from "@/lib/ai";
-import { OutCard, resolveNamed, scryfallSearch } from "@/lib/scryfall";
+import { OutCard, naturalToScryfall, resolveNamed, scryfallSearch } from "@/lib/scryfall";
 
 export const runtime = "nodejs";
 
@@ -454,9 +454,11 @@ export async function POST(req: Request) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Scryfall mode: treat the prompt as direct Scryfall syntax (unchanged).
+  // Scryfall mode: treat the prompt as Scryfall syntax. Real syntax passes
+  // through untouched; plain English ("1 mana blue creatures") is mapped to the
+  // equivalent tokens so the box still finds cards instead of 404-ing.
   // ─────────────────────────────────────────────────────────────────────────
-  let query = prompt.trim();
+  let query = naturalToScryfall(prompt.trim());
   if (filterTerms.length > 0) query = [query, ...filterTerms].join(" ");
 
   const result = await scryfallSearch(query);

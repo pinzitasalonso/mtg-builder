@@ -96,6 +96,27 @@ export async function resolveNamed(name: string): Promise<OutCard | null> {
   }
 }
 
+// Market price (USD) for a single card by Scryfall id, memoized for the page's
+// lifetime so the swipe review doesn't refetch the same card. Returns the raw
+// price string (e.g. "1.23") or null when Scryfall has no USD price.
+const usdPriceCache = new Map<string, string | null>();
+export async function fetchUsdPrice(scryfallId: string): Promise<string | null> {
+  if (usdPriceCache.has(scryfallId)) return usdPriceCache.get(scryfallId)!;
+  try {
+    const res = await fetch(`https://api.scryfall.com/cards/${scryfallId}`, { headers: SCRYFALL_HEADERS });
+    if (!res.ok) {
+      usdPriceCache.set(scryfallId, null);
+      return null;
+    }
+    const c = (await res.json()) as { prices?: { usd?: string | null } };
+    const usd = typeof c?.prices?.usd === "string" ? c.prices.usd : null;
+    usdPriceCache.set(scryfallId, usd);
+    return usd;
+  } catch {
+    return null;
+  }
+}
+
 // A concrete printing of a card — what's needed to locate it in another
 // marketplace's catalog (set code + collector number).
 export interface ScryfallPrinting {
@@ -155,6 +176,66 @@ export async function printingsOf(name: string): Promise<ScryfallPrinting[]> {
   } catch {
     return [];
   }
+}
+
+// ── Forgiving Scryfall input. The Scryfall box expects real syntax
+// (`t:creature c:u mv=1`), but people type plain English like
+// "1 mana blue creatures", which Scryfall 404s on. This maps bare words to the
+// equivalent tokens while leaving anything that already looks like syntax
+// (carries `:`, `=`, `<`, `>`, `!`, or quotes) untouched, so power queries pass
+// through verbatim and casual phrasing still finds cards.
+const COLOR_WORDS: Record<string, string> = {
+  white: "w", blue: "u", black: "b", red: "r", green: "g", colorless: "c",
+};
+const TYPE_WORDS: Record<string, string> = {
+  creature: "creature", creatures: "creature",
+  instant: "instant", instants: "instant",
+  sorcery: "sorcery", sorceries: "sorcery",
+  enchantment: "enchantment", enchantments: "enchantment",
+  artifact: "artifact", artifacts: "artifact",
+  planeswalker: "planeswalker", planeswalkers: "planeswalker",
+  land: "land", lands: "land",
+  legendary: "legendary",
+};
+const WORD_NUMBERS: Record<string, number> = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+};
+// Dropped — they only connect the meaningful words ("1 mana blue creatures").
+const FILLER_WORDS = new Set([
+  "mana", "cost", "costs", "cmc", "cards", "card", "with", "that", "for", "and", "the", "a", "an", "of",
+]);
+
+export function naturalToScryfall(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return trimmed;
+  const tokens = trimmed.split(/\s+/);
+  // Already real syntax? Leave it entirely alone.
+  if (tokens.some((t) => /[:=<>!"]/.test(t))) return trimmed;
+
+  const colors: string[] = [];
+  const out: string[] = [];
+  for (const tok of tokens) {
+    const w = tok.toLowerCase();
+    if (FILLER_WORDS.has(w)) continue;
+    if (w in COLOR_WORDS) {
+      const letter = COLOR_WORDS[w];
+      if (!colors.includes(letter)) colors.push(letter);
+      continue;
+    }
+    if (w in TYPE_WORDS) {
+      out.push(`t:${TYPE_WORDS[w]}`);
+      continue;
+    }
+    const num = /^\d+$/.test(w) ? Number(w) : WORD_NUMBERS[w];
+    if (num !== undefined && Number.isFinite(num)) {
+      out.push(`mv=${num}`);
+      continue;
+    }
+    // Unrecognized word — keep it (name search) so nothing is silently lost.
+    out.push(tok);
+  }
+  if (colors.length) out.unshift(`c:${colors.join("")}`);
+  return out.join(" ") || trimmed;
 }
 
 export interface ScryfallSearchResult {
