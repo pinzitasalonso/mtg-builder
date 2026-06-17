@@ -328,12 +328,15 @@ export function ManaCurve({
   curve,
   accent,
   onHoverBar,
+  onClickBar,
 }: {
   curve: number[];
   accent: string;
   /** Fires with the bar index (0–7, where 7 = "7+") on hover, null on leave.
       Only bars with cards are interactive. */
   onHoverBar?: (i: number | null) => void;
+  /** Fires with the bar index when a filled bar is clicked. */
+  onClickBar?: (i: number) => void;
 }) {
   const max = Math.max(1, ...curve);
   const labels = ["0", "1", "2", "3", "4", "5", "6", "7+"];
@@ -355,6 +358,7 @@ export function ManaCurve({
           key={i}
           onMouseEnter={() => enter(i, n)}
           onMouseLeave={leave}
+          onClick={() => n && onClickBar?.(i)}
           style={{
             flex: 1,
             display: "flex",
@@ -363,7 +367,7 @@ export function ManaCurve({
             gap: 6,
             height: "100%",
             justifyContent: "flex-end",
-            cursor: onHoverBar && n ? "pointer" : "default",
+            cursor: n ? "pointer" : "default",
             opacity: hover === null || hover === i ? 1 : 0.35,
             transition: "opacity .12s",
           }}

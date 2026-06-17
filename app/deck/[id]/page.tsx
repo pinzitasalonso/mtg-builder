@@ -511,6 +511,19 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     setDeckReviewCards(ordered);
   }
 
+  // Filtered deck review — launched by clicking a mana-curve bar or a type dot.
+  // Orders matching cards the same way the rail does so swiping and reading feel consistent.
+  function startDeckReviewOf(subset: PoolCard[]) {
+    if (subset.length === 0) return;
+    setSettingsOpen(false);
+    const orderedAll = groupedFor(deckCards).flatMap((g) => g.cards);
+    const ids = new Set(subset.map((c) => c.dbId));
+    const ordered = orderedAll.filter((c) => ids.has(c.dbId));
+    if (ordered.length === 0) return;
+    setDeckReviewStart(0);
+    setDeckReviewCards(ordered);
+  }
+
   // Sidebar stats describe the deck once it has cards; before that, the pool.
   const statsOnDeck = deckCards.length > 0;
   const statsSource = statsOnDeck ? deckCards : pool;
@@ -1010,14 +1023,21 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
 
-          {/* mana curve + dot-grid meter — hovering a bar or dot filters the
-              decklist below to that mana value / card type */}
+          {/* mana curve + dot-grid meter — hover filters the decklist below;
+              click opens a deck review scoped to that mana value / type */}
           <div style={{ display: "flex", gap: 16, alignItems: "flex-end", justifyContent: "space-between" }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <ManaCurve
                 curve={stats.curve}
                 accent="rgba(255,255,255,.9)"
                 onHoverBar={(i) => setDeckFilter(i === null ? null : { kind: "mv", value: i })}
+                onClickBar={(i) => {
+                  const filtered = deckCards.filter((c) => {
+                    if (categoryOf(c.typeLine) === "Lands") return false;
+                    return Math.min(manaValue(c.manaCost), 7) === i;
+                  });
+                  startDeckReviewOf(filtered);
+                }}
               />
             </div>
             <DotGrid
@@ -1026,6 +1046,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               target={target}
               empty={theme.dotEmpty}
               onHoverType={(name) => setDeckFilter(name === null ? null : { kind: "type", value: name })}
+              onClickType={(name) => {
+                const filtered = deckCards.filter((c) => categoryOf(c.typeLine) === name);
+                startDeckReviewOf(filtered);
+              }}
             />
           </div>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13, color: "var(--text-muted)", marginTop: -6 }}>
@@ -1447,6 +1471,7 @@ function DotGrid({
   target,
   empty,
   onHoverType,
+  onClickType,
 }: {
   types: { name: string; n: number }[];
   count: number;
@@ -1454,6 +1479,8 @@ function DotGrid({
   empty: string;
   /** Fires with a type name on hover of a filled dot, null on leave. */
   onHoverType?: (name: string | null) => void;
+  /** Fires with a type name when a filled dot is clicked. */
+  onClickType?: (name: string) => void;
 }) {
   // Expand the type breakdown (already in TYPE_ORDER) into one entry per card,
   // capped at the deck size so colours never outrun the filled dots.
@@ -1484,12 +1511,13 @@ function DotGrid({
             title={c?.name}
             onMouseEnter={() => enter(c?.name)}
             onMouseLeave={leave}
+            onClick={() => c && onClickType?.(c.name)}
             style={{
               width: 8,
               height: 8,
               borderRadius: "50%",
               background: c ? c.color : empty,
-              cursor: onHoverType && c ? "pointer" : "default",
+              cursor: c ? "pointer" : "default",
               opacity: hover === null || hover === c?.name ? 1 : 0.3,
               transition: "opacity .12s",
             }}
