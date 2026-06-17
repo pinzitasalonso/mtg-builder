@@ -332,6 +332,33 @@ export function buildComboBlock(almostCombos: AlmostCombo[]): string {
   );
 }
 
+// The player's owned-card collection, for grounding suggestions in what they
+// already have. Capped so a huge collection doesn't blow up the prompt.
+const MAX_COLLECTION_NAMES = 800;
+
+export function buildCollectionBlock(names: string[]): string {
+  if (names.length === 0) return "";
+  const shown = names.slice(0, MAX_COLLECTION_NAMES);
+  const more = names.length - shown.length;
+  const counted = more > 0 ? `showing ${shown.length} of ${names.length} owned` : `${names.length} owned`;
+  return (
+    "\n\nPLAYER'S COLLECTION — cards the player physically OWNS. Strongly prefer recommending cards from " +
+    "this list when they fit the request, since the player can add them at no cost. When you do recommend a " +
+    "card they do NOT own, briefly note that it's a new purchase. " +
+    `(${counted}):\n` +
+    shown.join(", ")
+  );
+}
+
+// Parse a request body's `collection` (array of names) into a clean string list.
+export function parseCollection(collection: unknown): string[] {
+  if (!Array.isArray(collection)) return [];
+  return collection
+    .filter((n): n is string => typeof n === "string" && n.trim().length > 0)
+    .map((n) => n.trim())
+    .slice(0, MAX_COLLECTION_NAMES);
+}
+
 // Parse a request body's `currentDeck` into a clean DeckContext (best-effort).
 export function parseDeckContext(currentDeck: unknown): DeckContext {
   const cd = currentDeck as { commander?: unknown; cards?: unknown } | null | undefined;
