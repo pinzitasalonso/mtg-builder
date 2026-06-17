@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ClassicCard } from "@/components/mtg";
+import { fetchUsdPrice } from "@/lib/scryfall";
 
 export interface SwipeCard {
   id: string;
@@ -126,6 +127,26 @@ export default function SwipeModal<T extends SwipeCard>({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [act, onClose]);
+
+  // Market price of the current card (and a quiet prefetch of the next one), via
+  // Scryfall by id. `undefined` = loading, `null` = no price, string = USD.
+  const [price, setPrice] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    const id = card?.id;
+    if (!id) {
+      setPrice(null);
+      return;
+    }
+    let live = true;
+    setPrice(undefined);
+    fetchUsdPrice(id).then((p) => {
+      if (live) setPrice(p);
+    });
+    if (cards[i + 1]?.id) fetchUsdPrice(cards[i + 1].id);
+    return () => {
+      live = false;
+    };
+  }, [card?.id, cards, i]);
 
   function onPointerDown(e: React.PointerEvent) {
     if (done || exit) return;
@@ -287,6 +308,18 @@ export default function SwipeModal<T extends SwipeCard>({
       {/* actions */}
       {!done && (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 13, padding: "8px 0 30px" }}>
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 15,
+              fontWeight: 600,
+              color: price ? "var(--accent)" : "var(--t3)",
+              minHeight: 18,
+              letterSpacing: ".02em",
+            }}
+          >
+            {price === undefined ? "" : price ? `$${price}` : "no price"}
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
             <SwBtn kind="skip" onClick={() => act("left")} />
             <SwBtn kind="info" onClick={() => card && onInfo?.(card)} />

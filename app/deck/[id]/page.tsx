@@ -630,7 +630,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
           <div className="deck-layout" data-mobile-view={mobileView}>
             {/* ── left: YOUR POOL ── */}
-            <div className="deck-pool" style={{ display: "flex", flexDirection: "column", gap: 18, minWidth: 0 }}>
+            <div className="deck-pool" style={{ gap: 18, minWidth: 0 }}>
               <span className="mn-label" style={{ color: "var(--text-muted)" }}>Your pool</span>
               {/* search panel */}
           <div style={{ background: "var(--bg2)", borderRadius: 16, padding: 18, border: "1px solid var(--line)" }}>
@@ -909,7 +909,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         </div>
 
         {/* ── right: YOUR DECK rail ── */}
-        <aside className="deck-sidebar" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <aside className="deck-sidebar" style={{ gap: 16 }}>
           {/* play guide (notes) */}
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
