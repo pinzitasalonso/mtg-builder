@@ -103,8 +103,8 @@ button {
 .mn-btn {
   font-family: var(--font-ui);
   font-weight: 600;
-  background: var(--t1);
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
   border: none;
   cursor: pointer;
   border-radius: 999px;
@@ -112,7 +112,7 @@ button {
   transition: background 0.14s;
 }
 .mn-btn:hover {
-  background: #34343c;
+  background: var(--accent-hover);
 }
 .mn-btn:disabled {
   opacity: 0.55;

@@ -3,6 +3,10 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
+import { getIdentityTheme, LIGHT_VARS } from "@/lib/identity-theme";
+
+// Same immersive theme as the deck page, neutral palette.
+const loginTheme = getIdentityTheme(null);
 
 type Mode = "login" | "signup";
 
@@ -94,9 +98,9 @@ function LoginInner() {
   }
 
   return (
-    <main style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 16px", gap: 26 }}>
+    <main style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 16px", gap: 26, ...loginTheme.vars, background: loginTheme.bg, color: loginTheme.text, minHeight: "100dvh" }}>
       <Logo />
-      <div className="cc-black" style={{ padding: 9, width: "100%", maxWidth: 400, animation: "sp-pop .18s ease" }}>
+      <div className="cc-black" style={{ ...LIGHT_VARS, color: "var(--t1)", padding: 9, width: "100%", maxWidth: 400, animation: "sp-pop .18s ease" }}>
         <div className="cc-brown" style={{ padding: "18px 18px 20px" }}>
           {pendingEmail ? (
             <>

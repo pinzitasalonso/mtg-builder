@@ -5,6 +5,21 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import { CardArt, ColorPips, deckTarget, relativeTime } from "@/components/mtg";
+import { getIdentityTheme, LIGHT_VARS } from "@/lib/identity-theme";
+
+/* The home/landing view wears the same immersive theme as the deck page, using
+   the neutral (colourless) palette. */
+const homeTheme = getIdentityTheme(null);
+
+/* Big uppercase display title — the deck page's signature heading style. */
+const displayTitle: React.CSSProperties = {
+  fontFamily: "var(--font-display)",
+  fontWeight: 800,
+  textTransform: "uppercase",
+  letterSpacing: ".01em",
+  lineHeight: 1.02,
+  color: "var(--text)",
+};
 
 interface Deck {
   id: number;
@@ -123,7 +138,7 @@ export default function HomePage() {
   const formatCount = new Set(decks.map((d) => d.format)).size;
 
   return (
-    <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+    <main style={{ flex: 1, display: "flex", flexDirection: "column", ...homeTheme.vars, background: homeTheme.bg, color: homeTheme.text }}>
       {/* top nav */}
       <header
         style={{
@@ -178,7 +193,7 @@ export default function HomePage() {
           <div style={{ maxWidth: 1080, width: "100%", margin: "0 auto", padding: "44px 22px 0" }}>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
               <div>
-                <h1 style={{ margin: 0, fontSize: "clamp(34px, 6vw, 46px)", fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1.02 }}>
+                <h1 style={{ margin: 0, fontSize: "clamp(34px, 6vw, 46px)", ...displayTitle }}>
                   Your decks
                 </h1>
                 <p style={{ margin: "12px 0 0", maxWidth: 480, fontSize: 16, lineHeight: 1.6, color: "var(--t2)" }}>
@@ -199,7 +214,7 @@ export default function HomePage() {
         <div style={{ maxWidth: 1080, width: "100%", margin: "0 auto", padding: "48px 22px 0", display: "flex", alignItems: "center", gap: 36, flexWrap: "wrap" }}>
           <div style={{ flex: "1 1 480px", minWidth: 0 }}>
             <Reveal delay={0.05}>
-              <h1 style={{ margin: 0, fontSize: "clamp(38px, 6.5vw, 54px)", fontWeight: 700, letterSpacing: "-.04em", lineHeight: 1.02, textWrap: "balance" }}>
+              <h1 style={{ margin: 0, fontSize: "clamp(38px, 6.5vw, 54px)", ...displayTitle, textWrap: "balance" }}>
                 Brew Magic decks with an Oracle at your side.
               </h1>
             </Reveal>
@@ -261,7 +276,7 @@ export default function HomePage() {
       {/* public brews index */}
       <div style={{ maxWidth: 1080, width: "100%", margin: "0 auto", padding: me ? "56px 22px 80px" : "78px 22px 80px", flex: 1 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14, paddingBottom: 22, borderBottom: "1px solid var(--t1)" }}>
-          <h2 style={{ margin: 0, fontSize: "clamp(28px, 4.5vw, 38px)", fontWeight: 700, letterSpacing: "-.03em" }}>Public brews</h2>
+          <h2 style={{ margin: 0, fontSize: "clamp(28px, 4.5vw, 38px)", ...displayTitle }}>Public brews</h2>
           <span className="mn-label">open decks anyone can edit</span>
         </div>
         <DeckTable decks={publicDecks} noHeadRule onOpen={(d) => router.push(`/deck/${d.id}`)} onDelete={deleteDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
@@ -285,7 +300,9 @@ export default function HomePage() {
         >
           <div
             style={{
+              ...LIGHT_VARS,
               background: "var(--bg)",
+              color: "var(--t1)",
               borderRadius: 20,
               boxShadow: "0 30px 70px -20px rgba(21,21,26,.4)",
               padding: "26px 28px 28px",
@@ -476,7 +493,7 @@ function DeckRow({ deck, index, onOpen, onDelete }: { deck: Deck; index: number;
           padding: "16px 10px",
           borderBottom: "1px solid var(--line)",
           cursor: "pointer",
-          background: hover ? "var(--bg2)" : "transparent",
+          background: hover ? "var(--bg3)" : "transparent",
           transition: "background .12s",
           position: "relative",
         }}
@@ -533,7 +550,7 @@ function DeckRow({ deck, index, onOpen, onDelete }: { deck: Deck; index: number;
             borderRadius: 8,
             border: "1px solid var(--line)",
             cursor: "pointer",
-            background: "var(--bg2)",
+            background: "var(--bg3)",
             color: "var(--t3)",
             fontSize: 10,
             opacity: hover ? 1 : 0,
