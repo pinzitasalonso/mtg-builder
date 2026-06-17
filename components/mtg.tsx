@@ -324,14 +324,37 @@ export function deckStats(pool: StatCardInput[]): DeckStats {
 }
 
 /* ---------- stat widgets ---------- */
-export function ManaCurve({ curve, accent }: { curve: number[]; accent: string }) {
+export function ManaCurve({
+  curve,
+  accent,
+  onHoverBar,
+}: {
+  curve: number[];
+  accent: string;
+  /** Fires with the bar index (0–7, where 7 = "7+") on hover, null on leave.
+      Only bars with cards are interactive. */
+  onHoverBar?: (i: number | null) => void;
+}) {
   const max = Math.max(1, ...curve);
   const labels = ["0", "1", "2", "3", "4", "5", "6", "7+"];
+  const [hover, setHover] = useState<number | null>(null);
+  const enter = (i: number, n: number) => {
+    if (!n || !onHoverBar) return;
+    setHover(i);
+    onHoverBar(i);
+  };
+  const leave = () => {
+    if (!onHoverBar) return;
+    setHover(null);
+    onHoverBar(null);
+  };
   return (
     <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 92 }}>
       {curve.map((n, i) => (
         <div
           key={i}
+          onMouseEnter={() => enter(i, n)}
+          onMouseLeave={leave}
           style={{
             flex: 1,
             display: "flex",
@@ -340,6 +363,9 @@ export function ManaCurve({ curve, accent }: { curve: number[]; accent: string }
             gap: 6,
             height: "100%",
             justifyContent: "flex-end",
+            cursor: onHoverBar && n ? "pointer" : "default",
+            opacity: hover === null || hover === i ? 1 : 0.35,
+            transition: "opacity .12s",
           }}
         >
           <span style={{ fontSize: 11, color: "var(--text-dim)", fontVariantNumeric: "tabular-nums", height: 13 }}>
