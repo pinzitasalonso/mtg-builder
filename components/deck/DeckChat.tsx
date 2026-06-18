@@ -588,11 +588,15 @@ function CardLink({
       onClick={onClick}
       disabled={busy}
       title={title}
-      onMouseEnter={(e) => {
+      onPointerEnter={(e) => {
+        // Mouse only — on touch the first tap would otherwise reveal the preview
+        // instead of registering the click, making cards feel unclickable.
+        if (e.pointerType !== "mouse") return;
         setHover(true);
         onPreview({ src: imageUri || namedImageUrl(name), rect: e.currentTarget.getBoundingClientRect() });
       }}
-      onMouseLeave={() => {
+      onPointerLeave={(e) => {
+        if (e.pointerType !== "mouse") return;
         setHover(false);
         onPreview(null);
       }}
