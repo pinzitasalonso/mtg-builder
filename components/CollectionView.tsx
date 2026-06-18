@@ -335,6 +335,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
                   key={c.name}
                   name={c.name}
                   quantity={c.quantity}
+                  imageUri={c.imageUri ?? null}
                   busy={rowBusy === c.name.toLowerCase()}
                   onPreview={setPreview}
                   onInc={() => editQty(c.name, c.quantity + 1)}
@@ -363,6 +364,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
 function CollectionTile({
   name,
   quantity,
+  imageUri,
   busy,
   onPreview,
   onInc,
@@ -371,6 +373,7 @@ function CollectionTile({
 }: {
   name: string;
   quantity: number;
+  imageUri: string | null;
   busy: boolean;
   onPreview: (p: Preview | null) => void;
   onInc: () => void;
@@ -378,16 +381,25 @@ function CollectionTile({
   onDelete: () => void;
 }) {
   const [hover, setHover] = useState(false);
+  // Prefer the persisted CDN image (cards.scryfall.io) — it isn't rate-limited,
+  // so a screenful loading at once is fine. Fall back to the rate-limited
+  // by-name API endpoint only while a card is still awaiting enrichment.
+  const base = imageUri || namedImageUrl(name);
+  // Retry transient failures (e.g. a 429 burst while scrolling) a few times with
+  // backoff before giving up to the text fallback; a cache-buster forces reload.
+  const [attempt, setAttempt] = useState(0);
   const [imgFailed, setImgFailed] = useState(false);
-  // Load art straight from Scryfall by name so tiles fill in immediately,
-  // independent of the server-side metadata enrichment that powers the filters.
-  const src = namedImageUrl(name);
+  useEffect(() => {
+    setAttempt(0);
+    setImgFailed(false);
+  }, [base]);
+  const src = attempt === 0 ? base : `${base}${base.includes("?") ? "&" : "?"}retry=${attempt}`;
   return (
     <div
       onPointerEnter={(e) => {
         if (e.pointerType !== "mouse") return;
         setHover(true);
-        onPreview({ src, rect: e.currentTarget.getBoundingClientRect() });
+        onPreview({ src: base, rect: e.currentTarget.getBoundingClientRect() });
       }}
       onPointerLeave={(e) => {
         if (e.pointerType !== "mouse") return;
@@ -411,7 +423,22 @@ function CollectionTile({
         </div>
       ) : (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={name} loading="lazy" decoding="async" onError={() => setImgFailed(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        <img
+          src={src}
+          alt={name}
+          loading="lazy"
+          decoding="async"
+          onError={() => {
+            if (attempt < 4) {
+              const next = attempt + 1;
+              // Stagger retries so a whole screen doesn't hammer Scryfall in lockstep.
+              setTimeout(() => setAttempt(next), 500 * next + Math.random() * 400);
+            } else {
+              setImgFailed(true);
+            }
+          }}
+          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+        />
       )}
       <span style={{ position: "absolute", top: 7, left: 7, background: "rgba(13,138,95,.92)", color: "#fff", fontSize: 12, fontWeight: 800, padding: "1px 8px", borderRadius: 999, boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}>
         ×{busy ? "…" : quantity}
