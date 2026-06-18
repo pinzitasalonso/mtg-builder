@@ -18,9 +18,10 @@ const displayTitle: React.CSSProperties = {
   fontFamily: "var(--font-display)",
   fontWeight: 800,
   textTransform: "uppercase",
-  letterSpacing: ".01em",
-  lineHeight: 1.02,
+  letterSpacing: ".015em",
+  lineHeight: 0.98,
   color: "var(--text)",
+  textShadow: "0 2px 0 rgba(0,0,0,.1)",
 };
 
 interface Deck {

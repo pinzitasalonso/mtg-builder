@@ -58,9 +58,9 @@ html {
 body {
   /* Font tokens defined here (not :root) because next/font sets the family
      vars on <html>; a same-element var() chain on :root resolves to empty. */
-  --font-ui: var(--font-instrument), system-ui, sans-serif;
-  --font-body: var(--font-instrument), system-ui, sans-serif;
-  --font-display: var(--font-instrument), system-ui, sans-serif;
+  --font-ui: var(--font-hanken), system-ui, sans-serif;
+  --font-body: var(--font-hanken), system-ui, sans-serif;
+  --font-display: var(--font-bangers), system-ui, cursive;
   --font-sc: var(--font-plexmono), monospace;
   --font-mono: var(--font-plexmono), monospace;
 
@@ -344,11 +344,11 @@ button {
   cursor: pointer;
   background: var(--bg3);
   color: var(--text-muted);
-  font-family: var(--font-display);
-  font-size: 15px;
+  font-family: var(--font-ui);
+  font-size: 14px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   transition: background 0.14s, color 0.14s;
 }
 .deck-mobile-tabs button.is-active {

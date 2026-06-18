@@ -557,8 +557,8 @@ export function FrameText({
     <span
       style={{
         flex: flex ? 1 : "none",
-        fontFamily: "var(--font-display)",
-        fontWeight: 600,
+        fontFamily: "var(--font-ui)",
+        fontWeight: 700,
         fontSize: size,
         color: ink || "var(--frame-ink)",
         letterSpacing: "-.01em",
@@ -853,7 +853,7 @@ export function ClassicRow({
         <CardArt name={card.name} src={card.imageUri || undefined} colors={colorsOf(card.manaCost)} radius={0} style={{ position: "absolute", inset: 0 }} />
       </div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 16, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.15 }}>
+        <div style={{ fontFamily: "var(--font-ui)", fontWeight: 700, fontSize: 16, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.15 }}>
           {warning && (
             <span title={warning} style={{ color: "var(--danger)", marginRight: 6, cursor: "help" }}>⚠</span>
           )}

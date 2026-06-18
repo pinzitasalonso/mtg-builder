@@ -630,12 +630,13 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 style={{
                   margin: 0,
                   fontFamily: "var(--font-display)",
-                  fontSize: "clamp(28px, 5vw, 46px)",
+                  fontSize: "clamp(34px, 6.5vw, 64px)",
                   fontWeight: 800,
-                  letterSpacing: ".01em",
+                  letterSpacing: ".015em",
                   textTransform: "uppercase",
-                  lineHeight: 1.02,
+                  lineHeight: 0.98,
                   color: "var(--text)",
+                  textShadow: "0 2px 0 rgba(0,0,0,.12)",
                 }}
               >
                 {deck?.commander || deck?.name || "…"}

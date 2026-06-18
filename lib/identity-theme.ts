@@ -13,24 +13,31 @@ export type IdentityTheme = {
   vars: CSSProperties;
 };
 
-export const IDENTITY_BG: Record<string, { bg: string; light?: boolean }> = {
-  W: { bg: "#d9cda2", light: true },
-  U: { bg: "#3f3ce6" },
-  B: { bg: "#191921" },
-  R: { bg: "#b22f33" },
-  G: { bg: "#2b7a48" },
-  c: { bg: "#45464f" },
-};
-
-// Per-color tones used to build a multicolor deck's gradient. They mirror the
-// mono backgrounds, except white is deepened from its light mono tan so white
-// body text stays readable across the whole blend.
-const GRADIENT_TONE: Record<string, string> = {
-  W: "#9a8a52",
-  U: "#3f3ce6",
-  B: "#191921",
-  R: "#b22f33",
-  G: "#2b7a48",
+// Saturated identity fields, keyed by the deck's colour letters sorted
+// alphabetically (B,G,R,U,W). Each is a `bg` field colour and a darker `deep`
+// pole; the view background is a radial gradient between them. Mono colours and
+// the ten two-colour guilds are tuned individually so every common identity has
+// its own field (matching the Color Identity design); rarer 3+ colour decks
+// blend their mono fields.
+const ID_THEME: Record<string, { bg: string; deep: string }> = {
+  // mono
+  W: { bg: "#c79a2e", deep: "#9a7414" },
+  U: { bg: "#4536e6", deep: "#2c1f9e" },
+  B: { bg: "#5b4a6e", deep: "#3a2d4c" },
+  R: { bg: "#d2452f", deep: "#9a2a18" },
+  G: { bg: "#2f7a4c", deep: "#195030" },
+  C: { bg: "#5a5560", deep: "#3a3640" },
+  // guilds (alphabetically-sorted keys)
+  UW: { bg: "#3f7fd6", deep: "#22568f" }, // azorius
+  BU: { bg: "#3f4f8a", deep: "#262f57" }, // dimir
+  BR: { bg: "#8a2f3a", deep: "#561a22" }, // rakdos
+  GR: { bg: "#7a6f2c", deep: "#4e4516" }, // gruul
+  GW: { bg: "#6f9a3a", deep: "#48631f" }, // selesnya
+  BW: { bg: "#6e5f4a", deep: "#473b2c" }, // orzhov
+  RU: { bg: "#7a3fd6", deep: "#561f9e" }, // izzet
+  BG: { bg: "#2f6b46", deep: "#19452c" }, // golgari
+  RW: { bg: "#d23f33", deep: "#9a2419" }, // boros
+  GU: { bg: "#2f8a7a", deep: "#195a4e" }, // simic
 };
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -41,9 +48,8 @@ function rgbToHex(r: number, g: number, b: number): string {
   const c = (n: number) => Math.round(n).toString(16).padStart(2, "0");
   return `#${c(r)}${c(g)}${c(b)}`;
 }
-// Average several hex tones into one solid colour, for the contexts that can't
-// take a gradient: the CSS --bg variables (used in color-mix and as the sticky
-// header fill).
+// Average several hex tones into one solid colour (for 3+ colour decks with no
+// dedicated field).
 function blendHexes(hexes: string[]): string {
   const sum = hexes.reduce<[number, number, number]>(
     (acc, h) => {
@@ -57,56 +63,24 @@ function blendHexes(hexes: string[]): string {
 
 export function getIdentityTheme(identity: string | null | undefined): IdentityTheme {
   const set = new Set((identity ?? "").toUpperCase().replace(/[^WUBRG]/g, "").split(""));
-  const letters = ["W", "U", "B", "R", "G"].filter((l) => set.has(l));
+  const key = [...set].sort().join("");
 
-  // bg drives `background:` (a gradient for multicolor decks); bgSolid is the
-  // single colour used for the --bg variables, which must stay valid colours.
-  let bg: string;
-  let bgSolid: string;
-  let light = false;
-
-  if (letters.length >= 2) {
-    const tones = letters.map((l) => GRADIENT_TONE[l]);
-    const stops = tones
-      .map((t, i) => `${t} ${Math.round((i / (tones.length - 1)) * 100)}%`)
-      .join(", ");
-    bg = `linear-gradient(140deg, ${stops})`;
-    bgSolid = blendHexes(tones);
-  } else {
-    const conf = letters.length === 1 ? IDENTITY_BG[letters[0]] : IDENTITY_BG.c;
-    bg = conf.bg;
-    bgSolid = conf.bg;
-    light = Boolean(conf.light);
+  // Resolve the deck's field: an exact mono/guild match where one exists,
+  // otherwise (3+ colours, or an unlisted set) a blend of the mono fields.
+  let field = ID_THEME[key];
+  if (!field) {
+    if (set.size === 0) field = ID_THEME.C;
+    else if (set.size === 1) field = ID_THEME[[...set][0]] ?? ID_THEME.C;
+    else {
+      const mono = [...set].map((l) => ID_THEME[l] ?? ID_THEME.C);
+      field = { bg: blendHexes(mono.map((m) => m.bg)), deep: blendHexes(mono.map((m) => m.deep)) };
+    }
   }
 
-  if (light) {
-    const text = "#211d12";
-    return {
-      bg,
-      text,
-      dotEmpty: "rgba(33,29,18,.16)",
-      vars: {
-        ["--bg" as string]: bgSolid,
-        "--bg2": bgSolid,
-        "--bg3": "rgba(33,29,18,.07)",
-        "--surface": "#ffffff",
-        "--surface2": "rgba(33,29,18,.05)",
-        "--text": text,
-        "--t1": text,
-        "--text-muted": "rgba(33,29,18,.7)",
-        "--t2": "rgba(33,29,18,.7)",
-        "--text-dim": "rgba(33,29,18,.46)",
-        "--t3": "rgba(33,29,18,.46)",
-        "--accent": "#2742d6",
-        "--accent-hover": "#1d35b8",
-        "--gold": "#2742d6",
-        "--gold-bright": "#1d35b8",
-        "--accent-ink": "#ffffff",
-        "--line": "rgba(33,29,18,.16)",
-        "--border": "rgba(33,29,18,.16)",
-      } as CSSProperties,
-    };
-  }
+  // The display background is a radial gradient toward the deep pole; the --bg
+  // variables stay a flat colour (they feed color-mix and opaque fills).
+  const bg = `radial-gradient(125% 80% at 85% -10%, ${field.bg}, ${field.deep} 80%)`;
+  const bgSolid = field.bg;
 
   return {
     bg,
@@ -124,11 +98,11 @@ export function getIdentityTheme(identity: string | null | undefined): IdentityT
       "--t2": "rgba(255,255,255,.74)",
       "--text-dim": "rgba(255,255,255,.52)",
       "--t3": "rgba(255,255,255,.52)",
-      "--accent": "#ffd23f",
-      "--accent-hover": "#ffdf6b",
-      "--gold": "#ffd23f",
-      "--gold-bright": "#ffdf6b",
-      "--accent-ink": "#2a2205",
+      "--accent": "#f5c425",
+      "--accent-hover": "#ffcf3a",
+      "--gold": "#f5c425",
+      "--gold-bright": "#ffcf3a",
+      "--accent-ink": "#181228",
       "--line": "rgba(255,255,255,.18)",
       "--border": "rgba(255,255,255,.18)",
     } as CSSProperties,
