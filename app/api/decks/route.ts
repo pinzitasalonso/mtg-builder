@@ -10,17 +10,23 @@ export async function GET(req: Request) {
   const wantPublic = new URL(req.url).searchParams.get("public") === "1";
   const decks = await prisma.deck.findMany({
     where: user && !wantPublic ? { userId: user.id } : { userId: null },
-    include: { _count: { select: { cards: true } } },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  // Aggregate each deck's color identity (WUBRG order) for the index table.
+  // Aggregate each deck's color identity (WUBRG order) and its real deck size.
+  // The card count must reflect only cards promoted to the decklist (board
+  // "deck"), not pool candidates — and summed by quantity, matching the deck
+  // page — so the home progress bar shows actual progress toward the format.
   const cards = await prisma.poolCard.findMany({
     where: { deckId: { in: decks.map((d) => d.id) } },
-    select: { deckId: true, colorIdentity: true },
+    select: { deckId: true, colorIdentity: true, board: true, quantity: true },
   });
   const colorsByDeck = new Map<number, Set<string>>();
+  const deckCountByDeck = new Map<number, number>();
   for (const c of cards) {
+    if (c.board === "deck") {
+      deckCountByDeck.set(c.deckId, (deckCountByDeck.get(c.deckId) ?? 0) + c.quantity);
+    }
     if (!c.colorIdentity) continue;
     const set = colorsByDeck.get(c.deckId) ?? new Set<string>();
     for (const ch of c.colorIdentity) if ("WUBRG".includes(ch)) set.add(ch);
@@ -29,6 +35,7 @@ export async function GET(req: Request) {
   return NextResponse.json(
     decks.map((d) => ({
       ...d,
+      _count: { cards: deckCountByDeck.get(d.id) ?? 0 },
       colors: ["W", "U", "B", "R", "G"].filter((ch) => colorsByDeck.get(d.id)?.has(ch)),
     }))
   );
