@@ -87,7 +87,13 @@ export default function HomePage() {
 
   async function loadCollection() {
     const c = await fetchCollection();
-    setCollection({ unique: c.unique, total: c.total, sample: c.cards.slice(0, 7).map((x) => x.name) });
+    // Randomize which cards headline the home block so it feels fresh each visit.
+    const names = c.cards.map((x) => x.name);
+    for (let i = names.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [names[i], names[j]] = [names[j], names[i]];
+    }
+    setCollection({ unique: c.unique, total: c.total, sample: names.slice(0, 7) });
   }
 
   async function loadAll() {
@@ -470,11 +476,11 @@ function CollectionBlock({
         <button
           onClick={onOpen}
           aria-label="Browse your collection"
-          style={{ display: "flex", gap: 12, marginTop: 20, padding: 0, border: "none", background: "transparent", cursor: "pointer", width: "100%", overflow: "hidden" }}
+          style={{ display: "flex", gap: 12, marginTop: 20, padding: 0, border: "none", background: "transparent", cursor: "pointer", width: "100%" }}
         >
           {sample.map((name) => (
-            <div key={name} style={{ width: 84, flex: "none", borderRadius: 8, overflow: "hidden", boxShadow: "0 6px 16px -8px rgba(0,0,0,.5)" }}>
-              <CardArt name={name} colors={["C"]} version="art_crop" radius={0} style={{ aspectRatio: "5 / 7" }} />
+            <div key={name} style={{ flex: "1 1 0", minWidth: 0, borderRadius: 10, overflow: "hidden", boxShadow: "0 6px 16px -8px rgba(0,0,0,.5)" }}>
+              <CardArt name={name} colors={["C"]} version="normal" radius={10} style={{ aspectRatio: "5 / 7" }} />
             </div>
           ))}
         </button>

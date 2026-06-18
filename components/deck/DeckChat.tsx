@@ -53,6 +53,8 @@ export default function DeckChat({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  // Live progress for the bulk add/remove bar so it never looks frozen.
+  const [bulkProgress, setBulkProgress] = useState<{ mode: "add" | "remove"; done: number; total: number } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -98,16 +100,19 @@ export default function DeckChat({
     const todo = names.filter((n) => !poolByLower.has(n.toLowerCase()));
     if (todo.length === 0) return;
     setBulkBusy(true);
+    setBulkProgress({ mode: "add", done: 0, total: todo.length });
     setError("");
     const known = poolByName(pool);
     const failed: string[] = [];
-    for (const n of todo) {
-      const r = await resolveAndAdd(deckId, n, 1, known);
-      if (r !== "added") failed.push(n);
+    for (let i = 0; i < todo.length; i++) {
+      const r = await resolveAndAdd(deckId, todo[i], 1, known);
+      if (r !== "added") failed.push(todo[i]);
+      setBulkProgress({ mode: "add", done: i + 1, total: todo.length });
     }
     onPoolChanged();
     if (failed.length) setError(`Couldn't add: ${failed.join(", ")}.`);
     setBulkBusy(false);
+    setBulkProgress(null);
   }
 
   // Remove every suggested card that's currently in the deck (the cuts).
@@ -118,14 +123,17 @@ export default function DeckChat({
       .filter((r): r is PoolEntry => Boolean(r));
     if (rows.length === 0) return;
     setBulkBusy(true);
+    setBulkProgress({ mode: "remove", done: 0, total: rows.length });
     setError("");
     let failed = 0;
-    for (const row of rows) {
-      if (!(await deleteCard(deckId, row.dbId))) failed++;
+    for (let i = 0; i < rows.length; i++) {
+      if (!(await deleteCard(deckId, rows[i].dbId))) failed++;
+      setBulkProgress({ mode: "remove", done: i + 1, total: rows.length });
     }
     onPoolChanged();
     if (failed) setError(`Couldn't remove ${failed} card${failed === 1 ? "" : "s"}.`);
     setBulkBusy(false);
+    setBulkProgress(null);
   }
 
   async function send(text: string) {
@@ -224,6 +232,7 @@ export default function DeckChat({
                 ownedLower={ownedLower}
                 busy={busy}
                 bulkBusy={bulkBusy}
+                bulkProgress={bulkProgress}
                 showActions={!(streaming && i === messages.length - 1)}
                 onCard={toggleCard}
                 onPreview={setPreview}
@@ -395,6 +404,7 @@ function AssistantMessage({
   ownedLower,
   busy,
   bulkBusy,
+  bulkProgress,
   showActions,
   onCard,
   onPreview,
@@ -406,6 +416,7 @@ function AssistantMessage({
   ownedLower: Set<string>;
   busy: Set<string>;
   bulkBusy: boolean;
+  bulkProgress: { mode: "add" | "remove"; done: number; total: number } | null;
   showActions: boolean;
   onCard: (name: string) => void;
   onPreview: (p: Preview | null) => void;
@@ -428,16 +439,33 @@ function AssistantMessage({
         onPreview={onPreview}
       />
       {showBar && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 8 }}>
           {toAdd.length > 0 && (
             <button type="button" onClick={() => onAddAll(toAdd)} disabled={bulkBusy} style={bulkBtn(false)}>
-              {bulkBusy ? "…" : `＋ Add all ${toAdd.length}`}
+              {bulkProgress?.mode === "add"
+                ? `Adding ${bulkProgress.done}/${bulkProgress.total}…`
+                : `＋ Add all ${toAdd.length}`}
             </button>
           )}
           {toRemove.length > 0 && (
             <button type="button" onClick={() => onRemoveAll(toRemove)} disabled={bulkBusy} style={bulkBtn(true)}>
-              {bulkBusy ? "…" : `✕ Remove all ${toRemove.length}`}
+              {bulkProgress?.mode === "remove"
+                ? `Removing ${bulkProgress.done}/${bulkProgress.total}…`
+                : `✕ Remove all ${toRemove.length}`}
             </button>
+          )}
+          {bulkProgress && (
+            <span style={{ flexBasis: "100%", height: 3, borderRadius: 99, background: "var(--line)", overflow: "hidden" }}>
+              <span
+                style={{
+                  display: "block",
+                  height: "100%",
+                  width: `${Math.round((bulkProgress.done / Math.max(1, bulkProgress.total)) * 100)}%`,
+                  background: bulkProgress.mode === "remove" ? "var(--danger)" : "var(--accent)",
+                  transition: "width .2s ease",
+                }}
+              />
+            </span>
           )}
         </div>
       )}
