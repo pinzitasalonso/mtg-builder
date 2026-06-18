@@ -283,6 +283,27 @@ button {
   }
 }
 
+/* Home "Your collection" sample strip: a few full cards on phones (so they
+   keep their shape instead of stretching into slivers), the full row on wider
+   screens. */
+.coll-sample {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.coll-sample > :nth-child(n + 5) {
+  display: none;
+}
+@media (min-width: 640px) {
+  .coll-sample {
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+  }
+  .coll-sample > :nth-child(n + 5) {
+    display: block;
+  }
+}
+
 /* Deck view two-column layout: the pool front and center, the decklist in a
    sticky sidebar that scrolls internally when it outgrows the viewport. */
 .deck-layout {
