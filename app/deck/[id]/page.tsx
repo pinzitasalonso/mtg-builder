@@ -609,7 +609,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             position: "sticky",
             top: 0,
             zIndex: 20,
-            background: "var(--bg)",
+            background: "transparent",
             gap: 12,
           }}
         >
