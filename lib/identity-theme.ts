@@ -19,14 +19,65 @@ export const IDENTITY_BG: Record<string, { bg: string; light?: boolean }> = {
   B: { bg: "#191921" },
   R: { bg: "#b22f33" },
   G: { bg: "#2b7a48" },
-  multi: { bg: "#8a6f2c" },
   c: { bg: "#45464f" },
 };
 
+// Per-color tones used to build a multicolor deck's gradient. They mirror the
+// mono backgrounds, except white is deepened from its light mono tan so white
+// body text stays readable across the whole blend.
+const GRADIENT_TONE: Record<string, string> = {
+  W: "#9a8a52",
+  U: "#3f3ce6",
+  B: "#191921",
+  R: "#b22f33",
+  G: "#2b7a48",
+};
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function rgbToHex(r: number, g: number, b: number): string {
+  const c = (n: number) => Math.round(n).toString(16).padStart(2, "0");
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+// Average several hex tones into one solid colour, for the contexts that can't
+// take a gradient: the CSS --bg variables (used in color-mix and as the sticky
+// header fill).
+function blendHexes(hexes: string[]): string {
+  const sum = hexes.reduce<[number, number, number]>(
+    (acc, h) => {
+      const [r, g, b] = hexToRgb(h);
+      return [acc[0] + r, acc[1] + g, acc[2] + b];
+    },
+    [0, 0, 0]
+  );
+  return rgbToHex(sum[0] / hexes.length, sum[1] / hexes.length, sum[2] / hexes.length);
+}
+
 export function getIdentityTheme(identity: string | null | undefined): IdentityTheme {
   const set = new Set((identity ?? "").toUpperCase().replace(/[^WUBRG]/g, "").split(""));
-  const key = set.size === 0 ? "c" : set.size === 1 ? [...set][0] : "multi";
-  const { bg, light } = IDENTITY_BG[key] ?? IDENTITY_BG.c;
+  const letters = ["W", "U", "B", "R", "G"].filter((l) => set.has(l));
+
+  // bg drives `background:` (a gradient for multicolor decks); bgSolid is the
+  // single colour used for the --bg variables, which must stay valid colours.
+  let bg: string;
+  let bgSolid: string;
+  let light = false;
+
+  if (letters.length >= 2) {
+    const tones = letters.map((l) => GRADIENT_TONE[l]);
+    const stops = tones
+      .map((t, i) => `${t} ${Math.round((i / (tones.length - 1)) * 100)}%`)
+      .join(", ");
+    bg = `linear-gradient(140deg, ${stops})`;
+    bgSolid = blendHexes(tones);
+  } else {
+    const conf = letters.length === 1 ? IDENTITY_BG[letters[0]] : IDENTITY_BG.c;
+    bg = conf.bg;
+    bgSolid = conf.bg;
+    light = Boolean(conf.light);
+  }
 
   if (light) {
     const text = "#211d12";
@@ -35,8 +86,8 @@ export function getIdentityTheme(identity: string | null | undefined): IdentityT
       text,
       dotEmpty: "rgba(33,29,18,.16)",
       vars: {
-        ["--bg" as string]: bg,
-        "--bg2": bg,
+        ["--bg" as string]: bgSolid,
+        "--bg2": bgSolid,
         "--bg3": "rgba(33,29,18,.07)",
         "--surface": "#ffffff",
         "--surface2": "rgba(33,29,18,.05)",
@@ -62,8 +113,8 @@ export function getIdentityTheme(identity: string | null | undefined): IdentityT
     text: "#ffffff",
     dotEmpty: "rgba(255,255,255,.18)",
     vars: {
-      ["--bg" as string]: bg,
-      "--bg2": bg,
+      ["--bg" as string]: bgSolid,
+      "--bg2": bgSolid,
       "--bg3": "rgba(255,255,255,.14)",
       "--surface": "rgba(255,255,255,.08)",
       "--surface2": "rgba(255,255,255,.06)",
