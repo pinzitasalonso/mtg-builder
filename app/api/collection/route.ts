@@ -77,6 +77,33 @@ export async function POST(req: Request) {
   });
 }
 
+// Set the exact quantity of a single card (by name). quantity <= 0 removes it.
+// Used by the collection browser to edit/remove individual cards.
+export async function PATCH(req: Request) {
+  const user = await currentUser();
+  if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
+
+  const body = await req.json().catch(() => null);
+  const name = typeof body?.name === "string" ? body.name.trim() : "";
+  const quantity = Math.floor(Number(body?.quantity));
+  if (!name || !Number.isFinite(quantity)) {
+    return NextResponse.json({ error: "name and quantity required" }, { status: 400 });
+  }
+  const nameKey = name.toLowerCase();
+
+  if (quantity <= 0) {
+    await prisma.collectionCard.deleteMany({ where: { userId: user.id, nameKey } });
+  } else {
+    const qty = Math.min(quantity, 9999);
+    await prisma.collectionCard.upsert({
+      where: { userId_nameKey: { userId: user.id, nameKey } },
+      create: { userId: user.id, name, nameKey, quantity: qty },
+      update: { quantity: qty },
+    });
+  }
+  return NextResponse.json({ ok: true });
+}
+
 // Clear the whole collection.
 export async function DELETE() {
   const user = await currentUser();

@@ -46,6 +46,20 @@ export async function importCollection(text: string, mode: "add" | "replace"): P
   }
 }
 
+// Set the exact owned quantity of a single card (0 removes it).
+export async function setCollectionCard(name: string, quantity: number): Promise<boolean> {
+  try {
+    const res = await fetch("/api/collection", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, quantity }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function clearCollection(): Promise<boolean> {
   try {
     const res = await fetch("/api/collection", { method: "DELETE" });

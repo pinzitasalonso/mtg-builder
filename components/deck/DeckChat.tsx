@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PoolEntry, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
-import { Block, InlineToken, parseBlocks } from "@/lib/chat-markdown";
+import { Block, InlineToken, cardNamesIn, parseBlocks } from "@/lib/chat-markdown";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -52,6 +52,7 @@ export default function DeckChat({
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -89,6 +90,42 @@ export default function DeckChat({
         return next;
       });
     }
+  }
+
+  // Add every suggested card not already in the pool, in one go.
+  async function bulkAdd(names: string[]) {
+    if (bulkBusy) return;
+    const todo = names.filter((n) => !poolByLower.has(n.toLowerCase()));
+    if (todo.length === 0) return;
+    setBulkBusy(true);
+    setError("");
+    const known = poolByName(pool);
+    const failed: string[] = [];
+    for (const n of todo) {
+      const r = await resolveAndAdd(deckId, n, 1, known);
+      if (r !== "added") failed.push(n);
+    }
+    onPoolChanged();
+    if (failed.length) setError(`Couldn't add: ${failed.join(", ")}.`);
+    setBulkBusy(false);
+  }
+
+  // Remove every suggested card that's currently in the deck (the cuts).
+  async function bulkRemove(names: string[]) {
+    if (bulkBusy) return;
+    const rows = names
+      .map((n) => poolByLower.get(n.toLowerCase()))
+      .filter((r): r is PoolEntry => Boolean(r));
+    if (rows.length === 0) return;
+    setBulkBusy(true);
+    setError("");
+    let failed = 0;
+    for (const row of rows) {
+      if (!(await deleteCard(deckId, row.dbId))) failed++;
+    }
+    onPoolChanged();
+    if (failed) setError(`Couldn't remove ${failed} card${failed === 1 ? "" : "s"}.`);
+    setBulkBusy(false);
   }
 
   async function send(text: string) {
@@ -180,16 +217,19 @@ export default function DeckChat({
                 </div>
               </div>
             ) : m.content ? (
-              <div key={i}>
-                <ChatMarkdown
-                  text={m.content}
-                  poolByLower={poolByLower}
-                  ownedLower={ownedLower}
-                  busy={busy}
-                  onCard={toggleCard}
-                  onPreview={setPreview}
-                />
-              </div>
+              <AssistantMessage
+                key={i}
+                content={m.content}
+                poolByLower={poolByLower}
+                ownedLower={ownedLower}
+                busy={busy}
+                bulkBusy={bulkBusy}
+                showActions={!(streaming && i === messages.length - 1)}
+                onCard={toggleCard}
+                onPreview={setPreview}
+                onAddAll={bulkAdd}
+                onRemoveAll={bulkRemove}
+              />
             ) : (
               <Thinking key={i} />
             )
@@ -344,6 +384,82 @@ function CardPreview({ preview }: { preview: Preview }) {
       </div>
     </div>
   );
+}
+
+/* One assistant turn: the rendered answer plus, when it names several cards, a
+   bulk action bar to add every suggested card or remove every suggested cut in
+   one tap. */
+function AssistantMessage({
+  content,
+  poolByLower,
+  ownedLower,
+  busy,
+  bulkBusy,
+  showActions,
+  onCard,
+  onPreview,
+  onAddAll,
+  onRemoveAll,
+}: {
+  content: string;
+  poolByLower: Map<string, PoolEntry>;
+  ownedLower: Set<string>;
+  busy: Set<string>;
+  bulkBusy: boolean;
+  showActions: boolean;
+  onCard: (name: string) => void;
+  onPreview: (p: Preview | null) => void;
+  onAddAll: (names: string[]) => void;
+  onRemoveAll: (names: string[]) => void;
+}) {
+  const names = cardNamesIn(content);
+  const toAdd = names.filter((n) => !poolByLower.has(n.toLowerCase()));
+  const toRemove = names.filter((n) => poolByLower.has(n.toLowerCase()));
+  // Only worth a bulk bar when the answer suggests more than one card.
+  const showBar = showActions && names.length > 1 && (toAdd.length > 0 || toRemove.length > 0);
+  return (
+    <div>
+      <ChatMarkdown
+        text={content}
+        poolByLower={poolByLower}
+        ownedLower={ownedLower}
+        busy={busy}
+        onCard={onCard}
+        onPreview={onPreview}
+      />
+      {showBar && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+          {toAdd.length > 0 && (
+            <button type="button" onClick={() => onAddAll(toAdd)} disabled={bulkBusy} style={bulkBtn(false)}>
+              {bulkBusy ? "…" : `＋ Add all ${toAdd.length}`}
+            </button>
+          )}
+          {toRemove.length > 0 && (
+            <button type="button" onClick={() => onRemoveAll(toRemove)} disabled={bulkBusy} style={bulkBtn(true)}>
+              {bulkBusy ? "…" : `✕ Remove all ${toRemove.length}`}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function bulkBtn(danger: boolean): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "5px 12px",
+    borderRadius: 999,
+    border: `1px solid ${danger ? "color-mix(in srgb, var(--danger) 45%, transparent)" : "var(--line)"}`,
+    cursor: "pointer",
+    background: "transparent",
+    color: danger ? "var(--danger)" : "var(--accent)",
+    fontFamily: "var(--font-ui)",
+    fontSize: 12.5,
+    fontWeight: 600,
+  };
 }
 
 /* Renders the assistant's Markdown answer: headings, bold, bullet/numbered
