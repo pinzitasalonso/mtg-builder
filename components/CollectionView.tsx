@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getIdentityTheme } from "@/lib/identity-theme";
 import {
   Collection,
@@ -18,8 +18,9 @@ import { categoryOf, manaValue, TYPE_ORDER } from "@/components/mtg";
 // enough to cover any realistic collection so the metadata filters apply to
 // every card, not just an early slice.
 const MAX_ENRICH = 12000;
-// Cap rendered tiles for snappiness; filters/search narrow the set.
-const MAX_TILES = 240;
+// Tiles render in pages; scrolling near the bottom reveals the next page, so a
+// filtered set shows every match without dumping thousands of nodes at once.
+const PAGE = 120;
 
 const theme = getIdentityTheme(null);
 
@@ -59,6 +60,9 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
 
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  // Infinite-scroll window: how many of the filtered cards are rendered.
+  const [visible, setVisible] = useState(PAGE);
+  const gridRef = useRef<HTMLDivElement>(null);
 
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
@@ -178,7 +182,13 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     return out;
   }, [collection.cards, meta, search, colorSel, typeSel, mvSel, sort, metaFiltersActive]);
 
-  const shown = filtered.slice(0, MAX_TILES);
+  const shown = filtered.slice(0, visible);
+
+  // A new search/filter/sort resets the window and scrolls back to the top.
+  useEffect(() => {
+    setVisible(PAGE);
+    gridRef.current?.scrollTo({ top: 0 });
+  }, [search, colorSel, typeSel, mvSel, sort]);
 
   function clearFilters() {
     setSearch("");
@@ -308,7 +318,18 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
       </div>
 
       {/* grid */}
-      <div onScroll={() => setPreview(null)} style={{ flex: 1, overflowY: "auto", padding: "18px 22px 40px" }}>
+      <div
+        ref={gridRef}
+        onScroll={(e) => {
+          setPreview(null);
+          const el = e.currentTarget;
+          // Near the bottom — reveal the next page of matches.
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 700) {
+            setVisible((v) => (v < filtered.length ? Math.min(filtered.length, v + PAGE) : v));
+          }
+        }}
+        style={{ flex: 1, overflowY: "auto", padding: "18px 22px 40px" }}
+      >
         {collection.unique === 0 ? (
           <div style={{ textAlign: "center", color: "var(--text-muted)", padding: "60px 20px", fontSize: 15 }}>
             Your collection is empty.{" "}
@@ -341,7 +362,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
             </div>
             {filtered.length > shown.length && (
               <p style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 13, marginTop: 18 }}>
-                Showing {shown.length} of {filtered.length} — refine your search or filters to see more.
+                Loading more… {shown.length} of {filtered.length}
               </p>
             )}
             {filtered.length === 0 && !indexing && (
@@ -376,13 +397,16 @@ function CollectionTile({
   onDelete: () => void;
 }) {
   const [hover, setHover] = useState(false);
-  const src = card?.imageUri || "";
+  const [imgFailed, setImgFailed] = useState(false);
+  // Load art straight from Scryfall by name so tiles fill in immediately, rather
+  // than waiting for the batched bulk enrichment (which only powers the filters).
+  const src = namedImageUrl(name);
   return (
     <div
       onPointerEnter={(e) => {
         if (e.pointerType !== "mouse") return;
         setHover(true);
-        onPreview({ src: src || namedImageUrl(name), rect: e.currentTarget.getBoundingClientRect() });
+        onPreview({ src, rect: e.currentTarget.getBoundingClientRect() });
       }}
       onPointerLeave={(e) => {
         if (e.pointerType !== "mouse") return;
@@ -400,13 +424,13 @@ function CollectionTile({
         transition: "transform .16s ease, box-shadow .16s ease",
       }}
     >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={name} loading="lazy" decoding="async" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-      ) : (
+      {imgFailed ? (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 10, textAlign: "center", fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,.82)" }}>
           {name}
         </div>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={name} loading="lazy" decoding="async" onError={() => setImgFailed(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
       )}
       <span style={{ position: "absolute", top: 7, left: 7, background: "rgba(13,138,95,.92)", color: "#fff", fontSize: 12, fontWeight: 800, padding: "1px 8px", borderRadius: 999, boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}>
         ×{busy ? "…" : quantity}
