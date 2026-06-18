@@ -150,7 +150,8 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
       if (colorSel.size > 0) {
         const ci = (c.colorIdentity ?? "").replace(/[^WUBRG]/g, "");
         const isColorless = ci.length === 0;
-        const matches = [...colorSel].some((c2) => (c2 === "C" ? isColorless : ci.includes(c2)));
+        // AND: the card's color identity must contain every selected color.
+        const matches = [...colorSel].every((c2) => (c2 === "C" ? isColorless : ci.includes(c2)));
         if (!matches) return false;
       }
       if (typeSel && categoryOf(c.typeLine) !== typeSel) return false;
