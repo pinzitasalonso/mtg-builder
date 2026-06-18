@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
-import CollectionModal from "@/components/CollectionModal";
+import CollectionView from "@/components/CollectionView";
 import { CardArt, ColorPips, deckTarget, relativeTime } from "@/components/mtg";
+import { fetchCollection } from "@/lib/collection-client";
 import { getIdentityTheme, LIGHT_VARS } from "@/lib/identity-theme";
 
 /* The home/landing view wears the same immersive theme as the deck page, using
@@ -79,8 +80,15 @@ export default function HomePage() {
   const [loaded, setLoaded] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showCollection, setShowCollection] = useState(false);
+  // Collection summary for the home block: count + a few names for thumbnails.
+  const [collection, setCollection] = useState<{ unique: number; total: number; sample: string[] }>({ unique: 0, total: 0, sample: [] });
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
   const [creating, setCreating] = useState(false);
+
+  async function loadCollection() {
+    const c = await fetchCollection();
+    setCollection({ unique: c.unique, total: c.total, sample: c.cards.slice(0, 7).map((x) => x.name) });
+  }
 
   async function loadAll() {
     const meBody = await fetch("/api/auth/me")
@@ -95,6 +103,8 @@ export default function HomePage() {
     setDecks(own);
     setPublicDecks(pub);
     setLoaded(true);
+    if (user) loadCollection();
+    else setCollection({ unique: 0, total: 0, sample: [] });
   }
 
   useEffect(() => {
@@ -212,6 +222,13 @@ export default function HomePage() {
               </div>
             </div>
             <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.id}`)} onDelete={deleteDeck} onNew={() => setShowModal(true)} showNew={loaded} />
+
+            <CollectionBlock
+              unique={collection.unique}
+              total={collection.total}
+              sample={collection.sample}
+              onOpen={() => setShowCollection(true)}
+            />
           </div>
         </>
       ) : (
@@ -287,7 +304,9 @@ export default function HomePage() {
         <DeckTable decks={publicDecks} noHeadRule onOpen={(d) => router.push(`/deck/${d.id}`)} onDelete={deleteDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
       </div>
 
-      {showCollection && <CollectionModal onClose={() => setShowCollection(false)} />}
+      {showCollection && (
+        <CollectionView onClose={() => setShowCollection(false)} onChanged={loadCollection} />
+      )}
 
       {showModal && (
         <div
@@ -418,6 +437,56 @@ function CStat({ n, label, accent }: { n: number; label: string; accent?: boolea
         {n}
       </div>
       <div className="mn-label" style={{ marginTop: 5 }}>{label}</div>
+    </div>
+  );
+}
+
+/* ---------- "Your collection" home block ---------- */
+function CollectionBlock({
+  unique,
+  total,
+  sample,
+  onOpen,
+}: {
+  unique: number;
+  total: number;
+  sample: string[];
+  onOpen: () => void;
+}) {
+  return (
+    <div style={{ marginTop: 56 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 14, paddingBottom: 20, borderBottom: "1px solid var(--t1)" }}>
+        <h2 style={{ margin: 0, fontSize: "clamp(24px, 4vw, 32px)", ...displayTitle }}>Your collection</h2>
+        <span className="mn-label">{unique > 0 ? `${unique} unique · ${total} total` : "nothing yet"}</span>
+        <button
+          onClick={onOpen}
+          className="mn-ghost"
+          style={{ marginLeft: "auto", padding: "9px 18px", fontSize: 14 }}
+        >
+          {unique > 0 ? "Browse →" : "Import →"}
+        </button>
+      </div>
+      {unique > 0 ? (
+        <button
+          onClick={onOpen}
+          aria-label="Browse your collection"
+          style={{ display: "flex", gap: 12, marginTop: 20, padding: 0, border: "none", background: "transparent", cursor: "pointer", width: "100%", overflow: "hidden" }}
+        >
+          {sample.map((name) => (
+            <div key={name} style={{ width: 84, flex: "none", borderRadius: 8, overflow: "hidden", boxShadow: "0 6px 16px -8px rgba(0,0,0,.5)" }}>
+              <CardArt name={name} colors={["C"]} version="art_crop" radius={0} style={{ aspectRatio: "5 / 7" }} />
+            </div>
+          ))}
+        </button>
+      ) : (
+        <p style={{ marginTop: 18, fontSize: 15, color: "var(--t2)", lineHeight: 1.5 }}>
+          Import the cards you own to track them across decks, see what you can build for free, and let the AI factor it in.{" "}
+          <button onClick={onOpen} style={{ background: "none", border: "none", padding: 0, color: "var(--accent)", fontWeight: 600, cursor: "pointer", textDecoration: "underline" }}>
+            Import your collection
+          </button>
+          .
+        </p>
+      )}
     </div>
   );
 }
