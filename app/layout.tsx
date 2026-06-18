@@ -1,14 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Instrument_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Hanken_Grotesk, Bangers, IBM_Plex_Mono } from "next/font/google";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import "./globals.css";
 
-const instrument = Instrument_Sans({
+const hanken = Hanken_Grotesk({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
-  variable: "--font-instrument",
+  weight: ["400", "500", "600", "700", "800"],
+  variable: "--font-hanken",
+  display: "swap",
+});
+
+const bangers = Bangers({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-bangers",
   display: "swap",
 });
 
@@ -45,7 +51,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`h-full ${instrument.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`h-full ${hanken.variable} ${bangers.variable} ${plexMono.variable}`}>
       <body className="min-h-full flex flex-col">
         {children}
         <footer
