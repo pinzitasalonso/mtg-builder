@@ -2,23 +2,56 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { parseDecklist } from "@/lib/decklist";
+import { collectionByName } from "@/lib/scryfall";
 
 export const runtime = "nodejs";
 
 const MAX_ENTRIES = 20000;
+// How many not-yet-resolved cards to enrich per GET. Bounded so a fresh import
+// converges over a few quick polls rather than blocking one slow request.
+const ENRICH_PER_CALL = 525; // 7 Scryfall requests of 75 names
 
 // The signed-in user's owned-card collection. Guests have none — GET returns an
-// empty collection so deck pages can fetch it unconditionally.
+// empty collection so deck pages can fetch it unconditionally. Each call resolves
+// a batch of un-enriched cards against Scryfall and persists their metadata, so
+// the browser's color/type/mana-value filters work on real stored data; the
+// returned `pending` count lets the client poll until enrichment is complete.
 export async function GET() {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ cards: [], unique: 0, total: 0 });
+  if (!user) return NextResponse.json({ cards: [], unique: 0, total: 0, pending: 0 });
+
+  const stale = await prisma.collectionCard.findMany({
+    where: { userId: user.id, enriched: false },
+    select: { id: true, name: true },
+    take: ENRICH_PER_CALL,
+  });
+  if (stale.length > 0) {
+    const map = await collectionByName(stale.map((r) => r.name));
+    await prisma.$transaction(
+      stale.map((r) => {
+        const m = map.get(r.name.toLowerCase());
+        return prisma.collectionCard.update({
+          where: { id: r.id },
+          data: {
+            enriched: true,
+            colorIdentity: m?.colorIdentity ?? null,
+            typeLine: m?.typeLine ?? null,
+            manaCost: m?.manaCost ?? null,
+            imageUri: m?.imageUri ?? null,
+          },
+        });
+      })
+    );
+  }
+
   const rows = await prisma.collectionCard.findMany({
     where: { userId: user.id },
-    select: { name: true, quantity: true },
+    select: { name: true, quantity: true, colorIdentity: true, typeLine: true, manaCost: true, imageUri: true },
     orderBy: { name: "asc" },
   });
+  const pending = await prisma.collectionCard.count({ where: { userId: user.id, enriched: false } });
   const total = rows.reduce((s, r) => s + r.quantity, 0);
-  return NextResponse.json({ cards: rows, unique: rows.length, total });
+  return NextResponse.json({ cards: rows, unique: rows.length, total, pending });
 }
 
 // Import a pasted collection. `mode: "replace"` swaps the whole collection;

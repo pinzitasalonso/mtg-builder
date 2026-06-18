@@ -33,6 +33,15 @@ model CollectionCard {
   name     String
   nameKey  String
   quantity Int    @default(1)
+  // Scryfall metadata, resolved lazily server-side so the collection browser's
+  // filters work instantly and completely instead of racing a client fetch.
+  colorIdentity String?
+  typeLine      String?
+  manaCost      String?
+  imageUri      String?
+  // True once resolved against Scryfall (even if the name didn't resolve), so
+  // the same names aren't re-queried on every load.
+  enriched Boolean @default(false)
 
   @@unique([userId, nameKey])
 }

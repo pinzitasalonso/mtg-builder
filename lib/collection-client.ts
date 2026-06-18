@@ -3,15 +3,22 @@
 export interface CollectionCard {
   name: string;
   quantity: number;
+  // Scryfall metadata, resolved server-side; null/undefined until enriched.
+  colorIdentity?: string | null;
+  typeLine?: string | null;
+  manaCost?: string | null;
+  imageUri?: string | null;
 }
 
 export interface Collection {
   cards: CollectionCard[];
   unique: number;
   total: number;
+  // Cards still awaiting server-side enrichment; poll GET until this is 0.
+  pending: number;
 }
 
-export const EMPTY_COLLECTION: Collection = { cards: [], unique: 0, total: 0 };
+export const EMPTY_COLLECTION: Collection = { cards: [], unique: 0, total: 0, pending: 0 };
 
 export async function fetchCollection(): Promise<Collection> {
   try {

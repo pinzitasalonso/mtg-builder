@@ -10,14 +10,8 @@ import {
   importCollection,
   setCollectionCard,
 } from "@/lib/collection-client";
-import { collectionByName, OutCard } from "@/lib/scryfall";
 import { categoryOf, manaValue, TYPE_ORDER } from "@/components/mtg";
 
-// Card metadata for filters/images can't be stored at import time (collections
-// can be huge), so enrich from Scryfall's bulk endpoint here. The cap is high
-// enough to cover any realistic collection so the metadata filters apply to
-// every card, not just an early slice.
-const MAX_ENRICH = 12000;
 // Tiles render in pages; scrolling near the bottom reveals the next page, so a
 // filtered set shows every match without dumping thousands of nodes at once.
 const PAGE = 120;
@@ -45,12 +39,14 @@ interface Preview {
 }
 
 /* Full-screen collection browser: search, color/type/mana-value filters, a card
-   grid with hover previews, and per-card quantity editing. Card metadata is
-   enriched from Scryfall on open so the metadata filters and tile art work. */
+   grid with hover previews, and per-card quantity editing. Cards arrive with
+   server-resolved Scryfall metadata (color/type/mana value) so the filters work
+   on the whole collection; while the server is still resolving newer cards the
+   `pending` count drives a short poll. */
 export default function CollectionView({ onClose, onChanged }: { onClose: () => void; onChanged?: () => void }) {
   const [collection, setCollection] = useState<Collection>(EMPTY_COLLECTION);
-  const [meta, setMeta] = useState<Map<string, OutCard>>(new Map());
-  const [indexing, setIndexing] = useState(false);
+  // Server is still resolving metadata for some cards; filters fill in as it does.
+  const indexing = collection.pending > 0;
 
   const [search, setSearch] = useState("");
   const [colorSel, setColorSel] = useState<Set<string>>(new Set());
@@ -70,32 +66,14 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
-  // Load the collection, then enrich a bounded slice for filters + art.
+  // Load the collection; cards already carry server-resolved metadata.
   async function load() {
     const c = await fetchCollection();
     setCollection(c);
     return c;
   }
-  async function enrich(c: Collection) {
-    if (c.cards.length === 0) {
-      setMeta(new Map());
-      return;
-    }
-    setIndexing(true);
-    const names = c.cards.slice(0, MAX_ENRICH).map((card) => card.name);
-    // Enrich in batches and flush into state as each lands, so filtered results
-    // fill in progressively instead of blocking on the whole collection.
-    const acc = new Map<string, OutCard>();
-    const BATCH = 300;
-    for (let i = 0; i < names.length; i += BATCH) {
-      const part = await collectionByName(names.slice(i, i + BATCH));
-      for (const [k, v] of part) acc.set(k, v);
-      setMeta(new Map(acc));
-    }
-    setIndexing(false);
-  }
   useEffect(() => {
-    load().then(enrich);
+    load();
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -103,6 +81,16 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Each GET resolves another batch of cards server-side; poll until none remain
+  // so the filters end up backed by the whole collection (persisted thereafter).
+  useEffect(() => {
+    if (collection.pending <= 0) return;
+    const t = setTimeout(() => {
+      load();
+    }, 500);
+    return () => clearTimeout(t);
+  }, [collection.pending, collection.unique]);
 
   // Edit one card's quantity (0 removes). Update locally to avoid re-enriching.
   async function editQty(name: string, next: number) {
@@ -115,7 +103,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
           next <= 0
             ? c.cards.filter((x) => x.name.toLowerCase() !== key)
             : c.cards.map((x) => (x.name.toLowerCase() === key ? { ...x, quantity: next } : x));
-        return { cards, unique: cards.length, total: cards.reduce((s, x) => s + x.quantity, 0) };
+        return { ...c, cards, unique: cards.length, total: cards.reduce((s, x) => s + x.quantity, 0) };
       });
       onChanged?.();
     }
@@ -132,8 +120,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
       setImportText("");
       setImportOpen(false);
       setNote(`${importMode === "replace" ? "Replaced" : "Merged"} — ${r.unique} unique, ${r.total} total.`);
-      const c = await load();
-      await enrich(c);
+      await load();
       onChanged?.();
     }
     setBusy(false);
@@ -145,7 +132,6 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     setBusy(true);
     if (await clearCollection()) {
       setCollection(EMPTY_COLLECTION);
-      setMeta(new Map());
       onChanged?.();
     }
     setBusy(false);
@@ -158,29 +144,26 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     const out = collection.cards.filter((c) => {
       if (q && !c.name.toLowerCase().includes(q)) return false;
       if (!metaFiltersActive) return true;
-      const m = meta.get(c.name.toLowerCase());
-      if (!m) return false; // not enriched / unknown — can't satisfy metadata filters
+      // Resolved cards always carry a type line; if it's missing the card is
+      // either still being indexed or didn't resolve — it can't match.
+      if (c.typeLine == null) return false;
       if (colorSel.size > 0) {
-        const ci = (m.colorIdentity ?? "").replace(/[^WUBRG]/g, "");
+        const ci = (c.colorIdentity ?? "").replace(/[^WUBRG]/g, "");
         const isColorless = ci.length === 0;
         const matches = [...colorSel].some((c2) => (c2 === "C" ? isColorless : ci.includes(c2)));
         if (!matches) return false;
       }
-      if (typeSel && categoryOf(m.typeLine) !== typeSel) return false;
-      if (mvSel !== null && Math.min(manaValue(m.manaCost), 7) !== mvSel) return false;
+      if (typeSel && categoryOf(c.typeLine) !== typeSel) return false;
+      if (mvSel !== null && Math.min(manaValue(c.manaCost ?? null), 7) !== mvSel) return false;
       return true;
     });
-    const byMv = (c: { name: string }) => {
-      const m = meta.get(c.name.toLowerCase());
-      return m ? manaValue(m.manaCost) : 99;
-    };
     out.sort((a, b) => {
       if (sort === "qty") return b.quantity - a.quantity || a.name.localeCompare(b.name);
-      if (sort === "mv") return byMv(a) - byMv(b) || a.name.localeCompare(b.name);
+      if (sort === "mv") return manaValue(a.manaCost ?? null) - manaValue(b.manaCost ?? null) || a.name.localeCompare(b.name);
       return a.name.localeCompare(b.name);
     });
     return out;
-  }, [collection.cards, meta, search, colorSel, typeSel, mvSel, sort, metaFiltersActive]);
+  }, [collection.cards, search, colorSel, typeSel, mvSel, sort, metaFiltersActive]);
 
   const shown = filtered.slice(0, visible);
 
@@ -351,7 +334,6 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
                   key={c.name}
                   name={c.name}
                   quantity={c.quantity}
-                  card={meta.get(c.name.toLowerCase())}
                   busy={rowBusy === c.name.toLowerCase()}
                   onPreview={setPreview}
                   onInc={() => editQty(c.name, c.quantity + 1)}
@@ -380,7 +362,6 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
 function CollectionTile({
   name,
   quantity,
-  card,
   busy,
   onPreview,
   onInc,
@@ -389,7 +370,6 @@ function CollectionTile({
 }: {
   name: string;
   quantity: number;
-  card: OutCard | undefined;
   busy: boolean;
   onPreview: (p: Preview | null) => void;
   onInc: () => void;
@@ -398,8 +378,8 @@ function CollectionTile({
 }) {
   const [hover, setHover] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
-  // Load art straight from Scryfall by name so tiles fill in immediately, rather
-  // than waiting for the batched bulk enrichment (which only powers the filters).
+  // Load art straight from Scryfall by name so tiles fill in immediately,
+  // independent of the server-side metadata enrichment that powers the filters.
   const src = namedImageUrl(name);
   return (
     <div
