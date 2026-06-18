@@ -14,8 +14,10 @@ import { collectionByName, OutCard } from "@/lib/scryfall";
 import { categoryOf, manaValue, TYPE_ORDER } from "@/components/mtg";
 
 // Card metadata for filters/images can't be stored at import time (collections
-// can be huge), so enrich a bounded slice from Scryfall's bulk endpoint here.
-const MAX_ENRICH = 2000;
+// can be huge), so enrich from Scryfall's bulk endpoint here. The cap is high
+// enough to cover any realistic collection so the metadata filters apply to
+// every card, not just an early slice.
+const MAX_ENRICH = 12000;
 // Cap rendered tiles for snappiness; filters/search narrow the set.
 const MAX_TILES = 240;
 
@@ -77,8 +79,15 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     }
     setIndexing(true);
     const names = c.cards.slice(0, MAX_ENRICH).map((card) => card.name);
-    const map = await collectionByName(names);
-    setMeta(map);
+    // Enrich in batches and flush into state as each lands, so filtered results
+    // fill in progressively instead of blocking on the whole collection.
+    const acc = new Map<string, OutCard>();
+    const BATCH = 300;
+    for (let i = 0; i < names.length; i += BATCH) {
+      const part = await collectionByName(names.slice(i, i + BATCH));
+      for (const [k, v] of part) acc.set(k, v);
+      setMeta(new Map(acc));
+    }
     setIndexing(false);
   }
   useEffect(() => {
@@ -308,10 +317,13 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
             </button>{" "}
             to fill it.
           </div>
-        ) : metaFiltersActive && indexing ? (
-          <div style={{ textAlign: "center", color: "var(--text-muted)", padding: "60px 20px", fontSize: 15 }}>Indexing your collection — filters available in a moment…</div>
         ) : (
           <>
+            {indexing && metaFiltersActive && (
+              <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 13.5, margin: "0 0 14px" }}>
+                Still indexing your collection — more matches will appear as cards are read…
+              </p>
+            )}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(132px, 1fr))", gap: 14 }}>
               {shown.map((c) => (
                 <CollectionTile
@@ -332,7 +344,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
                 Showing {shown.length} of {filtered.length} — refine your search or filters to see more.
               </p>
             )}
-            {filtered.length === 0 && (
+            {filtered.length === 0 && !indexing && (
               <p style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 14, marginTop: 40 }}>No cards match these filters.</p>
             )}
           </>
