@@ -188,9 +188,6 @@ export default function HomePage() {
               >
                 {me.email}
               </span>
-              <button onClick={() => setShowCollection(true)} title="Manage your owned-card collection" className="mn-ghost" style={{ padding: "8px 16px", fontSize: 13.5 }}>
-                Collection
-              </button>
               <button onClick={signOut} title="Sign out" className="mn-ghost" style={{ padding: "8px 16px", fontSize: 13.5 }}>
                 Sign out
               </button>
@@ -476,10 +473,11 @@ function CollectionBlock({
         <button
           onClick={onOpen}
           aria-label="Browse your collection"
-          style={{ display: "flex", gap: 12, marginTop: 20, padding: 0, border: "none", background: "transparent", cursor: "pointer", width: "100%" }}
+          className="coll-sample"
+          style={{ marginTop: 20, padding: 0, border: "none", background: "transparent", cursor: "pointer", width: "100%" }}
         >
           {sample.map((name) => (
-            <div key={name} style={{ flex: "1 1 0", minWidth: 0, borderRadius: 10, overflow: "hidden", boxShadow: "0 6px 16px -8px rgba(0,0,0,.5)" }}>
+            <div key={name} style={{ minWidth: 0, borderRadius: 10, overflow: "hidden", boxShadow: "0 6px 16px -8px rgba(0,0,0,.5)" }}>
               <CardArt name={name} colors={["C"]} version="normal" radius={10} style={{ aspectRatio: "5 / 7" }} />
             </div>
           ))}
