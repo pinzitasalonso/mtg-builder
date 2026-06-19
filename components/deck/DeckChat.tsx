@@ -67,12 +67,16 @@ export default function DeckChat({
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Whether the transcript is pinned to the bottom. While streaming we only
+  // auto-scroll when it's true, so scrolling up to read isn't yanked back down.
+  const pinnedRef = useRef(true);
   // lowercase name → pool row, for membership, dbId (remove) and stored image.
   const poolByLower = new Map(pool.map((c) => [c.name.toLowerCase(), c]));
   // lowercase names the player owns, for the "owned" hint on suggestions.
   const ownedLower = new Set(ownedNames.map((n) => n.toLowerCase()));
 
   useEffect(() => {
+    if (!pinnedRef.current) return;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
@@ -177,6 +181,8 @@ export default function DeckChat({
   async function send(text: string) {
     const content = text.trim();
     if (!content || streaming) return;
+    // Sending re-pins to the bottom so the new turn (and its reply) scroll in.
+    pinnedRef.current = true;
     const history = [...messages, { role: "user" as const, content }];
     // Append the user turn and an empty assistant turn we stream into.
     setMessages([...history, { role: "assistant", content: "" }]);
@@ -234,7 +240,12 @@ export default function DeckChat({
       {!empty && (
         <div
           ref={scrollRef}
-          onScroll={() => setPreview(null)}
+          onScroll={(e) => {
+            setPreview(null);
+            const el = e.currentTarget;
+            // Pinned when within ~80px of the bottom.
+            pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          }}
           style={{
             maxHeight: 460,
             overflowY: "auto",
