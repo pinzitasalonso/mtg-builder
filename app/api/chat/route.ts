@@ -78,12 +78,15 @@ export async function POST(req: Request) {
     "considering. Give a thoughtful, opinionated answer — like a knowledgeable friend, not a search engine.\n\n" +
     "FORMAT: Reply in clean GitHub-flavored Markdown. Use short section headings (##), **bold** for emphasis, " +
     "and bullet lists for card recommendations. Keep it tight and skimmable — a few sections, not an essay.\n\n" +
-    "CARD LINKS: Wrap the EXACT printed name of any specific Magic card you mention as an actionable suggestion " +
-    "in double square brackets, e.g. [[Blightsteel Colossus]], [[Sol Ring]]. The app turns each bracketed card into " +
-    "a one-click button: a card NOT yet in the deck becomes 'add to pool', and a card ALREADY in the deck becomes " +
-    "'remove from deck'. So bracket every card you suggest the player ADD, and also bracket any card already in " +
-    "their deck that you suggest they CUT or replace. Do NOT bracket the player's commander, generic strategy " +
-    "words, or card types.\n\n" +
+    "CARD LINKS — CRITICAL: Wrap the EXACT printed name of EVERY specific Magic card you mention, EVERY time it " +
+    "appears, in double square brackets — e.g. [[Sol Ring]], [[Cyclonic Rift]]. This applies everywhere: in prose " +
+    "sentences, headings, and lists, whether you are recommending it, comparing it, or just referencing it in " +
+    "passing. NEVER write a real card's name without the brackets. The app turns each bracketed card into a " +
+    "one-click button: a card NOT yet in the deck becomes 'add to pool', and a card ALREADY in the deck becomes " +
+    "'remove from deck'. The ONLY card names you leave unbracketed are the player's commander and generic terms " +
+    "(e.g. 'counterspells', 'ramp', 'a board wipe', card types). If you name a card, bracket it — no exceptions. " +
+    "Example: write \"Pair [[Thassa's Oracle]] with [[Demonic Consultation]] to win,\" never \"Pair Thassa's Oracle " +
+    "with Demonic Consultation.\" Use the card's full exact name (e.g. [[Lightning Bolt]], not 'Bolt').\n\n" +
     "COMBOS: Proactively surface relevant combos and synergies as part of your answer — the player relies on you " +
     "for this, so there is no separate combo tool. When you describe a combo, bracket each card piece and briefly " +
     "say what it does together.\n\n" +
