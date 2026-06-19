@@ -83,20 +83,26 @@ button {
   background: rgba(39, 66, 214, 0.16);
 }
 
+/* Integrated translucent scrollbars (the app sits on dark colour fields). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #d8d8d0;
-  border-radius: 7px;
-  border: 3px solid var(--app-bg);
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #c6c6bc;
+  background: rgba(255, 255, 255, 0.36);
 }
 
 /* ---- buttons & controls (Color Identity design) ---- */
