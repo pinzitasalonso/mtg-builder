@@ -851,7 +851,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </button>
           </div>
 
-          <div className="id-workspace" data-mobile-view={mobileView}>
+          <div className="id-workspace" data-mobile-view={mobileView} data-ai={searchMode === "ai" ? "true" : undefined}>
             {/* ── POOL ── */}
             <aside className="id-panel id-pool id-poolcol" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
