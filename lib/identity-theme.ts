@@ -61,21 +61,22 @@ function blendHexes(hexes: string[]): string {
   return rgbToHex(sum[0] / hexes.length, sum[1] / hexes.length, sum[2] / hexes.length);
 }
 
-export function getIdentityTheme(identity: string | null | undefined): IdentityTheme {
+// Resolve a colour identity to its saturated field: an exact mono/guild match
+// where one exists, otherwise (3+ colours or an unlisted set) a blend of the
+// mono fields. Returned `bg`/`deep` are the light and dark poles of the field.
+export function getIdentityField(identity: string | null | undefined): { bg: string; deep: string } {
   const set = new Set((identity ?? "").toUpperCase().replace(/[^WUBRG]/g, "").split(""));
   const key = [...set].sort().join("");
+  const exact = ID_THEME[key];
+  if (exact) return exact;
+  if (set.size === 0) return ID_THEME.C;
+  if (set.size === 1) return ID_THEME[[...set][0]] ?? ID_THEME.C;
+  const mono = [...set].map((l) => ID_THEME[l] ?? ID_THEME.C);
+  return { bg: blendHexes(mono.map((m) => m.bg)), deep: blendHexes(mono.map((m) => m.deep)) };
+}
 
-  // Resolve the deck's field: an exact mono/guild match where one exists,
-  // otherwise (3+ colours, or an unlisted set) a blend of the mono fields.
-  let field = ID_THEME[key];
-  if (!field) {
-    if (set.size === 0) field = ID_THEME.C;
-    else if (set.size === 1) field = ID_THEME[[...set][0]] ?? ID_THEME.C;
-    else {
-      const mono = [...set].map((l) => ID_THEME[l] ?? ID_THEME.C);
-      field = { bg: blendHexes(mono.map((m) => m.bg)), deep: blendHexes(mono.map((m) => m.deep)) };
-    }
-  }
+export function getIdentityTheme(identity: string | null | undefined): IdentityTheme {
+  const field = getIdentityField(identity);
 
   // The display background is a radial gradient toward the deep pole; the --bg
   // variables stay a flat colour (they feed color-mix and opaque fills).

@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
-import { CardArt, ColorPips, deckTarget, relativeTime } from "@/components/mtg";
+import { CardArt, ColorPips, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
-import { getIdentityTheme, LIGHT_VARS } from "@/lib/identity-theme";
+import { getIdentityTheme, getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
 
 /* The home/landing view wears the same immersive theme as the deck page, using
    the neutral (colourless) palette. */
@@ -496,14 +496,13 @@ function CollectionBlock({
   );
 }
 
-/* ---------- Swiss index table of decks ---------- */
+/* ---------- color-identity deck tiles ---------- */
 function DeckTable({
   decks,
   onOpen,
   onDelete,
   onNew,
   showNew,
-  noHeadRule,
 }: {
   decks: Deck[];
   onOpen: (d: Deck) => void;
@@ -513,138 +512,169 @@ function DeckTable({
   noHeadRule?: boolean;
 }) {
   return (
-    <div style={{ marginTop: noHeadRule ? 0 : 16 }}>
-      <div className="mn-row" style={{ padding: "14px 10px 10px", borderBottom: "1px solid var(--line)" }}>
-        <span className="mn-label">Nº</span>
-        <span className="mn-label"></span>
-        <span className="mn-label">Deck</span>
-        <span className="mn-label mn-col-format">Format</span>
-        <span className="mn-label mn-col-colors">Colors</span>
-        <span className="mn-label">Progress</span>
-        <span className="mn-label mn-col-updated">Updated</span>
-        <span className="mn-label"></span>
-      </div>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(258px, 1fr))",
+        gap: 22,
+        marginTop: 26,
+      }}
+    >
       {decks.map((d, i) => (
-        <DeckRow key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.id)} />
+        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.id)} />
       ))}
-      {showNew && (
-        <button onClick={onNew} className="mn-ghost" style={{ marginTop: 26, padding: "12px 24px", fontSize: 14.5, borderStyle: "dashed" }}>
-          + Start a new deck
-        </button>
-      )}
+      {showNew && <NewDeckTile onNew={onNew} />}
     </div>
   );
 }
 
-function MnProgress({ count, target, delay = 0 }: { count: number; target: number; delay?: number }) {
-  const on = useRevealed();
-  const pct = Math.min(100, Math.round((count / Math.max(1, target)) * 100));
-  return (
-    <div style={{ height: 4, borderRadius: 99, background: "var(--bar-track)" }}>
-      <div
-        style={{
-          height: "100%",
-          width: on ? `${pct}%` : "0%",
-          borderRadius: 99,
-          background: "var(--accent)",
-          transition: `width .9s cubic-bezier(.2,.8,.2,1) ${delay}s`,
-        }}
-      />
-    </div>
-  );
-}
-
-function DeckRow({ deck, index, onOpen, onDelete }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void }) {
+function DeckTile({ deck, index, onOpen, onDelete }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void }) {
   const [hover, setHover] = useState(false);
+  const colors = deck.colors?.length ? deck.colors : ["C"];
+  const field = getIdentityField(colors.join(""));
   const count = deck._count?.cards || 0;
   const target = deckTarget(deck.format);
+  const pct = Math.min(1, count / Math.max(1, target));
   return (
-    <Reveal delay={0.08 + Math.min(index, 8) * 0.06}>
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onOpen}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") onOpen();
-        }}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
-        className="mn-row"
-        style={{
-          padding: "16px 10px",
-          borderBottom: "1px solid var(--line)",
-          cursor: "pointer",
-          background: hover ? "var(--bg3)" : "transparent",
-          transition: "background .12s",
-          position: "relative",
-        }}
-      >
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: 13, color: "var(--t3)" }}>{String(index + 1).padStart(2, "0")}</span>
-        <CardArt
-          name={deck.commander || deck.name}
-          colors={deck.colors?.length ? deck.colors : ["C"]}
-          version="art_crop"
-          radius={6}
-          style={{ width: 56, height: 40, filter: hover ? "none" : "saturate(.4)", transition: "filter .25s" }}
-        />
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 17, letterSpacing: "-.01em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {deck.name}
-          </div>
-          <div style={{ fontSize: 13.5, color: "var(--t3)", marginTop: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {deck.commander || "An untitled brew, awaiting its first cards."}
-          </div>
-        </div>
-        <span className="mn-col-format" style={{ fontSize: 14, color: "var(--t2)", textTransform: "capitalize" }}>{deck.format}</span>
-        <span className="mn-col-colors">
-          {deck.colors && deck.colors.length > 0 ? <ColorPips colors={deck.colors} size={16} /> : <span style={{ color: "var(--t3)" }}>—</span>}
-        </span>
-        <div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-            <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "var(--t2)" }}>
-              {count}
-              <span style={{ color: "var(--t3)" }}>/{target}</span>
-            </span>
-            {count >= target && <span className="mn-label" style={{ fontSize: 10, color: "#0d8a5f" }}>Ready</span>}
-          </div>
-          <MnProgress count={count} target={target} delay={0.15 + Math.min(index, 8) * 0.08} />
-        </div>
-        <span className="mn-col-updated" style={{ fontSize: 13.5, color: "var(--t3)" }}>{relativeTime(deck.createdAt)}</span>
-        <span
-          style={{ fontSize: 17, color: hover ? "var(--accent)" : "var(--t3)", transform: hover ? "translateX(3px)" : "none", transition: "all .15s", textAlign: "right" }}
-        >
-          →
-        </span>
+    <Reveal delay={0.06 + Math.min(index, 8) * 0.05}>
+      <div style={{ position: "relative" }}>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
+          onClick={onOpen}
+          onMouseEnter={() => setHover(true)}
+          onMouseLeave={() => setHover(false)}
+          style={{
+            textAlign: "left",
+            cursor: "pointer",
+            width: "100%",
+            padding: 0,
+            border: "none",
+            borderRadius: 18,
+            overflow: "hidden",
+            position: "relative",
+            color: "#fff",
+            background: `linear-gradient(165deg, ${field.bg}, ${field.deep})`,
+            boxShadow: hover
+              ? "0 0 0 2px var(--gold), 0 26px 50px -22px rgba(0,0,0,.7)"
+              : "0 0 0 1px rgba(255,255,255,.06), 0 16px 38px -26px rgba(0,0,0,.7)",
+            transform: hover ? "translateY(-4px)" : "none",
+            transition: "transform .2s, box-shadow .2s",
           }}
+        >
+          {/* commander art banner */}
+          <div style={{ position: "relative", height: 132 }}>
+            <CardArt name={deck.commander || deck.name} colors={colors} version="art_crop" radius={0} style={{ position: "absolute", inset: 0 }} />
+            <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 30%, ${field.deep}ee)` }} />
+            <div style={{ position: "absolute", top: 12, left: 14 }}>
+              <ColorPips colors={colors} size={20} />
+            </div>
+            <span
+              style={{
+                position: "absolute",
+                top: 13,
+                right: 14,
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "rgba(255,255,255,.78)",
+                background: "rgba(0,0,0,.32)",
+                padding: "3px 8px",
+                borderRadius: 6,
+                textTransform: "capitalize",
+                opacity: hover ? 0 : 1,
+                transition: "opacity .15s",
+              }}
+            >
+              {deck.format}
+            </span>
+          </div>
+          {/* body */}
+          <div style={{ padding: "14px 18px 18px" }}>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 30,
+                lineHeight: 0.92,
+                marginBottom: 5,
+                textTransform: "uppercase",
+                letterSpacing: ".015em",
+                textShadow: "0 2px 0 rgba(0,0,0,.12)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {deck.name}
+            </div>
+            <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.78)", marginBottom: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {deck.commander || "An untitled brew"}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+              <div style={{ flex: 1, height: 6, borderRadius: 4, background: "rgba(255,255,255,.16)", overflow: "hidden" }}>
+                <div style={{ width: `${pct * 100}%`, height: "100%", background: "var(--gold)", borderRadius: 4 }} />
+              </div>
+              <span style={{ fontFamily: "var(--font-mono)", fontSize: 12.5, color: "#fff", fontWeight: 600 }}>
+                {count}
+                <span style={{ color: "rgba(255,255,255,.55)" }}>/{target}</span>
+              </span>
+            </div>
+          </div>
+        </button>
+        <button
+          onClick={onDelete}
           title="Delete deck"
           aria-label="Delete deck"
           style={{
             position: "absolute",
-            top: -9,
-            right: 2,
-            width: 22,
-            height: 22,
+            top: 10,
+            right: 10,
+            width: 24,
+            height: 24,
             borderRadius: 8,
-            border: "1px solid var(--line)",
+            border: "none",
             cursor: "pointer",
-            background: "var(--bg3)",
-            color: "var(--t3)",
-            fontSize: 10,
+            background: "rgba(0,0,0,.5)",
+            color: "#fff",
+            fontSize: 11,
             opacity: hover ? 1 : 0,
             transition: "opacity .15s",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            zIndex: 2,
           }}
         >
           ✕
         </button>
       </div>
     </Reveal>
+  );
+}
+
+function NewDeckTile({ onNew }: { onNew: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={onNew}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        minHeight: 250,
+        borderRadius: 18,
+        border: "1.5px dashed var(--line)",
+        background: hover ? "var(--bg3)" : "transparent",
+        color: "var(--text-muted)",
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        transition: "background .15s, border-color .15s",
+        borderColor: hover ? "var(--gold)" : "var(--line)",
+      }}
+    >
+      <span style={{ fontFamily: "var(--font-display)", fontSize: 30, color: hover ? "var(--gold)" : "var(--text-muted)", lineHeight: 1 }}>+</span>
+      <span style={{ fontFamily: "var(--font-ui)", fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".06em" }}>New deck</span>
+    </button>
   );
 }
 
