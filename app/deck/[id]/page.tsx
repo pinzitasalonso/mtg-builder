@@ -644,6 +644,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            flexWrap: "wrap",
+            rowGap: 8,
             padding: "14px clamp(16px,4vw,52px)",
             position: "sticky",
             top: 0,
@@ -657,7 +659,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           <Link href="/" aria-label="Spellpool home" style={{ textDecoration: "none" }}>
             <Logo size={18} />
           </Link>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative", flexWrap: "wrap", justifyContent: "flex-end", minWidth: 0 }}>
             <div style={{ position: "relative" }}>
               <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setToolsOpen((v) => !v)}>
                 Tools ▾
@@ -1068,8 +1070,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           )}
 
-          {/* candidate list */}
-          <div className="id-scroll" style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "calc(100vh - 220px)", paddingRight: 2 }}>
+          {/* candidate list — own scroll on desktop, flows with the page on mobile */}
+          <div className="id-cardscroll" style={{ display: "flex", flexDirection: "column", gap: 8, paddingRight: 2 }}>
             {poolCards.length === 0 ? (
               <div style={{ padding: "40px 16px", textAlign: "center", color: "var(--w-3)", borderRadius: 14, border: "1px dashed var(--w-line)", fontSize: 13.5 }}>
                 {pool.length === 0
