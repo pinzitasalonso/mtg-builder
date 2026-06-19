@@ -99,39 +99,105 @@ button {
   background: #c6c6bc;
 }
 
-/* ---- minimal primitives ---- */
+/* ---- buttons & controls (Color Identity design) ---- */
 .mn-btn {
   font-family: var(--font-ui);
-  font-weight: 600;
+  font-weight: 700;
   background: var(--accent);
   color: var(--accent-ink);
   border: none;
   cursor: pointer;
   border-radius: 999px;
   white-space: nowrap;
-  transition: background 0.14s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.5);
+  transition: transform 0.14s, box-shadow 0.14s, background 0.14s;
 }
 .mn-btn:hover {
   background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.55);
+}
+.mn-btn:active {
+  transform: translateY(0);
 }
 .mn-btn:disabled {
   opacity: 0.55;
   cursor: default;
+  box-shadow: none;
+  transform: none;
 }
+/* translucent "glass" pill — reads as frosted white on color, light grey on white */
 .mn-ghost {
   font-family: var(--font-ui);
-  font-weight: 500;
-  background: transparent;
-  color: var(--t2);
+  font-weight: 600;
+  background: var(--bg3);
+  color: var(--text);
   border: 1px solid var(--line);
   cursor: pointer;
   border-radius: 999px;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  backdrop-filter: blur(4px);
   transition: all 0.14s;
 }
 .mn-ghost:hover {
-  color: var(--t1);
-  border-color: #c9c9c0;
+  background: var(--surface2);
+  border-color: var(--text);
+  color: var(--text);
+}
+/* gold-outline pill */
+.mn-pill-gold {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  background: transparent;
+  color: var(--gold);
+  border: 1.5px solid var(--gold);
+  cursor: pointer;
+  border-radius: 999px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.14s;
+}
+.mn-pill-gold:hover {
+  background: var(--gold);
+  color: var(--accent-ink);
+}
+/* segmented control (mode / sort switchers) */
+.mn-seg {
+  display: inline-flex;
+  background: var(--bg3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.mn-seg button {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 999px;
+  transition: all 0.14s;
+}
+.mn-seg button[data-on="true"],
+.mn-seg button.is-active {
+  background: var(--accent);
+  color: var(--accent-ink);
 }
 .mn-label {
   font-family: var(--font-mono);

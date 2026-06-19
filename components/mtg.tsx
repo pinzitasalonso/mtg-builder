@@ -3,15 +3,15 @@
 import { useState, type CSSProperties } from "react";
 
 /* ---------- mana / color palette ---------- */
-/* Stylized-minimal mana palette: flat colored discs, glyph/letter cut in
-   near-white (reads as a cut-out on the light page). */
+/* Flat colored mana discs with a white glyph cut-out (white uses a dark glyph),
+   matching the Color Identity design's saturated disc set. */
 export const MANA: Record<string, { bg: string; fg: string; ring: string }> = {
-  W: { bg: "#dcd1a4", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
-  U: { bg: "#4a90c9", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
-  B: { bg: "#9b85b5", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
-  R: { bg: "#d96b45", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
-  G: { bg: "#58a877", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
-  C: { bg: "#b8b6ae", fg: "#fbfbf8", ring: "rgba(21,21,26,.08)" },
+  W: { bg: "#efe6c2", fg: "#7a6a32", ring: "rgba(0,0,0,.10)" },
+  U: { bg: "#3a82d8", fg: "#ffffff", ring: "rgba(0,0,0,.10)" },
+  B: { bg: "#6f5f7e", fg: "#ffffff", ring: "rgba(0,0,0,.10)" },
+  R: { bg: "#e0573f", fg: "#ffffff", ring: "rgba(0,0,0,.10)" },
+  G: { bg: "#4e9e6a", fg: "#ffffff", ring: "rgba(0,0,0,.10)" },
+  C: { bg: "#b6bcc6", fg: "#ffffff", ring: "rgba(0,0,0,.10)" },
 };
 export const COLOR_NAME: Record<string, string> = {
   W: "White",
@@ -135,7 +135,7 @@ export function Pip({ sym, size = 18 }: { sym: string; size?: number }) {
         fontWeight: 700,
         lineHeight: 1,
         fontFamily: "var(--font-ui)",
-        boxShadow: `inset 0 0 0 1px ${m.ring}`,
+        boxShadow: `inset 0 0 0 1px ${m.ring}, 0 1px 1.5px rgba(0,0,0,.2)`,
       }}
     >
       {isGlyph ? <ManaGlyph type={sym} color={m.fg} size={size * 0.86} /> : isMulti ? sym.replace("/", "") : sym}

@@ -680,28 +680,17 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             <div className="deck-pool" style={{ gap: 18, minWidth: 0 }}>
               <span className="mn-label" style={{ color: "var(--text-muted)" }}>Your pool</span>
               {/* search panel */}
-          <div style={{ background: "var(--bg2)", borderRadius: 16, padding: 18, border: "1px solid var(--line)" }}>
-            {/* mode tabs — underline style */}
-            <div style={{ display: "flex", gap: 22, borderBottom: "1px solid var(--line)", marginBottom: 16 }}>
+          <div style={{ background: "var(--surface)", backdropFilter: "blur(6px)", borderRadius: 18, padding: 18, border: "1px solid var(--line)" }}>
+            {/* mode tabs — segmented control */}
+            <div className="mn-seg" style={{ marginBottom: 16 }}>
               {(["ai", "scryfall", "name"] as const).map((mode) => (
                 <button
                   key={mode}
+                  type="button"
+                  data-on={searchMode === mode}
                   onClick={() => switchMode(mode)}
-                  style={{
-                    padding: "8px 2px 12px",
-                    border: "none",
-                    cursor: "pointer",
-                    background: "transparent",
-                    fontFamily: "var(--font-ui)",
-                    fontSize: 14,
-                    fontWeight: searchMode === mode ? 600 : 500,
-                    whiteSpace: "nowrap",
-                    color: searchMode === mode ? "var(--t1)" : "var(--t3)",
-                    boxShadow: searchMode === mode ? "inset 0 -2px 0 var(--accent)" : "none",
-                    transition: "all .12s",
-                  }}
                 >
-                  {mode === "ai" ? "AI" : mode === "scryfall" ? "Scryfall" : "Name"}
+                  {mode === "ai" ? "✦ AI" : mode === "scryfall" ? "Scryfall" : "Name"}
                 </button>
               ))}
             </div>
@@ -747,11 +736,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                             width: 32,
                             height: 32,
                             borderRadius: "50%",
-                            background: { w: "#dcd1a4", u: "#4a90c9", b: "#9b85b5", r: "#d96b45", g: "#58a877" }[c.code],
-                            color: "#fbfbf8",
+                            background: { w: "#efe6c2", u: "#3a82d8", b: "#6f5f7e", r: "#e0573f", g: "#4e9e6a" }[c.code],
+                            color: c.code === "w" ? "#7a6a32" : "#ffffff",
                             fontWeight: 700,
                             fontSize: 14,
-                            boxShadow: "inset 0 0 0 1px rgba(21,21,26,.08)",
+                            boxShadow: "inset 0 0 0 1px rgba(0,0,0,.1)",
                           }}
                         >
                           {c.label}
