@@ -768,3 +768,17 @@ button {
   .id-workspace[data-mobile-view="pool"] .id-deckcol { display: none; }
   .id-workspace[data-mobile-view="deck"] .id-poolcol { display: none; }
 }
+
+/* Pool candidate list: scrolls within the sticky panel on desktop, but flows
+   with the page on mobile (no nested scroll area). */
+.id-cardscroll {
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (max-width: 1023px) {
+  .id-cardscroll {
+    max-height: none;
+    overflow: visible;
+  }
+}
