@@ -163,6 +163,7 @@ export default function HomePage() {
           </div>
         </header>
 
+        {!me && (
         <div
           className="id-hero-grid"
           style={{ padding: "clamp(28px,5vw,68px) clamp(20px,4vw,52px) clamp(70px,8vw,108px)", maxWidth: 1240, margin: "0 auto" }}
@@ -198,11 +199,12 @@ export default function HomePage() {
           {/* fanned cards */}
           <CardFan />
         </div>
+        )}
       </div>
 
       {/* signed in: your decks + collection, on the blue field */}
       {me && (
-        <div style={{ maxWidth: 1180, width: "100%", margin: "0 auto", padding: "clamp(28px,4vw,52px) clamp(20px,4vw,52px) 0" }}>
+        <div style={{ maxWidth: 1180, width: "100%", margin: "0 auto", padding: "clamp(36px,5vw,64px) clamp(20px,4vw,52px) 0" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 30, flexWrap: "wrap" }}>
             <div>
               <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 12 }}>Your decks</div>

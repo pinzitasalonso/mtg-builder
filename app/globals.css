@@ -680,7 +680,7 @@ button {
   position: sticky;
   top: 78px;
 }
-@media (max-width: 940px) {
+@media (max-width: 1023px) {
   .id-workspace {
     grid-template-columns: 1fr;
   }
@@ -750,4 +750,10 @@ button {
   .id-fan {
     display: none !important;
   }
+}
+
+/* deck workspace — single-column mobile view toggle (mirrors .deck-layout) */
+@media (max-width: 1023px) {
+  .id-workspace[data-mobile-view="pool"] .id-deckcol { display: none; }
+  .id-workspace[data-mobile-view="deck"] .id-poolcol { display: none; }
 }
