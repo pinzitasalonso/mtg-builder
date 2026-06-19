@@ -40,6 +40,7 @@ export default function DeckChat({
   commander,
   ownedNames,
   onPoolChanged,
+  onEngaged,
 }: {
   deckId: number;
   pool: PoolEntry[];
@@ -47,6 +48,8 @@ export default function DeckChat({
   /** Card names from the player's collection — marks suggestions they own. */
   ownedNames: string[];
   onPoolChanged: () => void;
+  /** Reports when the user engages the chat (focus / conversation started). */
+  onEngaged?: (engaged: boolean) => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -181,6 +184,8 @@ export default function DeckChat({
   async function send(text: string) {
     const content = text.trim();
     if (!content || streaming) return;
+    // A started conversation keeps the chat engaged (and the pool wide).
+    onEngaged?.(true);
     // Sending re-pins to the bottom so the new turn (and its reply) scroll in.
     pinnedRef.current = true;
     const history = [...messages, { role: "user" as const, content }];
@@ -344,6 +349,8 @@ export default function DeckChat({
           className="cc-paper"
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          onFocus={() => onEngaged?.(true)}
+          onBlur={() => { if (messages.length === 0) onEngaged?.(false); }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();

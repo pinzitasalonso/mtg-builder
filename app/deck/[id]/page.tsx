@@ -205,6 +205,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [copied, setCopied] = useState<"" | "link" | "list">("");
   // deck-panel sort: by type (grouped), by cost (mv), or A–Z
   const [deckSort, setDeckSort] = useState<"type" | "cost" | "name">("type");
+  // The AI chat widens the pool, but only once you engage with it (focus the
+  // input or start a conversation) — not just because AI is the default mode.
+  const [aiEngaged, setAiEngaged] = useState(false);
 
   // settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -851,7 +854,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </button>
           </div>
 
-          <div className="id-workspace" data-mobile-view={mobileView} data-ai={searchMode === "ai" ? "true" : undefined}>
+          <div className="id-workspace" data-mobile-view={mobileView} data-ai={searchMode === "ai" && aiEngaged ? "true" : undefined}>
             {/* ── POOL ── */}
             <aside className="id-panel id-pool id-poolcol" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
@@ -1003,6 +1006,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 commander={deck?.commander}
                 ownedNames={ownedNames}
                 onPoolChanged={loadPool}
+                onEngaged={setAiEngaged}
               />
             ) : searchMode === "name" ? (
               <form onSubmit={addByName} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
