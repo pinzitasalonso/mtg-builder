@@ -402,7 +402,7 @@ button {
   gap: 6px;
   padding: 8px 0 12px;
   margin-bottom: 4px;
-  background: var(--bg);
+  background: transparent;
 }
 .deck-mobile-tabs button {
   flex: 1;

@@ -314,7 +314,7 @@ export default function DeckChat({
           e.preventDefault();
           send(input);
         }}
-        style={{ display: "flex", gap: 10, alignItems: "flex-end" }}
+        style={{ display: "flex", gap: 10, alignItems: "center" }}
       >
         <textarea
           className="cc-paper"
@@ -329,20 +329,23 @@ export default function DeckChat({
             }
           }}
           placeholder="Tell the assistant your idea…"
-          rows={2}
+          rows={1}
           disabled={streaming}
           style={{
             flex: 1,
+            height: 46,
             resize: "none",
+            overflow: "auto",
             border: "1px solid var(--line)",
             borderRadius: 12,
-            padding: "10px 12px",
+            padding: "12px 14px",
             fontFamily: "var(--font-body)",
             fontSize: 14.5,
-            lineHeight: 1.5,
+            lineHeight: 1.4,
             background: "var(--surface)",
             color: "var(--text)",
             outline: "none",
+            boxSizing: "border-box",
           }}
         />
         <button
@@ -350,8 +353,8 @@ export default function DeckChat({
           disabled={streaming || !input.trim()}
           style={{
             padding: "0 22px",
-            height: 44,
-            borderRadius: 999,
+            height: 46,
+            borderRadius: 12,
             border: "none",
             cursor: streaming || !input.trim() ? "default" : "pointer",
             background: "var(--accent)",
