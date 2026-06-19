@@ -10,13 +10,6 @@ interface ChatMessage {
   content: string;
 }
 
-const STARTERS = [
-  "I'm leaning artifact creatures over Eldrazi — what do you think?",
-  "What combos am I close to completing?",
-  "Suggest cheap card draw that fits my deck",
-  "How can I lower my mana curve?",
-];
-
 // Full-card image straight from Scryfall by name — used to preview cards that
 // aren't in the pool yet (pool cards reuse their stored image).
 function namedImageUrl(name: string): string {
@@ -305,35 +298,13 @@ export default function DeckChat({
         <div style={{ fontSize: 13.5, color: "var(--danger)", padding: "0 2px" }}>{error}</div>
       )}
 
-      {/* starter prompts (only before the first message) */}
+      {/* intro line (only before the first message) */}
       {empty && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-          <p style={{ margin: 0, fontSize: 14, color: "var(--text-muted)", lineHeight: 1.5 }}>
-            Describe an idea or a change to your deck. I&apos;ll talk it through, suggest cards (and combos).
-            Hover any card to preview it, tap to add it to your pool — or tap a card you already run to remove it.
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+          <span style={{ color: "var(--gold)", fontSize: 14, lineHeight: 1.5 }}>✦</span>
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--w-2, var(--text-muted))", lineHeight: 1.5 }}>
+            Describe what the deck needs — Spellpool pulls <b style={{ color: "var(--w-1, var(--text))" }}>real cards</b> in your color identity.
           </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {STARTERS.map((s) => (
-              <button
-                key={s}
-                onClick={() => send(s)}
-                style={{
-                  fontFamily: "var(--font-body)",
-                  fontSize: 13.5,
-                  textAlign: "left",
-                  padding: "7px 12px",
-                  borderRadius: 14,
-                  border: "none",
-                  cursor: "pointer",
-                  background: "transparent",
-                  color: "var(--accent)",
-                  boxShadow: "inset 0 0 0 1px var(--line)",
-                }}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
         </div>
       )}
 
