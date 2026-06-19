@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PoolEntry, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
 import { Block, InlineToken, cardNamesIn, parseBlocks } from "@/lib/chat-markdown";
+import { collectionByName } from "@/lib/scryfall";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -57,6 +58,14 @@ export default function DeckChat({
   const [bulkProgress, setBulkProgress] = useState<{ mode: "add" | "remove"; done: number; total: number } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
 
+  // lowercase name → exists-on-Scryfall, so the AI's hallucinated card names
+  // render as plain text instead of dead "couldn't find it" links.
+  const [checked, setChecked] = useState<Map<string, boolean>>(new Map());
+  const notFound = useMemo(
+    () => new Set([...checked].filter(([, ok]) => !ok).map(([k]) => k)),
+    [checked]
+  );
+
   const scrollRef = useRef<HTMLDivElement>(null);
   // lowercase name → pool row, for membership, dbId (remove) and stored image.
   const poolByLower = new Map(pool.map((c) => [c.name.toLowerCase(), c]));
@@ -66,6 +75,35 @@ export default function DeckChat({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  // Once a reply finishes, verify the cards it named against Scryfall (cards in
+  // the pool already exist, so skip those). Names Scryfall can't resolve are
+  // marked not-found and shown as plain text.
+  useEffect(() => {
+    if (streaming) return;
+    const names = new Set<string>();
+    for (const m of messages) {
+      if (m.role !== "assistant" || !m.content) continue;
+      for (const n of cardNamesIn(m.content)) {
+        const key = n.toLowerCase();
+        if (!checked.has(key) && !poolByLower.has(key)) names.add(n);
+      }
+    }
+    if (names.size === 0) return;
+    let cancelled = false;
+    collectionByName([...names]).then((found) => {
+      if (cancelled) return;
+      setChecked((prev) => {
+        const next = new Map(prev);
+        for (const n of names) next.set(n.toLowerCase(), found.has(n.toLowerCase()));
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, streaming]);
 
   // Click a card link: add it if it's not in the pool, otherwise remove that row
   // from the deck. Either way the pool reloads so the link's state flips.
@@ -230,6 +268,7 @@ export default function DeckChat({
                 content={m.content}
                 poolByLower={poolByLower}
                 ownedLower={ownedLower}
+                notFound={notFound}
                 busy={busy}
                 bulkBusy={bulkBusy}
                 bulkProgress={bulkProgress}
@@ -402,6 +441,7 @@ function AssistantMessage({
   content,
   poolByLower,
   ownedLower,
+  notFound,
   busy,
   bulkBusy,
   bulkProgress,
@@ -414,6 +454,7 @@ function AssistantMessage({
   content: string;
   poolByLower: Map<string, PoolEntry>;
   ownedLower: Set<string>;
+  notFound: Set<string>;
   busy: Set<string>;
   bulkBusy: boolean;
   bulkProgress: { mode: "add" | "remove"; done: number; total: number } | null;
@@ -424,7 +465,8 @@ function AssistantMessage({
   onRemoveAll: (names: string[]) => void;
 }) {
   const names = cardNamesIn(content);
-  const toAdd = names.filter((n) => !poolByLower.has(n.toLowerCase()));
+  // Skip cards Scryfall couldn't resolve — they can't be added.
+  const toAdd = names.filter((n) => !poolByLower.has(n.toLowerCase()) && !notFound.has(n.toLowerCase()));
   const toRemove = names.filter((n) => poolByLower.has(n.toLowerCase()));
   // Only worth a bulk bar when the answer suggests more than one card.
   const showBar = showActions && names.length > 1 && (toAdd.length > 0 || toRemove.length > 0);
@@ -434,6 +476,7 @@ function AssistantMessage({
         text={content}
         poolByLower={poolByLower}
         ownedLower={ownedLower}
+        notFound={notFound}
         busy={busy}
         onCard={onCard}
         onPreview={onPreview}
@@ -496,6 +539,7 @@ function ChatMarkdown({
   text,
   poolByLower,
   ownedLower,
+  notFound,
   busy,
   onCard,
   onPreview,
@@ -503,6 +547,7 @@ function ChatMarkdown({
   text: string;
   poolByLower: Map<string, PoolEntry>;
   ownedLower: Set<string>;
+  notFound: Set<string>;
   busy: Set<string>;
   onCard: (name: string) => void;
   onPreview: (p: Preview | null) => void;
@@ -518,6 +563,15 @@ function ChatMarkdown({
             {t.value}
           </strong>
         );
+      // A name Scryfall couldn't resolve (an AI slip) — show it plainly, not as
+      // a clickable card that would only fail to add.
+      if (notFound.has(t.value.toLowerCase())) {
+        return (
+          <span key={key} title="Not a real card on Scryfall" style={{ fontWeight: 600, color: "var(--text-muted)" }}>
+            {t.value}
+          </span>
+        );
+      }
       const entry = poolByLower.get(t.value.toLowerCase());
       return (
         <CardLink
