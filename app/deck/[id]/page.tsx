@@ -4,6 +4,7 @@ import { use, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Logo from "@/components/Logo";
 import SwipeModal from "@/components/SwipeModal";
 import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import JudgeModal from "@/components/deck/JudgeModal";
@@ -27,7 +28,20 @@ import {
   manaValue,
   deckTarget,
   TYPE_ORDER,
+  COLOR_NAME,
 } from "@/components/mtg";
+
+// Category accent colours for the composition matrix (matches the design).
+const CAT_COLOR: Record<string, string> = {
+  Creatures: "#f5c425",
+  Instants: "#7fb8ff",
+  Sorceries: "#b5d6ff",
+  Artifacts: "#d7dbe2",
+  Enchantments: "#e3b3ff",
+  Planeswalkers: "#ffcf8a",
+  Lands: "#d9bd8a",
+  Other: "#cfd3da",
+};
 
 type SearchCard = OutCard;
 type PoolCard = PoolEntry;
@@ -183,6 +197,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
   const [nameAdding, setNameAdding] = useState(false);
+
+  // header tools dropdown + play-guide popover
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [copied, setCopied] = useState<"" | "link" | "list">("");
 
   // settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -477,6 +496,20 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     setSettingsOpen(true);
   }
 
+  function flash(which: "link" | "list") {
+    setCopied(which);
+    setTimeout(() => setCopied(""), 1600);
+  }
+  function copyLink() {
+    navigator.clipboard?.writeText(window.location.href).then(() => flash("link")).catch(() => {});
+  }
+  function copyDecklist() {
+    const lines: string[] = [];
+    if (deck?.commander) lines.push(`1 ${deck.commander}`);
+    for (const c of deckCards) if (c.name !== deck?.commander) lines.push(`${c.quantity} ${c.name}`);
+    navigator.clipboard?.writeText(lines.join("\n")).then(() => flash("list")).catch(() => {});
+  }
+
   async function saveSettings(e: React.FormEvent) {
     e.preventDefault();
     if (!edit.name.trim()) return;
@@ -599,55 +632,186 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   return (
     <main style={{ flex: 1 }}>
       <div className="deck-theme" style={{ ...theme.vars, background: theme.bg, color: theme.text, minHeight: "100vh" }}>
-        {/* slim top bar */}
-        <div
+        {/* top nav — logo + tools / share / buy list / edit deck */}
+        <header
           style={{
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "16px 22px",
+            padding: "14px clamp(16px,4vw,52px)",
             position: "sticky",
             top: 0,
-            zIndex: 20,
-            background: "transparent",
+            zIndex: 30,
+            background: "color-mix(in srgb, var(--bg) 72%, transparent)",
+            backdropFilter: "blur(14px)",
+            borderBottom: "1px solid var(--w-line)",
             gap: 12,
           }}
         >
-          <Link href="/" aria-label="Back to decks" style={{ ...plateBtn, width: 36, height: 36, fontSize: 18, background: "var(--bg3)", color: "var(--text)" }}>
-            ‹
+          <Link href="/" aria-label="Spellpool home" style={{ textDecoration: "none" }}>
+            <Logo size={18} />
           </Link>
-          <button onClick={openSettings} style={{ ...plateBtn, width: 36, height: 36, fontSize: 15, background: "var(--bg3)", color: "var(--text)" }} title="Deck settings" aria-label="Deck settings">
-            ⚙
-          </button>
-        </div>
-
-        <div style={{ maxWidth: 1240, margin: "0 auto", padding: "10px 22px 80px" }}>
-          {/* title */}
-          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 28, minWidth: 0 }}>
-            {identityPips.length > 0 && <ColorPips colors={identityPips} size={28} />}
-            <div style={{ minWidth: 0 }}>
-              <h1
-                style={{
-                  margin: 0,
-                  fontFamily: "var(--font-display)",
-                  fontSize: "clamp(34px, 6.5vw, 64px)",
-                  fontWeight: 800,
-                  letterSpacing: ".015em",
-                  textTransform: "uppercase",
-                  lineHeight: 0.98,
-                  color: "var(--text)",
-                  textShadow: "0 2px 0 rgba(0,0,0,.12)",
-                }}
-              >
-                {deck?.commander || deck?.name || "…"}
-              </h1>
-              {deck && (
-                <div style={{ marginTop: 5, fontSize: 14, color: "var(--text-muted)" }}>
-                  {deck.name} · {deck.format}
-                </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative" }}>
+            <div style={{ position: "relative" }}>
+              <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setToolsOpen((v) => !v)}>
+                Tools ▾
+              </button>
+              {toolsOpen && (
+                <>
+                  <div onClick={() => setToolsOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+                  <div
+                    className="id-card"
+                    style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 41, width: 210, padding: 6, display: "flex", flexDirection: "column", gap: 2 }}
+                  >
+                    {[
+                      { label: "✨ AI judge", on: () => setJudgeOpen(true), disabled: pool.length === 0 },
+                      { label: "🎲 Sample hand", on: () => setHandSimOpen(true), disabled: deckCards.length === 0 },
+                      { label: "📝 Play guide", on: () => setNotesOpen((v) => !v) },
+                      { label: "🌲 Add lands & staples", on: () => setTool("lands") },
+                      { label: "⬆ Export / import", on: () => setTool("export") },
+                    ].map((it) => (
+                      <button
+                        key={it.label}
+                        onClick={() => { if (!it.disabled) { it.on(); setToolsOpen(false); } }}
+                        disabled={it.disabled}
+                        style={{ textAlign: "left", padding: "9px 11px", borderRadius: 9, border: "none", background: "transparent", color: "var(--ink)", fontFamily: "var(--font-ui)", fontSize: 13.5, fontWeight: 600, cursor: it.disabled ? "default" : "pointer", opacity: it.disabled ? 0.45 : 1 }}
+                      >
+                        {it.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
+            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={copyLink}>
+              {copied === "link" ? "Copied!" : "Share"}
+            </button>
+            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setOrderOpen(true)} disabled={deckCards.length === 0}>
+              Buy list
+            </button>
+            <button className="id-btn" style={{ padding: "10px 18px" }} onClick={openSettings}>
+              Edit deck
+            </button>
           </div>
+        </header>
+
+        <div style={{ maxWidth: 1180, margin: "0 auto", padding: "12px clamp(16px,4vw,52px) 80px" }}>
+          {/* breadcrumb */}
+          <Link href="/" style={{ display: "inline-block", color: "var(--w-3)", fontSize: 13, textDecoration: "none", marginBottom: 6 }}>
+            ← All decks
+          </Link>
+
+          {/* HERO — copy + commander card with progress badge */}
+          <div className="id-hero-grid" style={{ alignItems: "center", padding: "clamp(14px,3vw,32px) 0 clamp(22px,3vw,40px)" }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 16 }}>
+                {identityPips.length > 0 && <ColorPips colors={identityPips} size={22} />}
+                <span className="id-mono" style={{ fontSize: 12.5, color: "var(--w-2)", textTransform: "capitalize" }}>
+                  {deck?.format}{identityPips.length ? ` · ${identityPips.map((c) => COLOR_NAME[c]).join(" / ")}` : ""}
+                </span>
+              </div>
+              <h1 className="id-display" style={{ margin: "0 0 12px", fontSize: "clamp(40px, 7vw, 84px)", color: "var(--w-1)" }}>
+                {deck?.name || "…"}
+              </h1>
+              {deck?.commander && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24, fontSize: 14, color: "var(--w-2)" }}>
+                  Helmed by <b style={{ color: "var(--w-1)" }}>{deck.commander}</b>
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 13, flexWrap: "wrap" }}>
+                <button className="id-btn" style={{ padding: "14px 24px", fontSize: 15.5 }} onClick={() => setHandSimOpen(true)} disabled={deckCards.length === 0}>
+                  ▶ Playtest hand
+                </button>
+                <button className="id-ghost" style={{ padding: "13px 20px" }} onClick={copyDecklist} disabled={deckCards.length === 0}>
+                  {copied === "list" ? "Copied!" : "Copy decklist"}
+                </button>
+              </div>
+            </div>
+
+            {/* commander showcase + progress badge */}
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ position: "relative", width: "min(280px, 78vw)" }}>
+                <div style={{ aspectRatio: "5 / 7", borderRadius: 16, overflow: "hidden", boxShadow: "0 30px 60px -24px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.1)" }}>
+                  <CardArt name={deck?.commander || deck?.name || ""} colors={identityPips.length ? identityPips : ["C"]} version="normal" radius={16} style={{ width: "100%", height: "100%" }} />
+                </div>
+                <div className="id-card" style={{ position: "absolute", bottom: -18, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 11, padding: "10px 16px", whiteSpace: "nowrap" }}>
+                  <span className="id-display" style={{ fontSize: 26, color: "var(--ink)" }}>
+                    {deckCount}<span style={{ color: "#b3aebd", fontSize: 18 }}>/{target}</span>
+                  </span>
+                  <div style={{ width: 64, height: 6, borderRadius: 4, background: "#ece9f1", overflow: "hidden" }}>
+                    <div style={{ width: `${Math.min(1, deckCount / Math.max(1, target)) * 100}%`, height: "100%", background: "var(--gold)", borderRadius: 4 }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* STAT STRIP — mana curve · composition · color identity */}
+          {statsOnDeck && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "28px 0", padding: "24px 0", margin: "0 0 8px", borderTop: "1px solid var(--w-line)", borderBottom: "1px solid var(--w-line)" }}>
+              <div style={{ padding: "0 clamp(0px,2vw,28px) 0 0", flex: 1, minWidth: 220 }}>
+                <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 14 }}>Mana curve</div>
+                <ManaCurve
+                  curve={stats.curve}
+                  accent="var(--gold)"
+                  onHoverBar={(i) => setDeckFilter(i === null ? null : { kind: "mv", value: i })}
+                  onClickBar={(i) => startDeckReviewOf(deckCards.filter((c) => categoryOf(c.typeLine) !== "Lands" && Math.min(manaValue(c.manaCost), 7) === i))}
+                />
+              </div>
+              <div style={{ width: 1, background: "var(--w-line)", alignSelf: "stretch" }} />
+              <div style={{ padding: "0 clamp(18px,2.4vw,32px)", flex: 1, minWidth: 220 }}>
+                <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 14 }}>Composition · {deckCards.length} cards</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 12 }}>
+                  {deckStats(deckCards).types.flatMap((t) =>
+                    Array.from({ length: t.n }).map((_, i) => (
+                      <span key={t.name + i} style={{ width: 9, height: 9, borderRadius: 2.5, background: CAT_COLOR[t.name] || "#ccc" }} />
+                    ))
+                  )}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 14px" }}>
+                  {deckStats(deckCards).types.map((t) => (
+                    <span key={t.name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--w-2)" }}>
+                      <span style={{ width: 9, height: 9, borderRadius: 2.5, background: CAT_COLOR[t.name] || "#ccc" }} />
+                      {t.name} <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{t.n}</b>
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ width: 1, background: "var(--w-line)", alignSelf: "stretch" }} />
+              <div style={{ padding: "0 0 0 clamp(18px,2.4vw,32px)", flex: 1, minWidth: 200 }}>
+                <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 14 }}>Color identity</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  {identityPips.length > 0 && <ColorPips colors={identityPips} size={24} />}
+                  <span className="id-display" style={{ fontSize: 24, color: "var(--w-1)" }}>
+                    {identityPips.length ? identityPips.map((c) => COLOR_NAME[c]).join("·") : "Colorless"}
+                  </span>
+                </div>
+                <p style={{ fontSize: 12.5, color: "var(--w-2)", margin: 0, lineHeight: 1.45 }}>
+                  Avg. mana value <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{stats.avgMv.toFixed(1)}</b> · metrics track the deck.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* play guide — revealed from the Tools menu */}
+          {notesOpen && (
+            <div className="id-panel" style={{ padding: 16, marginBottom: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                <span className="id-label" style={{ color: "var(--w-2)" }}>Play guide</span>
+                <span className="id-label" style={{ fontSize: 10, color: noteStatus === "saving" ? "var(--w-3)" : "var(--gold)" }}>
+                  {noteStatus === "saving" ? "Saving…" : noteStatus === "saved" ? "Saved" : ""}
+                </span>
+              </div>
+              <textarea
+                value={notes}
+                onChange={(e) => onNotesChange(e.target.value)}
+                onBlur={() => { if (noteTimer.current) clearTimeout(noteTimer.current); saveNotes(notes); }}
+                placeholder="How does this deck play? Mulligans, key lines, win routes…"
+                rows={4}
+                style={{ width: "100%", border: "none", outline: "none", resize: "vertical", background: "transparent", fontFamily: "var(--font-body)", fontSize: 14.5, lineHeight: 1.55, color: "var(--text)", minHeight: 76, padding: 0 }}
+              />
+            </div>
+          )}
 
           {/* mobile pool/deck switcher — sticky segmented control, hidden ≥1024px */}
           <div className="deck-mobile-tabs">
@@ -925,128 +1089,31 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
         {/* ── right: YOUR DECK rail ── */}
         <aside className="deck-sidebar" style={{ gap: 16 }}>
-          {/* play guide (notes) */}
-          <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <span className="mn-label" style={{ color: "var(--text-muted)" }}>Play guide</span>
-              <span className="mn-label" style={{ fontSize: 10, color: noteStatus === "saving" ? "var(--text-dim)" : "var(--accent)" }}>
-                {noteStatus === "saving" ? "Saving…" : noteStatus === "saved" ? "Saved" : ""}
-              </span>
-            </div>
-            <textarea
-              value={notes}
-              onChange={(e) => onNotesChange(e.target.value)}
-              onBlur={() => {
-                if (noteTimer.current) clearTimeout(noteTimer.current);
-                saveNotes(notes);
-              }}
-              placeholder="How does this deck play? Mulligans, key lines, win routes…"
-              rows={4}
-              style={{
-                width: "100%",
-                border: "none",
-                outline: "none",
-                resize: "vertical",
-                background: "transparent",
-                fontFamily: "var(--font-body)",
-                fontSize: 14.5,
-                lineHeight: 1.55,
-                color: "var(--text)",
-                minHeight: 76,
-                padding: 0,
-              }}
-            />
-          </div>
-
-          {/* your deck header + review + buy */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+          {/* your deck header + review */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
             <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--text)" }}>
               Your deck
             </span>
-            <div style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
-              <button
-                onClick={() => startDeckReview()}
-                disabled={deckCards.length === 0}
-                title="Swipe through the deck — right keeps, left removes from the deck"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "7px 13px",
-                  borderRadius: 999,
-                  border: "1px solid var(--line)",
-                  cursor: deckCards.length ? "pointer" : "default",
-                  background: "var(--bg3)",
-                  color: "var(--text)",
-                  fontWeight: 600,
-                  fontSize: 13.5,
-                  opacity: deckCards.length ? 1 : 0.5,
-                }}
-              >
-                ✓ Review
-              </button>
-              <button
-                onClick={() => setOrderOpen(true)}
-                disabled={deckCards.length === 0}
-                title="Order the deck on CardTrader"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "7px 15px",
-                  borderRadius: 999,
-                  border: "none",
-                  cursor: deckCards.length ? "pointer" : "default",
-                  background: "var(--accent)",
-                  color: "var(--accent-ink)",
-                  fontWeight: 700,
-                  fontSize: 13.5,
-                  opacity: deckCards.length ? 1 : 0.5,
-                }}
-              >
-                🛒 Buy
-              </button>
-            </div>
-          </div>
-
-          {/* mana curve + dot-grid meter — hover filters the decklist below;
-              click opens a deck review scoped to that mana value / type */}
-          <div style={{ display: "flex", gap: 16, alignItems: "flex-end", justifyContent: "space-between" }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <ManaCurve
-                curve={stats.curve}
-                accent="rgba(255,255,255,.9)"
-                onHoverBar={(i) => setDeckFilter(i === null ? null : { kind: "mv", value: i })}
-                onClickBar={(i) => {
-                  const filtered = deckCards.filter((c) => {
-                    if (categoryOf(c.typeLine) === "Lands") return false;
-                    return Math.min(manaValue(c.manaCost), 7) === i;
-                  });
-                  startDeckReviewOf(filtered);
-                }}
-              />
-            </div>
-            <DotGrid
-              types={deckStats(deckCards).types}
-              count={deckCount}
-              target={target}
-              empty={theme.dotEmpty}
-              onHoverType={(name) => setDeckFilter(name === null ? null : { kind: "type", value: name })}
-              onClickType={(name) => {
-                const filtered = deckCards.filter((c) => categoryOf(c.typeLine) === name);
-                startDeckReviewOf(filtered);
+            <button
+              onClick={() => startDeckReview()}
+              disabled={deckCards.length === 0}
+              title="Swipe through the deck — right keeps, left removes from the deck"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "7px 13px",
+                borderRadius: 999,
+                border: "1px solid var(--w-line-2)",
+                cursor: deckCards.length ? "pointer" : "default",
+                background: "var(--w-fill)",
+                color: "var(--text)",
+                fontWeight: 600,
+                fontSize: 13.5,
+                opacity: deckCards.length ? 1 : 0.5,
               }}
-            />
-          </div>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontSize: 13, color: "var(--text-muted)", marginTop: -6 }}>
-            <span>
-              <b style={{ color: "var(--text)" }}>{deckCount}</b> / {target}
-            </span>
-            <span>
-              avg MV <b style={{ color: "var(--text)" }}>{stats.avgMv.toFixed(1)}</b>
-            </span>
-            <button onClick={() => setHandSimOpen(true)} title="Draw sample opening hands" style={{ background: "transparent", border: "none", color: "var(--accent)", cursor: "pointer", fontSize: 13, padding: 0 }}>
-              🎲 Hand
+            >
+              ✓ Review
             </button>
           </div>
           {warningCount > 0 && (
