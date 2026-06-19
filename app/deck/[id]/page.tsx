@@ -25,6 +25,7 @@ import {
   ManaCurve,
   deckStats,
   categoryOf,
+  colorsOf,
   manaValue,
   deckTarget,
   TYPE_ORDER,
@@ -202,6 +203,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [toolsOpen, setToolsOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [copied, setCopied] = useState<"" | "link" | "list">("");
+  // deck-panel sort: by type (grouped), by cost (mv), or A–Z
+  const [deckSort, setDeckSort] = useState<"type" | "cost" | "name">("type");
 
   // settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -642,7 +645,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             position: "sticky",
             top: 0,
             zIndex: 30,
-            background: "color-mix(in srgb, var(--bg) 72%, transparent)",
+            background: "rgba(14,11,24,.72)",
             backdropFilter: "blur(14px)",
             borderBottom: "1px solid var(--w-line)",
             gap: 12,
@@ -732,7 +735,16 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             <div style={{ display: "flex", justifyContent: "center" }}>
               <div style={{ position: "relative", width: "min(280px, 78vw)" }}>
                 <div style={{ aspectRatio: "5 / 7", borderRadius: 16, overflow: "hidden", boxShadow: "0 30px 60px -24px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.1)" }}>
-                  <CardArt name={deck?.commander || deck?.name || ""} colors={identityPips.length ? identityPips : ["C"]} version="normal" radius={16} style={{ width: "100%", height: "100%" }} />
+                  {(deck?.commander || deck?.name) && (
+                    <CardArt
+                      key={deck?.commander || deck?.name}
+                      name={deck?.commander || deck?.name || ""}
+                      colors={identityPips.length ? identityPips : ["C"]}
+                      version="normal"
+                      radius={16}
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                  )}
                 </div>
                 <div className="id-card" style={{ position: "absolute", bottom: -18, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 11, padding: "10px 16px", whiteSpace: "nowrap" }}>
                   <span className="id-display" style={{ fontSize: 26, color: "var(--ink)" }}>
@@ -839,25 +851,24 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </button>
           </div>
 
-          <div className="deck-layout" data-mobile-view={mobileView}>
-            {/* ── left: YOUR POOL ── */}
-            <div className="deck-pool" style={{ gap: 18, minWidth: 0 }}>
-              <span className="mn-label" style={{ color: "var(--text-muted)" }}>Your pool</span>
-              {/* search panel */}
-          <div style={{ background: "var(--surface)", backdropFilter: "blur(6px)", borderRadius: 18, padding: 18, border: "1px solid var(--line)" }}>
-            {/* mode tabs — segmented control */}
-            <div className="mn-seg" style={{ marginBottom: 16 }}>
-              {(["ai", "scryfall", "name"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  data-on={searchMode === mode}
-                  onClick={() => switchMode(mode)}
-                >
-                  {mode === "ai" ? "✦ AI" : mode === "scryfall" ? "Scryfall" : "Name"}
-                </button>
-              ))}
-            </div>
+          <div className="id-workspace" data-mobile-view={mobileView}>
+            {/* ── POOL ── */}
+            <aside className="id-panel id-pool id-poolcol" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
+                  <span className="id-display" style={{ fontSize: 24, color: "var(--w-1)" }}>Pool</span>
+                  <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>{poolCards.reduce((s, c) => s + c.quantity, 0)} candidates</span>
+                </div>
+                <div className="id-seg">
+                  {(["ai", "scryfall", "name"] as const).map((mode) => (
+                    <button key={mode} type="button" data-on={searchMode === mode} onClick={() => switchMode(mode)}>
+                      {mode === "ai" ? "✦ Ask AI" : mode === "scryfall" ? "Search" : "Name"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* search body */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
             {/* scryfall filters */}
             {searchMode === "scryfall" && (
@@ -1045,117 +1056,115 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
 
-          {/* pool actions */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-            <span style={{ fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--text)" }}>
-              {poolCards.reduce((s, c) => s + c.quantity, 0)} cards
-            </span>
-            <div style={{ display: "inline-flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              <HeaderAction onClick={() => startReview()} disabled={poolCards.length === 0} title="Swipe through the pool — right promotes to the deck, left removes from the pool">
+          {poolCards.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -2 }}>
+              <button onClick={() => startReview()} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }}>
                 ✓ Review pool
-              </HeaderAction>
-              <HeaderAction gold onClick={() => setJudgeOpen(true)} disabled={pool.length === 0} title="AI judge — review the pool">
-                ✨ Judge
-              </HeaderAction>
-              <HeaderAction onClick={() => setTool("lands")} title="Bulk-add lands & staples">
-                🌲 Lands
-              </HeaderAction>
+              </button>
             </div>
-          </div>
-          <div>
+          )}
+
+          {/* candidate list */}
+          <div className="id-scroll" style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: "calc(100vh - 220px)", paddingRight: 2 }}>
             {poolCards.length === 0 ? (
-              <div style={{ padding: "44px 20px", textAlign: "center", color: "var(--text-muted)", borderRadius: 14, border: "1px dashed var(--line)" }}>
+              <div style={{ padding: "40px 16px", textAlign: "center", color: "var(--w-3)", borderRadius: 14, border: "1px dashed var(--w-line)", fontSize: 13.5 }}>
                 {pool.length === 0
-                  ? "No cards yet — search above to begin filling the pool."
+                  ? "Ask for cards above to fill the pool."
                   : "Pool is empty — every card has been promoted to the deck."}
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 14 }}>
-                {poolCards.map((card) => (
-                  <PoolImageCard
-                    key={card.dbId}
-                    card={card}
-                    warning={warningOf(card)}
-                    owned={ownedSet.has(card.name.toLowerCase())}
-                    onOpen={() => startReview(card)}
-                    onMove={() => moveTo(card.dbId, "deck")}
-                    onRemove={() => removeCard(card.dbId)}
-                  />
-                ))}
-              </div>
+              poolCards.map((card) => (
+                <IdCardLine
+                  key={card.dbId}
+                  card={card}
+                  owned={ownedSet.has(card.name.toLowerCase())}
+                  warning={warningOf(card)}
+                  onOpen={() => startReview(card)}
+                  trailing={
+                    <button className="id-add" title="Add to deck" onClick={(e) => { e.stopPropagation(); moveTo(card.dbId, "deck"); }}>+</button>
+                  }
+                />
+              ))
             )}
           </div>
-        </div>
+        </aside>
 
-        {/* ── right: YOUR DECK rail ── */}
-        <aside className="deck-sidebar" style={{ gap: 16 }}>
-          {/* your deck header + review */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-            <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".03em", color: "var(--text)" }}>
-              Your deck
-            </span>
-            <button
-              onClick={() => startDeckReview()}
-              disabled={deckCards.length === 0}
-              title="Swipe through the deck — right keeps, left removes from the deck"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "7px 13px",
-                borderRadius: 999,
-                border: "1px solid var(--w-line-2)",
-                cursor: deckCards.length ? "pointer" : "default",
-                background: "var(--w-fill)",
-                color: "var(--text)",
-                fontWeight: 600,
-                fontSize: 13.5,
-                opacity: deckCards.length ? 1 : 0.5,
-              }}
-            >
-              ✓ Review
-            </button>
+        {/* ── THE DECK ── */}
+        <section className="id-panel id-deckcol" style={{ padding: "18px clamp(14px,2vw,24px)" }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+              <span className="id-display" style={{ fontSize: "clamp(26px,3vw,38px)", color: "var(--w-1)" }}>The deck</span>
+              <span className="id-mono" style={{ fontSize: 13, color: "var(--w-1)", fontWeight: 600 }}>
+                {deckCount}<span style={{ color: "var(--w-3)" }}>/{target}</span>
+                <span style={{ color: "var(--w-3)", marginLeft: 8 }}>· {Math.max(0, target - deckCount)} to go</span>
+              </span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="id-seg">
+                {([["type", "By type"], ["cost", "By cost"], ["name", "A–Z"]] as const).map(([k, label]) => (
+                  <button key={k} type="button" data-on={deckSort === k} onClick={() => setDeckSort(k)}>{label}</button>
+                ))}
+              </div>
+              <button onClick={() => startDeckReview()} disabled={deckCards.length === 0} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }}>
+                ✓ Review
+              </button>
+            </div>
           </div>
           {warningCount > 0 && (
-            <div style={{ fontSize: 12.5, color: "var(--accent)" }}>
+            <div style={{ fontSize: 12.5, color: "var(--gold)", marginBottom: 12 }}>
               ⚠ {warningCount} card{warningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ on a card.
             </div>
           )}
 
-          {/* grouped decklist */}
           {deckCards.length === 0 ? (
-            <div style={{ padding: "26px 16px", textAlign: "center", color: "var(--text-muted)", border: "1px dashed var(--line)", borderRadius: 12, fontSize: 13.5 }}>
-              Nothing here yet — promote cards from the pool with ⤴, or use “Review pool”.
+            <div style={{ padding: "54px 20px", textAlign: "center", color: "var(--w-3)" }}>
+              <div className="id-display" style={{ fontSize: 26, color: "var(--w-2)", marginBottom: 8 }}>Empty deck</div>
+              <div style={{ fontSize: 13.5 }}>Add cards from the pool with + to start building toward {target}.</div>
+            </div>
+          ) : deckSort === "type" ? (
+            <div>
+              {(() => {
+                const commander = deckCards.find((c) => c.name === deck?.commander);
+                const rest = deckCards.filter((c) => c.name !== deck?.commander);
+                return (
+                  <>
+                    {commander && (
+                      <div style={{ marginBottom: 22, maxWidth: 520 }}>
+                        <DeckSectionHead cat="Commander" n={1} />
+                        <IdCardLine card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} onOpen={() => startDeckReview(commander)} />
+                      </div>
+                    )}
+                    <div style={{ columnWidth: 300, columnGap: 22 }}>
+                      {groupedFor(rest)
+                        .map((g) => ({ t: g.t, cards: g.cards.filter(matchesDeckFilter) }))
+                        .filter((g) => g.cards.length)
+                        .map((g) => (
+                          <div key={g.t} style={{ breakInside: "avoid", marginBottom: 22, display: "flex", flexDirection: "column", gap: 8 }}>
+                            <DeckSectionHead cat={g.t} n={g.cards.reduce((s, c) => s + c.quantity, 0)} />
+                            {g.cards.map((c) => (
+                              <IdCardLine key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} onOpen={() => startDeckReview(c)}
+                                trailing={<button className="id-del" title="Remove from deck" onClick={(e) => { e.stopPropagation(); removeCard(c.dbId); }}>×</button>} />
+                            ))}
+                          </div>
+                        ))}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {groupedFor(deckCards)
-                .map((g) => ({ t: g.t, cards: g.cards.filter(matchesDeckFilter) }))
-                .filter((g) => g.cards.length)
-                .map((g) => (
-                  <div key={g.t}>
-                    <div className="mn-label" style={{ color: "var(--text-muted)", marginBottom: 8, display: "flex", gap: 8, alignItems: "baseline" }}>
-                      {g.t}
-                      <span style={{ color: "var(--text-dim)" }}>{g.cards.reduce((s, c) => s + c.quantity, 0)}</span>
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                      {g.cards.map((c) => (
-                        <DeckRailRow
-                          key={c.dbId}
-                          card={c}
-                          warning={warningOf(c)}
-                          owned={ownedSet.has(c.name.toLowerCase())}
-                          onOpen={() => startDeckReview(c)}
-                          onMove={() => moveTo(c.dbId, "pool")}
-                          onRemove={() => removeCard(c.dbId)}
-                        />
-                      ))}
-                    </div>
+            <div style={{ columnWidth: 300, columnGap: 22 }}>
+              {[...deckCards]
+                .sort((a, b) => deckSort === "cost" ? (manaValue(a.manaCost) - manaValue(b.manaCost)) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name))
+                .map((c) => (
+                  <div key={c.dbId} style={{ breakInside: "avoid", marginBottom: 8 }}>
+                    <IdCardLine card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} onOpen={() => startDeckReview(c)}
+                      trailing={c.name === deck?.commander ? null : <button className="id-del" title="Remove from deck" onClick={(e) => { e.stopPropagation(); removeCard(c.dbId); }}>×</button>} />
                   </div>
                 ))}
             </div>
           )}
-        </aside>
+        </section>
         </div>
         </div>
       </div>
@@ -1575,6 +1584,57 @@ const poolIconBtn: React.CSSProperties = {
 };
 
 /* Deck-rail row — white pill: thumbnail + name + type + mana pips. */
+/* White card row used in both panels: art thumb + name/type + mana + a trailing
+   action slot. Matches the Color Identity design's id-card rows. */
+function IdCardLine({
+  card,
+  owned,
+  warning,
+  onOpen,
+  trailing,
+}: {
+  card: PoolCard;
+  owned?: boolean;
+  warning?: string;
+  onOpen?: () => void;
+  trailing?: React.ReactNode;
+}) {
+  return (
+    <div
+      className="id-card id-deckrow"
+      onClick={onOpen}
+      style={{ display: "flex", alignItems: "center", gap: 12, padding: 8, cursor: onOpen ? "pointer" : "default" }}
+    >
+      <div style={{ position: "relative", width: 44, height: 44, borderRadius: 8, overflow: "hidden", flex: "none" }}>
+        <CardArt name={card.name} src={card.imageUri || undefined} colors={colorsOf(card.manaCost)} radius={0} style={{ position: "absolute", inset: 0 }} />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {card.quantity > 1 && <span style={{ fontSize: 12, fontWeight: 700, color: "#857f90", flex: "none" }}>{card.quantity}×</span>}
+          <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
+          {owned && <span title="In your collection" style={{ color: "#0d8a5f", fontSize: 12, fontWeight: 700, flex: "none" }}>✓</span>}
+          {warning && <span title={warning} style={{ color: "#c2402a", fontSize: 12, flex: "none" }}>⚠</span>}
+        </div>
+        <div style={{ fontSize: 11.5, color: "#857f90", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
+      </div>
+      <ManaCost cost={card.manaCost} size={14} />
+      {trailing}
+    </div>
+  );
+}
+
+/* Section header inside the deck panel: a category dot + label + count + rule. */
+function DeckSectionHead({ cat, n }: { cat: string; n: number }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 9, margin: "0 0 11px" }}>
+      <span style={{ width: 10, height: 10, borderRadius: 3, background: CAT_COLOR[cat] || "#ccc", flex: "none" }} />
+      <span className="id-label" style={{ color: "var(--w-1)", fontSize: 12.5 }}>{cat}</span>
+      <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>{n}</span>
+      <span style={{ flex: 1, height: 1, background: "var(--w-line)" }} />
+    </div>
+  );
+}
+
 function DeckRailRow({
   card,
   warning,

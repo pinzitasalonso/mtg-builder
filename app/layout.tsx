@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk, Bangers, IBM_Plex_Mono } from "next/font/google";
-import Link from "next/link";
-import Logo from "@/components/Logo";
 import "./globals.css";
 
 const hanken = Hanken_Grotesk({
@@ -54,30 +52,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`h-full ${hanken.variable} ${bangers.variable} ${plexMono.variable}`}>
       <body className="min-h-full flex flex-col">
         {children}
-        <footer
-          style={{
-            marginTop: "auto",
-            borderTop: "1px solid var(--line)",
-            padding: "20px 22px",
-          }}
-        >
-          <div
-            style={{
-              maxWidth: 1160,
-              margin: "0 auto",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-              flexWrap: "wrap",
-            }}
-          >
-            <Link href="/" aria-label="Spellpool home" style={{ textDecoration: "none" }}>
-              <Logo size={16} />
-            </Link>
-            <span className="mn-label">Powered by Claude + Scryfall</span>
-          </div>
-        </footer>
       </body>
     </html>
   );
