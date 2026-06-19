@@ -466,3 +466,288 @@ button {
     display: none; /* WebKit */
   }
 }
+
+/* ============================================================
+   Color Identity design system — ported from the Spellpool
+   "identity" reference. White-on-colour scales, gold buttons,
+   frosted panels, white card rows. Used by the home + deck views.
+   ============================================================ */
+:root {
+  --ink: #181228;            /* dark text on white panels / gold buttons */
+  --w-1: #ffffff;
+  --w-2: rgba(255, 255, 255, 0.78);
+  --w-3: rgba(255, 255, 255, 0.55);
+  --w-line: rgba(255, 255, 255, 0.18);
+  --w-line-2: rgba(255, 255, 255, 0.32);
+  --w-fill: rgba(255, 255, 255, 0.1);
+  --w-fill-2: rgba(255, 255, 255, 0.16);
+}
+
+/* display / marker headline */
+.id-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: 0.015em;
+  line-height: 0.96;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.1);
+}
+.id-label {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 11.5px;
+  letter-spacing: 0.16em;
+}
+.id-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* buttons */
+.id-btn {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 14.5px;
+  background: var(--gold);
+  color: var(--ink);
+  border: none;
+  cursor: pointer;
+  border-radius: 999px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.14s, box-shadow 0.14s, background 0.14s;
+  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.5);
+}
+.id-btn:hover {
+  background: var(--gold-bright);
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.55);
+}
+.id-btn:active {
+  transform: translateY(0);
+}
+.id-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+  transform: none;
+}
+.id-ghost {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 14px;
+  background: var(--w-fill);
+  color: var(--w-1);
+  border: 1px solid var(--w-line-2);
+  cursor: pointer;
+  border-radius: 999px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.14s;
+  backdrop-filter: blur(4px);
+  text-decoration: none;
+}
+.id-ghost:hover {
+  background: var(--w-fill-2);
+  border-color: var(--w-1);
+}
+.id-pill-gold {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  font-size: 13px;
+  background: transparent;
+  color: var(--gold);
+  border: 1.5px solid var(--gold);
+  cursor: pointer;
+  border-radius: 999px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.14s;
+}
+.id-pill-gold:hover {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+/* white floating panel (deck rows etc.) */
+.id-card {
+  background: #ffffff;
+  color: var(--ink);
+  border-radius: 14px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 10px 26px -16px rgba(0, 0, 0, 0.45);
+}
+
+/* frosted workspace panels */
+.id-panel {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--w-line);
+  border-radius: 18px;
+  backdrop-filter: blur(6px);
+}
+.id-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.id-seg {
+  display: inline-flex;
+  background: var(--w-fill);
+  border: 1px solid var(--w-line);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.id-seg button {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--w-2);
+  white-space: nowrap;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 999px;
+  transition: all 0.14s;
+}
+.id-seg button[data-on="true"] {
+  background: var(--gold);
+  color: var(--ink);
+}
+.id-finder {
+  width: 100%;
+  background: #fff;
+  border: none;
+  outline: none;
+  border-radius: 11px;
+  padding: 11px 13px;
+  font-family: var(--font-ui);
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.id-finder::placeholder {
+  color: #9a96a6;
+}
+.id-add,
+.id-del {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  cursor: pointer;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.14s;
+}
+.id-add {
+  background: var(--gold);
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 700;
+}
+.id-add:hover {
+  transform: scale(1.08);
+}
+.id-del {
+  background: #f0edf4;
+  color: #8a8494;
+  font-size: 16px;
+  opacity: 0;
+}
+.id-deckrow:hover .id-del {
+  opacity: 1;
+}
+.id-del:hover {
+  background: #ffe2e2;
+  color: #d4493f;
+}
+
+/* two-panel builder workspace */
+.id-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 392px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.id-pool {
+  position: sticky;
+  top: 78px;
+}
+@media (max-width: 940px) {
+  .id-workspace {
+    grid-template-columns: 1fr;
+  }
+  .id-pool {
+    position: static;
+  }
+}
+
+@keyframes id-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes id-pop {
+  from {
+    transform: translateY(-5px) scale(0.97);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes id-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-9px);
+  }
+}
+@keyframes id-float-sm {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+@keyframes id-deal {
+  from {
+    opacity: 0;
+    transform: translateY(46px) scale(0.93);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* home hero — two-up on desktop, stacked (fan hidden) on small screens */
+.id-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 40px;
+  align-items: center;
+}
+@media (max-width: 880px) {
+  .id-hero-grid {
+    grid-template-columns: 1fr;
+  }
+  .id-fan {
+    display: none !important;
+  }
+}
