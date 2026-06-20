@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
+import { ensureCommanderCard } from "@/lib/commander";
 
 const MAX_QTY = 999;
 
@@ -11,6 +12,8 @@ export async function GET(
   const user = await currentUser();
   const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
+  // Commander decks always carry their commander on the deck board.
+  await ensureCommanderCard(deck);
   const cards = await prisma.poolCard.findMany({
     where: { deckId: deck.id },
     orderBy: { addedAt: "asc" },

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseId } from "@/lib/api";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
+import { isCommanderCard } from "@/lib/commander";
 
 const MAX_QTY = 999;
 
@@ -39,6 +40,14 @@ export async function PATCH(
     return NextResponse.json({ error: "board or quantity required" }, { status: 400 });
   }
 
+  // The commander stays on the deck board — block moving it back to the pool.
+  if (data.board === "pool") {
+    const card = await prisma.poolCard.findFirst({ where: { id: cid, deckId }, select: { name: true } });
+    if (card && isCommanderCard(deck, card.name)) {
+      return NextResponse.json({ error: "The commander can't leave the deck." }, { status: 409 });
+    }
+  }
+
   const { count } = await prisma.poolCard.updateMany({ where: { id: cid, deckId }, data });
   if (count === 0) return NextResponse.json({ error: "card not found in deck" }, { status: 404 });
   const card = await prisma.poolCard.findUnique({ where: { id: cid } });
@@ -56,6 +65,11 @@ export async function DELETE(
   const deck = await accessibleDeckByPublicId(id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const deckId = deck.id;
+  // The commander can't be removed from a commander deck.
+  const target = await prisma.poolCard.findFirst({ where: { id: cid, deckId }, select: { name: true } });
+  if (target && isCommanderCard(deck, target.name)) {
+    return NextResponse.json({ error: "The commander can't be removed." }, { status: 409 });
+  }
   // Scoped to the deck so a card id from another deck can't be deleted through
   // this URL; deleteMany also makes a missing row a 404 instead of a 500.
   const { count } = await prisma.poolCard.deleteMany({ where: { id: cid, deckId } });

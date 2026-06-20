@@ -535,6 +535,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       const updated = await res.json();
       setDeck((d) => (d ? { ...d, name: updated.name, format: updated.format, commander: updated.commander } : d));
       setSettingsOpen(false);
+      // Pick up the (possibly new) auto-included commander card.
+      loadPool();
     }
     setSaving(false);
   }
@@ -550,6 +552,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const deckCards = pool.filter((c) => c.board === "deck");
   const poolCards = pool.filter((c) => c.board !== "deck");
   const deckCount = deckCards.reduce((s, c) => s + c.quantity, 0);
+
+  // The auto-included commander (commander decks) can't be removed or reviewed out.
+  const isCommander = (c: PoolCard) =>
+    (deck?.format ?? "").toLowerCase() === "commander" &&
+    !!deck?.commander &&
+    c.name.trim().toLowerCase() === deck.commander.trim().toLowerCase();
 
   // Review — triage the pool board: swipe right to promote into the deck, left
   // to drop from the pool. Opens on `startCard` when a pool tile is tapped.
@@ -567,7 +575,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   function startDeckReview(startCard?: PoolCard) {
     if (deckCards.length === 0) return;
     setSettingsOpen(false);
-    const ordered = groupedFor(deckCards).flatMap((g) => g.cards);
+    // The commander can't be discarded, so it's never part of the review.
+    const ordered = groupedFor(deckCards).flatMap((g) => g.cards).filter((c) => !isCommander(c));
+    if (ordered.length === 0) return;
     const idx = startCard ? ordered.findIndex((c) => c.dbId === startCard.dbId) : 0;
     setDeckReviewStart(idx < 0 ? 0 : idx);
     setDeckReviewCards(ordered);
@@ -580,7 +590,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     setSettingsOpen(false);
     const orderedAll = groupedFor(deckCards).flatMap((g) => g.cards);
     const ids = new Set(subset.map((c) => c.dbId));
-    const ordered = orderedAll.filter((c) => ids.has(c.dbId));
+    const ordered = orderedAll.filter((c) => ids.has(c.dbId) && !isCommander(c));
     if (ordered.length === 0) return;
     setDeckReviewStart(0);
     setDeckReviewCards(ordered);
@@ -1147,14 +1157,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           ) : deckSort === "type" ? (
             <div>
               {(() => {
-                const commander = deckCards.find((c) => c.name === deck?.commander);
-                const rest = deckCards.filter((c) => c.name !== deck?.commander);
+                const commander = deckCards.find(isCommander);
+                const rest = deckCards.filter((c) => !isCommander(c));
                 return (
                   <>
                     {commander && (
                       <div style={{ marginBottom: 22, maxWidth: 520 }}>
                         <DeckSectionHead cat="Commander" n={1} />
-                        <IdCardLine card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} onOpen={() => startDeckReview(commander)} />
+                        <IdCardLine card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} />
                       </div>
                     )}
                     <div style={{ columnWidth: 300, columnGap: 22 }}>
@@ -1182,7 +1192,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 .map((c) => (
                   <div key={c.dbId} style={{ breakInside: "avoid", marginBottom: 8 }}>
                     <IdCardLine card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} onOpen={() => startDeckReview(c)}
-                      trailing={c.name === deck?.commander ? null : <button className="id-del" title="Remove from deck" onClick={(e) => { e.stopPropagation(); removeCard(c.dbId); }}>×</button>} />
+                      trailing={isCommander(c) ? null : <button className="id-del" title="Remove from deck" onClick={(e) => { e.stopPropagation(); removeCard(c.dbId); }}>×</button>} />
                   </div>
                 ))}
             </div>
