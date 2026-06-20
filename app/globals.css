@@ -764,10 +764,11 @@ button {
   }
 }
 
-/* deck workspace — single-column mobile view toggle (mirrors .deck-layout) */
+/* deck workspace — single-column mobile view toggle (mirrors .deck-layout).
+   !important so it beats the panels' inline display values. */
 @media (max-width: 1023px) {
-  .id-workspace[data-mobile-view="pool"] .id-deckcol { display: none; }
-  .id-workspace[data-mobile-view="deck"] .id-poolcol { display: none; }
+  .id-workspace[data-mobile-view="pool"] .id-deckcol { display: none !important; }
+  .id-workspace[data-mobile-view="deck"] .id-poolcol { display: none !important; }
 }
 
 /* Pool candidate list: scrolls within the sticky panel on desktop, but flows
