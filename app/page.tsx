@@ -16,6 +16,7 @@ const heroField = getIdentityField("U");
 
 interface Deck {
   id: number;
+  publicId: string;
   name: string;
   format: string;
   commander: string | null;
@@ -103,11 +104,11 @@ export default function HomePage() {
     setForm({ name: "", format: "commander", commander: "" });
     setShowModal(false);
     setCreating(false);
-    if (created?.id) router.push(`/deck/${created.id}`);
+    if (created?.publicId) router.push(`/deck/${created.publicId}`);
     else loadAll();
   }
 
-  async function deleteDeck(id: number) {
+  async function deleteDeck(id: string) {
     if (!confirm("Delete this deck?")) return;
     await fetch(`/api/decks/${id}`, { method: "DELETE" });
     loadAll();
@@ -115,7 +116,7 @@ export default function HomePage() {
 
   // "See a sample deck" → open the first public brew, else scroll to the brews.
   function seeSample() {
-    if (publicDecks[0]) router.push(`/deck/${publicDecks[0].id}`);
+    if (publicDecks[0]) router.push(`/deck/${publicDecks[0].publicId}`);
     else document.getElementById("brews")?.scrollIntoView({ behavior: "smooth" });
   }
 
@@ -216,7 +217,7 @@ export default function HomePage() {
               <CStat n={formatCount} label="Formats" accent />
             </div>
           </div>
-          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.id}`)} onDelete={deleteDeck} onNew={() => setShowModal(true)} showNew={loaded} />
+          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onNew={() => setShowModal(true)} showNew={loaded} />
           <CollectionBlock unique={collection.unique} total={collection.total} sample={collection.sample} onOpen={() => setShowCollection(true)} />
           <div style={{ height: 64 }} />
         </div>
@@ -259,7 +260,7 @@ export default function HomePage() {
             </div>
             <button className="id-pill-gold" style={{ padding: "11px 20px" }} onClick={() => setShowModal(true)}>New brew →</button>
           </div>
-          <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.id}`)} onDelete={deleteDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
+          <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
         </div>
       </div>
 
@@ -456,14 +457,14 @@ function DeckTable({
 }: {
   decks: Deck[];
   onOpen: (d: Deck) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
   onNew: () => void;
   showNew: boolean;
 }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(258px, 1fr))", gap: 22 }}>
       {decks.map((d, i) => (
-        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.id)} />
+        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.publicId)} />
       ))}
       {showNew && <NewDeckTile onNew={onNew} />}
     </div>

@@ -33,7 +33,7 @@ export function poolByName(pool: OutCard[]): Map<string, OutCard> {
   return m;
 }
 
-export async function postCard(deckId: number, card: OutCard, qty: number): Promise<boolean> {
+export async function postCard(deckId: string, card: OutCard, qty: number): Promise<boolean> {
   const post = await fetch(`/api/decks/${deckId}/cards`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -53,7 +53,7 @@ export async function postCard(deckId: number, card: OutCard, qty: number): Prom
 }
 
 // Move a pool row between boards ("pool" ↔ "deck").
-export async function moveCard(deckId: number, dbId: number, board: Board): Promise<boolean> {
+export async function moveCard(deckId: string, dbId: number, board: Board): Promise<boolean> {
   const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -64,7 +64,7 @@ export async function moveCard(deckId: number, dbId: number, board: Board): Prom
 
 // Set the exact copy count of a pool row. To drop the last copy, delete the row
 // instead — the API rejects a quantity below 1.
-export async function setQuantity(deckId: number, dbId: number, quantity: number): Promise<boolean> {
+export async function setQuantity(deckId: string, dbId: number, quantity: number): Promise<boolean> {
   const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -74,7 +74,7 @@ export async function setQuantity(deckId: number, dbId: number, quantity: number
 }
 
 // Remove a pool row entirely.
-export async function deleteCard(deckId: number, dbId: number): Promise<boolean> {
+export async function deleteCard(deckId: string, dbId: number): Promise<boolean> {
   const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, { method: "DELETE" });
   return res.ok;
 }
@@ -83,7 +83,7 @@ export async function deleteCard(deckId: number, dbId: number): Promise<boolean>
 // pool we increment THAT row; otherwise we resolve it on Scryfall and create
 // it. `known` is mutated so repeats within a batch merge.
 export async function resolveAndAdd(
-  deckId: number,
+  deckId: string,
   name: string,
   qty: number,
   known: Map<string, OutCard>

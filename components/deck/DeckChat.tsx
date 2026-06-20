@@ -35,7 +35,7 @@ export default function DeckChat({
   onPoolChanged,
   onEngaged,
 }: {
-  deckId: number;
+  deckId: string;
   pool: PoolEntry[];
   commander: string | null | undefined;
   /** Card names from the player's collection — marks suggestions they own. */
