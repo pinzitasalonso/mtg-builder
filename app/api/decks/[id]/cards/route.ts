@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { parseId } from "@/lib/api";
-import { accessibleDeck, currentUser } from "@/lib/auth";
+import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
 
 const MAX_QTY = 999;
 
@@ -10,13 +9,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  const deckId = parseId((await params).id);
-  if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
-  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
-    return NextResponse.json({ error: "deck not found" }, { status: 404 });
-  }
+  const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
+  if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const cards = await prisma.poolCard.findMany({
-    where: { deckId },
+    where: { deckId: deck.id },
     orderBy: { addedAt: "asc" },
   });
   return NextResponse.json(cards);
@@ -27,8 +23,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  const deckId = parseId((await params).id);
-  if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
+  const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
+  if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
+  const deckId = deck.id;
   const body = await req.json();
   const { scryfallId, name, imageUri, manaCost, typeLine, oracleText } = body;
   if (
@@ -37,10 +34,6 @@ export async function POST(
     typeof imageUri !== "string" || !imageUri
   ) {
     return NextResponse.json({ error: "scryfallId, name, imageUri required" }, { status: 400 });
-  }
-
-  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
-    return NextResponse.json({ error: "deck not found" }, { status: 404 });
   }
 
   // quantity is how many copies to add; defaults to 1, clamped so a bad client

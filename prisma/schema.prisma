@@ -58,6 +58,10 @@ model Session {
 
 model Deck {
   id        Int        @id @default(autoincrement())
+  // Unguessable public identifier used in URLs (so decks can't be enumerated
+  // by walking sequential ids). Nullable only so existing rows survive the
+  // schema push; every deck is assigned one (at creation, or backfilled).
+  publicId  String?    @unique
   name      String
   format    String     @default("commander")
   commander String?

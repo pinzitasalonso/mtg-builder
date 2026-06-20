@@ -54,7 +54,7 @@ export default function ToolSheet({
   onChanged,
 }: {
   tool: Tool;
-  deckId: number;
+  deckId: string;
   pool: PoolEntry[];
   onClose: () => void;
   onChanged: () => Promise<void> | void;

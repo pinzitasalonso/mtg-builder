@@ -178,7 +178,9 @@ const plateBtn: React.CSSProperties = {
 
 export default function DeckPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const deckId = Number(id);
+  // The URL segment is the deck's unguessable public id; it's what every
+  // /api/decks/<id>/… call resolves against.
+  const deckId = id;
   const router = useRouter();
 
   const [deck, setDeck] = useState<Deck | null>(null);

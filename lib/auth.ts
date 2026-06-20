@@ -84,6 +84,17 @@ export async function accessibleDeck(deckId: number, userId: number | null) {
   });
 }
 
+// Same access rules, resolved by the unguessable public id used in URLs.
+export async function accessibleDeckByPublicId(publicId: string, userId: number | null) {
+  if (!publicId || typeof publicId !== "string") return null;
+  return prisma.deck.findFirst({
+    where:
+      userId === null
+        ? { publicId, userId: null }
+        : { publicId, OR: [{ userId: null }, { userId }] },
+  });
+}
+
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const MIN_PASSWORD = 8;
 

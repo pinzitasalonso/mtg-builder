@@ -1,16 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { parseId } from "@/lib/api";
-import { accessibleDeck, currentUser } from "@/lib/auth";
+import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
 
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  const deckId = parseId((await params).id);
-  if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
-  const deck = await accessibleDeck(deckId, user?.id ?? null);
+  const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const counted = await prisma.deck.findUnique({
     where: { id: deck.id },
@@ -24,11 +21,8 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  const deckId = parseId((await params).id);
-  if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
-  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
-    return NextResponse.json({ error: "deck not found" }, { status: 404 });
-  }
+  const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
+  if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const body = await req.json();
   const data: { name?: string; format?: string; commander?: string | null; notes?: string | null } = {};
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
@@ -44,8 +38,8 @@ export async function PATCH(
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "no fields to update" }, { status: 400 });
   }
-  const deck = await prisma.deck.update({ where: { id: deckId }, data });
-  return NextResponse.json(deck);
+  const updated = await prisma.deck.update({ where: { id: deck.id }, data });
+  return NextResponse.json(updated);
 }
 
 export async function DELETE(
@@ -53,11 +47,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  const deckId = parseId((await params).id);
-  if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
-  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
-    return NextResponse.json({ error: "deck not found" }, { status: 404 });
-  }
-  await prisma.deck.delete({ where: { id: deckId } });
+  const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
+  if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
+  await prisma.deck.delete({ where: { id: deck.id } });
   return new NextResponse(null, { status: 204 });
 }

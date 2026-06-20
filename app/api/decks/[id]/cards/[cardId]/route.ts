@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseId } from "@/lib/api";
-import { accessibleDeck, currentUser } from "@/lib/auth";
+import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
 
 const MAX_QTY = 999;
 
@@ -13,12 +13,11 @@ export async function PATCH(
 ) {
   const user = await currentUser();
   const { id, cardId } = await params;
-  const deckId = parseId(id);
   const cid = parseId(cardId);
-  if (!deckId || !cid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
-  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
-    return NextResponse.json({ error: "deck not found" }, { status: 404 });
-  }
+  if (!cid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
+  const deck = await accessibleDeckByPublicId(id, user?.id ?? null);
+  if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
+  const deckId = deck.id;
   const body = await req.json();
 
   const data: { board?: string; quantity?: number } = {};
@@ -52,12 +51,11 @@ export async function DELETE(
 ) {
   const user = await currentUser();
   const { id, cardId } = await params;
-  const deckId = parseId(id);
   const cid = parseId(cardId);
-  if (!deckId || !cid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
-  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
-    return NextResponse.json({ error: "deck not found" }, { status: 404 });
-  }
+  if (!cid) return NextResponse.json({ error: "invalid id" }, { status: 400 });
+  const deck = await accessibleDeckByPublicId(id, user?.id ?? null);
+  if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
+  const deckId = deck.id;
   // Scoped to the deck so a card id from another deck can't be deleted through
   // this URL; deleteMany also makes a missing row a 404 instead of a 500.
   const { count } = await prisma.poolCard.deleteMany({ where: { id: cid, deckId } });

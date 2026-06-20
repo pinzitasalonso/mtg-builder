@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { parseId } from "@/lib/api";
-import { accessibleDeck, currentUser } from "@/lib/auth";
+import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
 import { collectionByName } from "@/lib/scryfall";
 
 export const runtime = "nodejs";
@@ -13,11 +12,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  const deckId = parseId((await params).id);
-  if (!deckId) return NextResponse.json({ error: "invalid deck id" }, { status: 400 });
-  if (!(await accessibleDeck(deckId, user?.id ?? null))) {
-    return NextResponse.json({ error: "deck not found" }, { status: 404 });
-  }
+  const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
+  if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
+  const deckId = deck.id;
 
   const stale = await prisma.poolCard.findMany({
     where: { deckId, colorIdentity: null },

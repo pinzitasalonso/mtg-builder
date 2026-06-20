@@ -21,7 +21,7 @@ export default function JudgeModal({
   onClose,
   onPoolChanged,
 }: {
-  deckId: number;
+  deckId: string;
   pool: PoolEntry[];
   format?: string;
   commander?: string | null;
