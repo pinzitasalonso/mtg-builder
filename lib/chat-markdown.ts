@@ -7,7 +7,7 @@
 
 export type InlineToken =
   | { type: "text"; value: string }
-  | { type: "bold"; value: string }
+  | { type: "bold"; tokens: InlineToken[] }
   | { type: "card"; value: string };
 
 export type Block =
@@ -15,7 +15,8 @@ export type Block =
   | { type: "ul" | "ol"; items: InlineToken[][] };
 
 // Split a line of text into inline tokens. Only COMPLETE [[...]] / **...**
-// pairs become card/bold tokens; anything unterminated stays as text.
+// pairs become card/bold tokens; anything unterminated stays as text. Bold
+// spans are tokenized recursively so a [[Card]] inside **...** is still a link.
 export function tokenizeInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
   // Match a complete card link or a complete bold span, whichever comes first.
@@ -25,7 +26,7 @@ export function tokenizeInline(text: string): InlineToken[] {
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) tokens.push({ type: "text", value: text.slice(last, m.index) });
     if (m[1] !== undefined) tokens.push({ type: "card", value: m[1].trim() });
-    else tokens.push({ type: "bold", value: m[2] });
+    else tokens.push({ type: "bold", tokens: tokenizeInline(m[2]) });
     last = m.index + m[0].length;
   }
   if (last < text.length) tokens.push({ type: "text", value: text.slice(last) });
@@ -51,8 +52,14 @@ export function parseBlocks(md: string): Block[] {
     }
   };
 
-  for (const line of lines) {
-    const trimmed = line.trim();
+  for (const rawLine of lines) {
+    const raw = rawLine.trim();
+    if (!raw) {
+      flushPara();
+      continue;
+    }
+    // Strip a leading blockquote marker ("> …") so the inner cards still link.
+    const trimmed = raw.replace(/^>+\s?/, "");
     if (!trimmed) {
       flushPara();
       continue;

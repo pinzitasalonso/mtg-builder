@@ -1436,8 +1436,8 @@ function HeaderAction({
 
 function goldSearchBtn(busy: boolean): React.CSSProperties {
   return {
-    padding: "0 26px",
-    borderRadius: 999,
+    padding: "0 22px",
+    borderRadius: 12,
     border: "none",
     cursor: busy ? "wait" : "pointer",
     background: "var(--accent)",
