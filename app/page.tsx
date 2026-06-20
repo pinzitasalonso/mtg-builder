@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
+import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
 import { getIdentityTheme, getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
@@ -311,7 +312,7 @@ export default function HomePage() {
                 <option value="pauper">Pauper</option>
                 <option value="draft">Draft</option>
               </select>
-              <input placeholder="Commander (optional)" value={form.commander} onChange={(e) => setForm({ ...form, commander: e.target.value })} style={modalInput} />
+              <CommanderInput placeholder="Commander (optional)" value={form.commander} onChange={(v) => setForm({ ...form, commander: v })} style={modalInput} />
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>
                 <button type="button" onClick={() => setShowModal(false)} className="mn-ghost" style={{ padding: "10px 20px", fontSize: 14 }}>
                   Cancel
