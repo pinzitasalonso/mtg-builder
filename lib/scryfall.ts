@@ -83,17 +83,24 @@ export async function collectionByName(names: string[]): Promise<Map<string, Out
 // doesn't resolve (typo, double-faced quirk, not a real card) so the caller can
 // simply skip it.
 export async function resolveNamed(name: string): Promise<OutCard | null> {
-  try {
-    const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`, {
-      headers: SCRYFALL_HEADERS,
-    });
-    if (!res.ok) return null;
-    const c = (await res.json()) as ScryfallCard;
-    if (!c?.id) return null;
-    return toOutCard(c);
-  } catch {
-    return null;
+  const url = `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`;
+  // One retry on a rate-limit / transient failure (429/5xx) before giving up, so
+  // a momentary throttle doesn't make a real card look unaddable.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { headers: SCRYFALL_HEADERS });
+      if (res.ok) {
+        const c = (await res.json()) as ScryfallCard;
+        return c?.id ? toOutCard(c) : null;
+      }
+      // 404 = genuinely no such card; don't retry. 429/5xx = transient.
+      if (res.status === 404) return null;
+    } catch {
+      /* network blip — fall through to retry */
+    }
+    if (attempt === 0) await new Promise((r) => setTimeout(r, 350));
   }
+  return null;
 }
 
 // Market price (USD) for a single card by Scryfall id, memoized for the page's

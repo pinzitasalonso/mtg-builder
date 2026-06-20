@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PoolEntry, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
+import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
 import { Block, InlineToken, cardNamesIn, parseBlocks } from "@/lib/chat-markdown";
 import { collectionByName } from "@/lib/scryfall";
 
@@ -132,21 +132,16 @@ export default function DeckChat({
     }
   }
 
-  // Add every suggested card not already in the pool, in one go.
+  // Add every suggested card not already in the pool — resolved in one batched
+  // Scryfall lookup and inserted in a single request (fast, no per-card hammering).
   async function bulkAdd(names: string[]) {
     if (bulkBusy) return;
-    const todo = names.filter((n) => !poolByLower.has(n.toLowerCase()));
+    const todo = names.filter((n) => !poolByLower.has(n.toLowerCase()) && !notFound.has(n.toLowerCase()));
     if (todo.length === 0) return;
     setBulkBusy(true);
     setBulkProgress({ mode: "add", done: 0, total: todo.length });
     setError("");
-    const known = poolByName(pool);
-    const failed: string[] = [];
-    for (let i = 0; i < todo.length; i++) {
-      const r = await resolveAndAdd(deckId, todo[i], 1, known);
-      if (r !== "added") failed.push(todo[i]);
-      setBulkProgress({ mode: "add", done: i + 1, total: todo.length });
-    }
+    const { failed } = await addManyByName(deckId, todo, poolByName(pool));
     onPoolChanged();
     if (failed.length) setError(`Couldn't add: ${failed.join(", ")}.`);
     setBulkBusy(false);
@@ -477,9 +472,7 @@ function AssistantMessage({
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 8 }}>
           {toAdd.length > 0 && (
             <button type="button" onClick={() => onAddAll(toAdd)} disabled={bulkBusy} style={bulkBtn(false)}>
-              {bulkProgress?.mode === "add"
-                ? `Adding ${bulkProgress.done}/${bulkProgress.total}…`
-                : `＋ Add all ${toAdd.length}`}
+              {bulkProgress?.mode === "add" ? "Adding…" : `＋ Add all ${toAdd.length}`}
             </button>
           )}
           {toRemove.length > 0 && (
@@ -489,14 +482,14 @@ function AssistantMessage({
                 : `✕ Remove all ${toRemove.length}`}
             </button>
           )}
-          {bulkProgress && (
+          {bulkProgress?.mode === "remove" && (
             <span style={{ flexBasis: "100%", height: 3, borderRadius: 99, background: "var(--line)", overflow: "hidden" }}>
               <span
                 style={{
                   display: "block",
                   height: "100%",
                   width: `${Math.round((bulkProgress.done / Math.max(1, bulkProgress.total)) * 100)}%`,
-                  background: bulkProgress.mode === "remove" ? "var(--danger)" : "var(--accent)",
+                  background: "var(--danger)",
                   transition: "width .2s ease",
                 }}
               />
@@ -552,7 +545,7 @@ function ChatMarkdown({
       if (t.type === "bold")
         return (
           <strong key={key} style={{ fontWeight: 700 }}>
-            {t.value}
+            {renderInline(t.tokens, key)}
           </strong>
         );
       // A name Scryfall couldn't resolve (an AI slip) — show it plainly, not as

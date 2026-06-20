@@ -13,17 +13,24 @@ describe("tokenizeInline", () => {
   it("extracts bold spans", () => {
     expect(tokenizeInline("This is **strong** advice")).toEqual([
       { type: "text", value: "This is " },
-      { type: "bold", value: "strong" },
+      { type: "bold", tokens: [{ type: "text", value: "strong" }] },
       { type: "text", value: " advice" },
     ]);
   });
 
   it("handles cards and bold together", () => {
     expect(tokenizeInline("**Add** [[Lightning Bolt]] now")).toEqual([
-      { type: "bold", value: "Add" },
+      { type: "bold", tokens: [{ type: "text", value: "Add" }] },
       { type: "text", value: " " },
       { type: "card", value: "Lightning Bolt" },
       { type: "text", value: " now" },
+    ]);
+  });
+
+  it("links a [[card]] wrapped in bold", () => {
+    expect(tokenizeInline("**[[Ashnod's Altar]]** — combo piece")).toEqual([
+      { type: "bold", tokens: [{ type: "card", value: "Ashnod's Altar" }] },
+      { type: "text", value: " — combo piece" },
     ]);
   });
 
