@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getIdentityTheme } from "@/lib/identity-theme";
 import {
   Collection,
+  CollectionCard,
   EMPTY_COLLECTION,
   clearCollection,
   fetchCollection,
   importCollection,
   setCollectionCard,
 } from "@/lib/collection-client";
+import { parseDecklist } from "@/lib/decklist";
 import { categoryOf, manaValue, TYPE_ORDER } from "@/components/mtg";
 
 // Tiles render in pages; scrolling near the bottom reveals the next page, so a
@@ -114,16 +116,36 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     if (!importText.trim() || busy) return;
     setBusy(true);
     setNote(null);
-    const r = await importCollection(importText, importMode);
-    if (!r.ok) setNote(r.error ?? "Import failed.");
-    else {
-      setImportText("");
-      setImportOpen(false);
-      setNote(`${importMode === "replace" ? "Replaced" : "Merged"} — ${r.unique} unique, ${r.total} total.`);
-      await load();
-      onChanged?.();
+    const text = importText;
+    const mode = importMode;
+    const r = await importCollection(text, mode);
+    if (!r.ok) {
+      setNote(r.error ?? "Import failed.");
+      setBusy(false);
+      return;
     }
+    // Optimistically reflect the import right away so the grid never flashes the
+    // old list or an empty state while the server round-trip + enrichment finish.
+    const parsed = parseDecklist(text);
+    setCollection((prev) => {
+      const map = new Map<string, CollectionCard>();
+      if (mode === "add") for (const c of prev.cards) map.set(c.name.toLowerCase(), { ...c });
+      for (const e of parsed) {
+        const k = e.name.toLowerCase();
+        const ex = map.get(k);
+        if (ex) ex.quantity += e.qty;
+        else map.set(k, { name: e.name, quantity: e.qty });
+      }
+      const cards = [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
+      return { cards, unique: cards.length, total: cards.reduce((s, x) => s + x.quantity, 0), pending: cards.length };
+    });
+    setImportText("");
+    setImportOpen(false);
+    setNote(`${mode === "replace" ? "Replaced" : "Merged"} — ${r.unique} unique, ${r.total} total.`);
     setBusy(false);
+    onChanged?.();
+    // Reconcile with the server (canonical counts + kicks off enrichment/polling).
+    load();
   }
 
   async function runClear() {
@@ -224,8 +246,12 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
             disabled={busy}
+            autoCapitalize="none"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
             placeholder={"Paste a list — 1 Sol Ring, 4 Llanowar Elves, or a Moxfield/Deckbox export"}
-            style={{ width: "100%", minHeight: 90, resize: "vertical", border: "1px solid var(--line)", borderRadius: 10, padding: "10px 12px", fontFamily: "var(--font-mono, monospace)", fontSize: 13, background: "var(--surface)", color: "var(--text)", outline: "none" }}
+            style={{ width: "100%", minHeight: 110, resize: "vertical", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontFamily: "var(--font-mono, monospace)", fontSize: 16, lineHeight: 1.5, background: "var(--surface)", color: "var(--text)", outline: "none" }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
             <div style={{ display: "inline-flex", borderRadius: 999, background: "var(--surface)", padding: 3 }}>
@@ -252,7 +278,11 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search…"
-          style={{ width: 200, maxWidth: "60vw", padding: "8px 12px", border: "1px solid var(--line)", borderRadius: 999, background: "var(--bg3)", color: "var(--text)", outline: "none", fontSize: 14 }}
+          autoCapitalize="none"
+          autoCorrect="off"
+          autoComplete="off"
+          spellCheck={false}
+          style={{ width: 200, maxWidth: "60vw", padding: "9px 14px", border: "1px solid var(--line)", borderRadius: 999, background: "var(--bg3)", color: "var(--text)", outline: "none", fontSize: 16 }}
         />
         <div style={{ display: "flex", gap: 6 }} title={indexing ? "Indexing — color filters available shortly" : undefined}>
           {COLORS.map((c) => {
