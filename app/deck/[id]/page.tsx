@@ -204,6 +204,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   // header tools dropdown + play-guide popover
   const [toolsOpen, setToolsOpen] = useState(false);
+  // Fixed viewport coords for the tools menu, measured from the button so it
+  // opens right under it and never runs off-screen on mobile.
+  const [toolsPos, setToolsPos] = useState<{ top: number; left: number } | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [copied, setCopied] = useState<"" | "link" | "list">("");
   // deck-panel sort: by type (grouped), by cost (mv), or A–Z
@@ -662,9 +665,20 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           <Link href="/" aria-label="Spellpool home" style={{ textDecoration: "none" }}>
             <Logo size={18} />
           </Link>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative", flexWrap: "wrap", justifyContent: "flex-end", minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", minWidth: 0 }}>
             <div>
-              <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setToolsOpen((v) => !v)}>
+              <button
+                className="id-ghost"
+                style={{ padding: "9px 15px" }}
+                onClick={(e) => {
+                  if (toolsOpen) { setToolsOpen(false); return; }
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const width = 210;
+                  const left = Math.min(Math.max(8, r.right - width), window.innerWidth - width - 8);
+                  setToolsPos({ top: r.bottom + 8, left });
+                  setToolsOpen(true);
+                }}
+              >
                 Tools ▾
               </button>
               {toolsOpen && (
@@ -672,7 +686,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   <div onClick={() => setToolsOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                   <div
                     className="id-card"
-                    style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 41, width: 210, maxWidth: "calc(100vw - 28px)", padding: 6, display: "flex", flexDirection: "column", gap: 2 }}
+                    style={{ position: "fixed", top: toolsPos?.top ?? 0, left: toolsPos?.left ?? 0, zIndex: 41, width: 210, maxWidth: "calc(100vw - 16px)", padding: 6, display: "flex", flexDirection: "column", gap: 2 }}
                   >
                     {[
                       { label: "✨ AI judge", on: () => setJudgeOpen(true), disabled: pool.length === 0 },
