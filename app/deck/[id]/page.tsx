@@ -863,10 +863,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               type="button"
               aria-pressed={mobileView === "pool"}
               className={mobileView === "pool" ? "is-active" : ""}
-              onClick={() => {
-                setMobileView("pool");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
+              onClick={() => setMobileView("pool")}
             >
               Pool <span>{poolCards.reduce((s, c) => s + c.quantity, 0)}</span>
             </button>
@@ -874,10 +871,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               type="button"
               aria-pressed={mobileView === "deck"}
               className={mobileView === "deck" ? "is-active" : ""}
-              onClick={() => {
-                setMobileView("deck");
-                window.scrollTo({ top: 0, behavior: "smooth" });
-              }}
+              onClick={() => setMobileView("deck")}
             >
               Deck <span>{deckCount}</span>
             </button>
