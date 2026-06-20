@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Logo from "@/components/Logo";
+import CommanderInput from "@/components/CommanderInput";
 import SwipeModal from "@/components/SwipeModal";
 import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import JudgeModal from "@/components/deck/JudgeModal";
@@ -662,7 +663,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             <Logo size={18} />
           </Link>
           <div style={{ display: "flex", alignItems: "center", gap: 10, position: "relative", flexWrap: "wrap", justifyContent: "flex-end", minWidth: 0 }}>
-            <div style={{ position: "relative" }}>
+            <div>
               <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setToolsOpen((v) => !v)}>
                 Tools ▾
               </button>
@@ -671,7 +672,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   <div onClick={() => setToolsOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
                   <div
                     className="id-card"
-                    style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 41, width: 210, padding: 6, display: "flex", flexDirection: "column", gap: 2 }}
+                    style={{ position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 41, width: 210, maxWidth: "calc(100vw - 28px)", padding: 6, display: "flex", flexDirection: "column", gap: 2 }}
                   >
                     {[
                       { label: "✨ AI judge", on: () => setJudgeOpen(true), disabled: pool.length === 0 },
@@ -1212,7 +1213,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </select>
             </Field>
             <Field label="Commander">
-              <input className="cc-paper" placeholder="(optional)" value={edit.commander} onChange={(e) => setEdit({ ...edit, commander: e.target.value })} style={paperInput} />
+              <CommanderInput className="cc-paper" placeholder="(optional)" value={edit.commander} onChange={(v) => setEdit({ ...edit, commander: v })} style={paperInput} />
             </Field>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
               <button type="button" onClick={() => setSettingsOpen(false)} style={ghostBtn}>
