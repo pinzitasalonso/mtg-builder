@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { EMAIL_RE, MIN_PASSWORD, createVerifyToken, hashPassword, requestOrigin } from "@/lib/auth";
 import { sendVerificationEmail } from "@/lib/email";
+import { recordEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,7 @@ export async function POST(req: Request) {
 
   // Ownerless decks are PUBLIC decks now — no adoption on signup.
   const user = await prisma.user.create({ data: { email, passwordHash: hashPassword(password) } });
+  await recordEvent("signup");
 
   // No session yet — sign-in is blocked until the emailed link is clicked.
   const token = await createVerifyToken(user.id);

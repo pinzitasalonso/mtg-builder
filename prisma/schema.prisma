@@ -6,6 +6,18 @@ datasource db {
   provider = "sqlite"
 }
 
+// Privacy-respecting analytics: per-day counts of events only. No IPs, no user
+// agents, no cookies, no per-user rows — just how many times each thing
+// happened on a given (UTC) day.
+model AnalyticsDaily {
+  id    Int    @id @default(autoincrement())
+  day   String // YYYY-MM-DD (UTC)
+  type  String
+  count Int    @default(0)
+
+  @@unique([day, type])
+}
+
 model User {
   id           Int       @id @default(autoincrement())
   email        String    @unique

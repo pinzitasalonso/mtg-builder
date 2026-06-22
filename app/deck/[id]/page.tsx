@@ -18,6 +18,7 @@ import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard } from "@/lib/poo
 import { cardWarnings } from "@/lib/legality";
 import { getIdentityTheme } from "@/lib/identity-theme";
 import { fetchCollection } from "@/lib/collection-client";
+import { track } from "@/lib/track";
 import {
   CardArt,
   ManaCost,
@@ -324,6 +325,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   }, [deckId]);
 
   useEffect(() => {
+    track("visit");
+    track("deck_viewed");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     fetch(`/api/decks/${deckId}`)
       .then(async (r) => {
         if (r.ok) {
@@ -398,6 +405,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const runSearch = useCallback(
     async (text: string) => {
       if (!text.trim()) return;
+      track("card_search");
       setSearching(true);
       setSearchError("");
       setSearchResults([]);

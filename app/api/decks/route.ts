@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { newPublicId } from "@/lib/deck-id";
+import { recordEvent } from "@/lib/analytics";
 
 // One-time: assign an unguessable publicId to any deck created before this
 // column existed, so every deck has a stable URL. No-op once all are filled.
@@ -63,5 +64,6 @@ export async function POST(req: Request) {
   const deck = await prisma.deck.create({
     data: { name, format, commander, userId: user?.id ?? null, publicId: newPublicId() },
   });
+  await recordEvent("deck_created");
   return NextResponse.json(deck, { status: 201 });
 }

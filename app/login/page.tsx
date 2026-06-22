@@ -1,9 +1,10 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
 import { getIdentityTheme, LIGHT_VARS } from "@/lib/identity-theme";
+import { track } from "@/lib/track";
 
 // Same immersive theme as the deck page, neutral palette.
 const loginTheme = getIdentityTheme(null);
@@ -35,6 +36,10 @@ function LoginInner() {
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
   const [showResend, setShowResend] = useState(false);
+
+  useEffect(() => {
+    track("visit");
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
