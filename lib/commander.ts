@@ -10,6 +10,18 @@ export function isCommanderCard(deck: DeckLike | null | undefined, cardName: str
   return Boolean(c) && cardName.trim().toLowerCase() === c;
 }
 
+// Basic lands are the only cards that may stack in a singleton deck.
+export function isBasicLand(typeLine: string | null | undefined): boolean {
+  return !!typeLine && /\bbasic\b/i.test(typeLine) && /\bland\b/i.test(typeLine);
+}
+
+// In commander (a singleton format) only one copy of any non-basic card is
+// allowed. Returns true when this card must be capped at a single copy.
+export function singletonCapped(format: string, typeLine: string | null | undefined): boolean {
+  return format.toLowerCase() === "commander" && !isBasicLand(typeLine);
+}
+
+
 // Ensure a commander-format deck has its commander on the deck board. Idempotent
 // and best-effort: a name that doesn't resolve on Scryfall is simply skipped, and
 // the Scryfall lookup only runs when the card isn't already present.

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
+import { singletonCapped } from "@/lib/commander";
 
 const MAX_QTY = 999;
 const MAX_CARDS = 500;
@@ -31,7 +32,9 @@ export async function POST(
     ) {
       continue;
     }
-    const qty = Math.min(MAX_QTY, Number.isFinite(c.quantity) && c.quantity > 0 ? Math.floor(c.quantity) : 1);
+    const reqQty = Math.min(MAX_QTY, Number.isFinite(c.quantity) && c.quantity > 0 ? Math.floor(c.quantity) : 1);
+    const capped = singletonCapped(deck.format, c.typeLine);
+    const qty = capped ? 1 : reqQty;
     const colorIdentity = typeof c.colorIdentity === "string" ? c.colorIdentity.toUpperCase().slice(0, 5) : null;
     const legalities =
       c.legalities && typeof c.legalities === "object" && !Array.isArray(c.legalities)
@@ -40,7 +43,7 @@ export async function POST(
     ops.push(
       prisma.poolCard.upsert({
         where: { deckId_scryfallId: { deckId, scryfallId: c.scryfallId } },
-        update: { quantity: { increment: qty } },
+        update: capped ? { quantity: 1 } : { quantity: { increment: qty } },
         create: {
           deckId,
           scryfallId: c.scryfallId,
