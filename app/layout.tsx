@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Hanken_Grotesk, Bangers, IBM_Plex_Mono } from "next/font/google";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
 const hanken = Hanken_Grotesk({
@@ -44,7 +45,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#fbfbf8",
+  themeColor: "#0e0b18",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -52,6 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`h-full ${hanken.variable} ${bangers.variable} ${plexMono.variable}`}>
       <body className="min-h-full flex flex-col">
         {children}
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

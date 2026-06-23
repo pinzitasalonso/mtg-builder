@@ -2,6 +2,7 @@
 // import, bulk lands, AI-judge tap-to-add and name-mode add.
 
 import { OutCard, collectionByName, resolveNamed } from "./scryfall";
+import { enqueue } from "./offline-queue";
 
 export type Board = "pool" | "deck";
 
@@ -52,14 +53,20 @@ export async function postCard(deckId: string, card: OutCard, qty: number): Prom
   return post.ok;
 }
 
-// Move a pool row between boards ("pool" ↔ "deck").
+// Move a pool row between boards ("pool" ↔ "deck"). If the network is down the
+// move is queued and replayed on reconnect (optimistic success).
 export async function moveCard(deckId: string, dbId: number, board: Board): Promise<boolean> {
-  const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ board }),
-  });
-  return res.ok;
+  try {
+    const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ board }),
+    });
+    return res.ok; // 4xx (e.g. commander rule) is a real rejection — don't queue
+  } catch {
+    enqueue({ deckId, kind: "move", dbId, board });
+    return true;
+  }
 }
 
 // Set the exact copy count of a pool row. To drop the last copy, delete the row
@@ -73,10 +80,15 @@ export async function setQuantity(deckId: string, dbId: number, quantity: number
   return res.ok;
 }
 
-// Remove a pool row entirely.
+// Remove a pool row entirely. Queued for replay if offline.
 export async function deleteCard(deckId: string, dbId: number): Promise<boolean> {
-  const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, { method: "DELETE" });
-  return res.ok;
+  try {
+    const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, { method: "DELETE" });
+    return res.ok;
+  } catch {
+    enqueue({ deckId, kind: "remove", dbId });
+    return true;
+  }
 }
 
 // Add many cards by name in one go: resolve them all with a single batched
