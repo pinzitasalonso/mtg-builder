@@ -14,7 +14,8 @@ import DeckChat from "@/components/deck/DeckChat";
 import OrderModal from "@/components/deck/OrderModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
-import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard } from "@/lib/pool-client";
+import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard, deleteCard } from "@/lib/pool-client";
+import { applyPending, flushQueue, pendingFor } from "@/lib/offline-queue";
 import { cardWarnings } from "@/lib/legality";
 import { getIdentityTheme } from "@/lib/identity-theme";
 import { fetchCollection } from "@/lib/collection-client";
@@ -209,6 +210,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // opens right under it and never runs off-screen on mobile.
   const [toolsPos, setToolsPos] = useState<{ top: number; left: number } | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
+  // Count of offline review decisions waiting to sync (drives the banner).
+  const [pendingSync, setPendingSync] = useState(0);
   const [copied, setCopied] = useState<"" | "link" | "list">("");
   // deck-panel sort: by type (grouped), by cost (mv), or A–Z
   const [deckSort, setDeckSort] = useState<"type" | "cost" | "name">("type");
@@ -293,35 +296,41 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   }
 
   const loadPool = useCallback(async () => {
-    const res = await fetch(`/api/decks/${deckId}/cards`);
+    let res: Response;
+    try {
+      res = await fetch(`/api/decks/${deckId}/cards`);
+    } catch {
+      return; // offline with no cached response — keep current state
+    }
     if (!res.ok) return;
     const data = await res.json();
-    setPool(
-      data.map((c: { id: number; scryfallId: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null; quantity?: number; board?: string; role?: string | null; colorIdentity?: string | null; legalities?: string | null }) => {
-        let legalities: Record<string, string> | null = null;
-        if (c.legalities) {
-          try {
-            legalities = JSON.parse(c.legalities);
-          } catch {
-            legalities = null;
-          }
+    const mapped: PoolCard[] = data.map((c: { id: number; scryfallId: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null; quantity?: number; board?: string; role?: string | null; colorIdentity?: string | null; legalities?: string | null }) => {
+      let legalities: Record<string, string> | null = null;
+      if (c.legalities) {
+        try {
+          legalities = JSON.parse(c.legalities);
+        } catch {
+          legalities = null;
         }
-        return {
-          dbId: c.id,
-          id: c.scryfallId,
-          name: c.name,
-          imageUri: c.imageUri,
-          manaCost: c.manaCost,
-          typeLine: c.typeLine,
-          oracleText: c.oracleText,
-          quantity: c.quantity ?? 1,
-          board: c.board === "deck" ? "deck" : "pool",
-          role: c.role ?? null,
-          colorIdentity: c.colorIdentity ?? null,
-          legalities,
-        };
-      })
-    );
+      }
+      return {
+        dbId: c.id,
+        id: c.scryfallId,
+        name: c.name,
+        imageUri: c.imageUri,
+        manaCost: c.manaCost,
+        typeLine: c.typeLine,
+        oracleText: c.oracleText,
+        quantity: c.quantity ?? 1,
+        board: c.board === "deck" ? "deck" : "pool",
+        role: c.role ?? null,
+        colorIdentity: c.colorIdentity ?? null,
+        legalities,
+      };
+    });
+    // Overlay any not-yet-synced offline review decisions for this deck.
+    setPool(applyPending(deckId, mapped));
+    setPendingSync(pendingFor(deckId).length);
   }, [deckId]);
 
   useEffect(() => {
@@ -329,6 +338,17 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     track("deck_viewed");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Replay any offline review decisions when the connection returns.
+  useEffect(() => {
+    const sync = async () => {
+      await flushQueue();
+      await loadPool();
+    };
+    window.addEventListener("online", sync);
+    if (typeof navigator !== "undefined" && navigator.onLine && pendingFor(deckId).length) sync();
+    return () => window.removeEventListener("online", sync);
+  }, [deckId, loadPool]);
 
   useEffect(() => {
     fetch(`/api/decks/${deckId}`)
@@ -514,7 +534,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   }
 
   async function removeCard(dbId: number) {
-    await fetch(`/api/decks/${deckId}/cards/${dbId}`, { method: "DELETE" });
+    await deleteCard(deckId, dbId);
     loadPool();
   }
 
@@ -751,6 +771,27 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           <Link href="/" style={{ display: "inline-block", color: "var(--w-3)", fontSize: 13, textDecoration: "none", marginBottom: 6 }}>
             ← All decks
           </Link>
+
+          {pendingSync > 0 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                margin: "8px 0 0",
+                padding: "8px 14px",
+                borderRadius: 999,
+                background: "var(--w-fill)",
+                border: "1px solid var(--w-line-2)",
+                fontSize: 13,
+                color: "var(--w-1)",
+                width: "fit-content",
+              }}
+            >
+              <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--gold)", flex: "none" }} />
+              {pendingSync} review change{pendingSync === 1 ? "" : "s"} will sync when you&apos;re back online
+            </div>
+          )}
 
           {/* HERO — copy + commander card with progress badge */}
           <div className="id-hero-grid" style={{ alignItems: "center", padding: "clamp(14px,3vw,32px) 0 clamp(22px,3vw,40px)" }}>
@@ -1292,11 +1333,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           startIndex={reviewStart}
           onAdd={(card) => {
             const pc = reviewCards.find((c) => c.id === card.id);
-            if (pc) moveCard(deckId, pc.dbId, "deck");
+            if (pc) moveCard(deckId, pc.dbId, "deck").then(() => setPendingSync(pendingFor(deckId).length));
           }}
           onPass={(card) => {
             const pc = reviewCards.find((c) => c.id === card.id);
-            if (pc) fetch(`/api/decks/${deckId}/cards/${pc.dbId}`, { method: "DELETE" });
+            if (pc) deleteCard(deckId, pc.dbId).then(() => setPendingSync(pendingFor(deckId).length));
           }}
           onInfo={setPreview}
           onClose={() => {
@@ -1319,7 +1360,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           }}
           onPass={(card) => {
             const dc = deckReviewCards.find((c) => c.id === card.id);
-            if (dc) fetch(`/api/decks/${deckId}/cards/${dc.dbId}`, { method: "DELETE" });
+            if (dc) deleteCard(deckId, dc.dbId).then(() => setPendingSync(pendingFor(deckId).length));
           }}
           onInfo={setPreview}
           onClose={() => {
