@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createSession, verifyPassword } from "@/lib/auth";
+import { recordEvent } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 
@@ -30,5 +31,6 @@ export async function POST(req: Request) {
   }
 
   await createSession(user.id);
+  await recordEvent("login");
   return NextResponse.json({ id: user.id, email: user.email });
 }

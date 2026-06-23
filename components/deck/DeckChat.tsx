@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
 import { Block, InlineToken, cardNamesIn, parseBlocks } from "@/lib/chat-markdown";
 import { collectionByName } from "@/lib/scryfall";
+import { track } from "@/lib/track";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -172,6 +173,7 @@ export default function DeckChat({
   async function send(text: string) {
     const content = text.trim();
     if (!content || streaming) return;
+    track("ai_message");
     // A started conversation keeps the chat engaged (and the pool wide).
     onEngaged?.(true);
     // Sending re-pins to the bottom so the new turn (and its reply) scroll in.

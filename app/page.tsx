@@ -8,6 +8,7 @@ import CollectionView from "@/components/CollectionView";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
+import { track } from "@/lib/track";
 import { getIdentityTheme, getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
 
 /* The home view wears the commander-blue identity field — the same immersive
@@ -78,6 +79,7 @@ export default function HomePage() {
 
   useEffect(() => {
     loadAll();
+    track("visit");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
