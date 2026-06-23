@@ -429,13 +429,19 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         if (!res.ok) {
           setSearchError(data.details?.details ?? data.error ?? "Search failed");
         } else {
+          // Hide cards already in the deck — by id and by name — so the swipe
+          // never offers a duplicate.
           const poolIds = new Set(pool.map((c) => c.id));
-          const filtered = (data.cards as SearchCard[]).filter((c) => !poolIds.has(c.id));
+          const poolNames = new Set(pool.map((c) => c.name.toLowerCase()));
+          const all = data.cards as SearchCard[];
+          const filtered = all.filter((c) => !poolIds.has(c.id) && !poolNames.has(c.name.toLowerCase()));
+          const hidden = all.length - filtered.length;
           setSearchResults(filtered);
           setGeneratedQuery(data.query);
           setTruncated(Boolean(data.truncated));
           setSources(Array.isArray(data.sources) ? data.sources : []);
           if (filtered.length > 0) setSwipeOpen(true);
+          else if (hidden > 0) setSearchError(`Every match is already in your deck.`);
           else setSearchError("No cards matched — try a different search.");
         }
       } catch {
@@ -495,10 +501,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     if (!name) return;
     setNameAdding(true);
     setNameError("");
-    const r = await resolveAndAdd(deckId, name, 1, poolByName(pool));
+    const r = await resolveAndAdd(deckId, name, 1, poolByName(pool), { skipIfExists: true });
     if (r === "added") {
       setNameInput("");
       await loadPool();
+    } else if (r === "exists") {
+      setNameError(`"${name}" is already in your deck.`);
     } else {
       setNameError(r === "notfound" ? "Card not found — check the spelling." : "Couldn't add that card.");
     }
