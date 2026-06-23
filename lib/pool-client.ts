@@ -154,16 +154,20 @@ export async function resolveAndAdd(
   deckId: string,
   name: string,
   qty: number,
-  known: Map<string, OutCard>
-): Promise<"added" | "notfound" | "error"> {
+  known: Map<string, OutCard>,
+  opts?: { skipIfExists?: boolean }
+): Promise<"added" | "exists" | "notfound" | "error"> {
   try {
     const existing = known.get(name.toLowerCase());
     if (existing) {
+      if (opts?.skipIfExists) return "exists";
       return (await postCard(deckId, existing, qty)) ? "added" : "error";
     }
     const card = await resolveNamed(name);
     if (!card) return "notfound";
     if (!card.imageUri) return "error";
+    // Fuzzy input may resolve to a card already in the deck under its full name.
+    if (opts?.skipIfExists && known.has(card.name.toLowerCase())) return "exists";
     if (!(await postCard(deckId, card, qty))) return "error";
     known.set(card.name.toLowerCase(), card);
     return "added";
