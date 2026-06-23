@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
-import { ensureCommanderCard } from "@/lib/commander";
+import { ensureCommanderCard, singletonCapped } from "@/lib/commander";
 
 const MAX_QTY = 999;
 
@@ -55,9 +55,11 @@ export async function POST(
     body.legalities && typeof body.legalities === "object" && !Array.isArray(body.legalities)
       ? JSON.stringify(body.legalities).slice(0, 4000)
       : null;
+  // Commander is singleton: non-basics never go past one copy.
+  const capped = singletonCapped(deck.format, typeLine);
   const card = await prisma.poolCard.upsert({
     where: { deckId_scryfallId: { deckId, scryfallId } },
-    update: { quantity: { increment: qty } },
+    update: capped ? { quantity: 1 } : { quantity: { increment: qty } },
     create: {
       deckId,
       scryfallId,
@@ -68,7 +70,7 @@ export async function POST(
       oracleText: str(oracleText),
       colorIdentity,
       legalities,
-      quantity: qty,
+      quantity: capped ? 1 : qty,
     },
   });
   return NextResponse.json(card, { status: 201 });

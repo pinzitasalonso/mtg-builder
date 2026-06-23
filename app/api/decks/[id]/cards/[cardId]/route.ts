@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { parseId } from "@/lib/api";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
-import { isCommanderCard } from "@/lib/commander";
+import { isCommanderCard, singletonCapped } from "@/lib/commander";
 
 const MAX_QTY = 999;
 
@@ -40,11 +40,17 @@ export async function PATCH(
     return NextResponse.json({ error: "board or quantity required" }, { status: 400 });
   }
 
-  // The commander stays on the deck board — block moving it back to the pool.
-  if (data.board === "pool") {
-    const card = await prisma.poolCard.findFirst({ where: { id: cid, deckId }, select: { name: true } });
-    if (card && isCommanderCard(deck, card.name)) {
-      return NextResponse.json({ error: "The commander can't leave the deck." }, { status: 409 });
+  // Commander-format rules: the commander stays on the deck board, and a
+  // non-basic can't be set to more than one copy.
+  if (data.board === "pool" || (data.quantity !== undefined && data.quantity > 1)) {
+    const card = await prisma.poolCard.findFirst({ where: { id: cid, deckId }, select: { name: true, typeLine: true } });
+    if (card) {
+      if (data.board === "pool" && isCommanderCard(deck, card.name)) {
+        return NextResponse.json({ error: "The commander can't leave the deck." }, { status: 409 });
+      }
+      if (data.quantity !== undefined && data.quantity > 1 && singletonCapped(deck.format, card.typeLine)) {
+        return NextResponse.json({ error: "Commander decks allow only one copy of a non-basic card." }, { status: 409 });
+      }
     }
   }
 
