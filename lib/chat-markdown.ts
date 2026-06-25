@@ -114,3 +114,29 @@ export function cardNamesIn(md: string): string[] {
   }
   return out;
 }
+
+// Bold spans the model wrote WITHOUT brackets — candidate card names. The AI
+// often bolds a card name instead of bracketing it (e.g. "**Birds of
+// Paradise**"); the client verifies these against Scryfall and links the ones
+// that are real cards, so a suggestion is never left unclickable.
+export function boldNamesIn(md: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of md.matchAll(/\*\*([^*]+?)\*\*/g)) {
+    const inner = m[1].trim().replace(/\s+/g, " ");
+    const key = inner.toLowerCase();
+    // Skip empties, already-bracketed spans, and obvious non-names (too long).
+    if (inner && !inner.includes("[[") && inner.length <= 60 && !seen.has(key)) {
+      seen.add(key);
+      out.push(inner);
+    }
+  }
+  return out;
+}
+
+// Flatten inline tokens to their plain text (used to read a bold span's content).
+export function flattenInline(tokens: InlineToken[]): string {
+  return tokens
+    .map((t) => (t.type === "bold" ? flattenInline(t.tokens) : t.value))
+    .join("");
+}

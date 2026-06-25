@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { cardNamesIn, parseBlocks, tokenizeInline } from "./chat-markdown";
+import { boldNamesIn, cardNamesIn, flattenInline, parseBlocks, tokenizeInline } from "./chat-markdown";
+
+describe("boldNamesIn", () => {
+  it("collects unbracketed bold spans as candidate card names", () => {
+    expect(boldNamesIn("Run **Birds of Paradise** and **Farseek** now")).toEqual([
+      "Birds of Paradise",
+      "Farseek",
+    ]);
+  });
+  it("ignores bold spans that already contain a bracketed card", () => {
+    expect(boldNamesIn("**[[Sol Ring]]**")).toEqual([]);
+  });
+});
+
+describe("flattenInline", () => {
+  it("returns the plain text of nested tokens", () => {
+    expect(flattenInline(tokenizeInline("**Birds of Paradise**"))).toBe("Birds of Paradise");
+  });
+});
 
 describe("tokenizeInline", () => {
   it("extracts card links as card tokens", () => {
