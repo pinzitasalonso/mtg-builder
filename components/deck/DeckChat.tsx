@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
-import { Block, InlineToken, cardNamesIn, parseBlocks } from "@/lib/chat-markdown";
+import { Block, InlineToken, boldNamesIn, cardNamesIn, flattenInline, parseBlocks } from "@/lib/chat-markdown";
 import { collectionByName } from "@/lib/scryfall";
 import { track } from "@/lib/track";
 
@@ -55,11 +55,16 @@ export default function DeckChat({
   const [bulkProgress, setBulkProgress] = useState<{ mode: "add" | "remove"; done: number; total: number } | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
 
-  // lowercase name → exists-on-Scryfall, so the AI's hallucinated card names
-  // render as plain text instead of dead "couldn't find it" links.
+  // lowercase name → exists-on-Scryfall. Drives two things: hallucinated bracket
+  // names render as plain text (notFound), and bold names that ARE real cards
+  // get linked even when the model forgot to bracket them (valid).
   const [checked, setChecked] = useState<Map<string, boolean>>(new Map());
   const notFound = useMemo(
     () => new Set([...checked].filter(([, ok]) => !ok).map(([k]) => k)),
+    [checked]
+  );
+  const validCards = useMemo(
+    () => new Set([...checked].filter(([, ok]) => ok).map(([k]) => k)),
     [checked]
   );
 
@@ -85,7 +90,8 @@ export default function DeckChat({
     const names = new Set<string>();
     for (const m of messages) {
       if (m.role !== "assistant" || !m.content) continue;
-      for (const n of cardNamesIn(m.content)) {
+      // Bracketed names, plus bold spans (which may be unbracketed card names).
+      for (const n of [...cardNamesIn(m.content), ...boldNamesIn(m.content)]) {
         const key = n.toLowerCase();
         if (!checked.has(key) && !poolByLower.has(key)) names.add(n);
       }
@@ -275,6 +281,7 @@ export default function DeckChat({
                 poolByLower={poolByLower}
                 ownedLower={ownedLower}
                 notFound={notFound}
+                validCards={validCards}
                 busy={busy}
                 bulkBusy={bulkBusy}
                 bulkProgress={bulkProgress}
@@ -431,6 +438,7 @@ function AssistantMessage({
   poolByLower,
   ownedLower,
   notFound,
+  validCards,
   busy,
   bulkBusy,
   bulkProgress,
@@ -444,6 +452,7 @@ function AssistantMessage({
   poolByLower: Map<string, PoolEntry>;
   ownedLower: Set<string>;
   notFound: Set<string>;
+  validCards: Set<string>;
   busy: Set<string>;
   bulkBusy: boolean;
   bulkProgress: { mode: "add" | "remove"; done: number; total: number } | null;
@@ -453,8 +462,18 @@ function AssistantMessage({
   onAddAll: (names: string[]) => void;
   onRemoveAll: (names: string[]) => void;
 }) {
-  const names = cardNamesIn(content);
-  // Skip cards Scryfall couldn't resolve — they can't be added.
+  // Every clickable card in the reply: bracketed names plus bold spans that
+  // verified as real cards (so "Add all" matches what's actually linked).
+  const seen = new Set<string>();
+  const names: string[] = [];
+  for (const n of [...cardNamesIn(content), ...boldNamesIn(content)]) {
+    const key = n.toLowerCase();
+    const linkable = poolByLower.has(key) || validCards.has(key);
+    if (linkable && !seen.has(key)) {
+      seen.add(key);
+      names.push(n);
+    }
+  }
   const toAdd = names.filter((n) => !poolByLower.has(n.toLowerCase()) && !notFound.has(n.toLowerCase()));
   const toRemove = names.filter((n) => poolByLower.has(n.toLowerCase()));
   // Only worth a bulk bar when the answer suggests more than one card.
@@ -466,6 +485,7 @@ function AssistantMessage({
         poolByLower={poolByLower}
         ownedLower={ownedLower}
         notFound={notFound}
+        validCards={validCards}
         busy={busy}
         onCard={onCard}
         onPreview={onPreview}
@@ -530,6 +550,7 @@ function ChatMarkdown({
   busy,
   onCard,
   onPreview,
+  validCards,
 }: {
   text: string;
   poolByLower: Map<string, PoolEntry>;
@@ -538,18 +559,43 @@ function ChatMarkdown({
   busy: Set<string>;
   onCard: (name: string) => void;
   onPreview: (p: Preview | null) => void;
+  validCards: Set<string>;
 }) {
   const blocks = parseBlocks(text);
+  const linkFor = (name: string, key: string) => {
+    const entry = poolByLower.get(name.toLowerCase());
+    return (
+      <CardLink
+        key={key}
+        name={name}
+        inPool={Boolean(entry)}
+        owned={ownedLower.has(name.toLowerCase())}
+        busy={busy.has(name.toLowerCase())}
+        imageUri={entry?.imageUri || null}
+        onClick={() => onCard(name)}
+        onPreview={onPreview}
+      />
+    );
+  };
   const renderInline = (tokens: InlineToken[], keyPrefix: string) =>
     tokens.map((t, i) => {
       const key = `${keyPrefix}-${i}`;
       if (t.type === "text") return <span key={key}>{t.value}</span>;
-      if (t.type === "bold")
+      if (t.type === "bold") {
+        // Guardrail: a bold span that's actually a real card name (the model
+        // forgot the brackets) still becomes a clickable link.
+        const flat = flattenInline(t.tokens).trim();
+        const k = flat.toLowerCase();
+        const hasCardChild = t.tokens.some((x) => x.type === "card");
+        if (!hasCardChild && flat && (poolByLower.has(k) || validCards.has(k))) {
+          return linkFor(flat, key);
+        }
         return (
           <strong key={key} style={{ fontWeight: 700 }}>
             {renderInline(t.tokens, key)}
           </strong>
         );
+      }
       // A name Scryfall couldn't resolve (an AI slip) — show it plainly, not as
       // a clickable card that would only fail to add.
       if (notFound.has(t.value.toLowerCase())) {
@@ -559,19 +605,7 @@ function ChatMarkdown({
           </span>
         );
       }
-      const entry = poolByLower.get(t.value.toLowerCase());
-      return (
-        <CardLink
-          key={key}
-          name={t.value}
-          inPool={Boolean(entry)}
-          owned={ownedLower.has(t.value.toLowerCase())}
-          busy={busy.has(t.value.toLowerCase())}
-          imageUri={entry?.imageUri || null}
-          onClick={() => onCard(t.value)}
-          onPreview={onPreview}
-        />
-      );
+      return linkFor(t.value, key);
     });
 
   return (

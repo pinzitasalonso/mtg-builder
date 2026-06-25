@@ -344,7 +344,9 @@ export function buildCollectionBlock(names: string[]): string {
   return (
     "\n\nPLAYER'S COLLECTION — cards the player physically OWNS. Strongly prefer recommending cards from " +
     "this list when they fit the request, since the player can add them at no cost. When you do recommend a " +
-    "card they do NOT own, briefly note that it's a new purchase. " +
+    "card they do NOT own, you may briefly note it's a new purchase. Do NOT write your own ownership labels " +
+    "like \"owned\" or a ✅ next to cards — the app already marks owned cards automatically. And no matter what, " +
+    "the card name itself MUST still be wrapped in [[double brackets]] so it stays a clickable link. " +
     `(${counted}):\n` +
     shown.join(", ")
   );
