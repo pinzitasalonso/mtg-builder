@@ -1213,7 +1213,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 return (
                   <>
                     {commander && (
-                      <div style={{ marginBottom: 22, maxWidth: 520 }}>
+                      <div style={{ marginBottom: 22 }}>
                         <DeckSectionHead cat="Commander" n={1} />
                         <IdCardLine card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} />
                       </div>
