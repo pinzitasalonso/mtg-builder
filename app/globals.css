@@ -769,3 +769,30 @@ button {
 .id-cardscroll {
   overflow: visible;
 }
+
+/* Swipe review: keep/remove buttons sit below the card on narrow screens, but
+   flank it on the left/right edges on wide screens (e.g. iPad landscape). */
+.sw-side {
+  display: none;
+}
+.sw-narrow-only {
+  display: inline-flex;
+}
+@media (min-width: 880px) {
+  .sw-side {
+    display: block;
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+  }
+  .sw-side-left {
+    left: clamp(20px, 5vw, 72px);
+  }
+  .sw-side-right {
+    right: clamp(20px, 5vw, 72px);
+  }
+  .sw-narrow-only {
+    display: none !important;
+  }
+}

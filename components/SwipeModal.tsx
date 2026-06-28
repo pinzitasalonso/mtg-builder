@@ -244,6 +244,17 @@ export default function SwipeModal<T extends SwipeCard>({
 
       {/* card area */}
       <div style={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+        {/* on wide screens the keep/remove buttons flank the card */}
+        {!done && (
+          <>
+            <div className="sw-side sw-side-left">
+              <SwBtn kind="skip" size={74} onClick={() => act("left")} />
+            </div>
+            <div className="sw-side sw-side-right">
+              <SwBtn kind="add" size={74} onClick={() => act("right")} />
+            </div>
+          </>
+        )}
         {done ? (
           <div style={{ textAlign: "center", animation: "sp-pop .35s ease" }}>
             <div style={{ fontSize: 40, color: "var(--accent)", marginBottom: 6 }}>{copy.doneIcon}</div>
@@ -321,9 +332,13 @@ export default function SwipeModal<T extends SwipeCard>({
             {price === undefined ? "" : price ? `$${price}` : "no price"}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
-            <SwBtn kind="skip" onClick={() => act("left")} />
+            <span className="sw-narrow-only">
+              <SwBtn kind="skip" onClick={() => act("left")} />
+            </span>
             <SwBtn kind="info" onClick={() => card && onInfo?.(card)} />
-            <SwBtn kind="add" onClick={() => act("right")} />
+            <span className="sw-narrow-only">
+              <SwBtn kind="add" onClick={() => act("right")} />
+            </span>
           </div>
           <div style={{ fontSize: 13, color: "var(--t3)" }}>
             {copy.hint}
@@ -354,12 +369,13 @@ function CardFace({ card }: { card: SwipeCard }) {
   return <ClassicCard card={card} variant="full" />;
 }
 
-function SwBtn({ kind, onClick }: { kind: "skip" | "info" | "add"; onClick?: () => void }) {
+function SwBtn({ kind, onClick, size }: { kind: "skip" | "info" | "add"; onClick?: () => void; size?: number }) {
   const cfg = {
     skip: { ic: "✕", color: "#c2402a", size: 58 },
     info: { ic: "i", color: "#9a9aa2", size: 46 },
     add: { ic: "✦", color: "#0d8a5f", size: 58 },
   }[kind];
+  const dim = size ?? cfg.size;
   const [h, setH] = useState(false);
   return (
     <button
@@ -368,14 +384,14 @@ function SwBtn({ kind, onClick }: { kind: "skip" | "info" | "add"; onClick?: () 
       onMouseLeave={() => setH(false)}
       aria-label={kind}
       style={{
-        width: cfg.size,
-        height: cfg.size,
+        width: dim,
+        height: dim,
         borderRadius: "50%",
         cursor: "pointer",
         border: "none",
         background: h ? `${cfg.color}14` : "var(--bg2)",
         color: cfg.color,
-        fontSize: cfg.size * 0.36,
+        fontSize: dim * 0.36,
         fontFamily: kind === "info" ? "var(--font-display)" : "inherit",
         
         boxShadow: `inset 0 0 0 2px ${cfg.color}55, 0 4px 12px rgba(21,21,26,.12)`,
