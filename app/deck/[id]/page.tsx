@@ -889,25 +889,66 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   </span>
                 </div>
                 {(() => {
-                  const order = ["W", "U", "B", "R", "G", "C"].filter((c) => stats.colors[c] > 0);
-                  const max = Math.max(1, ...order.map((c) => stats.colors[c]));
+                  // Non-land colour requirements (spell pips) vs the lands that
+                  // can produce each colour. An "any colour" land (e.g. Command
+                  // Tower) makes every colour in the deck's identity.
+                  const spell: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+                  const land: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+                  const identity = identityPips.filter((c) => "WUBRG".includes(c));
+                  for (const c of deckCards) {
+                    const qty = c.quantity > 0 ? c.quantity : 1;
+                    if (categoryOf(c.typeLine) === "Lands") {
+                      const produced =
+                        c.oracleText && /any colou?r/i.test(c.oracleText)
+                          ? identity
+                          : (c.colorIdentity ?? "").replace(/[^WUBRG]/g, "").split("");
+                      for (const col of produced) if (land[col] != null) land[col] += qty;
+                    } else {
+                      for (const col of colorsOf(c.manaCost)) if (spell[col] != null) spell[col] += qty;
+                    }
+                  }
+                  const order = (["W", "U", "B", "R", "G"] as const).filter((c) => spell[c] > 0 || land[c] > 0);
                   if (order.length === 0) return null;
+                  const max = Math.max(1, ...order.flatMap((c) => [spell[c], land[c]]));
                   return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
-                      {order.map((c) => (
-                        <div key={c} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <ColorPips colors={[c]} size={15} />
-                          <div style={{ flex: 1, height: 8, borderRadius: 4, background: "var(--w-fill)", overflow: "hidden" }}>
-                            <div style={{ width: `${(stats.colors[c] / max) * 100}%`, height: "100%", background: MANA[c]?.bg ?? "#9aa0a8", borderRadius: 4, transition: "width .4s cubic-bezier(.2,.8,.2,1)" }} />
-                          </div>
-                          <span className="id-mono" style={{ fontSize: 12, color: "var(--w-1)", width: 26, textAlign: "right" }}>{stats.colors[c]}</span>
-                        </div>
-                      ))}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ display: "flex", gap: 14, marginBottom: 9, fontSize: 11, color: "var(--w-2)" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ width: 9, height: 6, borderRadius: 2, background: "var(--w-1)" }} /> spells
+                        </span>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                          <span style={{ width: 9, height: 6, borderRadius: 2, background: "var(--w-1)", opacity: 0.4 }} /> land sources
+                        </span>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                        {order.map((c) => {
+                          const fill = MANA[c]?.bg ?? "#9aa0a8";
+                          return (
+                            <div key={c} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <ColorPips colors={[c]} size={15} />
+                              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <div style={{ flex: 1, height: 7, borderRadius: 4, background: "var(--w-fill)", overflow: "hidden" }}>
+                                    <div style={{ width: `${(spell[c] / max) * 100}%`, height: "100%", background: fill, borderRadius: 4, transition: "width .4s cubic-bezier(.2,.8,.2,1)" }} />
+                                  </div>
+                                  <span className="id-mono" style={{ fontSize: 11.5, color: "var(--w-1)", width: 22, textAlign: "right" }}>{spell[c]}</span>
+                                </div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <div style={{ flex: 1, height: 7, borderRadius: 4, background: "var(--w-fill)", overflow: "hidden" }}>
+                                    <div style={{ width: `${(land[c] / max) * 100}%`, height: "100%", background: fill, opacity: 0.4, borderRadius: 4, transition: "width .4s cubic-bezier(.2,.8,.2,1)" }} />
+                                  </div>
+                                  <span className="id-mono" style={{ fontSize: 11.5, color: "var(--w-2)", width: 22, textAlign: "right" }}>{land[c]}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   );
                 })()}
                 <p style={{ fontSize: 12.5, color: "var(--w-2)", margin: 0, lineHeight: 1.45 }}>
-                  Avg. mana value <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{stats.avgMv.toFixed(1)}</b> · a card counts toward each of its colors.
+                  Avg. mana value <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{stats.avgMv.toFixed(1)}</b> · spells exclude lands; land sources count any-colour lands toward your identity.
                 </p>
               </div>
             </div>
