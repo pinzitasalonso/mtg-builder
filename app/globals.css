@@ -683,10 +683,6 @@ button {
   gap: 24px;
   align-items: start;
 }
-.id-pool {
-  position: sticky;
-  top: 78px;
-}
 /* While chatting with the AI the pool needs room — make it the wide column. */
 .id-workspace[data-ai="true"] {
   grid-template-columns: minmax(0, 1fr) minmax(0, 392px);
@@ -695,9 +691,6 @@ button {
   .id-workspace,
   .id-workspace[data-ai="true"] {
     grid-template-columns: 1fr;
-  }
-  .id-pool {
-    position: static;
   }
 }
 
@@ -771,16 +764,8 @@ button {
   .id-workspace[data-mobile-view="deck"] .id-poolcol { display: none !important; }
 }
 
-/* Pool candidate list: scrolls within the sticky panel on desktop, but flows
-   with the page on mobile (no nested scroll area). */
+/* Pool candidate list flows with the page — no nested scroll area, so the deck
+   detail has a single, predictable scroll. */
 .id-cardscroll {
-  max-height: calc(100vh - 220px);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-@media (max-width: 1023px) {
-  .id-cardscroll {
-    max-height: none;
-    overflow: visible;
-  }
+  overflow: visible;
 }
