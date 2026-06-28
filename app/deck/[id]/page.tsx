@@ -1273,38 +1273,36 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 return (
                   <>
                     {commander && (
-                      <div style={{ marginBottom: 22 }}>
+                      <div style={{ marginBottom: 24 }}>
                         <DeckSectionHead cat="Commander" n={1} />
-                        <IdCardLine card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} />
+                        <div style={deckTileGrid}>
+                          <DeckCardTile card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} removable={false} onRemove={() => {}} />
+                        </div>
                       </div>
                     )}
-                    <div style={{ columnWidth: 300, columnGap: 22 }}>
-                      {groupedFor(rest)
-                        .map((g) => ({ t: g.t, cards: g.cards.filter(matchesDeckFilter) }))
-                        .filter((g) => g.cards.length)
-                        .map((g) => (
-                          <div key={g.t} style={{ breakInside: "avoid", marginBottom: 22, display: "flex", flexDirection: "column", gap: 8 }}>
-                            <DeckSectionHead cat={g.t} n={g.cards.reduce((s, c) => s + c.quantity, 0)} />
+                    {groupedFor(rest)
+                      .map((g) => ({ t: g.t, cards: g.cards.filter(matchesDeckFilter) }))
+                      .filter((g) => g.cards.length)
+                      .map((g) => (
+                        <div key={g.t} style={{ marginBottom: 24 }}>
+                          <DeckSectionHead cat={g.t} n={g.cards.reduce((s, c) => s + c.quantity, 0)} />
+                          <div style={deckTileGrid}>
                             {g.cards.map((c) => (
-                              <IdCardLine key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} onOpen={() => startDeckReview(c)}
-                                trailing={<button className="id-del" title="Remove from deck" onClick={(e) => { e.stopPropagation(); removeCard(c.dbId); }}>×</button>} />
+                              <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable onOpen={() => startDeckReview(c)} onRemove={() => removeCard(c.dbId)} />
                             ))}
                           </div>
-                        ))}
-                    </div>
+                        </div>
+                      ))}
                   </>
                 );
               })()}
             </div>
           ) : (
-            <div style={{ columnWidth: 300, columnGap: 22 }}>
+            <div style={deckTileGrid}>
               {[...deckCards]
                 .sort((a, b) => deckSort === "cost" ? (manaValue(a.manaCost) - manaValue(b.manaCost)) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name))
                 .map((c) => (
-                  <div key={c.dbId} style={{ breakInside: "avoid", marginBottom: 8 }}>
-                    <IdCardLine card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} onOpen={() => startDeckReview(c)}
-                      trailing={isCommander(c) ? null : <button className="id-del" title="Remove from deck" onClick={(e) => { e.stopPropagation(); removeCard(c.dbId); }}>×</button>} />
-                  </div>
+                  <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable={!isCommander(c)} onOpen={() => startDeckReview(c)} onRemove={() => removeCard(c.dbId)} />
                 ))}
             </div>
           )}
@@ -1726,6 +1724,83 @@ const poolIconBtn: React.CSSProperties = {
   justifyContent: "center",
   backdropFilter: "blur(4px)",
 };
+
+const deckTileGrid: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))",
+  gap: 12,
+};
+
+/* Full card-image tile for the decklist: the card art with quantity / owned /
+   warning badges, a hover remove (unless it's the commander), and click-to-review. */
+function DeckCardTile({
+  card,
+  owned,
+  warning,
+  removable,
+  onOpen,
+  onRemove,
+}: {
+  card: PoolCard;
+  owned?: boolean;
+  warning?: string;
+  removable: boolean;
+  onOpen?: () => void;
+  onRemove: () => void;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={onOpen}
+      title={card.name}
+      style={{
+        position: "relative",
+        borderRadius: "4.8%/3.5%",
+        overflow: "hidden",
+        cursor: onOpen ? "pointer" : "default",
+        aspectRatio: "5 / 7",
+        background: "rgba(0,0,0,.25)",
+        boxShadow: hover ? "0 14px 30px -10px rgba(0,0,0,.6)" : "0 4px 12px -4px rgba(0,0,0,.45)",
+        transform: hover ? "translateY(-3px)" : "none",
+        transition: "transform .16s ease, box-shadow .16s ease",
+      }}
+    >
+      {card.imageUri ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={card.imageUri} alt={card.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+      ) : (
+        <CardArt name={card.name} radius={0} style={{ position: "absolute", inset: 0 }} />
+      )}
+      {owned && (
+        <span title="In your collection" style={{ position: "absolute", top: 7, left: 7, background: "rgba(13,138,95,.92)", color: "#fff", fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 999, boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}>
+          ✓
+        </span>
+      )}
+      {card.quantity > 1 && (
+        <span style={{ position: "absolute", bottom: 7, left: 7, background: "rgba(0,0,0,.72)", color: "#fff", fontSize: 11.5, fontWeight: 700, padding: "2px 7px", borderRadius: 999 }}>
+          ×{card.quantity}
+        </span>
+      )}
+      {warning && (
+        <span title={warning} style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", fontSize: 12, width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          ⚠
+        </span>
+      )}
+      {removable && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove(); }}
+          title="Remove from deck"
+          aria-label="Remove from deck"
+          style={{ ...poolIconBtn, position: "absolute", top: 7, right: 7, opacity: hover ? 1 : 0, transition: "opacity .15s", color: "#ff9b8a" }}
+        >
+          ✕
+        </button>
+      )}
+    </div>
+  );
+}
 
 /* Deck-rail row — white pill: thumbnail + name + type + mana pips. */
 /* White card row used in both panels: art thumb + name/type + mana + a trailing
