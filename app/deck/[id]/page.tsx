@@ -33,6 +33,7 @@ import {
   deckTarget,
   TYPE_ORDER,
   COLOR_NAME,
+  MANA,
 } from "@/components/mtg";
 
 // Category accent colours for the composition matrix (matches the design).
@@ -881,14 +882,32 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               <div style={{ width: 1, background: "var(--w-line)", alignSelf: "stretch" }} />
               <div style={{ padding: "0 0 0 clamp(18px,2.4vw,32px)", flex: 1, minWidth: 200 }}>
                 <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 14 }}>Color identity</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  {identityPips.length > 0 && <ColorPips colors={identityPips} size={24} />}
-                  <span className="id-display" style={{ fontSize: 24, color: "var(--w-1)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  {identityPips.length > 0 && <ColorPips colors={identityPips} size={22} />}
+                  <span className="id-display" style={{ fontSize: 22, color: "var(--w-1)" }}>
                     {identityPips.length ? identityPips.map((c) => COLOR_NAME[c]).join("·") : "Colorless"}
                   </span>
                 </div>
+                {(() => {
+                  const order = ["W", "U", "B", "R", "G", "C"].filter((c) => stats.colors[c] > 0);
+                  const max = Math.max(1, ...order.map((c) => stats.colors[c]));
+                  if (order.length === 0) return null;
+                  return (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                      {order.map((c) => (
+                        <div key={c} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <ColorPips colors={[c]} size={15} />
+                          <div style={{ flex: 1, height: 8, borderRadius: 4, background: "var(--w-fill)", overflow: "hidden" }}>
+                            <div style={{ width: `${(stats.colors[c] / max) * 100}%`, height: "100%", background: MANA[c]?.bg ?? "#9aa0a8", borderRadius: 4, transition: "width .4s cubic-bezier(.2,.8,.2,1)" }} />
+                          </div>
+                          <span className="id-mono" style={{ fontSize: 12, color: "var(--w-1)", width: 26, textAlign: "right" }}>{stats.colors[c]}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
                 <p style={{ fontSize: 12.5, color: "var(--w-2)", margin: 0, lineHeight: 1.45 }}>
-                  Avg. mana value <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{stats.avgMv.toFixed(1)}</b> · metrics track the deck.
+                  Avg. mana value <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{stats.avgMv.toFixed(1)}</b> · a card counts toward each of its colors.
                 </p>
               </div>
             </div>
