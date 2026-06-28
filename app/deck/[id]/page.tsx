@@ -914,32 +914,32 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                     <div style={{ marginBottom: 12 }}>
                       <div style={{ display: "flex", gap: 14, marginBottom: 9, fontSize: 11, color: "var(--w-2)" }}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                          <span style={{ width: 9, height: 6, borderRadius: 2, background: "var(--w-1)" }} /> spells
+                          <span style={{ width: 9, height: 7, borderRadius: 2, background: "var(--w-1)" }} /> spells
                         </span>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                          <span style={{ width: 9, height: 6, borderRadius: 2, background: "var(--w-1)", opacity: 0.4 }} /> land sources
+                          <span style={{ width: 2, height: 11, background: "var(--w-1)", boxShadow: "0 0 0 1px rgba(0,0,0,.3)" }} /> land sources
                         </span>
                       </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {order.map((c) => {
                           const fill = MANA[c]?.bg ?? "#9aa0a8";
+                          const landPos = Math.min(100, (land[c] / max) * 100);
                           return (
                             <div key={c} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                               <ColorPips colors={[c]} size={15} />
-                              <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3 }}>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                  <div style={{ flex: 1, height: 7, borderRadius: 4, background: "var(--w-fill)", overflow: "hidden" }}>
-                                    <div style={{ width: `${(spell[c] / max) * 100}%`, height: "100%", background: fill, borderRadius: 4, transition: "width .4s cubic-bezier(.2,.8,.2,1)" }} />
-                                  </div>
-                                  <span className="id-mono" style={{ fontSize: 11.5, color: "var(--w-1)", width: 22, textAlign: "right" }}>{spell[c]}</span>
-                                </div>
-                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                  <div style={{ flex: 1, height: 7, borderRadius: 4, background: "var(--w-fill)", overflow: "hidden" }}>
-                                    <div style={{ width: `${(land[c] / max) * 100}%`, height: "100%", background: fill, opacity: 0.4, borderRadius: 4, transition: "width .4s cubic-bezier(.2,.8,.2,1)" }} />
-                                  </div>
-                                  <span className="id-mono" style={{ fontSize: 11.5, color: "var(--w-2)", width: 22, textAlign: "right" }}>{land[c]}</span>
-                                </div>
+                              <div style={{ flex: 1, position: "relative", height: 9, borderRadius: 5, background: "var(--w-fill)", overflow: "hidden" }}>
+                                {/* spell requirement fill */}
+                                <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(spell[c] / max) * 100}%`, background: fill, borderRadius: 5, transition: "width .4s cubic-bezier(.2,.8,.2,1)" }} />
+                                {/* land-sources marker line */}
+                                <div
+                                  title={`${land[c]} land source${land[c] === 1 ? "" : "s"}`}
+                                  style={{ position: "absolute", top: 0, bottom: 0, left: `calc(${landPos}% - 1px)`, width: 2, background: "var(--w-1)", boxShadow: "0 0 0 1px rgba(0,0,0,.3)", transition: "left .4s cubic-bezier(.2,.8,.2,1)" }}
+                                />
                               </div>
+                              <span className="id-mono" style={{ fontSize: 11.5, width: 42, textAlign: "right" }}>
+                                <span style={{ color: "var(--w-1)" }}>{spell[c]}</span>
+                                <span style={{ color: "var(--w-3)" }}> / {land[c]}</span>
+                              </span>
                             </div>
                           );
                         })}
