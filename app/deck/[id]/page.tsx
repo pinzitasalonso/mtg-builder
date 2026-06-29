@@ -882,9 +882,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               <div style={{ width: 1, background: "var(--w-line)", alignSelf: "stretch" }} />
               <div style={{ padding: "0 0 0 clamp(18px,2.4vw,32px)", flex: 1, minWidth: 200 }}>
                 <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 10 }}>Color identity</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
                   {identityPips.length > 0 && <ColorPips colors={identityPips} size={20} />}
-                  <span className="id-display" style={{ fontSize: 16, color: "var(--w-1)", lineHeight: 1.05, overflowWrap: "anywhere" }}>
+                  <span className="id-display" style={{ fontSize: 16, color: "var(--w-1)", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, flex: 1 }}>
                     {identityPips.length ? identityPips.map((c) => COLOR_NAME[c]).join(" · ") : "Colorless"}
                   </span>
                 </div>
