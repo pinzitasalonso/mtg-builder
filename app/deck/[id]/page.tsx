@@ -936,7 +936,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                                   style={{ position: "absolute", top: 0, bottom: 0, left: `calc(${landPos}% - 1px)`, width: 2, background: "var(--w-1)", boxShadow: "0 0 0 1px rgba(0,0,0,.3)", transition: "left .4s cubic-bezier(.2,.8,.2,1)" }}
                                 />
                               </div>
-                              <span className="id-mono" style={{ fontSize: 11, width: 40, textAlign: "right" }}>
+                              <span className="id-mono" style={{ fontSize: 11, width: 52, textAlign: "right", whiteSpace: "nowrap", flexShrink: 0 }}>
                                 <span style={{ color: "var(--w-1)" }}>{spell[c]}</span>
                                 <span style={{ color: "var(--w-3)" }}> / {land[c]}</span>
                               </span>
