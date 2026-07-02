@@ -115,6 +115,14 @@ export function cardNamesIn(md: string): string[] {
   return out;
 }
 
+// Canonical lookup key for a card name: trimmed, internal whitespace collapsed,
+// lowercased. Every name map/set (verified, not-found, pool membership) must be
+// keyed through this so a streaming quirk like a doubled space can't make the
+// same name hash differently in different code paths.
+export function normalizeCardKey(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 // Bold spans the model wrote WITHOUT brackets — candidate card names. The AI
 // often bolds a card name instead of bracketing it (e.g. "**Birds of
 // Paradise**"); the client verifies these against Scryfall and links the ones
@@ -125,8 +133,18 @@ export function boldNamesIn(md: string): string[] {
   for (const m of md.matchAll(/\*\*([^*]+?)\*\*/g)) {
     const inner = m[1].trim().replace(/\s+/g, " ");
     const key = inner.toLowerCase();
-    // Skip empties, already-bracketed spans, and obvious non-names (too long).
-    if (inner && !inner.includes("[[") && inner.length <= 60 && !seen.has(key)) {
+    // Only spans that look like card names: they start with a capital (or a
+    // digit), stay short, and never end with ':'. This keeps bold prose
+    // emphasis ("**removal**", "**Strategy:**") from being verified against
+    // Scryfall and becoming an accidental add-to-deck link when the word
+    // happens to also be a real card (Fog, Ponder, …).
+    const nameLike =
+      inner.length <= 60 &&
+      /^[\p{Lu}\d]/u.test(inner) &&
+      !inner.endsWith(":") &&
+      inner.split(" ").length <= 8 &&
+      !inner.includes("[[");
+    if (nameLike && !seen.has(key)) {
       seen.add(key);
       out.push(inner);
     }

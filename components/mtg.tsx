@@ -177,6 +177,8 @@ export function CardArt({
   colors = ["C"],
   version = "art_crop",
   radius = 0,
+  prefer = "art",
+  loading,
   style,
 }: {
   name?: string;
@@ -184,12 +186,17 @@ export function CardArt({
   colors?: string[];
   version?: string;
   radius?: number;
+  /** "art" tries the name-based fetch first (cropped look); "src" shows the
+      stored image first — for full-card tiles — falling back to the name fetch
+      and then the placeholder if the stored URL has gone stale. */
+  prefer?: "art" | "src";
+  loading?: "lazy" | "eager";
   style?: CSSProperties;
 }) {
   // art-crop by name gives the clean cropped look the design wants; if that
   // fails (double-faced names, etc.) fall back to the stored full image.
   const [stage, setStage] = useState<"art" | "src" | "fallback">(
-    name ? "art" : src ? "src" : "fallback"
+    prefer === "src" ? (src ? "src" : name ? "art" : "fallback") : name ? "art" : src ? "src" : "fallback"
   );
   const [loaded, setLoaded] = useState(false);
   const url = stage === "art" && name ? artURL(name, version) : stage === "src" ? src : null;
@@ -233,10 +240,16 @@ export function CardArt({
             // Cached images can complete before React attaches onLoad.
             if (el && el.complete && el.naturalWidth > 0) setLoaded(true);
           }}
+          loading={loading}
           onLoad={() => setLoaded(true)}
           onError={() => {
             setLoaded(false);
-            setStage((s) => (s === "art" && src ? "src" : "fallback"));
+            // Step down the chain without cycling: whichever of art/src came
+            // first falls back to the other (if available), then the placeholder.
+            setStage((s) => {
+              if (s === "art") return src && prefer !== "src" ? "src" : "fallback";
+              return name && prefer === "src" ? "art" : "fallback";
+            });
           }}
           style={{
             position: "absolute",
@@ -271,6 +284,44 @@ export function categoryOf(typeLine: string | null): string {
   if (t.includes("artifact")) return "Artifacts";
   if (t.includes("enchantment")) return "Enchantments";
   return "Other";
+}
+
+const BASIC_LAND_COLORS: [string, string][] = [
+  ["plains", "W"],
+  ["island", "U"],
+  ["swamp", "B"],
+  ["mountain", "R"],
+  ["forest", "G"],
+];
+
+/* The WUBRG colors a land can put into the pool, read from what the card
+   actually does rather than its color identity (which is a rules concept:
+   Kessig Wolf Run has an RG identity but taps only for colorless). Sources,
+   in order: "any color" text and fetches count as every identity color; basic
+   land types (Forest, Triome subtypes, …) grant their color intrinsically;
+   explicit "{T}: Add {G} or {W}" abilities are scanned for mana symbols.
+   A land whose oracle text hasn't been enriched yet (null) falls back to its
+   color identity as the best available guess. */
+export function landProducedColors(
+  typeLine: string | null,
+  oracleText: string | null,
+  colorIdentity: string | null,
+  identity: string[]
+): string[] {
+  if (oracleText == null) {
+    return (colorIdentity ?? "").split("").filter((c) => WUBRG.includes(c));
+  }
+  if (/any colou?r/i.test(oracleText)) return identity;
+  // Fetch lands (Evolving Wilds, …) grab a land from the library — within a
+  // deck that's effectively any identity color.
+  if (/search your library for .{0,80}land/i.test(oracleText)) return identity;
+  const found = new Set<string>();
+  const t = (typeLine || "").toLowerCase();
+  for (const [subtype, c] of BASIC_LAND_COLORS) if (t.includes(subtype)) found.add(c);
+  for (const clause of oracleText.matchAll(/\badd [^.\n]*/gi)) {
+    for (const sym of clause[0].matchAll(/\{([WUBRG])\}/g)) found.add(sym[1]);
+  }
+  return WUBRG.filter((c) => found.has(c));
 }
 export const TYPE_ORDER = [
   "Creatures",
