@@ -29,6 +29,7 @@ import {
   deckStats,
   categoryOf,
   colorsOf,
+  landProducedColors,
   manaValue,
   deckTarget,
   TYPE_ORDER,
@@ -889,23 +890,20 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   </span>
                 </div>
                 {(() => {
-                  // Non-land colour requirements (spell pips) vs the lands that
-                  // can produce each colour. An "any colour" land (e.g. Command
-                  // Tower) makes every colour in the deck's identity.
+                  // Colour requirements (spell pips) vs the lands that can
+                  // produce each colour, from what each land actually adds.
+                  // Cards are not either/or: a spell//land MDFC counts on both
+                  // sides.
                   const spell: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
                   const land: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
                   const identity = identityPips.filter((c) => "WUBRG".includes(c));
                   for (const c of deckCards) {
                     const qty = c.quantity > 0 ? c.quantity : 1;
                     if (categoryOf(c.typeLine) === "Lands") {
-                      const produced =
-                        c.oracleText && /any colou?r/i.test(c.oracleText)
-                          ? identity
-                          : (c.colorIdentity ?? "").replace(/[^WUBRG]/g, "").split("");
-                      for (const col of produced) if (land[col] != null) land[col] += qty;
-                    } else {
-                      for (const col of colorsOf(c.manaCost)) if (spell[col] != null) spell[col] += qty;
+                      for (const col of landProducedColors(c.typeLine, c.oracleText, c.colorIdentity, identity))
+                        if (land[col] != null) land[col] += qty;
                     }
+                    for (const col of colorsOf(c.manaCost)) if (spell[col] != null) spell[col] += qty;
                   }
                   const order = (["W", "U", "B", "R", "G"] as const).filter((c) => spell[c] > 0 || land[c] > 0);
                   if (order.length === 0) return null;
@@ -948,7 +946,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   );
                 })()}
                 <p style={{ fontSize: 12.5, color: "var(--w-2)", margin: 0, lineHeight: 1.45 }}>
-                  Avg. mana value <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{stats.avgMv.toFixed(1)}</b> · spells exclude lands; land sources count any-colour lands toward your identity.
+                  Avg. mana value <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{stats.avgMv.toFixed(1)}</b> · land sources reflect what each land can produce; fetches and any-colour lands count toward your identity.
                 </p>
               </div>
             </div>
@@ -1640,76 +1638,6 @@ function DotGrid({
   );
 }
 
-/* Pool tile — full card scan, with hover actions. Tapping opens review. */
-function PoolImageCard({
-  card,
-  warning,
-  owned,
-  onOpen,
-  onMove,
-  onRemove,
-}: {
-  card: PoolCard;
-  warning?: string;
-  owned?: boolean;
-  onOpen: () => void;
-  onMove: () => void;
-  onRemove: () => void;
-}) {
-  const [hover, setHover] = useState(false);
-  return (
-    <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      onClick={onOpen}
-      style={{
-        position: "relative",
-        borderRadius: "4.8%/3.5%",
-        overflow: "hidden",
-        cursor: "pointer",
-        aspectRatio: "5 / 7",
-        background: "rgba(0,0,0,.25)",
-        boxShadow: hover ? "0 14px 30px -10px rgba(0,0,0,.6)" : "0 4px 12px -4px rgba(0,0,0,.45)",
-        transform: hover ? "translateY(-3px)" : "none",
-        transition: "transform .16s ease, box-shadow .16s ease",
-      }}
-    >
-      {card.imageUri ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={card.imageUri} alt={card.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-      ) : (
-        <CardArt name={card.name} src={card.imageUri || undefined} radius={0} style={{ position: "absolute", inset: 0 }} />
-      )}
-      {owned && (
-        <span
-          title="In your collection"
-          style={{ position: "absolute", top: 8, left: 8, background: "rgba(13,138,95,.92)", color: "#fff", fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 999, letterSpacing: ".02em", boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}
-        >
-          ✓ Owned
-        </span>
-      )}
-      {card.quantity > 1 && (
-        <span style={{ position: "absolute", bottom: 8, left: 8, background: "rgba(0,0,0,.72)", color: "#fff", fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 999 }}>
-          ×{card.quantity}
-        </span>
-      )}
-      {warning && (
-        <span title={warning} style={{ position: "absolute", bottom: 8, right: 8, background: "rgba(0,0,0,.72)", color: "#ffd23f", fontSize: 13, width: 22, height: 22, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          ⚠
-        </span>
-      )}
-      <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6, opacity: hover ? 1 : 0, transition: "opacity .15s" }}>
-        <button onClick={(e) => { e.stopPropagation(); onMove(); }} title="Move to deck" aria-label="Move to deck" style={poolIconBtn}>
-          ⤴
-        </button>
-        <button onClick={(e) => { e.stopPropagation(); onRemove(); }} title="Remove" aria-label="Remove" style={poolIconBtn}>
-          ✕
-        </button>
-      </div>
-    </div>
-  );
-}
-
 const poolIconBtn: React.CSSProperties = {
   width: 26,
   height: 26,
@@ -1767,12 +1695,17 @@ function DeckCardTile({
         transition: "transform .16s ease, box-shadow .16s ease",
       }}
     >
-      {card.imageUri ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={card.imageUri} alt={card.name} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-      ) : (
-        <CardArt name={card.name} radius={0} style={{ position: "absolute", inset: 0 }} />
-      )}
+      {/* stored scan first; a stale/404 URL falls back to a fresh name-based
+          fetch, then the gradient placeholder — never a broken-image icon. */}
+      <CardArt
+        name={card.name}
+        src={card.imageUri || undefined}
+        prefer="src"
+        version="normal"
+        loading="lazy"
+        radius={0}
+        style={{ position: "absolute", inset: 0 }}
+      />
       {owned && (
         <span title="In your collection" style={{ position: "absolute", top: 7, left: 7, background: "rgba(13,138,95,.92)", color: "#fff", fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 999, boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}>
           ✓

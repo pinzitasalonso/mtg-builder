@@ -171,6 +171,11 @@ export default function SwipeModal<T extends SwipeCard>({
   const tx = exit === "right" ? "120%" : exit === "left" ? "-120%" : `${drag}px`;
   const decision = exit || (drag > 50 ? "right" : drag < -50 ? "left" : null);
 
+  // Skip/add render in two places (flanking the card on wide screens, in the
+  // bottom row on narrow) — defined once so their behavior can't drift.
+  const skipBtn = (size?: number) => <SwBtn kind="skip" size={size} onClick={() => act("left")} />;
+  const addBtn = (size?: number) => <SwBtn kind="add" size={size} onClick={() => act("right")} />;
+
   return (
     <div
       style={{
@@ -247,12 +252,8 @@ export default function SwipeModal<T extends SwipeCard>({
         {/* on wide screens the keep/remove buttons flank the card */}
         {!done && (
           <>
-            <div className="sw-side sw-side-left">
-              <SwBtn kind="skip" size={74} onClick={() => act("left")} />
-            </div>
-            <div className="sw-side sw-side-right">
-              <SwBtn kind="add" size={74} onClick={() => act("right")} />
-            </div>
+            <div className="sw-side sw-side-left">{skipBtn(74)}</div>
+            <div className="sw-side sw-side-right">{addBtn(74)}</div>
           </>
         )}
         {done ? (
@@ -332,13 +333,9 @@ export default function SwipeModal<T extends SwipeCard>({
             {price === undefined ? "" : price ? `$${price}` : "no price"}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
-            <span className="sw-narrow-only">
-              <SwBtn kind="skip" onClick={() => act("left")} />
-            </span>
+            <span className="sw-narrow-only">{skipBtn()}</span>
             <SwBtn kind="info" onClick={() => card && onInfo?.(card)} />
-            <span className="sw-narrow-only">
-              <SwBtn kind="add" onClick={() => act("right")} />
-            </span>
+            <span className="sw-narrow-only">{addBtn()}</span>
           </div>
           <div style={{ fontSize: 13, color: "var(--t3)" }}>
             {copy.hint}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boldNamesIn, cardNamesIn, flattenInline, parseBlocks, tokenizeInline } from "./chat-markdown";
+import { boldNamesIn, cardNamesIn, flattenInline, normalizeCardKey, parseBlocks, tokenizeInline } from "./chat-markdown";
 
 describe("boldNamesIn", () => {
   it("collects unbracketed bold spans as candidate card names", () => {
@@ -10,6 +10,24 @@ describe("boldNamesIn", () => {
   });
   it("ignores bold spans that already contain a bracketed card", () => {
     expect(boldNamesIn("**[[Sol Ring]]**")).toEqual([]);
+  });
+  it("skips lowercase prose emphasis even when the word is a real card", () => {
+    expect(boldNamesIn("focus on **removal** and **fog** effects")).toEqual([]);
+  });
+  it("skips header-style spans ending with a colon", () => {
+    expect(boldNamesIn("**Strategy:** go wide")).toEqual([]);
+  });
+  it("skips long bold sentences", () => {
+    expect(boldNamesIn("**This is a whole bolded sentence about the deck plan**")).toEqual([]);
+  });
+  it("collapses internal whitespace in candidates", () => {
+    expect(boldNamesIn("**Birds of  Paradise**")).toEqual(["Birds of Paradise"]);
+  });
+});
+
+describe("normalizeCardKey", () => {
+  it("trims, collapses whitespace, and lowercases", () => {
+    expect(normalizeCardKey("  Birds of  Paradise ")).toBe("birds of paradise");
   });
 });
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
-import { Block, InlineToken, boldNamesIn, cardNamesIn, flattenInline, parseBlocks } from "@/lib/chat-markdown";
+import { Block, InlineToken, boldNamesIn, cardNamesIn, flattenInline, normalizeCardKey, parseBlocks } from "@/lib/chat-markdown";
 import { collectionByName } from "@/lib/scryfall";
 import { track } from "@/lib/track";
 
@@ -72,10 +72,11 @@ export default function DeckChat({
   // Whether the transcript is pinned to the bottom. While streaming we only
   // auto-scroll when it's true, so scrolling up to read isn't yanked back down.
   const pinnedRef = useRef(true);
-  // lowercase name → pool row, for membership, dbId (remove) and stored image.
-  const poolByLower = new Map(pool.map((c) => [c.name.toLowerCase(), c]));
-  // lowercase names the player owns, for the "owned" hint on suggestions.
-  const ownedLower = new Set(ownedNames.map((n) => n.toLowerCase()));
+  // Normalized name → pool row, for membership, dbId (remove) and stored image.
+  // Memoized so message components don't see a fresh map on every keystroke.
+  const poolByLower = useMemo(() => new Map(pool.map((c) => [normalizeCardKey(c.name), c])), [pool]);
+  // Normalized names the player owns, for the "owned" hint on suggestions.
+  const ownedLower = useMemo(() => new Set(ownedNames.map(normalizeCardKey)), [ownedNames]);
 
   useEffect(() => {
     if (!pinnedRef.current) return;
@@ -92,20 +93,25 @@ export default function DeckChat({
       if (m.role !== "assistant" || !m.content) continue;
       // Bracketed names, plus bold spans (which may be unbracketed card names).
       for (const n of [...cardNamesIn(m.content), ...boldNamesIn(m.content)]) {
-        const key = n.toLowerCase();
+        const key = normalizeCardKey(n);
         if (!checked.has(key) && !poolByLower.has(key)) names.add(n);
       }
     }
     if (names.size === 0) return;
     let cancelled = false;
-    collectionByName([...names]).then((found) => {
-      if (cancelled) return;
-      setChecked((prev) => {
-        const next = new Map(prev);
-        for (const n of names) next.set(n.toLowerCase(), found.has(n.toLowerCase()));
-        return next;
-      });
-    });
+    collectionByName([...names])
+      .then((found) => {
+        if (cancelled) return;
+        setChecked((prev) => {
+          const next = new Map(prev);
+          for (const n of names) next.set(normalizeCardKey(n), found.has(normalizeCardKey(n)));
+          return next;
+        });
+      })
+      // A failed lookup just leaves the names unverified: bracketed cards stay
+      // clickable (they're trusted unless proven not-found) and bold spans stay
+      // plain text. The next reply retriggers the effect and retries them.
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -115,7 +121,7 @@ export default function DeckChat({
   // Click a card link: add it if it's not in the pool, otherwise remove that row
   // from the deck. Either way the pool reloads so the link's state flips.
   async function toggleCard(name: string) {
-    const key = name.toLowerCase();
+    const key = normalizeCardKey(name);
     if (busy.has(key)) return;
     setPreview(null);
     setError("");
@@ -143,7 +149,7 @@ export default function DeckChat({
   // Scryfall lookup and inserted in a single request (fast, no per-card hammering).
   async function bulkAdd(names: string[]) {
     if (bulkBusy) return;
-    const todo = names.filter((n) => !poolByLower.has(n.toLowerCase()) && !notFound.has(n.toLowerCase()));
+    const todo = names.filter((n) => !poolByLower.has(normalizeCardKey(n)) && !notFound.has(normalizeCardKey(n)));
     if (todo.length === 0) return;
     setBulkBusy(true);
     setBulkProgress({ mode: "add", done: 0, total: todo.length });
@@ -159,7 +165,7 @@ export default function DeckChat({
   async function bulkRemove(names: string[]) {
     if (bulkBusy) return;
     const rows = names
-      .map((n) => poolByLower.get(n.toLowerCase()))
+      .map((n) => poolByLower.get(normalizeCardKey(n)))
       .filter((r): r is PoolEntry => Boolean(r));
     if (rows.length === 0) return;
     setBulkBusy(true);
@@ -430,6 +436,34 @@ function CardPreview({ preview }: { preview: Preview }) {
   );
 }
 
+/* The cards a reply makes clickable — the single source of truth shared by the
+   bulk-action bar and the inline render, so they can't disagree. Bracketed
+   names are trusted (linked unless Scryfall said not-found: the model marked
+   them as cards explicitly), while bold spans only count once verified as real
+   cards. */
+function linkableNames(
+  content: string,
+  poolByLower: Map<string, PoolEntry>,
+  validCards: Set<string>,
+  notFound: Set<string>
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (n: string, linkable: boolean) => {
+    const key = normalizeCardKey(n);
+    if (linkable && !seen.has(key)) {
+      seen.add(key);
+      out.push(n);
+    }
+  };
+  for (const n of cardNamesIn(content)) push(n, !notFound.has(normalizeCardKey(n)));
+  for (const n of boldNamesIn(content)) {
+    const key = normalizeCardKey(n);
+    push(n, poolByLower.has(key) || validCards.has(key));
+  }
+  return out;
+}
+
 /* One assistant turn: the rendered answer plus, when it names several cards, a
    bulk action bar to add every suggested card or remove every suggested cut in
    one tap. */
@@ -462,20 +496,15 @@ function AssistantMessage({
   onAddAll: (names: string[]) => void;
   onRemoveAll: (names: string[]) => void;
 }) {
-  // Every clickable card in the reply: bracketed names plus bold spans that
-  // verified as real cards (so "Add all" matches what's actually linked).
-  const seen = new Set<string>();
-  const names: string[] = [];
-  for (const n of [...cardNamesIn(content), ...boldNamesIn(content)]) {
-    const key = n.toLowerCase();
-    const linkable = poolByLower.has(key) || validCards.has(key);
-    if (linkable && !seen.has(key)) {
-      seen.add(key);
-      names.push(n);
-    }
-  }
-  const toAdd = names.filter((n) => !poolByLower.has(n.toLowerCase()) && !notFound.has(n.toLowerCase()));
-  const toRemove = names.filter((n) => poolByLower.has(n.toLowerCase()));
+  // Every clickable card in the reply, so "Add all" matches what's linked.
+  // Memoized: streaming re-renders every bubble per chunk, and this scans the
+  // whole reply text.
+  const names = useMemo(
+    () => linkableNames(content, poolByLower, validCards, notFound),
+    [content, poolByLower, validCards, notFound]
+  );
+  const toAdd = names.filter((n) => !poolByLower.has(normalizeCardKey(n)));
+  const toRemove = names.filter((n) => poolByLower.has(normalizeCardKey(n)));
   // Only worth a bulk bar when the answer suggests more than one card.
   const showBar = showActions && names.length > 1 && (toAdd.length > 0 || toRemove.length > 0);
   return (
@@ -561,16 +590,19 @@ function ChatMarkdown({
   onPreview: (p: Preview | null) => void;
   validCards: Set<string>;
 }) {
-  const blocks = parseBlocks(text);
+  // Re-parsing the whole reply on every streamed chunk (for every bubble) adds
+  // up; the parse only depends on the text.
+  const blocks = useMemo(() => parseBlocks(text), [text]);
   const linkFor = (name: string, key: string) => {
-    const entry = poolByLower.get(name.toLowerCase());
+    const nameKey = normalizeCardKey(name);
+    const entry = poolByLower.get(nameKey);
     return (
       <CardLink
         key={key}
         name={name}
         inPool={Boolean(entry)}
-        owned={ownedLower.has(name.toLowerCase())}
-        busy={busy.has(name.toLowerCase())}
+        owned={ownedLower.has(nameKey)}
+        busy={busy.has(nameKey)}
         imageUri={entry?.imageUri || null}
         onClick={() => onCard(name)}
         onPreview={onPreview}
@@ -585,7 +617,7 @@ function ChatMarkdown({
         // Guardrail: a bold span that's actually a real card name (the model
         // forgot the brackets) still becomes a clickable link.
         const flat = flattenInline(t.tokens).trim();
-        const k = flat.toLowerCase();
+        const k = normalizeCardKey(flat);
         const hasCardChild = t.tokens.some((x) => x.type === "card");
         if (!hasCardChild && flat && (poolByLower.has(k) || validCards.has(k))) {
           return linkFor(flat, key);
@@ -598,7 +630,7 @@ function ChatMarkdown({
       }
       // A name Scryfall couldn't resolve (an AI slip) — show it plainly, not as
       // a clickable card that would only fail to add.
-      if (notFound.has(t.value.toLowerCase())) {
+      if (notFound.has(normalizeCardKey(t.value))) {
         return (
           <span key={key} title="Not a real card on Scryfall" style={{ fontWeight: 600, color: "var(--text-muted)" }}>
             {t.value}
