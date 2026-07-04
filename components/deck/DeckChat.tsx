@@ -22,19 +22,43 @@ interface Preview {
   rect: DOMRect;
 }
 
-/* Conversational AI deck assistant. The player describes an idea or change and
-   gets a streamed, ChatGPT-style Markdown answer (combos woven in). Every card
-   the assistant names is an interactive link: hover to preview it, click to add
-   it to the pool — or, if it's already in the deck, click to remove it.
-   Conversation is multi-turn for the session — it persists while the deck page
-   is mounted, including across search-mode tab switches, and resets on reload. */
-export default function DeckChat({
+/* Everything a chat view needs: the conversation, its derived name sets, and
+   the actions. Produced once per deck page by useDeckChat so several views
+   (the pool search panel, the mobile deck tab) share ONE conversation. */
+export interface DeckChatController {
+  messages: ChatMessage[];
+  input: string;
+  setInput: React.Dispatch<React.SetStateAction<string>>;
+  streaming: boolean;
+  error: string;
+  busy: Set<string>;
+  bulkBusy: boolean;
+  bulkProgress: { mode: "add" | "remove"; done: number; total: number } | null;
+  preview: Preview | null;
+  setPreview: React.Dispatch<React.SetStateAction<Preview | null>>;
+  poolByLower: Map<string, PoolEntry>;
+  ownedLower: Set<string>;
+  notFound: Set<string>;
+  validCards: Set<string>;
+  toggleCard: (name: string) => void;
+  bulkAdd: (names: string[]) => void;
+  bulkRemove: (names: string[]) => void;
+  send: (text: string) => void;
+}
+
+/* Conversational AI deck assistant state. The player describes an idea or
+   change and gets a streamed, ChatGPT-style Markdown answer (combos woven in).
+   Every card the assistant names is an interactive link: hover to preview it,
+   click to add it to the pool — or, if it's already in the deck, click to
+   remove it. Conversation is multi-turn for the session — it persists while
+   the deck page is mounted, including across search-mode tab switches and the
+   mobile pool/deck tabs, and resets on reload. */
+export function useDeckChat({
   deckId,
   pool,
   commander,
   ownedNames,
   onPoolChanged,
-  onEngaged,
 }: {
   deckId: string;
   pool: PoolEntry[];
@@ -42,9 +66,7 @@ export default function DeckChat({
   /** Card names from the player's collection — marks suggestions they own. */
   ownedNames: string[];
   onPoolChanged: () => void;
-  /** Reports when the user engages the chat (focus / conversation started). */
-  onEngaged?: (engaged: boolean) => void;
-}) {
+}): DeckChatController {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
@@ -68,20 +90,11 @@ export default function DeckChat({
     [checked]
   );
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  // Whether the transcript is pinned to the bottom. While streaming we only
-  // auto-scroll when it's true, so scrolling up to read isn't yanked back down.
-  const pinnedRef = useRef(true);
   // Normalized name → pool row, for membership, dbId (remove) and stored image.
   // Memoized so message components don't see a fresh map on every keystroke.
   const poolByLower = useMemo(() => new Map(pool.map((c) => [normalizeCardKey(c.name), c])), [pool]);
   // Normalized names the player owns, for the "owned" hint on suggestions.
   const ownedLower = useMemo(() => new Set(ownedNames.map(normalizeCardKey)), [ownedNames]);
-
-  useEffect(() => {
-    if (!pinnedRef.current) return;
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
 
   // Once a reply finishes, verify the cards it named against Scryfall (cards in
   // the pool already exist, so skip those). Names Scryfall can't resolve are
@@ -186,10 +199,6 @@ export default function DeckChat({
     const content = text.trim();
     if (!content || streaming) return;
     track("ai_message");
-    // A started conversation keeps the chat engaged (and the pool wide).
-    onEngaged?.(true);
-    // Sending re-pins to the bottom so the new turn (and its reply) scroll in.
-    pinnedRef.current = true;
     const history = [...messages, { role: "user" as const, content }];
     // Append the user turn and an empty assistant turn we stream into.
     setMessages([...history, { role: "assistant", content: "" }]);
@@ -238,6 +247,96 @@ export default function DeckChat({
       setStreaming(false);
     }
   }
+
+  return {
+    messages,
+    input,
+    setInput,
+    streaming,
+    error,
+    busy,
+    bulkBusy,
+    bulkProgress,
+    preview,
+    setPreview,
+    poolByLower,
+    ownedLower,
+    notFound,
+    validCards,
+    toggleCard,
+    bulkAdd,
+    bulkRemove,
+    send,
+  };
+}
+
+/* One-tap prompts for the empty state. The deck judge lives here now — it used
+   to be a separate Tools modal, but it's just a conversation with the expert. */
+const STARTERS: { label: string; prompt: string }[] = [
+  {
+    label: "✨ Judge my deck",
+    prompt:
+      "Judge my current deck like a pro deckbuilder: a short verdict first, then what's working well, the weakest cards I should consider cutting, and the key cards I'm missing (suggest specific ones).",
+  },
+  {
+    label: "Fix my mana base",
+    prompt: "Review my mana base: do I have enough lands and the right color sources? Suggest specific lands to add or swap.",
+  },
+  {
+    label: "How do I win?",
+    prompt: "How does this deck actually close out games? If the win conditions are thin, suggest specific cards to strengthen them.",
+  },
+];
+
+/* The chat view. All conversation state lives in the DeckChatController from
+   useDeckChat, so several placements share one conversation; each view keeps
+   only its own scroll position. */
+export default function DeckChat({
+  chat,
+  onEngaged,
+}: {
+  chat: DeckChatController;
+  /** Reports when the user engages the chat (focus / conversation started). */
+  onEngaged?: (engaged: boolean) => void;
+}) {
+  const {
+    messages,
+    input,
+    setInput,
+    streaming,
+    error,
+    busy,
+    bulkBusy,
+    bulkProgress,
+    preview,
+    setPreview,
+    poolByLower,
+    ownedLower,
+    notFound,
+    validCards,
+    toggleCard,
+    bulkAdd,
+    bulkRemove,
+    send,
+  } = chat;
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // Whether the transcript is pinned to the bottom. While streaming we only
+  // auto-scroll when it's true, so scrolling up to read isn't yanked back down.
+  const pinnedRef = useRef(true);
+  useEffect(() => {
+    if (!pinnedRef.current) return;
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
+  // Sending re-pins to the bottom so the new turn (and its reply) scroll in; a
+  // started conversation also keeps the chat engaged (and the pool wide).
+  const doSend = (text: string) => {
+    if (!text.trim() || streaming) return;
+    onEngaged?.(true);
+    pinnedRef.current = true;
+    send(text);
+  };
 
   const empty = messages.length === 0;
 
@@ -308,21 +407,46 @@ export default function DeckChat({
         <div style={{ fontSize: 13.5, color: "var(--danger)", padding: "0 2px" }}>{error}</div>
       )}
 
-      {/* intro line (only before the first message) */}
+      {/* intro line + one-tap starters (only before the first message) */}
       {empty && (
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
-          <span style={{ color: "var(--gold)", fontSize: 14, lineHeight: 1.5 }}>✦</span>
-          <p style={{ margin: 0, fontSize: 13.5, color: "var(--w-2, var(--text-muted))", lineHeight: 1.5 }}>
-            Describe what the deck needs — Spellpool pulls <b style={{ color: "var(--w-1, var(--text))" }}>real cards</b> in your color identity.
-          </p>
-        </div>
+        <>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+            <span style={{ color: "var(--gold)", fontSize: 14, lineHeight: 1.5 }}>✦</span>
+            <p style={{ margin: 0, fontSize: 13.5, color: "var(--w-2, var(--text-muted))", lineHeight: 1.5 }}>
+              Describe what the deck needs — Spellpool pulls <b style={{ color: "var(--w-1, var(--text))" }}>real cards</b> in your color identity.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {STARTERS.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => doSend(s.prompt)}
+                disabled={streaming}
+                style={{
+                  padding: "7px 13px",
+                  borderRadius: 999,
+                  border: "1px solid var(--line)",
+                  background: "transparent",
+                  color: "var(--accent)",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {/* composer */}
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          send(input);
+          doSend(input);
         }}
         style={{ display: "flex", gap: 10, alignItems: "center" }}
       >
@@ -335,7 +459,7 @@ export default function DeckChat({
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              send(input);
+              doSend(input);
             }
           }}
           placeholder="Tell the assistant your idea…"
