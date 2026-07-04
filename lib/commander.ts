@@ -1,6 +1,10 @@
 import prisma from "@/lib/prisma";
 import { resolveNamed } from "@/lib/scryfall";
 
+// Pure format rules live in lib/format (client-safe); re-exported here so the
+// API routes keep a single import for all commander logic.
+export { isBasicLand, singletonCapped } from "@/lib/format";
+
 type DeckLike = { id: number; format: string; commander: string | null };
 
 // True when a card is the deck's commander (commander format only).
@@ -8,17 +12,6 @@ export function isCommanderCard(deck: DeckLike | null | undefined, cardName: str
   if (!deck || deck.format.toLowerCase() !== "commander") return false;
   const c = deck.commander?.trim().toLowerCase();
   return Boolean(c) && cardName.trim().toLowerCase() === c;
-}
-
-// Basic lands are the only cards that may stack in a singleton deck.
-export function isBasicLand(typeLine: string | null | undefined): boolean {
-  return !!typeLine && /\bbasic\b/i.test(typeLine) && /\bland\b/i.test(typeLine);
-}
-
-// In commander (a singleton format) only one copy of any non-basic card is
-// allowed. Returns true when this card must be capped at a single copy.
-export function singletonCapped(format: string, typeLine: string | null | undefined): boolean {
-  return format.toLowerCase() === "commander" && !isBasicLand(typeLine);
 }
 
 

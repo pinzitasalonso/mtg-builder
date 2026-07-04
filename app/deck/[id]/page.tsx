@@ -14,7 +14,8 @@ import DeckChat from "@/components/deck/DeckChat";
 import OrderModal from "@/components/deck/OrderModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
-import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard, deleteCard } from "@/lib/pool-client";
+import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard, deleteCard, setQuantity } from "@/lib/pool-client";
+import { singletonCapped } from "@/lib/format";
 import { applyPending, flushQueue, pendingFor } from "@/lib/offline-queue";
 import { cardWarnings } from "@/lib/legality";
 import { getIdentityTheme } from "@/lib/identity-theme";
@@ -451,13 +452,19 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         if (!res.ok) {
           setSearchError(data.details?.details ?? data.error ?? "Search failed");
         } else {
-          // Hide cards already in the deck — by id and by name — so the swipe
-          // never offers a duplicate.
-          const poolIds = new Set(pool.map((c) => c.id));
-          const poolNames = new Set(pool.map((c) => c.name.toLowerCase()));
+          // In singleton decks, hide cards already in the deck — by id and by
+          // name — so the swipe never offers a duplicate. Other formats allow
+          // playsets, so every match stays offerable (swiping right adds
+          // another copy).
           const all = data.cards as SearchCard[];
-          const filtered = all.filter((c) => !poolIds.has(c.id) && !poolNames.has(c.name.toLowerCase()));
-          const hidden = all.length - filtered.length;
+          let filtered = all;
+          let hidden = 0;
+          if ((deck?.format ?? "").toLowerCase() === "commander") {
+            const poolIds = new Set(pool.map((c) => c.id));
+            const poolNames = new Set(pool.map((c) => c.name.toLowerCase()));
+            filtered = all.filter((c) => !poolIds.has(c.id) && !poolNames.has(c.name.toLowerCase()));
+            hidden = all.length - filtered.length;
+          }
           setSearchResults(filtered);
           setGeneratedQuery(data.query);
           setTruncated(Boolean(data.truncated));
@@ -471,7 +478,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       }
       setSearching(false);
     },
-    [searchMode, pool]
+    [searchMode, pool, deck?.format]
   );
 
   function onSubmitSearch(e: React.FormEvent) {
@@ -497,7 +504,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   const addCard = useCallback(
     async (card: SearchCard) => {
-      if (pool.some((c) => c.id === card.id)) return;
+      // Singleton decks ignore a re-add; elsewhere the server increments the
+      // existing row's quantity (another copy for the playset).
+      if (singletonCapped(deck?.format ?? "commander", card.typeLine) && pool.some((c) => c.id === card.id)) return;
       await fetch(`/api/decks/${deckId}/cards`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -514,7 +523,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       });
       loadPool();
     },
-    [pool, deckId, loadPool]
+    [pool, deckId, loadPool, deck?.format]
   );
 
   async function addByName(e: React.FormEvent) {
@@ -523,7 +532,15 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     if (!name) return;
     setNameAdding(true);
     setNameError("");
-    const r = await resolveAndAdd(deckId, name, 1, poolByName(pool), { skipIfExists: true });
+    // Refuse a duplicate only where the format caps copies: commander and
+    // non-basic. Re-adding elsewhere (or a basic in commander) puts another
+    // copy on the existing row.
+    const known = poolByName(pool);
+    const existing = known.get(name.toLowerCase());
+    const skip = existing
+      ? singletonCapped(deck?.format ?? "", existing.typeLine)
+      : (deck?.format ?? "").toLowerCase() === "commander";
+    const r = await resolveAndAdd(deckId, name, 1, known, { skipIfExists: skip });
     if (r === "added") {
       setNameInput("");
       await loadPool();
@@ -533,6 +550,13 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       setNameError(r === "notfound" ? "Card not found — check the spelling." : "Couldn't add that card.");
     }
     setNameAdding(false);
+  }
+
+  // Set the exact copy count of a deck row (the tiles' − / + stepper, shown in
+  // formats that allow playsets). The last copy is removed via the ✕, not here.
+  async function setCopies(c: PoolCard, next: number) {
+    if (next < 1 || next === c.quantity) return;
+    if (await setQuantity(deckId, c.dbId, next)) loadPool();
   }
 
   async function removeCard(dbId: number) {
@@ -1286,7 +1310,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                           <DeckSectionHead cat={g.t} n={g.cards.reduce((s, c) => s + c.quantity, 0)} />
                           <div style={deckTileGrid}>
                             {g.cards.map((c) => (
-                              <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable onOpen={() => startDeckReview(c)} onRemove={() => removeCard(c.dbId)} />
+                              <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable onOpen={() => startDeckReview(c)} onRemove={() => removeCard(c.dbId)} onQty={singletonCapped(deck?.format ?? "commander", c.typeLine) ? undefined : (n) => setCopies(c, n)} />
                             ))}
                           </div>
                         </div>
@@ -1300,7 +1324,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               {[...deckCards]
                 .sort((a, b) => deckSort === "cost" ? (manaValue(a.manaCost) - manaValue(b.manaCost)) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name))
                 .map((c) => (
-                  <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable={!isCommander(c)} onOpen={() => startDeckReview(c)} onRemove={() => removeCard(c.dbId)} />
+                  <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable={!isCommander(c)} onOpen={() => startDeckReview(c)} onRemove={() => removeCard(c.dbId)} onQty={isCommander(c) || singletonCapped(deck?.format ?? "commander", c.typeLine) ? undefined : (n) => setCopies(c, n)} />
                 ))}
             </div>
           )}
@@ -1653,6 +1677,23 @@ const poolIconBtn: React.CSSProperties = {
   backdropFilter: "blur(4px)",
 };
 
+const tileQtyBtn: React.CSSProperties = {
+  width: 20,
+  height: 20,
+  borderRadius: "50%",
+  border: "none",
+  cursor: "pointer",
+  background: "rgba(255,255,255,.14)",
+  color: "#fff",
+  fontSize: 13,
+  fontWeight: 700,
+  lineHeight: 1,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 0,
+};
+
 const deckTileGrid: React.CSSProperties = {
   display: "grid",
   gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))",
@@ -1668,6 +1709,7 @@ function DeckCardTile({
   removable,
   onOpen,
   onRemove,
+  onQty,
 }: {
   card: PoolCard;
   owned?: boolean;
@@ -1675,6 +1717,9 @@ function DeckCardTile({
   removable: boolean;
   onOpen?: () => void;
   onRemove: () => void;
+  /** Set the copy count — provided only where the format allows playsets
+      (non-commander decks, basics in commander); shows a − / + stepper. */
+  onQty?: (next: number) => void;
 }) {
   const [hover, setHover] = useState(false);
   return (
@@ -1711,10 +1756,31 @@ function DeckCardTile({
           ✓
         </span>
       )}
-      {card.quantity > 1 && (
-        <span style={{ position: "absolute", bottom: 7, left: 7, background: "rgba(0,0,0,.72)", color: "#fff", fontSize: 11.5, fontWeight: 700, padding: "2px 7px", borderRadius: 999 }}>
-          ×{card.quantity}
+      {onQty ? (
+        <span
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: "absolute", bottom: 7, left: 7, display: "flex", alignItems: "center", gap: 2, background: "rgba(0,0,0,.72)", borderRadius: 999, padding: "2px 3px" }}
+        >
+          <button
+            onClick={() => onQty(card.quantity - 1)}
+            disabled={card.quantity <= 1}
+            title="One copy fewer"
+            aria-label="One copy fewer"
+            style={{ ...tileQtyBtn, opacity: card.quantity <= 1 ? 0.35 : 1, cursor: card.quantity <= 1 ? "default" : "pointer" }}
+          >
+            −
+          </button>
+          <span style={{ color: "#fff", fontSize: 11.5, fontWeight: 700, minWidth: 18, textAlign: "center" }}>×{card.quantity}</span>
+          <button onClick={() => onQty(card.quantity + 1)} title="One copy more" aria-label="One copy more" style={tileQtyBtn}>
+            +
+          </button>
         </span>
+      ) : (
+        card.quantity > 1 && (
+          <span style={{ position: "absolute", bottom: 7, left: 7, background: "rgba(0,0,0,.72)", color: "#fff", fontSize: 11.5, fontWeight: 700, padding: "2px 7px", borderRadius: 999 }}>
+            ×{card.quantity}
+          </span>
+        )
       )}
       {warning && (
         <span title={warning} style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", fontSize: 12, width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
