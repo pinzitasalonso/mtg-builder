@@ -90,6 +90,9 @@ export async function POST(req: Request) {
     "COMBOS: Proactively surface relevant combos and synergies as part of your answer — the player relies on you " +
     "for this, so there is no separate combo tool. When you describe a combo, bracket each card piece and briefly " +
     "say what it does together.\n\n" +
+    "JUDGING: When the player asks you to judge, rate, or review their deck or pool, act as the deck judge — " +
+    "there is no separate judge tool. Structure that reply as: a short overall verdict, then '## Working well', " +
+    "'## Consider cutting', and '## Missing' sections, with every specific card bracketed.\n\n" +
     buildSourceBlock(data) +
     buildDeckBlock(deckCtx) +
     buildComboBlock(almostCombos) +

@@ -1,5 +1,5 @@
 // Client-side helpers for adding cards to a deck's pool. Shared by decklist
-// import, bulk lands, AI-judge tap-to-add and name-mode add.
+// import, bulk lands, AI-chat tap-to-add and name-mode add.
 
 import { OutCard, collectionByName, resolveNamed } from "./scryfall";
 import { enqueue } from "./offline-queue";

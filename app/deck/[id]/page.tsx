@@ -8,9 +8,8 @@ import Logo from "@/components/Logo";
 import CommanderInput from "@/components/CommanderInput";
 import SwipeModal from "@/components/SwipeModal";
 import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
-import JudgeModal from "@/components/deck/JudgeModal";
 import HandSimModal from "@/components/deck/HandSimModal";
-import DeckChat from "@/components/deck/DeckChat";
+import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
 import OrderModal from "@/components/deck/OrderModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
@@ -249,9 +248,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [deckFilter, setDeckFilter] = useState<
     { kind: "mv"; value: number } | { kind: "type"; value: string } | null
   >(null);
-
-  // AI pool judge — runs in <JudgeModal> while open
-  const [judgeOpen, setJudgeOpen] = useState(false);
 
   // sample-hand simulator
   const [handSimOpen, setHandSimOpen] = useState(false);
@@ -694,6 +690,16 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     return Math.min(manaValue(c.manaCost), 7) === deckFilter.value;
   };
 
+  // One AI conversation for the whole page — rendered in the pool search panel
+  // and again on the mobile deck tab, both views sharing this state.
+  const chat = useDeckChat({
+    deckId,
+    pool,
+    commander: deck?.commander,
+    ownedNames,
+    onPoolChanged: loadPool,
+  });
+
   if (deckMissing) {
     return (
       <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
@@ -761,7 +767,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                     style={{ position: "fixed", top: toolsPos?.top ?? 0, left: toolsPos?.left ?? 0, zIndex: 41, width: 210, maxWidth: "calc(100vw - 16px)", padding: 6, display: "flex", flexDirection: "column", gap: 2 }}
                   >
                     {[
-                      { label: "✨ AI judge", on: () => setJudgeOpen(true), disabled: pool.length === 0 },
                       { label: "🎲 Sample hand", on: () => setHandSimOpen(true), disabled: deckCards.length === 0 },
                       { label: "📝 Play guide", on: () => setNotesOpen((v) => !v) },
                       { label: "🌲 Add lands & staples", on: () => setTool("lands") },
@@ -1162,14 +1167,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
             {/* AI chat · name add · scryfall search */}
             {searchMode === "ai" ? (
-              <DeckChat
-                deckId={deckId}
-                pool={pool}
-                commander={deck?.commander}
-                ownedNames={ownedNames}
-                onPoolChanged={loadPool}
-                onEngaged={setAiEngaged}
-              />
+              <DeckChat chat={chat} onEngaged={setAiEngaged} />
             ) : searchMode === "name" ? (
               <form onSubmit={addByName} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", gap: 10 }}>
@@ -1281,6 +1279,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               ⚠ {warningCount} card{warningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ on a card.
             </div>
           )}
+
+          {/* The AI assistant on the deck tab — mobile only (on desktop the pool
+              column hosts it). Same conversation as the pool panel's chat. */}
+          <div className="id-deckchat">
+            <DeckChat chat={chat} />
+          </div>
 
           {deckCards.length === 0 ? (
             <div style={{ padding: "54px 20px", textAlign: "center", color: "var(--w-3)" }}>
@@ -1461,18 +1465,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {/* CardTrader order */}
       {orderOpen && <OrderModal cards={deckCards} onClose={() => setOrderOpen(false)} />}
-
-      {/* AI pool judge */}
-      {judgeOpen && (
-        <JudgeModal
-          deckId={deckId}
-          pool={pool}
-          format={deck?.format}
-          commander={deck?.commander}
-          onClose={() => setJudgeOpen(false)}
-          onPoolChanged={loadPool}
-        />
-      )}
 
       {/* card preview modal */}
       {preview && (
