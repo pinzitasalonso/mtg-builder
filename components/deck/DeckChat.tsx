@@ -504,7 +504,7 @@ export default function DeckChat({
         </button>
       </form>
 
-      {preview && <CardPreview preview={preview} />}
+      {preview && <CardPreview preview={preview} onDismiss={() => setPreview(null)} />}
     </div>
   );
 }
@@ -526,9 +526,11 @@ function Thinking() {
   );
 }
 
-/* Floating card image anchored to the hovered link — placed above it when there's
-   room, otherwise below, and clamped to the viewport. Non-interactive. */
-function CardPreview({ preview }: { preview: Preview }) {
+/* Floating card image anchored to the link — placed above it when there's room,
+   otherwise below, and clamped to the viewport. On desktop it's a passive hover
+   preview; on touch it's opened by the 🔍 and a tap-anywhere backdrop (shown
+   only under `@media (hover: none)`) dismisses it. */
+function CardPreview({ preview, onDismiss }: { preview: Preview; onDismiss: () => void }) {
   const W = 224;
   const H = 312;
   const { rect } = preview;
@@ -536,27 +538,31 @@ function CardPreview({ preview }: { preview: Preview }) {
   const top = above ? rect.top - H - 10 : rect.bottom + 10;
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - W - 8));
   return (
-    <div
-      style={{
-        position: "fixed",
-        top,
-        left,
-        width: W,
-        zIndex: 80,
-        pointerEvents: "none",
-        animation: "sp-fade .12s ease",
-      }}
-    >
-      <div className="cc-black" style={{ padding: 6 }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={preview.src}
-          alt=""
-          draggable={false}
-          style={{ width: "100%", height: "auto", display: "block", borderRadius: 8 }}
-        />
+    <>
+      {/* Touch dismiss layer — inert on hover devices (see globals.css). */}
+      <div className="cardlink-preview-backdrop" onClick={onDismiss} style={{ position: "fixed", inset: 0, zIndex: 79 }} />
+      <div
+        onClick={onDismiss}
+        style={{
+          position: "fixed",
+          top,
+          left,
+          width: W,
+          zIndex: 80,
+          animation: "sp-fade .12s ease",
+        }}
+      >
+        <div className="cc-black" style={{ padding: 6 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview.src}
+            alt=""
+            draggable={false}
+            style={{ width: "100%", height: "auto", display: "block", borderRadius: 8 }}
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -805,9 +811,10 @@ function ChatMarkdown({
   );
 }
 
-/* Inline card reference. Hover previews the card; click adds it to the pool, or
-   removes it if it's already in the deck. In-pool links read green with a ✓ and
-   turn red ("remove") on hover. */
+/* Inline card reference. Hover previews the card (desktop); click adds it to the
+   pool, or removes it if it's already in the deck. On touch devices — where
+   there's no hover — a small 🔍 sits after the name to open the preview. In-pool
+   links read green with a ✓ and turn red ("remove") on hover. */
 function CardLink({
   name,
   inPool,
@@ -841,49 +848,74 @@ function CardLink({
     : owned
       ? `Add ${name} — you own a copy`
       : `Add ${name} to your pool`;
+  const previewFrom = (el: Element) =>
+    onPreview({ src: imageUri || namedImageUrl(name), rect: el.getBoundingClientRect() });
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={busy}
-      title={title}
-      onPointerEnter={(e) => {
-        // Mouse only — on touch the first tap would otherwise reveal the preview
-        // instead of registering the click, making cards feel unclickable.
-        if (e.pointerType !== "mouse") return;
-        setHover(true);
-        onPreview({ src: imageUri || namedImageUrl(name), rect: e.currentTarget.getBoundingClientRect() });
-      }}
-      onPointerLeave={(e) => {
-        if (e.pointerType !== "mouse") return;
-        setHover(false);
-        onPreview(null);
-      }}
-      style={{
-        display: "inline",
-        border: "none",
-        background: "transparent",
-        padding: 0,
-        margin: 0,
-        font: "inherit",
-        cursor: busy ? "default" : "pointer",
-        color,
-        fontWeight: 600,
-        textDecoration: "underline",
-        textDecorationStyle: "dotted",
-        textUnderlineOffset: 2,
-        opacity: busy ? 0.6 : 1,
-      }}
-    >
-      {name}
-      {suffix}
-      {showOwned && (
-        <span
-          style={{ color: "#0d8a5f", fontSize: "0.82em", fontWeight: 600, textDecoration: "none", whiteSpace: "nowrap" }}
-        >
-          {" "}· owned
-        </span>
-      )}
-    </button>
+    <span style={{ whiteSpace: "nowrap" }}>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={busy}
+        title={title}
+        onPointerEnter={(e) => {
+          // Mouse only — on touch the first tap would otherwise reveal the preview
+          // instead of registering the click, making cards feel unclickable.
+          if (e.pointerType !== "mouse") return;
+          setHover(true);
+          previewFrom(e.currentTarget);
+        }}
+        onPointerLeave={(e) => {
+          if (e.pointerType !== "mouse") return;
+          setHover(false);
+          onPreview(null);
+        }}
+        style={{
+          display: "inline",
+          border: "none",
+          background: "transparent",
+          padding: 0,
+          margin: 0,
+          font: "inherit",
+          cursor: busy ? "default" : "pointer",
+          color,
+          fontWeight: 600,
+          textDecoration: "underline",
+          textDecorationStyle: "dotted",
+          textUnderlineOffset: 2,
+          opacity: busy ? 0.6 : 1,
+        }}
+      >
+        {name}
+        {suffix}
+        {showOwned && (
+          <span style={{ color: "#0d8a5f", fontSize: "0.82em", fontWeight: 600, textDecoration: "none" }}>
+            {" "}· owned
+          </span>
+        )}
+      </button>
+      {/* Touch-only preview affordance (desktop uses hover). */}
+      <button
+        type="button"
+        className="cardlink-preview"
+        aria-label={`Preview ${name}`}
+        title={`Preview ${name}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          previewFrom(e.currentTarget);
+        }}
+        style={{
+          border: "none",
+          background: "transparent",
+          padding: "0 2px",
+          margin: 0,
+          cursor: "pointer",
+          color: "var(--accent)",
+          fontSize: "0.85em",
+          verticalAlign: "baseline",
+        }}
+      >
+        🔍
+      </button>
+    </span>
   );
 }
