@@ -201,7 +201,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [preview, setPreview] = useState<SearchCard | null>(null);
-  const [searchMode, setSearchMode] = useState<SearchMode>("scryfall");
+  const [searchMode, setSearchMode] = useState<SearchMode>("name");
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
   const [nameAdding, setNameAdding] = useState(false);
@@ -1056,7 +1056,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>{poolCards.reduce((s, c) => s + c.quantity, 0)} candidates</span>
                 </div>
                 <div className="id-seg">
-                  {(["scryfall", "name"] as const).map((mode) => (
+                  {(["name", "scryfall"] as const).map((mode) => (
                     <button key={mode} type="button" data-on={searchMode === mode} onClick={() => switchMode(mode)}>
                       {mode === "scryfall" ? "Search" : "Name"}
                     </button>
