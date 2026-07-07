@@ -760,6 +760,15 @@ button {
 }
 
 
+/* AI chat card-link preview affordance. Desktop previews on hover, so the 🔍
+   and its tap-to-dismiss backdrop only exist where hover isn't available. */
+.cardlink-preview { display: none; }
+.cardlink-preview-backdrop { display: none; }
+@media (hover: none) {
+  .cardlink-preview { display: inline; }
+  .cardlink-preview-backdrop { display: block; }
+}
+
 /* Pool candidate list flows with the page — no nested scroll area, so the deck
    detail has a single, predictable scroll. */
 .id-cardscroll {
