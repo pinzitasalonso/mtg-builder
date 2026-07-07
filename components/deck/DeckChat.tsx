@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
 import { Block, InlineToken, boldNamesIn, cardNamesIn, flattenInline, normalizeCardKey, parseBlocks } from "@/lib/chat-markdown";
 import { collectionByName } from "@/lib/scryfall";
@@ -529,7 +530,10 @@ function Thinking() {
 /* Floating card image anchored to the link — placed above it when there's room,
    otherwise below, and clamped to the viewport. On desktop it's a passive hover
    preview; on touch it's opened by the 🔍 and a tap-anywhere backdrop (shown
-   only under `@media (hover: none)`) dismisses it. */
+   only under `@media (hover: none)`) dismisses it.
+   Rendered through a portal to <body>: the chat lives inside an .id-panel whose
+   backdrop-filter would otherwise make it the containing block for this fixed
+   element, trapping it behind the panel's text. */
 function CardPreview({ preview, onDismiss }: { preview: Preview; onDismiss: () => void }) {
   const W = 224;
   const H = 312;
@@ -537,7 +541,8 @@ function CardPreview({ preview, onDismiss }: { preview: Preview; onDismiss: () =
   const above = rect.top > H + 16;
   const top = above ? rect.top - H - 10 : rect.bottom + 10;
   const left = Math.max(8, Math.min(rect.left, window.innerWidth - W - 8));
-  return (
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <>
       {/* Touch dismiss layer — inert on hover devices (see globals.css). */}
       <div className="cardlink-preview-backdrop" onClick={onDismiss} style={{ position: "fixed", inset: 0, zIndex: 79 }} />
@@ -562,7 +567,8 @@ function CardPreview({ preview, onDismiss }: { preview: Preview; onDismiss: () =
           />
         </div>
       </div>
-    </>
+    </>,
+    document.body
   );
 }
 
