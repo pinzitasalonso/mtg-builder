@@ -440,7 +440,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             mode: "scryfall",
             currentDeck: {
               commander: deck?.commander ?? null,
-              cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine })),
+              cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine, quantity: c.quantity })),
             },
           }),
         });

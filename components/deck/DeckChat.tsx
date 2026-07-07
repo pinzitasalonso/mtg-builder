@@ -213,7 +213,7 @@ export function useDeckChat({
           messages: history,
           currentDeck: {
             commander: commander ?? null,
-            cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine })),
+            cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine, quantity: c.quantity })),
           },
           collection: ownedNames,
         }),
