@@ -94,7 +94,7 @@ const FORMATS = [
 
 const EDIT_FORMATS = ["commander", "standard", "modern", "pioneer", "legacy", "vintage", "pauper", "draft"];
 
-type SearchMode = "ai" | "scryfall" | "name";
+type SearchMode = "scryfall" | "name";
 
 /* The query text is the single source of truth. Chips toggle Scryfall tokens
    directly in and out of the input, and their selected state is derived from
@@ -201,7 +201,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
   const [preview, setPreview] = useState<SearchCard | null>(null);
-  const [searchMode, setSearchMode] = useState<SearchMode>("ai");
+  const [searchMode, setSearchMode] = useState<SearchMode>("scryfall");
   const [nameInput, setNameInput] = useState("");
   const [nameError, setNameError] = useState("");
   const [nameAdding, setNameAdding] = useState(false);
@@ -217,9 +217,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [copied, setCopied] = useState<"" | "link" | "list">("");
   // deck-panel sort: by type (grouped), by cost (mv), or A–Z
   const [deckSort, setDeckSort] = useState<"type" | "cost" | "name">("type");
-  // The AI chat widens the pool, but only once you engage with it (focus the
-  // input or start a conversation) — not just because AI is the default mode.
-  const [aiEngaged, setAiEngaged] = useState(false);
 
   // settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -440,7 +437,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             prompt: text,
-            mode: searchMode,
+            mode: "scryfall",
             currentDeck: {
               commander: deck?.commander ?? null,
               cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine })),
@@ -477,7 +474,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       }
       setSearching(false);
     },
-    [searchMode, pool, deck?.format]
+    [pool, deck?.format]
   );
 
   function onSubmitSearch(e: React.FormEvent) {
@@ -485,10 +482,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     runSearch(query);
   }
 
-  // Switching modes clears the inputs and any errors/results — the three modes
-  // speak different languages (AI prose, Scryfall syntax, exact names), so
-  // carrying text across them mostly produces errors (e.g. a prompt run as
-  // Scryfall syntax 404s).
+  // Switching modes clears the inputs and any errors/results — the two modes
+  // speak different languages (Scryfall syntax vs. exact names), so carrying
+  // text across them mostly produces errors (e.g. a name run as Scryfall
+  // syntax 404s).
   function switchMode(mode: SearchMode) {
     if (mode === searchMode) return;
     setSearchMode(mode);
@@ -1019,6 +1016,17 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           )}
 
+          {/* Central AI assistant — it fills the pool AND judges/reshapes the
+              deck, so it sits above the pool/deck split rather than inside the
+              pool. One shared conversation for the whole page. */}
+          <section className="id-panel" style={{ padding: 16, marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 12 }}>
+              <span className="id-display" style={{ fontSize: 20, color: "var(--w-1)" }}>✦ Ask the AI</span>
+              <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>build · judge · refine</span>
+            </div>
+            <DeckChat chat={chat} />
+          </section>
+
           {/* mobile pool/deck switcher — sticky segmented control, hidden ≥1024px */}
           <div className="deck-mobile-tabs">
             <button
@@ -1039,7 +1047,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </button>
           </div>
 
-          <div className="id-workspace" data-mobile-view={mobileView} data-ai={searchMode === "ai" && aiEngaged ? "true" : undefined}>
+          <div className="id-workspace" data-mobile-view={mobileView}>
             {/* ── POOL ── */}
             <aside className="id-panel id-pool id-poolcol" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
@@ -1048,9 +1056,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>{poolCards.reduce((s, c) => s + c.quantity, 0)} candidates</span>
                 </div>
                 <div className="id-seg">
-                  {(["ai", "scryfall", "name"] as const).map((mode) => (
+                  {(["scryfall", "name"] as const).map((mode) => (
                     <button key={mode} type="button" data-on={searchMode === mode} onClick={() => switchMode(mode)}>
-                      {mode === "ai" ? "✦ Ask AI" : mode === "scryfall" ? "Search" : "Name"}
+                      {mode === "scryfall" ? "Search" : "Name"}
                     </button>
                   ))}
                 </div>
@@ -1183,10 +1191,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </div>
             )}
 
-            {/* AI chat · name add · scryfall search */}
-            {searchMode === "ai" ? (
-              <DeckChat chat={chat} onEngaged={setAiEngaged} />
-            ) : searchMode === "name" ? (
+            {/* name add · scryfall search (the AI lives in the panel above) */}
+            {searchMode === "name" ? (
               <form onSubmit={addByName} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", gap: 10 }}>
                   <input
@@ -1297,12 +1303,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               ⚠ {warningCount} card{warningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ on a card.
             </div>
           )}
-
-          {/* The AI assistant on the deck tab — mobile only (on desktop the pool
-              column hosts it). Same conversation as the pool panel's chat. */}
-          <div className="id-deckchat">
-            <DeckChat chat={chat} />
-          </div>
 
           {deckCards.length === 0 ? (
             <div style={{ padding: "54px 20px", textAlign: "center", color: "var(--w-3)" }}>

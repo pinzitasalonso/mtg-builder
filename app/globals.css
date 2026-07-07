@@ -683,13 +683,8 @@ button {
   gap: 24px;
   align-items: start;
 }
-/* While chatting with the AI the pool needs room — make it the wide column. */
-.id-workspace[data-ai="true"] {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 392px);
-}
 @media (max-width: 1023px) {
-  .id-workspace,
-  .id-workspace[data-ai="true"] {
+  .id-workspace {
     grid-template-columns: 1fr;
   }
 }
@@ -764,12 +759,6 @@ button {
   .id-workspace[data-mobile-view="deck"] .id-poolcol { display: none !important; }
 }
 
-/* The deck tab's copy of the AI chat. Hidden on desktop, where both columns
-   are visible and the pool panel already hosts the (same) conversation. */
-.id-deckchat { display: none; }
-@media (max-width: 1023px) {
-  .id-deckchat { display: block; margin-bottom: 18px; }
-}
 
 /* Pool candidate list flows with the page — no nested scroll area, so the deck
    detail has a single, predictable scroll. */
