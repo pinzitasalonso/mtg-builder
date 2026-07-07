@@ -21,7 +21,7 @@ export interface Intent {
 // Snapshot of the caller's current deck so Claude can avoid suggesting
 // duplicates, spot synergies, and find missing combo pieces.
 export interface DeckContext {
-  cards: { name: string; manaCost: string | null; typeLine: string | null }[];
+  cards: { name: string; manaCost: string | null; typeLine: string | null; quantity: number }[];
   commander: string | null;
 }
 
@@ -225,20 +225,20 @@ export async function fetchAlmostCombos(ctx: DeckContext): Promise<AlmostCombo[]
   if (ctx.cards.length === 0) return [];
   const MAX_ALMOST = 10;
   try {
-    const names = ctx.cards.map((c) => c.name).slice(0, 500);
+    const main = ctx.cards.slice(0, 500).map((c) => ({ card: c.name, quantity: Math.max(1, c.quantity) }));
     const commanders = ctx.commander ? [ctx.commander] : [];
     const res = await fetch("https://backend.commanderspellbook.com/find-my-combos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        main: names.map((card) => ({ card, quantity: 1 })),
+        main,
         commanders: commanders.map((card) => ({ card, quantity: 1 })),
       }),
       signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return [];
     const data = await res.json();
-    const owned = new Set([...names, ...commanders].map((n) => n.toLowerCase()));
+    const owned = new Set([...main.map((m) => m.card), ...commanders].map((n) => n.toLowerCase()));
     const almost: { uses?: { card?: { name?: string } }[]; produces?: { feature?: { name?: string } }[] }[] =
       data?.results?.almostIncluded ?? [];
     return almost.slice(0, MAX_ALMOST).map((c) => {
@@ -307,15 +307,18 @@ export function buildSourceBlock(data: SourceData): string {
 export function buildDeckBlock(deckCtx: DeckContext): string {
   if (deckCtx.cards.length === 0 && !deckCtx.commander) return "";
   const commanderLine = deckCtx.commander ? `COMMANDER: ${deckCtx.commander}\n` : "";
+  // Count actual copies, not rows: a deck with 20 basics is 20 cards, not 1.
+  const totalCopies = deckCtx.cards.reduce((n, c) => n + Math.max(1, c.quantity), 0);
   const cardLines = deckCtx.cards
-    .map((c) => `  ${c.name}${c.typeLine ? ` (${c.typeLine})` : ""}`)
+    .map((c) => `  ${c.quantity > 1 ? `${c.quantity}x ` : ""}${c.name}${c.typeLine ? ` (${c.typeLine})` : ""}`)
     .join("\n");
   return (
     "\n\nCURRENT DECK COMPOSITION — these cards are ALREADY in the player's pool. " +
     "Do NOT suggest any of them. Use this list to understand the deck's strategy, mana curve, " +
-    "and synergies so your suggestions complement what's already built:\n" +
+    "and synergies so your suggestions complement what's already built. The count in front of a " +
+    "card is how many copies it runs (e.g. basic lands):\n" +
     commanderLine +
-    `${deckCtx.cards.length} cards:\n${cardLines}`
+    `${totalCopies} cards total (${deckCtx.cards.length} unique):\n${cardLines}`
   );
 }
 
@@ -367,12 +370,13 @@ export function parseDeckContext(currentDeck: unknown): DeckContext {
   return {
     commander: typeof cd?.commander === "string" ? cd.commander : null,
     cards: Array.isArray(cd?.cards)
-      ? (cd!.cards as { name?: unknown; manaCost?: unknown; typeLine?: unknown }[])
+      ? (cd!.cards as { name?: unknown; manaCost?: unknown; typeLine?: unknown; quantity?: unknown }[])
           .filter((c) => typeof c?.name === "string" && c.name)
           .map((c) => ({
             name: c.name as string,
             manaCost: typeof c.manaCost === "string" ? c.manaCost : null,
             typeLine: typeof c.typeLine === "string" ? c.typeLine : null,
+            quantity: typeof c.quantity === "number" && c.quantity > 0 ? Math.floor(c.quantity) : 1,
           }))
           .slice(0, 500)
       : [],
