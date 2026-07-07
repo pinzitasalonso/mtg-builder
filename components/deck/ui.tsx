@@ -64,6 +64,18 @@ export const goldBtn: React.CSSProperties = {
   fontSize: 14.5,
 };
 
+export const dangerBtn: React.CSSProperties = {
+  background: "var(--danger)",
+  border: "none",
+  borderRadius: 999,
+  color: "#fff",
+  padding: "9px 20px",
+  cursor: "pointer",
+  fontFamily: "var(--font-ui)",
+  fontWeight: 600,
+  fontSize: 14.5,
+};
+
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
