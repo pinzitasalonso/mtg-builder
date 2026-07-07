@@ -11,7 +11,7 @@ import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import HandSimModal from "@/components/deck/HandSimModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
 import OrderModal from "@/components/deck/OrderModal";
-import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn } from "@/components/deck/ui";
+import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, dangerBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
 import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard, deleteCard, setQuantity } from "@/lib/pool-client";
 import { singletonCapped } from "@/lib/format";
@@ -224,6 +224,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [edit, setEdit] = useState({ name: "", format: "commander", commander: "" });
+  // Two-step delete inside settings: the first click arms the confirm.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // tool sheet (export / import / lands) — its state lives in <ToolSheet>
@@ -563,6 +566,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   function openSettings() {
     if (!deck) return;
     setEdit({ name: deck.name, format: deck.format, commander: deck.commander || "" });
+    setConfirmDelete(false);
     setSettingsOpen(true);
   }
 
@@ -597,6 +601,20 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       loadPool();
     }
     setSaving(false);
+  }
+
+  // Delete the whole deck (a two-step confirm guards the destructive click),
+  // then return to the deck list.
+  async function deleteDeck() {
+    if (!deck) return;
+    setDeleting(true);
+    const res = await fetch(`/api/decks/${deckId}`, { method: "DELETE" });
+    if (res.ok) {
+      router.push("/");
+    } else {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
   }
 
   async function moveTo(dbId: number, board: Board) {
@@ -1397,6 +1415,32 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 ⤒ Import list
               </button>
             </div>
+          </div>
+
+          {/* Danger zone — delete the deck (two-step confirm). */}
+          <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+            <div className="label-sc" style={{ fontSize: 11.5, color: "var(--danger)", letterSpacing: ".1em", marginBottom: 10 }}>
+              Danger zone
+            </div>
+            {confirmDelete ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <p style={{ margin: 0, fontSize: 13.5, color: "var(--frame-ink)", lineHeight: 1.45 }}>
+                  Delete <b>{deck?.name}</b> and all its cards? This can’t be undone.
+                </p>
+                <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                  <button type="button" onClick={() => setConfirmDelete(false)} disabled={deleting} style={ghostBtn}>
+                    Keep deck
+                  </button>
+                  <button type="button" onClick={deleteDeck} disabled={deleting} style={dangerBtn}>
+                    {deleting ? "Deleting…" : "Delete permanently"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setConfirmDelete(true)} style={{ ...toolBtn, color: "var(--danger)", width: "100%" }}>
+                🗑 Delete this deck
+              </button>
+            )}
           </div>
         </ModalShell>
       )}
