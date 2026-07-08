@@ -117,6 +117,15 @@ export default function HomePage() {
     loadAll();
   }
 
+  async function duplicateDeck(id: string) {
+    const res = await fetch(`/api/decks/${id}/duplicate`, { method: "POST" });
+    if (res.ok) {
+      const copy = await res.json();
+      if (copy?.publicId) router.push(`/deck/${copy.publicId}`);
+      else loadAll();
+    }
+  }
+
   // "See a sample deck" → open the first public brew, else scroll to the brews.
   function seeSample() {
     if (publicDecks[0]) router.push(`/deck/${publicDecks[0].publicId}`);
@@ -220,7 +229,7 @@ export default function HomePage() {
               <CStat n={formatCount} label="Formats" accent />
             </div>
           </div>
-          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onNew={() => setShowModal(true)} showNew={loaded} />
+          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onNew={() => setShowModal(true)} showNew={loaded} />
           <CollectionBlock unique={collection.unique} total={collection.total} sample={collection.sample} onOpen={() => setShowCollection(true)} />
           <div style={{ height: 64 }} />
         </div>
@@ -263,7 +272,7 @@ export default function HomePage() {
             </div>
             <button className="id-pill-gold" style={{ padding: "11px 20px" }} onClick={() => setShowModal(true)}>New brew →</button>
           </div>
-          <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
+          <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
         </div>
       </div>
 
@@ -455,26 +464,28 @@ function DeckTable({
   decks,
   onOpen,
   onDelete,
+  onDuplicate,
   onNew,
   showNew,
 }: {
   decks: Deck[];
   onOpen: (d: Deck) => void;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onNew: () => void;
   showNew: boolean;
 }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(258px, 1fr))", gap: 22 }}>
       {decks.map((d, i) => (
-        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.publicId)} />
+        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.publicId)} onDuplicate={() => onDuplicate(d.publicId)} />
       ))}
       {showNew && <NewDeckTile onNew={onNew} />}
     </div>
   );
 }
 
-function DeckTile({ deck, index, onOpen, onDelete }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void }) {
+function DeckTile({ deck, index, onOpen, onDelete, onDuplicate }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void; onDuplicate: () => void }) {
   const [hover, setHover] = useState(false);
   const colors = deck.colors?.length ? deck.colors : ["C"];
   const field = getIdentityField(colors.join(""));
@@ -550,7 +561,33 @@ function DeckTile({ deck, index, onOpen, onDelete }: { deck: Deck; index: number
           </div>
         </button>
         <button
-          onClick={onDelete}
+          onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+          title="Duplicate deck"
+          aria-label="Duplicate deck"
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 42,
+            width: 24,
+            height: 24,
+            borderRadius: 8,
+            border: "none",
+            cursor: "pointer",
+            background: "rgba(0,0,0,.5)",
+            color: "#fff",
+            fontSize: 12,
+            opacity: hover ? 1 : 0,
+            transition: "opacity .15s",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2,
+          }}
+        >
+          ⧉
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
           title="Delete deck"
           aria-label="Delete deck"
           style={{
