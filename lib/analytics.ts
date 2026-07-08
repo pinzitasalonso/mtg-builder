@@ -7,6 +7,7 @@ export const EVENT_TYPES = [
   "signup",
   "login",
   "deck_created",
+  "deck_duplicated",
   "deck_viewed",
   "ai_message",
   "card_search",
