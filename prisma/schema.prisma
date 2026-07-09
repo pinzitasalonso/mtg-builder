@@ -77,6 +77,10 @@ model Deck {
   name      String
   format    String     @default("commander")
   commander String?
+  // When true, anyone with the deck's URL can VIEW it (read-only). Editing is
+  // still restricted to the owner. Independent of ownerless "public" decks
+  // (userId null), which stay fully editable by anyone by design.
+  shared    Boolean    @default(false)
   // Free-form play notes: mulligans, lines, win routes.
   notes     String?
   createdAt DateTime   @default(now())

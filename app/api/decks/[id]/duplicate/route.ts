@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
+import { currentUser, viewableDeckByPublicId } from "@/lib/auth";
 import { newPublicId } from "@/lib/deck-id";
 import { recordEvent } from "@/lib/analytics";
 
@@ -12,7 +12,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  const source = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
+  // You can copy any deck you can see — your own, an ownerless public deck, or
+  // one someone shared with you — into a fresh deck you own.
+  const source = await viewableDeckByPublicId((await params).id, user?.id ?? null);
   if (!source) return NextResponse.json({ error: "deck not found" }, { status: 404 });
 
   const cards = await prisma.poolCard.findMany({ where: { deckId: source.id } });
