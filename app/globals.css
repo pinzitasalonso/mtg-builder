@@ -688,6 +688,11 @@ button {
     grid-template-columns: 1fr;
   }
 }
+/* Read-only view (a shared deck opened by a non-owner): no pool column, so the
+   deck spans the full width. */
+.id-workspace[data-readonly="true"] {
+  grid-template-columns: 1fr;
+}
 
 @keyframes id-rise {
   from {

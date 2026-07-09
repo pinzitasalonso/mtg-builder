@@ -85,6 +85,7 @@ export async function accessibleDeck(deckId: number, userId: number | null) {
 }
 
 // Same access rules, resolved by the unguessable public id used in URLs.
+// EDIT access — the owner (or anyone, for ownerless public decks).
 export async function accessibleDeckByPublicId(publicId: string, userId: number | null) {
   if (!publicId || typeof publicId !== "string") return null;
   return prisma.deck.findFirst({
@@ -93,6 +94,24 @@ export async function accessibleDeckByPublicId(publicId: string, userId: number 
         ? { publicId, userId: null }
         : { publicId, OR: [{ userId: null }, { userId }] },
   });
+}
+
+// VIEW access — everything you can edit, PLUS any deck explicitly shared for
+// read-only viewing. Used by the deck GET so a shared link resolves for anyone
+// while writes stay gated by accessibleDeckByPublicId.
+export async function viewableDeckByPublicId(publicId: string, userId: number | null) {
+  if (!publicId || typeof publicId !== "string") return null;
+  return prisma.deck.findFirst({
+    where:
+      userId === null
+        ? { publicId, OR: [{ userId: null }, { shared: true }] }
+        : { publicId, OR: [{ userId: null }, { userId }, { shared: true }] },
+  });
+}
+
+// Whether `userId` may EDIT this deck (owner, or an ownerless public deck).
+export function canEditDeck(deck: { userId: number | null }, userId: number | null): boolean {
+  return deck.userId === null || deck.userId === userId;
 }
 
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

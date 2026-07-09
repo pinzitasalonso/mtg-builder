@@ -58,6 +58,9 @@ interface Deck {
   format: string;
   commander: string | null;
   notes: string | null;
+  shared?: boolean;
+  isPublic?: boolean;
+  canEdit?: boolean;
 }
 
 const COLORS = [
@@ -574,6 +577,41 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   function copyLink() {
     navigator.clipboard?.writeText(window.location.href).then(() => flash("link")).catch(() => {});
   }
+
+  // Toggle read-only public sharing for an owned deck. Turning it on makes the
+  // current URL resolve for anyone (view-only); off makes it private again.
+  const [sharing, setSharing] = useState(false);
+  async function setShared(next: boolean) {
+    if (!deck) return;
+    setSharing(true);
+    const res = await fetch(`/api/decks/${deckId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ shared: next }),
+    });
+    if (res.ok) setDeck((d) => (d ? { ...d, shared: next } : d));
+    setSharing(false);
+  }
+
+  // Header "Share": ensure an owned deck is view-shareable, then copy its link.
+  // Ownerless public decks and already-shared decks just copy.
+  async function shareDeck() {
+    if (canEdit && deck && !deck.isPublic && !deck.shared) await setShared(true);
+    copyLink();
+  }
+
+  // Fork the deck into an editable copy of one's own (the read-only viewer's
+  // main action) and open it.
+  const [forking, setForking] = useState(false);
+  async function duplicateThisDeck() {
+    setForking(true);
+    const res = await fetch(`/api/decks/${deckId}/duplicate`, { method: "POST" });
+    if (res.ok) {
+      const copy = await res.json();
+      if (copy?.publicId) { router.push(`/deck/${copy.publicId}`); return; }
+    }
+    setForking(false);
+  }
   function copyDecklist() {
     const lines: string[] = [];
     if (deck?.commander) lines.push(`1 ${deck.commander}`);
@@ -625,6 +663,13 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const deckCards = pool.filter((c) => c.board === "deck");
   const poolCards = pool.filter((c) => c.board !== "deck");
   const deckCount = deckCards.reduce((s, c) => s + c.quantity, 0);
+
+  // Read-only viewing: someone opened a shared link to a deck they don't own.
+  // The API says so via canEdit; treat an unloaded deck as editable so the
+  // owner never sees a flash of the view-only layout.
+  const canEdit = deck?.canEdit !== false;
+  // Tapping a deck card: owners triage it in review; viewers just preview it.
+  const openCard = (c: PoolCard) => (canEdit ? startDeckReview(c) : setPreview(c));
 
   // The auto-included commander (commander decks) can't be removed or reviewed out.
   const isCommander = (c: PoolCard) =>
@@ -759,7 +804,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             <Logo size={18} />
           </Link>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", minWidth: 0 }}>
-            <div>
+            {canEdit && <div>
               <button
                 className="id-ghost"
                 style={{ padding: "9px 15px" }}
@@ -799,16 +844,22 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   </div>
                 </>
               )}
-            </div>
-            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={copyLink}>
-              {copied === "link" ? "Copied!" : "Share"}
+            </div>}
+            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={shareDeck} disabled={sharing}>
+              {copied === "link" ? "Copied!" : sharing ? "Sharing…" : "Share"}
             </button>
             <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setOrderOpen(true)} disabled={deckCards.length === 0}>
               Buy list
             </button>
-            <button className="id-btn" style={{ padding: "10px 18px" }} onClick={openSettings}>
-              Edit deck
-            </button>
+            {canEdit ? (
+              <button className="id-btn" style={{ padding: "10px 18px" }} onClick={openSettings}>
+                Edit deck
+              </button>
+            ) : (
+              <button className="id-btn" style={{ padding: "10px 18px" }} onClick={duplicateThisDeck} disabled={forking}>
+                {forking ? "Duplicating…" : "⧉ Duplicate"}
+              </button>
+            )}
           </div>
         </header>
 
@@ -902,7 +953,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   curve={stats.curve}
                   accent="var(--gold)"
                   onHoverBar={(i) => setDeckFilter(i === null ? null : { kind: "mv", value: i })}
-                  onClickBar={(i) => startDeckReviewOf(deckCards.filter((c) => categoryOf(c.typeLine) !== "Lands" && Math.min(manaValue(c.manaCost), 7) === i))}
+                  onClickBar={canEdit ? (i) => startDeckReviewOf(deckCards.filter((c) => categoryOf(c.typeLine) !== "Lands" && Math.min(manaValue(c.manaCost), 7) === i)) : undefined}
                 />
               </div>
               <div style={{ width: 1, background: "var(--w-line)", alignSelf: "stretch" }} />
@@ -1016,40 +1067,53 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           )}
 
+          {/* A read-only banner for viewers of a shared deck. */}
+          {!canEdit && (
+            <div className="id-panel" style={{ padding: "11px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 9, fontSize: 13.5, color: "var(--w-2)" }}>
+              <span aria-hidden style={{ fontSize: 15 }}>👁</span>
+              You’re viewing a shared deck — read-only. Hit <b style={{ color: "var(--w-1)" }}>Duplicate</b> to make your own editable copy.
+            </div>
+          )}
+
           {/* Central AI assistant — it fills the pool AND judges/reshapes the
               deck, so it sits above the pool/deck split rather than inside the
-              pool. One shared conversation for the whole page. */}
-          <section className="id-panel" style={{ padding: 16, marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 12 }}>
-              <span className="id-display" style={{ fontSize: 20, color: "var(--w-1)" }}>✦ Ask the AI</span>
-              <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>build · judge · refine</span>
+              pool. One shared conversation for the whole page. Owner-only. */}
+          {canEdit && (
+            <section className="id-panel" style={{ padding: 16, marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 12 }}>
+                <span className="id-display" style={{ fontSize: 20, color: "var(--w-1)" }}>✦ Ask the AI</span>
+                <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>build · judge · refine</span>
+              </div>
+              <DeckChat chat={chat} />
+            </section>
+          )}
+
+          {/* mobile pool/deck switcher — sticky segmented control, hidden ≥1024px.
+              Only meaningful when the pool column exists (owner). */}
+          {canEdit && (
+            <div className="deck-mobile-tabs">
+              <button
+                type="button"
+                aria-pressed={mobileView === "pool"}
+                className={mobileView === "pool" ? "is-active" : ""}
+                onClick={() => setMobileView("pool")}
+              >
+                Pool <span>{poolCards.reduce((s, c) => s + c.quantity, 0)}</span>
+              </button>
+              <button
+                type="button"
+                aria-pressed={mobileView === "deck"}
+                className={mobileView === "deck" ? "is-active" : ""}
+                onClick={() => setMobileView("deck")}
+              >
+                Deck <span>{deckCount}</span>
+              </button>
             </div>
-            <DeckChat chat={chat} />
-          </section>
+          )}
 
-          {/* mobile pool/deck switcher — sticky segmented control, hidden ≥1024px */}
-          <div className="deck-mobile-tabs">
-            <button
-              type="button"
-              aria-pressed={mobileView === "pool"}
-              className={mobileView === "pool" ? "is-active" : ""}
-              onClick={() => setMobileView("pool")}
-            >
-              Pool <span>{poolCards.reduce((s, c) => s + c.quantity, 0)}</span>
-            </button>
-            <button
-              type="button"
-              aria-pressed={mobileView === "deck"}
-              className={mobileView === "deck" ? "is-active" : ""}
-              onClick={() => setMobileView("deck")}
-            >
-              Deck <span>{deckCount}</span>
-            </button>
-          </div>
-
-          <div className="id-workspace" data-mobile-view={mobileView}>
-            {/* ── POOL ── */}
-            <aside className="id-panel id-pool id-poolcol" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+          <div className="id-workspace" data-mobile-view={canEdit ? mobileView : "deck"} data-readonly={!canEdit ? "true" : undefined}>
+            {/* ── POOL ── (owner only) */}
+            {canEdit && <aside className="id-panel id-pool id-poolcol" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
                   <span className="id-display" style={{ fontSize: 24, color: "var(--w-1)" }}>Pool</span>
@@ -1275,7 +1339,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               ))
             )}
           </div>
-        </aside>
+        </aside>}
 
         {/* ── THE DECK ── */}
         <section className="id-panel id-deckcol" style={{ padding: "18px clamp(14px,2vw,24px)" }}>
@@ -1293,9 +1357,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   <button key={k} type="button" data-on={deckSort === k} onClick={() => setDeckSort(k)}>{label}</button>
                 ))}
               </div>
-              <button onClick={() => startDeckReview()} disabled={deckCards.length === 0} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }}>
-                ✓ Review
-              </button>
+              {canEdit && (
+                <button onClick={() => startDeckReview()} disabled={deckCards.length === 0} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }}>
+                  ✓ Review
+                </button>
+              )}
             </div>
           </div>
           {warningCount > 0 && (
@@ -1320,7 +1386,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       <div style={{ marginBottom: 24 }}>
                         <DeckSectionHead cat="Commander" n={1} />
                         <div style={deckTileGrid}>
-                          <DeckCardTile card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} removable={false} onRemove={() => {}} />
+                          <DeckCardTile card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} removable={false} onOpen={!canEdit ? () => setPreview(commander) : undefined} onRemove={() => {}} />
                         </div>
                       </div>
                     )}
@@ -1332,7 +1398,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                           <DeckSectionHead cat={g.t} n={g.cards.reduce((s, c) => s + c.quantity, 0)} />
                           <div style={deckTileGrid}>
                             {g.cards.map((c) => (
-                              <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable onOpen={() => startDeckReview(c)} onRemove={() => removeCard(c.dbId)} onQty={singletonCapped(deck?.format ?? "commander", c.typeLine) ? undefined : (n) => setCopies(c, n)} />
+                              <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable={canEdit} onOpen={() => openCard(c)} onRemove={() => removeCard(c.dbId)} onQty={!canEdit || singletonCapped(deck?.format ?? "commander", c.typeLine) ? undefined : (n) => setCopies(c, n)} />
                             ))}
                           </div>
                         </div>
@@ -1346,7 +1412,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               {[...deckCards]
                 .sort((a, b) => deckSort === "cost" ? (manaValue(a.manaCost) - manaValue(b.manaCost)) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name))
                 .map((c) => (
-                  <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable={!isCommander(c)} onOpen={() => startDeckReview(c)} onRemove={() => removeCard(c.dbId)} onQty={isCommander(c) || singletonCapped(deck?.format ?? "commander", c.typeLine) ? undefined : (n) => setCopies(c, n)} />
+                  <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable={canEdit && !isCommander(c)} onOpen={() => openCard(c)} onRemove={() => removeCard(c.dbId)} onQty={!canEdit || isCommander(c) || singletonCapped(deck?.format ?? "commander", c.typeLine) ? undefined : (n) => setCopies(c, n)} />
                 ))}
             </div>
           )}
@@ -1401,6 +1467,36 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </button>
             </div>
           </form>
+
+          {/* Sharing — a read-only public link. Not shown for ownerless public
+              decks, which are already open to everyone. */}
+          {!deck?.isPublic && (
+            <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
+              <div className="label-sc" style={{ fontSize: 11.5, color: "var(--t3)", letterSpacing: ".1em", marginBottom: 10 }}>
+                Sharing
+              </div>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(deck?.shared)}
+                  disabled={sharing}
+                  onChange={(e) => setShared(e.target.checked)}
+                  style={{ marginTop: 3, width: 16, height: 16, flex: "none", accentColor: "var(--gold)" }}
+                />
+                <span style={{ fontSize: 13.5, color: "var(--frame-ink)", lineHeight: 1.45 }}>
+                  <b>Anyone with the link can view</b> — a read-only copy of this deck. They can’t edit it.
+                </span>
+              </label>
+              {deck?.shared && (
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <input readOnly value={typeof window !== "undefined" ? window.location.href : ""} style={{ ...paperInput, flex: 1, fontSize: 12.5 }} onFocus={(e) => e.currentTarget.select()} />
+                  <button type="button" onClick={copyLink} style={toolBtn}>
+                    {copied === "link" ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Tools — import/export live here; judge, lands & review are on the deck screen */}
           <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid var(--line)" }}>
@@ -1530,7 +1626,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               <button onClick={() => setPreview(null)} style={{ ...ghostBtn, flex: 1 }}>
                 Close
               </button>
-              {!inPool(preview.id) ? (
+              {!canEdit ? null : !inPool(preview.id) ? (
                 <button
                   onClick={() => {
                     addCard(preview);
