@@ -28,6 +28,12 @@ model User {
   emailVerifiedAt   DateTime?
   verifyTokenHash   String?   @unique
   verifyTokenExpiry DateTime?
+  // Plan gating: "free" (3 decks, 4 AI asks/day) or "pro" — the future
+  // paid tier — which lifts every cap.
+  tier         String    @default("free")
+  // Daily AI meter: calls made on aiDay (UTC); stale aiDay means zero used.
+  aiDay        String?
+  aiCount      Int       @default(0)
   decks        Deck[]
   sessions     Session[]
   collection   CollectionCard[]

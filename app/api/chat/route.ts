@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { currentUser } from "@/lib/auth";
 import { ANON_LIMIT_MSG, anonAiAllowed } from "@/lib/ratelimit";
+import { AI_LIMIT_MSG } from "@/lib/limits";
+import { consumeAi } from "@/lib/limits-db";
 import {
   buildCollectionBlock,
   buildComboBlock,
@@ -28,9 +30,13 @@ const MAX_MESSAGE_CHARS = 2000;
 // reasons about the player's idea and weaves in combos. Every card it recommends
 // is wrapped in [[Card Name]] so the client can render it as a click-to-add link.
 export async function POST(req: Request) {
-  // Same shared anonymous budget as search — guests can chat but can't burn the key.
-  if (!(await currentUser()) && !anonAiAllowed()) {
+  // Guests share the anonymous budget; free accounts spend their daily meter.
+  const user = await currentUser();
+  if (!user && !anonAiAllowed()) {
     return NextResponse.json({ error: ANON_LIMIT_MSG }, { status: 429 });
+  }
+  if (user && !(await consumeAi(user))) {
+    return NextResponse.json({ error: AI_LIMIT_MSG, code: "ai_limit" }, { status: 429 });
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {
