@@ -4,18 +4,24 @@ import prisma from "@/lib/prisma";
 import { FREE_AI_PER_DAY, FREE_DECK_LIMIT, isPro, utcDay, type TierFields } from "@/lib/limits";
 
 /* Spend one AI call from the user's daily budget. Returns false when the
-   budget is exhausted (free tier only — pro never runs out). */
+   budget is exhausted (free tier only — pro never runs out). Each UPDATE's
+   WHERE clause makes it a compare-and-set, so two parallel requests can't
+   spend the same unit or slip past the cap. */
 export async function consumeAi(user: { id: number } & TierFields): Promise<boolean> {
   if (isPro(user)) return true;
   const day = utcDay();
-  const fresh = await prisma.user.findUnique({
-    where: { id: user.id },
-    select: { aiDay: true, aiCount: true },
+  // First claim of a new day resets the meter to 1…
+  const freshDay = await prisma.user.updateMany({
+    where: { id: user.id, OR: [{ aiDay: null }, { aiDay: { not: day } }] },
+    data: { aiDay: day, aiCount: 1 },
   });
-  const used = fresh?.aiDay === day ? fresh.aiCount : 0;
-  if (used >= FREE_AI_PER_DAY) return false;
-  await prisma.user.update({ where: { id: user.id }, data: { aiDay: day, aiCount: used + 1 } });
-  return true;
+  if (freshDay.count === 1) return true;
+  // …otherwise spend one unit only while under the cap.
+  const spent = await prisma.user.updateMany({
+    where: { id: user.id, aiDay: day, aiCount: { lt: FREE_AI_PER_DAY } },
+    data: { aiCount: { increment: 1 } },
+  });
+  return spent.count === 1;
 }
 
 /* Whether the user may create (or duplicate into) another deck. */
