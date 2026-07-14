@@ -96,10 +96,18 @@ export async function DELETE(
   const deck = await accessibleDeckByPublicId(id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const deckId = deck.id;
-  // The commander can't be removed from a commander deck.
+  // The commander can't be removed from a commander deck — but a *duplicate*
+  // printing of it can. Only the last copy carrying the commander's name is
+  // protected, so a deck can never lose its commander while redundant printings
+  // (e.g. left behind by an older printing-swap bug) can still be cleaned up.
   const target = await prisma.poolCard.findFirst({ where: { id: cid, deckId }, select: { name: true } });
   if (target && isCommanderCard(deck, target.name)) {
-    return NextResponse.json({ error: "The commander can't be removed." }, { status: 409 });
+    const siblings = await prisma.poolCard.count({
+      where: { deckId, name: target.name, id: { not: cid } },
+    });
+    if (siblings === 0) {
+      return NextResponse.json({ error: "The commander can't be removed." }, { status: 409 });
+    }
   }
   // Scoped to the deck so a card id from another deck can't be deleted through
   // this URL; deleteMany also makes a missing row a 404 instead of a 500.
