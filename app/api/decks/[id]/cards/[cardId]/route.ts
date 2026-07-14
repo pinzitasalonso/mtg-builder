@@ -6,8 +6,9 @@ import { isCommanderCard, singletonCapped } from "@/lib/commander";
 
 const MAX_QTY = 999;
 
-// Update a card in the pool: move it between boards ("pool" ↔ "deck") and/or set
-// the exact copy count. Both fields are optional, but at least one is required.
+// Update a card in the pool: move it between boards ("pool" ↔ "deck"), set the
+// exact copy count, and/or swap its printing (scryfallId + imageUri). Every
+// field is optional, but at least one is required.
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string; cardId: string }> }
@@ -21,7 +22,7 @@ export async function PATCH(
   const deckId = deck.id;
   const body = await req.json();
 
-  const data: { board?: string; quantity?: number } = {};
+  const data: { board?: string; quantity?: number; scryfallId?: string; imageUri?: string } = {};
   if (body.board !== undefined) {
     if (body.board !== "pool" && body.board !== "deck") {
       return NextResponse.json({ error: "board must be 'pool' or 'deck'" }, { status: 400 });
@@ -36,8 +37,24 @@ export async function PATCH(
     }
     data.quantity = Math.min(MAX_QTY, Math.floor(body.quantity));
   }
-  if (data.board === undefined && data.quantity === undefined) {
-    return NextResponse.json({ error: "board or quantity required" }, { status: 400 });
+  if (body.scryfallId !== undefined) {
+    // Swap the printing in place (used when the player picks a specific
+    // version). The card's identity — name, types, oracle text — is unchanged,
+    // so only the Scryfall id and its image move; the DELETE-then-add path
+    // can't do this for a commander, which the server refuses to delete.
+    if (typeof body.scryfallId !== "string" || !body.scryfallId.trim()) {
+      return NextResponse.json({ error: "scryfallId must be a non-empty string" }, { status: 400 });
+    }
+    data.scryfallId = body.scryfallId;
+    if (body.imageUri !== undefined) {
+      if (typeof body.imageUri !== "string" || !body.imageUri) {
+        return NextResponse.json({ error: "imageUri must be a non-empty string" }, { status: 400 });
+      }
+      data.imageUri = body.imageUri;
+    }
+  }
+  if (data.board === undefined && data.quantity === undefined && data.scryfallId === undefined) {
+    return NextResponse.json({ error: "board, quantity, or scryfallId required" }, { status: 400 });
   }
 
   // Commander-format rules: the commander stays on the deck board, and a
@@ -54,8 +71,16 @@ export async function PATCH(
     }
   }
 
-  const { count } = await prisma.poolCard.updateMany({ where: { id: cid, deckId }, data });
-  if (count === 0) return NextResponse.json({ error: "card not found in deck" }, { status: 404 });
+  try {
+    const { count } = await prisma.poolCard.updateMany({ where: { id: cid, deckId }, data });
+    if (count === 0) return NextResponse.json({ error: "card not found in deck" }, { status: 404 });
+  } catch (e) {
+    // @@unique([deckId, scryfallId]) — the target printing is already in the deck.
+    if ((e as { code?: string })?.code === "P2002") {
+      return NextResponse.json({ error: "That printing is already in the deck." }, { status: 409 });
+    }
+    throw e;
+  }
   const card = await prisma.poolCard.findUnique({ where: { id: cid } });
   return NextResponse.json(card);
 }
