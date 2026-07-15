@@ -110,8 +110,9 @@ export async function POST(req: Request) {
     async start(controller) {
       try {
         const ai = anthropic.messages.stream({
-          model: "claude-sonnet-4-6",
+          model: "claude-sonnet-5",
           max_tokens: 3000,
+          temperature: 0.4,
           system,
           messages: messages.map((m) => ({ role: m.role, content: m.content })),
         });
