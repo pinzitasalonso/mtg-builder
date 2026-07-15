@@ -111,7 +111,8 @@ export async function POST(req: Request) {
 }
 
 // Set the exact quantity of a single card (by name). quantity <= 0 removes it.
-// Used by the collection browser to edit/remove individual cards.
+// An optional imageUri pins the printing the player owns — the owned version is
+// read back off this image, so persisting it is how a version change sticks.
 export async function PATCH(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Sign in first." }, { status: 401 });
@@ -123,15 +124,19 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "name and quantity required" }, { status: 400 });
   }
   const nameKey = name.toLowerCase();
+  const imageUri = typeof body?.imageUri === "string" && body.imageUri ? body.imageUri : null;
 
   if (quantity <= 0) {
     await prisma.collectionCard.deleteMany({ where: { userId: user.id, nameKey } });
   } else {
     const qty = Math.min(quantity, 9999);
+    // Pinning an image counts as enriched, so the nightly name-enrich won't
+    // overwrite the player's chosen printing.
+    const pinned = imageUri ? { imageUri, enriched: true } : {};
     await prisma.collectionCard.upsert({
       where: { userId_nameKey: { userId: user.id, nameKey } },
-      create: { userId: user.id, name, nameKey, quantity: qty },
-      update: { quantity: qty },
+      create: { userId: user.id, name, nameKey, quantity: qty, ...pinned },
+      update: { quantity: qty, ...pinned },
     });
   }
   return NextResponse.json({ ok: true });
