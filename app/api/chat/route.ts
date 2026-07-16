@@ -109,10 +109,13 @@ export async function POST(req: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
+        // Sonnet 5 rejects sampling params (`temperature` → 400) and runs
+        // adaptive thinking by default; thinking spends output tokens, so the
+        // budget carries headroom beyond the visible reply. The stream filter
+        // below already passes text deltas only, so thinking never leaks out.
         const ai = anthropic.messages.stream({
           model: "claude-sonnet-5",
-          max_tokens: 3000,
-          temperature: 0.4,
+          max_tokens: 6000,
           system,
           messages: messages.map((m) => ({ role: m.role, content: m.content })),
         });
