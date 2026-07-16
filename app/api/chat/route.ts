@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { currentUser } from "@/lib/auth";
-import { ANON_LIMIT_MSG, anonAiAllowed } from "@/lib/ratelimit";
+import { ANON_LIMIT_MSG, anonAiAllowed, clientIp } from "@/lib/ratelimit";
 import { AI_LIMIT_MSG } from "@/lib/limits";
 import { consumeAi } from "@/lib/limits-db";
 import {
@@ -32,7 +32,7 @@ const MAX_MESSAGE_CHARS = 2000;
 export async function POST(req: Request) {
   // Guests share the anonymous budget; free accounts spend their daily meter.
   const user = await currentUser();
-  if (!user && !anonAiAllowed()) {
+  if (!user && !anonAiAllowed(clientIp(req))) {
     return NextResponse.json({ error: ANON_LIMIT_MSG }, { status: 429 });
   }
   if (user && !(await consumeAi(user))) {

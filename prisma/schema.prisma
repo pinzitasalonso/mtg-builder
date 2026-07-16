@@ -120,6 +120,9 @@ model PlayCode {
   commanderImageUri String?
   createdAt         DateTime @default(now())
   expiresAt         DateTime
+  // Set the first time a result is reported for this code, so a game records
+  // exactly once — a code can't be replayed to inflate the deck's record.
+  reportedAt        DateTime?
 }
 
 model PoolCard {

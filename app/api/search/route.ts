@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { mapPool } from "@/lib/async";
 import { currentUser } from "@/lib/auth";
-import { ANON_LIMIT_MSG, anonAiAllowed } from "@/lib/ratelimit";
+import { ANON_LIMIT_MSG, anonAiAllowed, clientIp } from "@/lib/ratelimit";
 import { AI_LIMIT_MSG } from "@/lib/limits";
 import { consumeAi } from "@/lib/limits-db";
 import { extractJson, messageText, strArr } from "@/lib/ai";
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
   // Publicly deployed: anonymous visitors may search, but they share one
   // small per-minute AI budget so drive-bys can't burn the Anthropic key.
   const user = await currentUser();
-  if (!user && !anonAiAllowed()) {
+  if (!user && !anonAiAllowed(clientIp(req))) {
     return NextResponse.json({ error: ANON_LIMIT_MSG }, { status: 429 });
   }
   if (user && !(await consumeAi(user))) {

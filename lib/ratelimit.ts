@@ -1,19 +1,61 @@
-// Tiny in-memory rate limiter for anonymous AI calls: one bucket shared by
-// every signed-out visitor, since they all burn the site owner's API key.
-// Per-process state — fine on a single long-lived Railway instance.
+// Tiny in-memory rate limiter. Per-process state: on a single long-lived
+// Railway instance this is exactly right; limits are per-instance and reset on
+// redeploy, which is fine for the abuse we throttle here (guest AI spend that
+// burns the owner's API key, and play-code guessing). It is NOT a distributed
+// quota — if the app is ever scaled to multiple instances, move these buckets
+// to a shared store (Redis/DB).
+
+// key → recent hit timestamps (ms), pruned to the caller's window on access.
+const buckets = new Map<string, number[]>();
+let lastSweep = Date.now();
+
+/* Consume one slot for `key`; returns false when its window is already full. */
+export function rateLimit(key: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+
+  // Opportunistic GC so the map can't grow without bound: every few minutes,
+  // drop any bucket untouched for an hour (stale for every window we use).
+  if (now - lastSweep > 5 * 60_000) {
+    for (const [k, arr] of buckets) {
+      if (arr.length === 0 || now - arr[arr.length - 1] > 3_600_000) buckets.delete(k);
+    }
+    lastSweep = now;
+  }
+
+  const arr = (buckets.get(key) ?? []).filter((t) => now - t < windowMs);
+  if (arr.length >= max) {
+    buckets.set(key, arr);
+    return false;
+  }
+  arr.push(now);
+  buckets.set(key, arr);
+  return true;
+}
+
+/* Best-effort client IP, from the proxy's forwarded headers (Railway sets
+   x-forwarded-for). Only used as a rate-limit bucket key — never for auth. */
+export function clientIp(req: Request): string {
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) {
+    const first = xff.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return req.headers.get("x-real-ip")?.trim() || "unknown";
+}
 
 const WINDOW_MS = 60_000;
-const MAX_ANON_CALLS = 2;
+// Guests all burn the site owner's Anthropic key, so a global ceiling caps the
+// total spend, while a tighter per-IP cap keeps one client from eating the
+// whole shared budget (which the old single global bucket allowed).
+const ANON_GLOBAL_MAX = 6;
+const ANON_PER_IP_MAX = 2;
 
-let stamps: number[] = [];
-
-/* Consume one anonymous AI call if the shared budget allows it. */
-export function anonAiAllowed(): boolean {
-  const now = Date.now();
-  stamps = stamps.filter((t) => now - t < WINDOW_MS);
-  if (stamps.length >= MAX_ANON_CALLS) return false;
-  stamps.push(now);
-  return true;
+/* Consume one anonymous AI call if BOTH the per-client and the shared budgets
+   allow it. Per-IP is checked first, so an abusive client is turned away
+   without spending from the shared ceiling. */
+export function anonAiAllowed(ip: string): boolean {
+  if (!rateLimit(`anon-ai:ip:${ip}`, ANON_PER_IP_MAX, WINDOW_MS)) return false;
+  return rateLimit("anon-ai:global", ANON_GLOBAL_MAX, WINDOW_MS);
 }
 
 export const ANON_LIMIT_MSG =

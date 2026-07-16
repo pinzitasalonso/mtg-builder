@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
-import { ANON_LIMIT_MSG, anonAiAllowed } from "@/lib/ratelimit";
+import { ANON_LIMIT_MSG, anonAiAllowed, clientIp } from "@/lib/ratelimit";
 import { extractJson, messageText } from "@/lib/ai";
 
 export const runtime = "nodejs";
@@ -19,7 +19,7 @@ const isRole = (v: unknown): v is Role => typeof v === "string" && (ROLES as rea
 // Tag every untagged card in the deck with a deckbuilding role. Lands are
 // tagged locally; the rest go to haiku in one batch. Idempotent.
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
@@ -52,7 +52,7 @@ export async function POST(
 
   // Anonymous visitors share one small AI budget; lands above were still
   // tagged locally, so report rather than 429 — the client retries later.
-  if (!user && !anonAiAllowed()) {
+  if (!user && !anonAiAllowed(clientIp(req))) {
     return NextResponse.json({ tagged, aiSkipped: true, limited: ANON_LIMIT_MSG });
   }
 
