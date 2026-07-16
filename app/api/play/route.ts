@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
-import { newPlayCode, PLAY_CODE_TTL_MS } from "@/lib/play-code";
+import { newPlayCode, PLAY_CODE_REPORT_WINDOW_MS, PLAY_CODE_TTL_MS } from "@/lib/play-code";
 
 // POST /api/play — mint a "seat me at your table" code for one of MY decks.
 // The code resolves publicly (the host's phone is another account, or none),
@@ -23,10 +23,12 @@ export async function POST(req: Request) {
       ? body.commanderImageUri.slice(0, 500)
       : null;
 
-  // Housekeeping: expired codes go, and re-minting for the same deck replaces
-  // the old code instead of accumulating live ones.
+  // Housekeeping: a row lives past its join expiry so the seated game can
+  // still report its result — only codes past the report window are swept.
+  // (Never delete a deck's fresher codes: a re-mint mid-game would strand
+  // the table that already seated the old one.)
   await prisma.playCode.deleteMany({
-    where: { OR: [{ expiresAt: { lt: new Date() } }, { deckId: deck.id }] },
+    where: { createdAt: { lt: new Date(Date.now() - PLAY_CODE_REPORT_WINDOW_MS) } },
   });
 
   const playerName = user.email.split("@")[0];

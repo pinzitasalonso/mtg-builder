@@ -4,7 +4,12 @@ import { randomBytes } from "crypto";
 // the lookalikes (0/O, 1/I/L) and sticks to uppercase.
 export const PLAY_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 export const PLAY_CODE_LENGTH = 6;
-export const PLAY_CODE_TTL_MS = 24 * 60 * 60 * 1000;
+// A code is JOINABLE for 10 minutes (expiresAt) — long enough to read it
+// across the table, short enough not to float around. The seated game still
+// gets to REPORT its result long after: commander games outlive the join
+// window, so reporting is gated by this grace from mint instead.
+export const PLAY_CODE_TTL_MS = 10 * 60 * 1000;
+export const PLAY_CODE_REPORT_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export function newPlayCode(): string {
   const bytes = randomBytes(PLAY_CODE_LENGTH);
