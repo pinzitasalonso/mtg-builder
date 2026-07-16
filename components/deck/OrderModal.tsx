@@ -119,7 +119,7 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {result.added.length > 0 ? (
             <>
-              <div className="label-sc" style={{ fontSize: 12, color: "#0d8a5f", letterSpacing: ".1em" }}>
+              <div className="label-sc" style={{ fontSize: 12, color: "#4ecb8f", letterSpacing: ".1em" }}>
                 Added to your Zero cart · {result.added.length}
               </div>
               <div style={{ background: "rgba(0,0,0,.2)", borderRadius: 8, padding: "8px 13px", maxHeight: 220, overflowY: "auto" }}>

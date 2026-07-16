@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Hanken_Grotesk, Bangers, IBM_Plex_Mono } from "next/font/google";
+import { Hanken_Grotesk, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
@@ -10,10 +11,10 @@ const hanken = Hanken_Grotesk({
   display: "swap",
 });
 
-const bangers = Bangers({
-  subsets: ["latin"],
-  weight: "400",
-  variable: "--font-bangers",
+// Tabletop blackletter display face — the same file the iOS app ships.
+const vadstena = localFont({
+  src: "./fonts/Vadstenakursive.otf",
+  variable: "--font-vadstena",
   display: "swap",
 });
 
@@ -45,12 +46,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0e0b18",
+  themeColor: "#0e0b12",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`h-full ${hanken.variable} ${bangers.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`h-full ${hanken.variable} ${vadstena.variable} ${plexMono.variable}`}>
       <body className="min-h-full flex flex-col">
         {children}
         <ServiceWorkerRegister />

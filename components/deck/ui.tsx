@@ -53,14 +53,14 @@ export const ghostBtn: React.CSSProperties = {
 };
 
 export const goldBtn: React.CSSProperties = {
-  background: "var(--t1)",
+  background: "var(--gold)",
   border: "none",
   borderRadius: 999,
-  color: "#fff",
+  color: "var(--accent-ink)",
   padding: "9px 20px",
   cursor: "pointer",
   fontFamily: "var(--font-ui)",
-  fontWeight: 600,
+  fontWeight: 700,
   fontSize: 14.5,
 };
 
@@ -107,14 +107,14 @@ export function ModalShell({
 }) {
   return (
     <div
-      style={{ position: "fixed", inset: 0, background: "rgba(21,21,26,.32)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex, animation: "sp-fade .15s ease" }}
+      style={{ position: "fixed", inset: 0, background: "rgba(8,6,11,.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex, animation: "sp-fade .15s ease" }}
       onClick={(e) => e.target === e.currentTarget && onDismiss()}
     >
       <div
         style={{
           background: "var(--bg)",
           borderRadius: 20,
-          boxShadow: "0 30px 70px -20px rgba(21,21,26,.4)",
+          boxShadow: "inset 0 0 0 1px rgba(255,255,255,.09), 0 30px 70px -20px rgba(0,0,0,.7)",
           width: "100%",
           maxWidth,
           maxHeight: "88vh",

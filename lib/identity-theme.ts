@@ -75,61 +75,75 @@ export function getIdentityField(identity: string | null | undefined): { bg: str
   return { bg: blendHexes(mono.map((m) => m.bg)), deep: blendHexes(mono.map((m) => m.deep)) };
 }
 
+// The iOS Tabletop felt poles — identity fields wash INTO these instead of
+// standing as saturated colour, so a mono-blue deck reads as blue-tinted felt
+// rather than a vivid blue page (matching IdentityFeltBackground in the app).
+const FELT = { center: "#262030", mid: "#17131d", edge: "#0e0b12" };
+
+function mixHex(a: string, b: string, t: number): string {
+  const [ar, ag, ab] = hexToRgb(a);
+  const [br, bg, bb] = hexToRgb(b);
+  return rgbToHex(ar + (br - ar) * t, ag + (bg - ag) * t, ab + (bb - ab) * t);
+}
+
 export function getIdentityTheme(identity: string | null | undefined): IdentityTheme {
   const field = getIdentityField(identity);
 
-  // The display background is a radial gradient toward the deep pole; the --bg
-  // variables stay a flat colour (they feed color-mix and opaque fills).
-  const bg = `radial-gradient(125% 80% at 85% -10%, ${field.bg}, ${field.deep} 80%)`;
-  const bgSolid = field.bg;
+  // Wash the identity into the felt: mostly felt, a breath of the deck's hue
+  // at the top-right pole fading to near-black felt at the edges.
+  const washTop = mixHex(FELT.center, field.bg, 0.34);
+  const washMid = mixHex(FELT.mid, field.deep, 0.22);
+  const bg = `radial-gradient(125% 85% at 85% -10%, ${washTop}, ${washMid} 55%, ${FELT.edge} 100%)`;
+  const bgSolid = washMid;
 
   return {
     bg,
-    text: "#ffffff",
+    text: "#f4f0e6",
     dotEmpty: "rgba(255,255,255,.18)",
     vars: {
       ["--bg" as string]: bgSolid,
       "--bg2": bgSolid,
-      "--bg3": "rgba(255,255,255,.14)",
-      "--surface": "rgba(255,255,255,.08)",
-      "--surface2": "rgba(255,255,255,.06)",
-      "--text": "#ffffff",
-      "--t1": "#ffffff",
-      "--text-muted": "rgba(255,255,255,.74)",
-      "--t2": "rgba(255,255,255,.74)",
-      "--text-dim": "rgba(255,255,255,.52)",
-      "--t3": "rgba(255,255,255,.52)",
+      "--bg3": "rgba(255,255,255,.1)",
+      "--surface": "rgba(255,255,255,.07)",
+      "--surface2": "rgba(255,255,255,.05)",
+      "--text": "#f4f0e6",
+      "--t1": "#f4f0e6",
+      "--text-muted": "rgba(244,240,230,.74)",
+      "--t2": "rgba(244,240,230,.74)",
+      "--text-dim": "rgba(244,240,230,.52)",
+      "--t3": "rgba(244,240,230,.52)",
       "--accent": "#f5c425",
       "--accent-hover": "#ffcf3a",
       "--gold": "#f5c425",
       "--gold-bright": "#ffcf3a",
       "--accent-ink": "#181228",
-      "--line": "rgba(255,255,255,.18)",
-      "--border": "rgba(255,255,255,.18)",
+      "--line": "rgba(255,255,255,.16)",
+      "--border": "rgba(255,255,255,.16)",
     } as CSSProperties,
   };
 }
 
-// Reset back to the light Swiss palette. Applied to a subtree (a modal card, a
-// login panel) so it renders light even while sitting inside a themed dark view —
-// mirroring how the deck page floats light modals over its coloured background.
+// Panel palette for floating surfaces (modals, the login card). The whole app
+// is dark felt now — like the iOS app, dialogs sit on a slightly lifted felt
+// panel rather than flipping to a light card. (Name kept so call sites don't
+// churn; the values are the Tabletop panel, not a light theme.)
 export const LIGHT_VARS: CSSProperties = {
-  ["--bg" as string]: "#fbfbf8",
-  "--bg2": "#ffffff",
-  "--bg3": "#f1f1ec",
-  "--surface": "#ffffff",
-  "--surface2": "#f1f1ec",
-  "--text": "#15151a",
-  "--t1": "#15151a",
-  "--text-muted": "#5c5c64",
-  "--t2": "#5c5c64",
-  "--text-dim": "#9a9aa2",
-  "--t3": "#9a9aa2",
-  "--accent": "#2742d6",
-  "--accent-hover": "#1d35b8",
-  "--gold": "#2742d6",
-  "--gold-bright": "#1d35b8",
-  "--accent-ink": "#ffffff",
-  "--line": "#e6e6df",
-  "--border": "#e6e6df",
+  ["--bg" as string]: "#1c1722",
+  "--bg2": "#262030",
+  "--bg3": "rgba(255,255,255,.08)",
+  "--surface": "rgba(255,255,255,.06)",
+  "--surface2": "rgba(255,255,255,.09)",
+  "--text": "#f4f0e6",
+  "--t1": "#f4f0e6",
+  "--text-muted": "rgba(244,240,230,.72)",
+  "--t2": "rgba(244,240,230,.72)",
+  "--text-dim": "rgba(244,240,230,.52)",
+  "--t3": "rgba(244,240,230,.52)",
+  "--accent": "#f5c425",
+  "--accent-hover": "#ffcf3a",
+  "--gold": "#f5c425",
+  "--gold-bright": "#ffcf3a",
+  "--accent-ink": "#181228",
+  "--line": "rgba(255,255,255,.14)",
+  "--border": "rgba(255,255,255,.14)",
 } as CSSProperties;

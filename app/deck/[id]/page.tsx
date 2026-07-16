@@ -9,6 +9,7 @@ import CommanderInput from "@/components/CommanderInput";
 import SwipeModal from "@/components/SwipeModal";
 import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import HandSimModal from "@/components/deck/HandSimModal";
+import GameCodeModal from "@/components/deck/GameCodeModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
 import OrderModal from "@/components/deck/OrderModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, dangerBtn } from "@/components/deck/ui";
@@ -61,6 +62,9 @@ interface Deck {
   shared?: boolean;
   isPublic?: boolean;
   canEdit?: boolean;
+  /** Game-night record — play-code results and the owner's tracker. */
+  gamesPlayed?: number;
+  gamesWon?: number;
 }
 
 const COLORS = [
@@ -254,6 +258,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   // sample-hand simulator
   const [handSimOpen, setHandSimOpen] = useState(false);
+  const [gameCodeOpen, setGameCodeOpen] = useState(false);
 
   // "Order on CardTrader" — runs in <OrderModal> while open
   const [orderOpen, setOrderOpen] = useState(false);
@@ -828,6 +833,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   >
                     {[
                       { label: "🎲 Sample hand", on: () => setHandSimOpen(true), disabled: deckCards.length === 0 },
+                      { label: "🎟 Game code", on: () => setGameCodeOpen(true) },
                       { label: "📝 Play guide", on: () => setNotesOpen((v) => !v) },
                       { label: "🌲 Add lands & staples", on: () => setTool("lands") },
                       { label: "⬆ Export / import", on: () => setTool("export") },
@@ -836,7 +842,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                         key={it.label}
                         onClick={() => { if (!it.disabled) { it.on(); setToolsOpen(false); } }}
                         disabled={it.disabled}
-                        style={{ textAlign: "left", padding: "9px 11px", borderRadius: 9, border: "none", background: "transparent", color: "var(--ink)", fontFamily: "var(--font-ui)", fontSize: 13.5, fontWeight: 600, cursor: it.disabled ? "default" : "pointer", opacity: it.disabled ? 0.45 : 1 }}
+                        style={{ textAlign: "left", padding: "9px 11px", borderRadius: 9, border: "none", background: "transparent", color: "var(--w-1)", fontFamily: "var(--font-ui)", fontSize: 13.5, fontWeight: 600, cursor: it.disabled ? "default" : "pointer", opacity: it.disabled ? 0.45 : 1 }}
                       >
                         {it.label}
                       </button>
@@ -898,6 +904,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 <span className="id-mono" style={{ fontSize: 12.5, color: "var(--w-2)", textTransform: "capitalize" }}>
                   {deck?.format}{identityPips.length ? ` · ${identityPips.map((c) => COLOR_NAME[c]).join(" / ")}` : ""}
                 </span>
+                {(deck?.gamesPlayed ?? 0) > 0 && (
+                  <span className="id-mono" title="Game-night record — wins–losses" style={{ fontSize: 12.5, color: "var(--gold)", padding: "3px 10px", borderRadius: 999, background: "var(--w-fill)", border: "1px solid var(--w-line)" }}>
+                    {deck!.gamesWon ?? 0}–{(deck!.gamesPlayed ?? 0) - (deck!.gamesWon ?? 0)} record
+                  </span>
+                )}
               </div>
               <h1 className="id-display" style={{ margin: "0 0 12px", fontSize: "clamp(40px, 7vw, 84px)", color: "var(--w-1)" }}>
                 {deck?.name || "…"}
@@ -933,10 +944,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   )}
                 </div>
                 <div className="id-card" style={{ position: "absolute", bottom: -18, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 11, padding: "10px 16px", whiteSpace: "nowrap" }}>
-                  <span className="id-display" style={{ fontSize: 26, color: "var(--ink)" }}>
-                    {deckCount}<span style={{ color: "#b3aebd", fontSize: 18 }}>/{target}</span>
+                  <span className="id-display" style={{ fontSize: 26, color: "var(--w-1)" }}>
+                    {deckCount}<span style={{ color: "var(--w-3)", fontSize: 18 }}>/{target}</span>
                   </span>
-                  <div style={{ width: 64, height: 6, borderRadius: 4, background: "#ece9f1", overflow: "hidden" }}>
+                  <div style={{ width: 64, height: 6, borderRadius: 4, background: "rgba(255,255,255,.14)", overflow: "hidden" }}>
                     <div style={{ width: `${Math.min(1, deckCount / Math.max(1, target)) * 100}%`, height: "100%", background: "var(--gold)", borderRadius: 4 }} />
                   </div>
                 </div>
@@ -1603,6 +1614,15 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         />
       )}
 
+      {/* game code — seat this deck at a friend's table */}
+      {gameCodeOpen && (
+        <GameCodeModal
+          deckId={deckId}
+          commanderImageUri={deckCards.find((c) => c.name === deck?.commander)?.imageUri ?? null}
+          onClose={() => setGameCodeOpen(false)}
+        />
+      )}
+
       {/* CardTrader order */}
       {orderOpen && <OrderModal cards={deckCards} onClose={() => setOrderOpen(false)} />}
 
@@ -1960,12 +1980,12 @@ function IdCardLine({
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {card.quantity > 1 && <span style={{ fontSize: 12, fontWeight: 700, color: "#857f90", flex: "none" }}>{card.quantity}×</span>}
-          <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ink)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
-          {owned && <span title="In your collection" style={{ color: "#0d8a5f", fontSize: 12, fontWeight: 700, flex: "none" }}>✓</span>}
-          {warning && <span title={warning} style={{ color: "#c2402a", fontSize: 12, flex: "none" }}>⚠</span>}
+          {card.quantity > 1 && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--w-3)", flex: "none" }}>{card.quantity}×</span>}
+          <span style={{ fontSize: 14, fontWeight: 700, color: "var(--w-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
+          {owned && <span title="In your collection" style={{ color: "#4ecb8f", fontSize: 12, fontWeight: 700, flex: "none" }}>✓</span>}
+          {warning && <span title={warning} style={{ color: "#ff9c86", fontSize: 12, flex: "none" }}>⚠</span>}
         </div>
-        <div style={{ fontSize: 11.5, color: "#857f90", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
+        <div style={{ fontSize: 11.5, color: "var(--w-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
       </div>
       <ManaCost cost={card.manaCost} size={14} />
       {trailing}
@@ -2026,8 +2046,8 @@ function DeckRailRow({
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {card.quantity > 1 && <span style={{ fontSize: 12, fontWeight: 700, color: "#5c5c64" }}>{card.quantity}×</span>}
           <span style={{ fontSize: 14, fontWeight: 600, color: "#15151a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
-          {owned && <span title="In your collection" style={{ color: "#0d8a5f", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>✓</span>}
-          {warning && <span title={warning} style={{ color: "#c2402a", fontSize: 12 }}>⚠</span>}
+          {owned && <span title="In your collection" style={{ color: "#4ecb8f", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>✓</span>}
+          {warning && <span title={warning} style={{ color: "#ff9c86", fontSize: 12 }}>⚠</span>}
         </div>
         <div style={{ fontSize: 11.5, color: "#8a8a92", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
       </div>

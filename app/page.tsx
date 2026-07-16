@@ -14,7 +14,6 @@ import { getIdentityTheme, getIdentityField, LIGHT_VARS } from "@/lib/identity-t
 /* The home view wears the commander-blue identity field — the same immersive
    look the deck pages use, matching the Color Identity design. */
 const homeTheme = getIdentityTheme("U");
-const heroField = getIdentityField("U");
 
 interface Deck {
   id: number;
@@ -136,13 +135,13 @@ export default function HomePage() {
   const formatCount = new Set(decks.map((d) => d.format)).size;
 
   return (
-    <main style={{ flex: 1, display: "flex", flexDirection: "column", ...homeTheme.vars, background: heroField.bg, color: "#fff" }}>
+    <main style={{ flex: 1, display: "flex", flexDirection: "column", ...homeTheme.vars, background: "var(--bg)", color: homeTheme.text }}>
       {/* HERO — on the commander-blue field */}
       <div
         style={{
           position: "relative",
           overflow: "hidden",
-          background: `radial-gradient(120% 80% at 78% -10%, ${heroField.bg}, ${heroField.deep} 78%)`,
+          background: homeTheme.bg,
         }}
       >
         {/* transparent top nav */}
@@ -237,7 +236,7 @@ export default function HomePage() {
 
       {/* HOW IT WORKS — deep neutral band (signed-out landing) */}
       {!me && (
-        <div style={{ background: "#14101f", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px)" }}>
+        <div style={{ background: "#17131d", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px)" }}>
           <div style={{ maxWidth: 1180, margin: "0 auto" }}>
             <Reveal>
               <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 12 }}>How it works</div>
@@ -261,7 +260,7 @@ export default function HomePage() {
       )}
 
       {/* PUBLIC BREWS — color-identity showcase */}
-      <div id="brews" style={{ background: "#0e0b18", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px) clamp(72px,8vw,112px)", flex: 1 }}>
+      <div id="brews" style={{ background: "#0e0b12", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px) clamp(72px,8vw,112px)", flex: 1 }}>
         <div style={{ maxWidth: 1180, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 40, flexWrap: "wrap" }}>
             <div>

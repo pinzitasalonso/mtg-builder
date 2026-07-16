@@ -1,50 +1,57 @@
 @import "tailwindcss";
 
 :root {
-  /* Spellpool "modern minimal" design tokens — Swiss index, hairlines, one
-     accent. Generic names (--bg, --surface, --accent, --text…) are mapped to
-     the minimal palette so existing components reskin through them. */
-  --app-bg: #fbfbf8;
-  --app-bg2: #ffffff;
+  /* Spellpool "Tabletop" design tokens — the iOS app's dark felt table,
+     gold accents, warm paper text. Generic names (--bg, --surface, --accent,
+     --text…) are mapped to the felt palette so existing components reskin
+     through them. Felt poles: #262030 (center) → #17131D (mid) → #0E0B12. */
+  --felt-center: #262030;
+  --felt-mid: #17131d;
+  --felt-edge: #0e0b12;
 
-  --bg: #fbfbf8;
-  --surface: #ffffff;
-  --surface2: #f1f1ec;
-  --bg2: #ffffff;
-  --bg3: #f1f1ec;
-  --border: #e6e6df;
-  --line: #e6e6df;
+  --app-bg: #17131d;
+  --app-bg2: #1c1722;
 
-  --accent: #2742d6;
-  --accent-hover: #1d35b8;
-  --accent-ink: #ffffff;
+  --bg: #17131d;
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface2: rgba(255, 255, 255, 0.09);
+  --bg2: #1c1722;
+  --bg3: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.14);
+  --line: rgba(255, 255, 255, 0.14);
 
-  --text: #15151a;
-  --text-muted: #5c5c64;
-  --text-dim: #9a9aa2;
-  --t1: #15151a;
-  --t2: #5c5c64;
-  --t3: #9a9aa2;
-  --danger: #c2402a;
+  --accent: #f5c425;
+  --accent-hover: #ffcf3a;
+  --accent-ink: #181228;
 
-  --bar-track: #ececE6;
-  --ring-track: #e9e9e2;
+  --text: #f4f0e6;
+  --text-muted: rgba(244, 240, 230, 0.72);
+  --text-dim: rgba(244, 240, 230, 0.52);
+  --t1: #f4f0e6;
+  --t2: rgba(244, 240, 230, 0.72);
+  --t3: rgba(244, 240, 230, 0.52);
+  --danger: #d0563f;
 
-  /* legacy card-frame names — remapped flat so old components reskin */
-  --frame-hi: #ffffff;
-  --frame-base: #ffffff;
-  --frame-dark: #e6e6df;
-  --frame-light: #f1f1ec;
-  --frame-ink: #15151a;
-  --plate: #ffffff;
-  --paper: #ffffff;
-  --paper-hi: #ffffff;
-  --paper-lo: #f1f1ec;
-  --paper-edge: #e6e6df;
-  --ink: #15151a;
-  --ink-soft: #5c5c64;
-  --gold: #2742d6;
-  --gold-bright: #1d35b8;
+  --bar-track: rgba(255, 255, 255, 0.12);
+  --ring-track: rgba(255, 255, 255, 0.12);
+
+  /* legacy card-frame names — remapped onto the felt so old components reskin */
+  --frame-hi: #262030;
+  --frame-base: #1c1722;
+  --frame-dark: #0e0b12;
+  --frame-light: #262030;
+  --frame-ink: #f4f0e6;
+  --plate: #1c1722;
+  --paper: #1c1722;
+  --paper-hi: #262030;
+  --paper-lo: #17131d;
+  --paper-edge: rgba(255, 255, 255, 0.14);
+  --ink: #181228;
+  --ink-soft: rgba(244, 240, 230, 0.72);
+  --gold: #f5c425;
+  --gold-bright: #ffcf3a;
+  /* Eyebrow/heading gold — the muted table gold the iOS app uses for labels. */
+  --gold-soft: #c9a94e;
 }
 
 * {
@@ -60,7 +67,7 @@ body {
      vars on <html>; a same-element var() chain on :root resolves to empty. */
   --font-ui: var(--font-hanken), system-ui, sans-serif;
   --font-body: var(--font-hanken), system-ui, sans-serif;
-  --font-display: var(--font-bangers), system-ui, cursive;
+  --font-display: var(--font-vadstena), Georgia, serif;
   --font-sc: var(--font-plexmono), monospace;
   --font-mono: var(--font-plexmono), monospace;
 
@@ -68,7 +75,11 @@ body {
   color: var(--text);
   font-family: var(--font-body);
   min-height: 100dvh;
-  background: var(--app-bg);
+  /* The felt table: the same radial ground the iOS app paints. (No
+     background-attachment: fixed — Chromium repaints it per scroll frame,
+     which stalls scrolling and flashes black.) */
+  background: radial-gradient(120% 90% at 80% -10%, var(--felt-center), var(--felt-mid) 55%, var(--felt-edge)), var(--felt-edge);
+  background-color: var(--felt-edge);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -80,7 +91,7 @@ button {
 }
 
 ::selection {
-  background: rgba(39, 66, 214, 0.16);
+  background: rgba(245, 196, 37, 0.28);
 }
 
 /* Integrated translucent scrollbars (the app sits on dark colour fields). */
@@ -490,14 +501,14 @@ button {
   --w-fill-2: rgba(255, 255, 255, 0.16);
 }
 
-/* display / marker headline */
+/* display headline — Tabletop blackletter, Title Case (never uppercase: the
+   blackletter face is unreadable in all caps). */
 .id-display {
   font-family: var(--font-display);
   font-weight: 400;
-  letter-spacing: 0.015em;
-  line-height: 0.96;
-  text-transform: uppercase;
-  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.1);
+  letter-spacing: 0.01em;
+  line-height: 1.02;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 .id-label {
   font-family: var(--font-ui);
@@ -582,12 +593,12 @@ button {
   color: var(--ink);
 }
 
-/* white floating panel (deck rows etc.) */
+/* floating felt panel (deck rows etc.) — the iOS tabSurface tile */
 .id-card {
-  background: #ffffff;
-  color: var(--ink);
+  background: rgba(28, 23, 34, 0.92);
+  color: var(--w-1);
   border-radius: 14px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 10px 26px -16px rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09), 0 10px 26px -16px rgba(0, 0, 0, 0.6);
 }
 
 /* frosted workspace panels */
@@ -628,17 +639,17 @@ button {
 }
 .id-finder {
   width: 100%;
-  background: #fff;
-  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   outline: none;
   border-radius: 11px;
   padding: 11px 13px;
   font-family: var(--font-ui);
   font-size: 14.5px;
-  color: var(--ink);
+  color: var(--w-1);
 }
 .id-finder::placeholder {
-  color: #9a96a6;
+  color: var(--w-3);
 }
 .id-add,
 .id-del {
@@ -663,8 +674,8 @@ button {
   transform: scale(1.08);
 }
 .id-del {
-  background: #f0edf4;
-  color: #8a8494;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--w-3);
   font-size: 16px;
   opacity: 0;
 }
@@ -672,8 +683,8 @@ button {
   opacity: 1;
 }
 .id-del:hover {
-  background: #ffe2e2;
-  color: #d4493f;
+  background: rgba(208, 86, 63, 0.28);
+  color: #ff9c86;
 }
 
 /* two-panel builder workspace */

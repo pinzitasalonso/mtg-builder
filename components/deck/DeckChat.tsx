@@ -844,7 +844,7 @@ function CardLink({
     : inPool
       ? hover
         ? "var(--danger)"
-        : "#0d8a5f"
+        : "#4ecb8f"
       : "var(--accent)";
   const suffix = busy ? " …" : inPool ? (hover ? " ✕" : " ✓") : "";
   // Owned but not yet in the pool — flag that it's a free add from their collection.
@@ -894,7 +894,7 @@ function CardLink({
         {name}
         {suffix}
         {showOwned && (
-          <span style={{ color: "#0d8a5f", fontSize: "0.82em", fontWeight: 600, textDecoration: "none" }}>
+          <span style={{ color: "#4ecb8f", fontSize: "0.82em", fontWeight: 600, textDecoration: "none" }}>
             {" "}· owned
           </span>
         )}
