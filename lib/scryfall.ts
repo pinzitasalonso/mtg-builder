@@ -124,6 +124,59 @@ export async function fetchUsdPrice(scryfallId: string): Promise<string | null> 
   }
 }
 
+// The Scryfall id embedded in a card image URL — the filename is the id (a
+// UUID). Null when the URL is missing or not in that shape. Lets us price a
+// collection card (which stores only its owned printing's image) without a
+// separate id column.
+export function scryfallIdFromImage(uri: string | null | undefined): string | null {
+  if (!uri) return null;
+  const m = uri.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+  return m ? m[1].toLowerCase() : null;
+}
+
+// Batched USD prices for many Scryfall ids, memoized in the same cache as
+// fetchUsdPrice so the two interoperate. Returns id → price string for the
+// cards Scryfall priced; ids with no USD price (or that Scryfall didn't return)
+// are cached as null so they aren't refetched. Used to price a whole collection
+// server-side in a few /cards/collection calls instead of one lookup per card.
+export async function usdPricesByIds(ids: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const missing: string[] = [];
+  for (const id of new Set(ids)) {
+    if (usdPriceCache.has(id)) {
+      const cached = usdPriceCache.get(id)!;
+      if (cached) out.set(id, cached);
+    } else {
+      missing.push(id);
+    }
+  }
+  for (let i = 0; i < missing.length; i += 75) {
+    const chunk = missing.slice(i, i + 75);
+    try {
+      const res = await fetch("https://api.scryfall.com/cards/collection", {
+        method: "POST",
+        headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
+        body: JSON.stringify({ identifiers: chunk.map((id) => ({ id })) }),
+      });
+      if (!res.ok) continue; // leave this chunk uncached; a later request retries
+      const data = (await res.json()) as {
+        data?: Array<{ id: string; prices?: { usd?: string | null } }>;
+      };
+      const seen = new Set<string>();
+      for (const c of data.data ?? []) {
+        const usd = typeof c.prices?.usd === "string" ? c.prices.usd : null;
+        usdPriceCache.set(c.id, usd);
+        seen.add(c.id);
+        if (usd) out.set(c.id, usd);
+      }
+      for (const id of chunk) if (!seen.has(id)) usdPriceCache.set(id, null);
+    } catch {
+      // Network hiccup — leave the chunk uncached so the next GET can retry.
+    }
+  }
+  return out;
+}
+
 // A concrete printing of a card — what's needed to locate it in another
 // marketplace's catalog (set code + collector number).
 export interface ScryfallPrinting {

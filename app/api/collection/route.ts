@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { parseDecklist } from "@/lib/decklist";
-import { collectionByName } from "@/lib/scryfall";
+import { collectionByName, scryfallIdFromImage, usdPricesByIds } from "@/lib/scryfall";
 
 export const runtime = "nodejs";
 
@@ -49,9 +49,22 @@ export async function GET() {
     select: { name: true, quantity: true, colorIdentity: true, typeLine: true, manaCost: true, imageUri: true },
     orderBy: { name: "asc" },
   });
+
+  // Price every resolved card server-side, the same way deck pages do — the
+  // owned printing's id is in its image URL. Batched + memoized in fetchUsdPrice's
+  // cache, so a warm cache serves this for free and the client never has to
+  // fetch prices itself (which is fragile on device).
+  const priceMap = await usdPricesByIds(
+    rows.map((r) => scryfallIdFromImage(r.imageUri)).filter((id): id is string => id !== null)
+  );
+  const cards = rows.map((r) => {
+    const id = scryfallIdFromImage(r.imageUri);
+    return { ...r, usdPrice: (id && priceMap.get(id)) || null };
+  });
+
   const pending = await prisma.collectionCard.count({ where: { userId: user.id, enriched: false } });
   const total = rows.reduce((s, r) => s + r.quantity, 0);
-  return NextResponse.json({ cards: rows, unique: rows.length, total, pending });
+  return NextResponse.json({ cards, unique: rows.length, total, pending });
 }
 
 // Import a pasted collection. `mode: "replace"` swaps the whole collection;
