@@ -37,6 +37,7 @@ model User {
   decks        Deck[]
   sessions     Session[]
   collection   CollectionCard[]
+  playCodes    PlayCode[]
 }
 
 // A card the user physically owns, for "do I have this?" checks across their
@@ -89,12 +90,36 @@ model Deck {
   shared    Boolean    @default(false)
   // Free-form play notes: mulligans, lines, win routes.
   notes     String?
+  // Game-night record: incremented by play-code results (a friend's tracker
+  // reporting a finished game) and by the owner's own tracker via /record.
+  gamesPlayed Int      @default(0)
+  gamesWon    Int      @default(0)
   createdAt DateTime   @default(now())
   // Nullable so pre-auth decks survive the migration; the first user to sign
   // up adopts them (they belong to whoever ran the instance before auth).
   userId    Int?
   user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards     PoolCard[]
+  playCodes PlayCode[]
+}
+
+// A short-lived "seat me at your table" code. The deck's owner mints one, a
+// friend types it into THEIR life tracker, and the seat fills with this
+// player and deck (name + commander art); the game's result is recorded back
+// onto the deck. Display fields are snapshotted at mint so resolving needs no
+// joins and a mid-night deck edit doesn't rewrite a live table.
+model PlayCode {
+  code              String   @id
+  userId            Int
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deckId            Int
+  deck              Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  playerName        String
+  deckName          String
+  commander         String?
+  commanderImageUri String?
+  createdAt         DateTime @default(now())
+  expiresAt         DateTime
 }
 
 model PoolCard {
