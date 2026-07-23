@@ -7,9 +7,9 @@ export const FREE_DECK_LIMIT = 3;
 export const FREE_AI_PER_DAY = 4;
 
 export const DECK_LIMIT_MSG =
-  `The free plan holds ${FREE_DECK_LIMIT} decks — delete one to make room. A paid tier with unlimited decks is coming.`;
+  `The free plan holds ${FREE_DECK_LIMIT} decks — delete one to make room. Spellpool Pro (in the iOS app) lifts the limit.`;
 export const AI_LIMIT_MSG =
-  `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. A paid tier with unlimited AI is coming.`;
+  `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro (in the iOS app) lifts the limit.`;
 
 export interface TierFields {
   tier?: string | null;

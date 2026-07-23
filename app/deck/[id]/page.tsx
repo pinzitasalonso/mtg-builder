@@ -1466,9 +1466,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 ))}
               </select>
             </Field>
-            <Field label="Commander">
-              <CommanderInput className="cc-paper" placeholder="(optional)" value={edit.commander} onChange={(v) => setEdit({ ...edit, commander: v })} style={paperInput} />
-            </Field>
+            {edit.format === "commander" && (
+              <Field label="Commander">
+                <CommanderInput className="cc-paper" placeholder="(optional)" value={edit.commander} onChange={(v) => setEdit({ ...edit, commander: v })} style={paperInput} />
+              </Field>
+            )}
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
               <button type="button" onClick={() => setSettingsOpen(false)} style={ghostBtn}>
                 Cancel

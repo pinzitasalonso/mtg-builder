@@ -78,7 +78,7 @@ export function getIdentityField(identity: string | null | undefined): { bg: str
 // The iOS Tabletop felt poles — identity fields wash INTO these instead of
 // standing as saturated colour, so a mono-blue deck reads as blue-tinted felt
 // rather than a vivid blue page (matching IdentityFeltBackground in the app).
-const FELT = { center: "#262030", mid: "#17131d", edge: "#0e0b12" };
+const FELT = { center: "#412fda", mid: "#3726be", edge: "#2d1da1" };
 
 function mixHex(a: string, b: string, t: number): string {
   const [ar, ag, ab] = hexToRgb(a);
@@ -93,7 +93,7 @@ export function getIdentityTheme(identity: string | null | undefined): IdentityT
   // at the top-right pole fading to near-black felt at the edges.
   const washTop = mixHex(FELT.center, field.bg, 0.34);
   const washMid = mixHex(FELT.mid, field.deep, 0.22);
-  const bg = `radial-gradient(125% 85% at 85% -10%, ${washTop}, ${washMid} 55%, ${FELT.edge} 100%)`;
+  const bg = `linear-gradient(180deg, ${washTop}, ${washMid} 55%, ${FELT.edge} 100%)`;
   const bgSolid = washMid;
 
   return {
@@ -128,8 +128,8 @@ export function getIdentityTheme(identity: string | null | undefined): IdentityT
 // panel rather than flipping to a light card. (Name kept so call sites don't
 // churn; the values are the Tabletop panel, not a light theme.)
 export const LIGHT_VARS: CSSProperties = {
-  ["--bg" as string]: "#1c1722",
-  "--bg2": "#262030",
+  ["--bg" as string]: "#1d136b",
+  "--bg2": "#241875",
   "--bg3": "rgba(255,255,255,.08)",
   "--surface": "rgba(255,255,255,.06)",
   "--surface2": "rgba(255,255,255,.09)",

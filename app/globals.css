@@ -4,18 +4,18 @@
   /* Spellpool "Tabletop" design tokens — the iOS app's dark felt table,
      gold accents, warm paper text. Generic names (--bg, --surface, --accent,
      --text…) are mapped to the felt palette so existing components reskin
-     through them. Felt poles: #262030 (center) → #17131D (mid) → #0E0B12. */
-  --felt-center: #262030;
-  --felt-mid: #17131d;
-  --felt-edge: #0e0b12;
+     through them. Indigo table (matches the iOS app): #412FDA → #2D1DA1. */
+  --felt-center: #412fda;
+  --felt-mid: #3726be;
+  --felt-edge: #2d1da1;
 
-  --app-bg: #17131d;
-  --app-bg2: #1c1722;
+  --app-bg: #1d136b;
+  --app-bg2: #241875;
 
-  --bg: #17131d;
+  --bg: #1d136b;
   --surface: rgba(255, 255, 255, 0.06);
   --surface2: rgba(255, 255, 255, 0.09);
-  --bg2: #1c1722;
+  --bg2: #241875;
   --bg3: rgba(255, 255, 255, 0.08);
   --border: rgba(255, 255, 255, 0.14);
   --line: rgba(255, 255, 255, 0.14);
@@ -36,22 +36,22 @@
   --ring-track: rgba(255, 255, 255, 0.12);
 
   /* legacy card-frame names — remapped onto the felt so old components reskin */
-  --frame-hi: #262030;
-  --frame-base: #1c1722;
-  --frame-dark: #0e0b12;
-  --frame-light: #262030;
+  --frame-hi: #241875;
+  --frame-base: #1d136b;
+  --frame-dark: #150e52;
+  --frame-light: #241875;
   --frame-ink: #f4f0e6;
-  --plate: #1c1722;
-  --paper: #1c1722;
-  --paper-hi: #262030;
-  --paper-lo: #17131d;
+  --plate: #1d136b;
+  --paper: #1d136b;
+  --paper-hi: #241875;
+  --paper-lo: #1a1160;
   --paper-edge: rgba(255, 255, 255, 0.14);
   --ink: #181228;
   --ink-soft: rgba(244, 240, 230, 0.72);
   --gold: #f5c425;
   --gold-bright: #ffcf3a;
-  /* Eyebrow/heading gold — the muted table gold the iOS app uses for labels. */
-  --gold-soft: #c9a94e;
+  /* Highlight gold — one gold app-wide, same as the iOS app. */
+  --gold-soft: #f5c425;
 }
 
 * {
@@ -75,10 +75,10 @@ body {
   color: var(--text);
   font-family: var(--font-body);
   min-height: 100dvh;
-  /* The felt table: the same radial ground the iOS app paints. (No
-     background-attachment: fixed — Chromium repaints it per scroll frame,
+  /* The indigo table: the same top-to-bottom linear wash the iOS app paints.
+     (No background-attachment: fixed — Chromium repaints it per scroll frame,
      which stalls scrolling and flashes black.) */
-  background: radial-gradient(120% 90% at 80% -10%, var(--felt-center), var(--felt-mid) 55%, var(--felt-edge)), var(--felt-edge);
+  background: linear-gradient(180deg, var(--felt-center), var(--felt-edge)), var(--felt-edge);
   background-color: var(--felt-edge);
   -webkit-font-smoothing: antialiased;
 }
@@ -595,7 +595,7 @@ button {
 
 /* floating felt panel (deck rows etc.) — the iOS tabSurface tile */
 .id-card {
-  background: rgba(28, 23, 34, 0.92);
+  background: rgba(36, 24, 117, 0.92);
   color: var(--w-1);
   border-radius: 14px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09), 0 10px 26px -16px rgba(0, 0, 0, 0.6);

@@ -26,7 +26,7 @@ interface Deck {
   _count: { cards: number };
 }
 
-type Me = { id: number; email: string } | null;
+type Me = { id: number; email: string; tier?: string } | null;
 
 const FEATURES = [
   { n: "01", t: "Pour in a theme", d: "Tell Spellpool a commander, a combo, or just a vibe. It reads the whole Oracle text database — not just card names." },
@@ -99,7 +99,7 @@ export default function HomePage() {
       body: JSON.stringify({
         name: form.name.trim(),
         format: form.format,
-        commander: form.commander.trim() || undefined,
+        commander: form.format === "commander" ? form.commander.trim() || undefined : undefined,
       }),
     });
     const created = await res.json().catch(() => null);
@@ -161,6 +161,11 @@ export default function HomePage() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             {me ? (
               <>
+                {me.tier === "pro" && (
+                  <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.14em", color: "var(--accent-ink)", background: "var(--gold)", padding: "3px 8px", borderRadius: 999 }}>
+                    PRO
+                  </span>
+                )}
                 <span title={me.email} style={{ fontSize: 13, color: "var(--w-3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {me.email}
                 </span>
@@ -236,7 +241,7 @@ export default function HomePage() {
 
       {/* HOW IT WORKS — deep neutral band (signed-out landing) */}
       {!me && (
-        <div style={{ background: "#17131d", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px)" }}>
+        <div style={{ background: "#1d136b", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px)" }}>
           <div style={{ maxWidth: 1180, margin: "0 auto" }}>
             <Reveal>
               <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 12 }}>How it works</div>
@@ -260,7 +265,7 @@ export default function HomePage() {
       )}
 
       {/* PUBLIC BREWS — color-identity showcase */}
-      <div id="brews" style={{ background: "#0e0b12", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px) clamp(72px,8vw,112px)", flex: 1 }}>
+      <div id="brews" style={{ background: "#150e52", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px) clamp(72px,8vw,112px)", flex: 1 }}>
         <div style={{ maxWidth: 1180, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 40, flexWrap: "wrap" }}>
             <div>
@@ -322,7 +327,9 @@ export default function HomePage() {
                 <option value="pauper">Pauper</option>
                 <option value="draft">Draft</option>
               </select>
-              <CommanderInput placeholder="Commander (optional)" value={form.commander} onChange={(v) => setForm({ ...form, commander: v })} style={modalInput} />
+              {form.format === "commander" && (
+                <CommanderInput placeholder="Commander (optional)" value={form.commander} onChange={(v) => setForm({ ...form, commander: v })} style={modalInput} />
+              )}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>
                 <button type="button" onClick={() => setShowModal(false)} className="mn-ghost" style={{ padding: "10px 20px", fontSize: 14 }}>
                   Cancel
@@ -524,8 +531,8 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate }: { deck: Deck; 
             color: "#fff",
             background: `linear-gradient(165deg, ${field.bg}, ${field.deep})`,
             boxShadow: hover
-              ? "0 0 0 2px var(--gold), 0 26px 50px -22px rgba(0,0,0,.7)"
-              : "0 0 0 1px rgba(255,255,255,.06), 0 16px 38px -26px rgba(0,0,0,.7)",
+              ? "0 0 0 2px var(--gold), 0 10px 22px -14px rgba(0,0,0,.5)"
+              : "0 3px 8px -2px rgba(0,0,0,.28)",
             transform: hover ? "translateY(-4px)" : "none",
             transition: "transform .2s, box-shadow .2s",
           }}
