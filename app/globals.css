@@ -11,6 +11,7 @@
 
   --app-bg: #1d136b;
   --app-bg2: #241875;
+  --panel: #241875;
 
   --bg: #1d136b;
   --surface: rgba(255, 255, 255, 0.06);
@@ -593,9 +594,11 @@ button {
   color: var(--ink);
 }
 
-/* floating felt panel (deck rows etc.) — the iOS tabSurface tile */
+/* floating panel (deck rows etc.) — a darker cut of whatever ground the page
+   wears (the theme computes --panel), so it follows identity-tinted deck pages
+   instead of staying indigo */
 .id-card {
-  background: rgba(36, 24, 117, 0.92);
+  background: var(--panel, #241875);
   color: var(--w-1);
   border-radius: 14px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09), 0 10px 26px -16px rgba(0, 0, 0, 0.6);

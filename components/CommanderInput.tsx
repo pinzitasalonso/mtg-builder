@@ -113,10 +113,12 @@ export default function CommanderInput({
             left: 0,
             right: 0,
             zIndex: 5,
-            background: "#fff",
+            // The dark panel the modals sit on — the old hardcoded white made
+            // the paper-white row text invisible.
+            background: "var(--bg2)",
             border: "1px solid var(--line)",
             borderRadius: 10,
-            boxShadow: "0 14px 34px -14px rgba(0,0,0,.4)",
+            boxShadow: "0 14px 34px -14px rgba(0,0,0,.6)",
             overflow: "hidden",
             maxHeight: 260,
             overflowY: "auto",

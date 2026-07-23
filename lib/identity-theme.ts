@@ -23,7 +23,7 @@ const ID_THEME: Record<string, { bg: string; deep: string }> = {
   // mono
   W: { bg: "#c79a2e", deep: "#9a7414" },
   U: { bg: "#4536e6", deep: "#2c1f9e" },
-  B: { bg: "#5b4a6e", deep: "#3a2d4c" },
+  B: { bg: "#48424f", deep: "#292430" },
   R: { bg: "#d2452f", deep: "#9a2a18" },
   G: { bg: "#2f7a4c", deep: "#195030" },
   C: { bg: "#5a5560", deep: "#3a3640" },
@@ -75,10 +75,11 @@ export function getIdentityField(identity: string | null | undefined): { bg: str
   return { bg: blendHexes(mono.map((m) => m.bg)), deep: blendHexes(mono.map((m) => m.deep)) };
 }
 
-// The iOS Tabletop felt poles — identity fields wash INTO these instead of
-// standing as saturated colour, so a mono-blue deck reads as blue-tinted felt
-// rather than a vivid blue page (matching IdentityFeltBackground in the app).
+// The indigo table poles — used verbatim when a surface has NO identity (the
+// login page, colorless contexts), so the brand ground stays indigo there.
 const FELT = { center: "#412fda", mid: "#3726be", edge: "#2d1da1" };
+// The near-black every identity ground sinks into at the bottom.
+const TABLE_DARK = "#100a18";
 
 function mixHex(a: string, b: string, t: number): string {
   const [ar, ag, ab] = hexToRgb(a);
@@ -87,14 +88,27 @@ function mixHex(a: string, b: string, t: number): string {
 }
 
 export function getIdentityTheme(identity: string | null | undefined): IdentityTheme {
-  const field = getIdentityField(identity);
+  const letters = (identity ?? "").toUpperCase().replace(/[^WUBRG]/g, "");
 
-  // Wash the identity into the felt: mostly felt, a breath of the deck's hue
-  // at the top-right pole fading to near-black felt at the edges.
-  const washTop = mixHex(FELT.center, field.bg, 0.34);
-  const washMid = mixHex(FELT.mid, field.deep, 0.22);
-  const bg = `linear-gradient(180deg, ${washTop}, ${washMid} 55%, ${FELT.edge} 100%)`;
-  const bgSolid = washMid;
+  // A deck's ground IS its identity: the field colour up top sinking into a
+  // darkened version of itself — a mono-red page reads red, Golgari reads
+  // green-black. (A weak wash into the indigo used to turn everything purple.)
+  // No identity at all → the plain indigo table, so neutral surfaces stay brand.
+  let top: string, mid: string, bottom: string;
+  if (letters) {
+    const field = getIdentityField(letters);
+    top = mixHex(field.bg, TABLE_DARK, 0.15);
+    mid = field.deep;
+    bottom = mixHex(field.deep, TABLE_DARK, 0.45);
+  } else {
+    top = FELT.center;
+    mid = FELT.mid;
+    bottom = FELT.edge;
+  }
+  const bg = `linear-gradient(180deg, ${top}, ${mid} 55%, ${bottom} 100%)`;
+  const bgSolid = mid;
+  // Floating panels (.id-card) sit on a darker cut of the same ground.
+  const panel = mixHex(mid, "#05030a", 0.3);
 
   return {
     bg,
@@ -103,6 +117,7 @@ export function getIdentityTheme(identity: string | null | undefined): IdentityT
     vars: {
       ["--bg" as string]: bgSolid,
       "--bg2": bgSolid,
+      "--panel": panel,
       "--bg3": "rgba(255,255,255,.1)",
       "--surface": "rgba(255,255,255,.07)",
       "--surface2": "rgba(255,255,255,.05)",
