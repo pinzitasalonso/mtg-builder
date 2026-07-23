@@ -48,8 +48,22 @@ describe("isProOnRevenueCat", () => {
     expect(await isProOnRevenueCat("42", "sk_test")).toBe(false);
   });
 
-  it("fails closed on an API error", async () => {
+  it("is definitively not pro when RevenueCat has never seen the user", async () => {
+    mockFetch(404, {});
+    expect(await isProOnRevenueCat("42", "sk_test")).toBe(false);
+  });
+
+  it("is INDETERMINATE (null) on an auth failure — a bad key must never downgrade", async () => {
     mockFetch(401, {});
-    expect(await isProOnRevenueCat("42", "sk_bad")).toBe(false);
+    expect(await isProOnRevenueCat("42", "sk_bad")).toBeNull();
+    mockFetch(403, {});
+    expect(await isProOnRevenueCat("42", "sk_restricted")).toBeNull();
+  });
+
+  it("is INDETERMINATE (null) on an outage", async () => {
+    mockFetch(500, {});
+    expect(await isProOnRevenueCat("42", "sk_test")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("network down"); }));
+    expect(await isProOnRevenueCat("42", "sk_test")).toBeNull();
   });
 });

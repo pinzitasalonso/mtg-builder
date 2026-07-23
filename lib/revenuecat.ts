@@ -29,13 +29,24 @@ interface RCSubscriberResponse {
 /* Ask RevenueCat whether this app_user_id currently has the `pro` entitlement.
    Canonical check (RevenueCat's recommended pattern): re-read the subscriber
    rather than infer from a single event, so missed or out-of-order webhooks
-   can't desync us. Returns false on any error (fail closed). */
-export async function isProOnRevenueCat(appUserId: string, secretKey: string): Promise<boolean> {
+   can't desync us.
+
+   Tri-state: true/false is a DEFINITIVE answer from RevenueCat; null means we
+   couldn't get one (bad/permission-less API key, network failure, RC outage).
+   Callers must not change anyone's tier on null — a misconfigured key once
+   made every re-check actively stamp paying subscribers back to "free". */
+export async function isProOnRevenueCat(
+  appUserId: string,
+  secretKey: string
+): Promise<boolean | null> {
   try {
     const res = await fetch(`${RC_API}/subscribers/${encodeURIComponent(appUserId)}`, {
       headers: { Authorization: `Bearer ${secretKey}`, Accept: "application/json" },
     });
-    if (!res.ok) return false;
+    // 404 = RevenueCat has never seen this user: definitively not entitled.
+    // Anything else non-2xx (401/403 bad key, 5xx outage) is indeterminate.
+    if (res.status === 404) return false;
+    if (!res.ok) return null;
     const data = (await res.json()) as RCSubscriberResponse;
     const ent = data.subscriber?.entitlements?.[PRO_ENTITLEMENT];
     if (!ent) return false;
@@ -43,7 +54,7 @@ export async function isProOnRevenueCat(appUserId: string, secretKey: string): P
     if (!ent.expires_date) return true;
     return new Date(ent.expires_date).getTime() > Date.now();
   } catch {
-    return false;
+    return null;
   }
 }
 

@@ -36,7 +36,13 @@ export async function POST(req: Request) {
   }
 
   // Re-read the canonical entitlement state and mirror it onto the tier.
-  const tier = (await isProOnRevenueCat(appUserId as string, secret)) ? "pro" : "free";
+  // An indeterminate answer (bad API key, RC outage) changes NOTHING — and
+  // returns 500 so RevenueCat retries the event once we're healthy again.
+  const entitled = await isProOnRevenueCat(appUserId as string, secret);
+  if (entitled === null) {
+    return NextResponse.json({ error: "entitlement check failed" }, { status: 500 });
+  }
+  const tier = entitled ? "pro" : "free";
   await prisma.user.updateMany({ where: { id: userId }, data: { tier } });
   return NextResponse.json({ ok: true, tier });
 }

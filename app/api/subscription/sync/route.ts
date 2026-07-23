@@ -19,7 +19,12 @@ export async function POST() {
   // Not configured yet — report the tier as-is rather than downgrade anyone.
   if (!secret) return NextResponse.json({ tier: user.tier });
 
-  const tier = (await isProOnRevenueCat(String(user.id), secret)) ? "pro" : "free";
+  // Indeterminate (bad key / RC outage) also changes nothing: keep the stored
+  // tier rather than stamping a paying subscriber back to free.
+  const entitled = await isProOnRevenueCat(String(user.id), secret);
+  if (entitled === null) return NextResponse.json({ tier: user.tier });
+
+  const tier = entitled ? "pro" : "free";
   if (tier !== user.tier) {
     await prisma.user.update({ where: { id: user.id }, data: { tier } });
   }
