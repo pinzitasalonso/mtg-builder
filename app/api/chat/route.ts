@@ -112,6 +112,24 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      // The model can think silently for a long stretch before its first
+      // visible token — long enough for proxy/client idle timeouts to kill
+      // full-deck builds mid-request. Newline heartbeats keep bytes flowing
+      // until real text arrives; blank lines are invisible to Markdown and
+      // to both clients' parsers.
+      let heartbeat: ReturnType<typeof setInterval> | null = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode("\n"));
+        } catch {
+          // Stream already closed — the clear below is on its way.
+        }
+      }, 15000);
+      const stopHeartbeat = () => {
+        if (heartbeat) {
+          clearInterval(heartbeat);
+          heartbeat = null;
+        }
+      };
       try {
         // Sonnet 5 rejects sampling params (`temperature` → 400) and runs
         // adaptive thinking by default; thinking spends output tokens, so the
@@ -127,11 +145,14 @@ export async function POST(req: Request) {
         });
         for await (const event of ai) {
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            stopHeartbeat();
             controller.enqueue(encoder.encode(event.delta.text));
           }
         }
+        stopHeartbeat();
         controller.close();
       } catch (e) {
+        stopHeartbeat();
         const detail = e instanceof Error ? e.message : String(e);
         controller.enqueue(encoder.encode(`\n\n_Sorry — the assistant hit an error: ${detail}_`));
         controller.close();
