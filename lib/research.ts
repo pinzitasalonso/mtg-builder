@@ -304,6 +304,34 @@ export function buildSourceBlock(data: SourceData): string {
   );
 }
 
+// Whether a chat request is the "suggest a deck from my collection" build —
+// the one flow where community research costs seconds of dead air before the
+// first streamed byte and adds little, because the answer is meant to come out
+// of cards the player already owns.
+//
+// The tell is a MISSING `currentDeck`, not an empty one. The iOS suggest flow
+// omits it entirely (the deck doesn't exist yet); every other caller — the deck
+// assistant on both clients and the web deck page — always sends the object,
+// even for an empty deck. Testing emptiness instead would wrongly strip
+// research from an assistant conversation about a brand-new deck.
+export function isCollectionBuild(currentDeck: unknown, collection: string[]): boolean {
+  return (currentDeck === undefined || currentDeck === null) && collection.length > 0;
+}
+
+// The grounding preamble for a build that deliberately skipped research. The
+// empty case of buildSourceBlock says community data "could be retrieved" —
+// true when a fetch failed, misleading when we chose not to fetch. Framing a
+// deliberate skip as a degraded state invites the model to hedge, so say plainly
+// that the player's collection (supplied further down the prompt) is the ground
+// truth here.
+export function buildCollectionFirstBlock(): string {
+  return (
+    "No community data was gathered for this request — it is a build from the player's own collection, " +
+    "which is listed below and is your primary evidence. Use it together with your own expert Magic " +
+    "knowledge to pick cards that satisfy EVERY constraint in the request."
+  );
+}
+
 export function buildDeckBlock(deckCtx: DeckContext): string {
   if (deckCtx.cards.length === 0 && !deckCtx.commander) return "";
   const commanderLine = deckCtx.commander ? `COMMANDER: ${deckCtx.commander}\n` : "";

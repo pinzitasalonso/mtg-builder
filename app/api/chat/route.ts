@@ -6,10 +6,12 @@ import { AI_LIMIT_MSG } from "@/lib/limits";
 import { consumeAi } from "@/lib/limits-db";
 import {
   buildCollectionBlock,
+  buildCollectionFirstBlock,
   buildComboBlock,
   buildDeckBlock,
   buildSourceBlock,
   gatherContext,
+  isCollectionBuild,
   parseCollection,
   parseDeckContext,
 } from "@/lib/research";
@@ -70,13 +72,23 @@ export async function POST(req: Request) {
   const collection = parseCollection(body?.collection);
   const latestUser = messages[messages.length - 1].content;
 
+  // Building from the player's own collection skips research: a blocking Haiku
+  // intent call plus four network fetches, all before the first byte can move,
+  // to ground an answer that is supposed to come out of the cards listed in the
+  // request anyway. Skipping lands in the all-sources-empty state gatherContext
+  // already degrades to. See isCollectionBuild for why the tell is a *missing*
+  // currentDeck rather than an empty one.
+  const buildingFromCollection = isCollectionBuild(body?.currentDeck, collection);
+
   const anthropic = new Anthropic();
 
   // Gather grounding data (intent → EDHREC/Reddit/Moxfield/Spellbook) before we
   // start streaming — this is the brief "thinking" pause the client shows.
-  const { data, sources, almostCombos } = await gatherContext(anthropic, latestUser, deckCtx).catch(
-    () => ({ data: { edhrec: [], reddit: [], moxfield: [] }, sources: [] as string[], almostCombos: [] })
-  );
+  const { data, sources, almostCombos } = buildingFromCollection
+    ? { data: { edhrec: [], reddit: [], moxfield: [] }, sources: [] as string[], almostCombos: [] }
+    : await gatherContext(anthropic, latestUser, deckCtx).catch(
+        () => ({ data: { edhrec: [], reddit: [], moxfield: [] }, sources: [] as string[], almostCombos: [] })
+      );
 
   const system =
     "You are a world-class Magic: The Gathering deckbuilding expert having a focused conversation with a " +
@@ -103,7 +115,7 @@ export async function POST(req: Request) {
     "JUDGING: When the player asks you to judge, rate, or review their deck or pool, act as the deck judge — " +
     "there is no separate judge tool. Structure that reply as: a short overall verdict, then '## Working well', " +
     "'## Consider cutting', and '## Missing' sections, with every specific card bracketed.\n\n" +
-    buildSourceBlock(data) +
+    (buildingFromCollection ? buildCollectionFirstBlock() : buildSourceBlock(data)) +
     buildDeckBlock(deckCtx) +
     buildComboBlock(almostCombos) +
     buildCollectionBlock(collection) +
