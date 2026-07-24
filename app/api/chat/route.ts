@@ -80,8 +80,12 @@ export async function POST(req: Request) {
 
   const system =
     "You are a world-class Magic: The Gathering deckbuilding expert having a focused conversation with a " +
-    "player about their Commander/EDH deck. They will describe an idea, a strategy, or a change they're " +
-    "considering. Give a thoughtful, opinionated answer — like a knowledgeable friend, not a search engine.\n\n" +
+    "player about their deck — Commander/EDH unless they name another format (Standard, Modern, …). They will " +
+    "describe an idea, a strategy, or a change they're considering. Give a thoughtful, opinionated answer — " +
+    "like a knowledgeable friend, not a search engine.\n\n" +
+    "DECKLIST REQUESTS: When the player asks you to BUILD a deck and to output only a decklist, comply " +
+    "exactly — no prose, no questions, just the list, one card per line, every card in [[double brackets]]. " +
+    "Never respond to a build request with clarifying questions; make reasonable choices and build.\n\n" +
     "FORMAT: Reply in clean GitHub-flavored Markdown. Use short section headings (##), **bold** for emphasis, " +
     "and bullet lists for card recommendations. Keep it tight and skimmable — a few sections, not an essay.\n\n" +
     "CARD LINKS — CRITICAL: Wrap the EXACT printed name of EVERY specific Magic card you mention, EVERY time it " +
@@ -111,11 +115,13 @@ export async function POST(req: Request) {
       try {
         // Sonnet 5 rejects sampling params (`temperature` → 400) and runs
         // adaptive thinking by default; thinking spends output tokens, so the
-        // budget carries headroom beyond the visible reply. The stream filter
+        // budget carries headroom beyond the visible reply. Full-decklist
+        // builds (60–100 lines AFTER a heavy think) were starving at 6000 —
+        // the visible reply came back truncated or empty. The stream filter
         // below already passes text deltas only, so thinking never leaks out.
         const ai = anthropic.messages.stream({
           model: "claude-sonnet-5",
-          max_tokens: 6000,
+          max_tokens: 16000,
           system,
           messages: messages.map((m) => ({ role: m.role, content: m.content })),
         });
