@@ -25,7 +25,14 @@ interface ChatMessage {
 }
 
 const MAX_TOTAL_CHARS = 12000;
-const MAX_MESSAGE_CHARS = 2000;
+// The iOS app appends an invisible directive to the player's ask — the answer
+// structure, the format rule and the commander's color identity — which runs
+// ~2200 characters on a commander deck. At 2000 this cap sliced that directive
+// off the end of every such ask (and the app, budgeting its question against
+// it, went negative and crashed). The cap exists to stop abuse, not to fit the
+// directive: 8000 clears it with room for a real question, and MAX_TOTAL_CHARS
+// still bounds the conversation.
+const MAX_MESSAGE_CHARS = 8000;
 
 // Conversational deck assistant. Unlike /api/search (which returns a ranked JSON
 // card list for the swipe UI), this streams a ChatGPT-style Markdown answer that
