@@ -34,6 +34,12 @@ const MAX_TOTAL_CHARS = 12000;
 // still bounds the conversation.
 const MAX_MESSAGE_CHARS = 8000;
 
+// How many times a `pause_turn` may be resumed before we stop and return what
+// we have. Each resume is a fresh request, so this bounds a runaway search
+// loop's cost and latency rather than any expected behaviour — one is already
+// unusual with web search capped at 6 uses.
+const MAX_RESUMES = 3;
+
 // Conversational deck assistant. Unlike /api/search (which returns a ranked JSON
 // card list for the swipe UI), this streams a ChatGPT-style Markdown answer that
 // reasons about the player's idea and weaves in combos. Every card it recommends
@@ -107,6 +113,27 @@ export async function POST(req: Request) {
     "Never respond to a build request with clarifying questions; make reasonable choices and build.\n\n" +
     "FORMAT: Reply in clean GitHub-flavored Markdown. Use short section headings (##), **bold** for emphasis, " +
     "and bullet lists for card recommendations. Keep it tight and skimmable — a few sections, not an essay.\n\n" +
+    // Only when the tool is actually attached below — telling a collection
+    // build to "search, don't guess" when it has nothing to search with is
+    // just an instruction it can't follow.
+    (buildingFromCollection
+      ? ""
+      : "LOOK IT UP — you have a web_search tool, and Magic moves faster than your memory. New sets land every " +
+        "few weeks, formats rotate, cards get banned, and the metagame turns over. SEARCH, don't guess, " +
+        "whenever: the player names a card, set or archetype you don't recognise or can't quote confidently; " +
+        "the deck is a 60-card constructed format (Standard, Pioneer, Modern, Pauper) where what's good right " +
+        "now is the whole question; the answer turns on what is legal or banned today; or the player mentions " +
+        "a recent release, a tournament result, or a price. Scryfall is the authority on card text and " +
+        "legality. Do your searching BEFORE you start writing the answer, so the reply streams out in one " +
+        "piece. Never narrate the search, paste raw URLs, or hedge about your knowledge cutoff — and every " +
+        "card name you learn from a search still gets wrapped in [[double brackets]] like any other.\n\n") +
+    "HOW MANY CARDS TO RECOMMEND: match the count to what the deck actually needs — never to a quota. A rough " +
+    "or half-built pool can take a long list. A tuned, competitive list — a tournament decklist, a known " +
+    "archetype played as-is — usually needs one or two changes, and sometimes none. 60-card constructed decks " +
+    "are the tightest of all: every slot is deliberate, the 4-of counts are load-bearing, and a card only " +
+    "earns a spot by beating the specific card it would replace, so say which one it replaces. If the deck is " +
+    "already strong, say so plainly and recommend little or nothing — that is a better answer than a padded " +
+    "list. Never invent changes to fill out a section.\n\n" +
     "CARD LINKS — CRITICAL: Wrap the EXACT printed name of EVERY specific Magic card you mention, EVERY time it " +
     "appears, in double square brackets — e.g. [[Sol Ring]], [[Cyclonic Rift]]. This applies everywhere: in prose " +
     "sentences, headings, and lists, whether you are recommending it, comparing it, or just referencing it in " +
@@ -131,47 +158,80 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      // The model can think silently for a long stretch before its first
-      // visible token — long enough for proxy/client idle timeouts to kill
-      // full-deck builds mid-request. Newline heartbeats keep bytes flowing
-      // until real text arrives; blank lines are invisible to Markdown and
-      // to both clients' parsers.
-      let heartbeat: ReturnType<typeof setInterval> | null = setInterval(() => {
+      // The model can go silent for a long stretch — before its first visible
+      // token while it thinks, and again mid-answer whenever it runs a web
+      // search — long enough for proxy/client idle timeouts to kill the
+      // request. Newline heartbeats keep bytes flowing through those gaps.
+      //
+      // A newline is invisible to Markdown BETWEEN blocks but would break a
+      // sentence in half inside one, so a beat only goes out when the last
+      // byte written was itself a newline (or nothing has been written yet).
+      // That's why the interval runs for the whole request rather than being
+      // killed at first text: with search on, "first text" is no longer the
+      // last quiet moment.
+      let lastByte = "";
+      const heartbeat = setInterval(() => {
+        if (lastByte !== "" && lastByte !== "\n") return;
         try {
           controller.enqueue(encoder.encode("\n"));
         } catch {
           // Stream already closed — the clear below is on its way.
         }
       }, 15000);
-      const stopHeartbeat = () => {
-        if (heartbeat) {
-          clearInterval(heartbeat);
-          heartbeat = null;
-        }
+      const write = (text: string) => {
+        if (!text) return;
+        lastByte = text.slice(-1);
+        controller.enqueue(encoder.encode(text));
       };
       try {
-        // Sonnet 5 rejects sampling params (`temperature` → 400) and runs
+        // Opus 5 rejects sampling params (`temperature` → 400) and runs
         // adaptive thinking by default; thinking spends output tokens, so the
         // budget carries headroom beyond the visible reply. Full-decklist
         // builds (60–100 lines AFTER a heavy think) were starving at 6000 —
         // the visible reply came back truncated or empty. The stream filter
-        // below already passes text deltas only, so thinking never leaks out.
-        const ai = anthropic.messages.stream({
-          model: "claude-sonnet-5",
-          max_tokens: 16000,
-          system,
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        });
-        for await (const event of ai) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            stopHeartbeat();
-            controller.enqueue(encoder.encode(event.delta.text));
+        // below passes text deltas only, so neither thinking nor the search's
+        // tool blocks and citations leak into the reply.
+        //
+        // Web search is what keeps answers current: the model's own memory of
+        // card text, bans and the metagame goes stale between sets. The
+        // 20260209 tool version filters results before they hit the context
+        // window on its own — declaring `code_execution` alongside it would
+        // just give the model a second, confusing sandbox.
+        //
+        // Withheld from the collection build for the same reason that flow
+        // skips research: its answer is supposed to come out of the card list
+        // already in the request, so a search would only put back the dead air
+        // before the first byte that the skip exists to remove.
+        const tools = buildingFromCollection
+          ? []
+          : [{ type: "web_search_20260209" as const, name: "web_search" as const, max_uses: 6 }];
+        const convo: Anthropic.MessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
+        // A server-tool turn can stop with `stop_reason: "pause_turn"` when the
+        // server-side loop hits its iteration limit. Nothing errors — the
+        // answer simply stops mid-thought — so resume by handing the paused
+        // turn back (no extra user message: the API sees the trailing tool
+        // block and picks up where it left off).
+        for (let attempt = 0; ; attempt++) {
+          const ai = anthropic.messages.stream({
+            model: "claude-opus-5",
+            max_tokens: 16000,
+            system,
+            tools,
+            messages: convo,
+          });
+          for await (const event of ai) {
+            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+              write(event.delta.text);
+            }
           }
+          const final = await ai.finalMessage();
+          if (final.stop_reason !== "pause_turn" || attempt >= MAX_RESUMES) break;
+          convo.push({ role: "assistant", content: final.content });
         }
-        stopHeartbeat();
+        clearInterval(heartbeat);
         controller.close();
       } catch (e) {
-        stopHeartbeat();
+        clearInterval(heartbeat);
         const detail = e instanceof Error ? e.message : String(e);
         controller.enqueue(encoder.encode(`\n\n_Sorry — the assistant hit an error: ${detail}_`));
         controller.close();
