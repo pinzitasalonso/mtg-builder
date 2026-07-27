@@ -29,5 +29,7 @@ Next.js 16 (App Router, Turbopack) + Prisma 7 on better-sqlite3. **Railway auto-
 
 ## Conventions
 
-- tsc + vitest green before committing. Commit + push verified work; end messages with a `Co-Authored-By: Claude …` line.
+- tsc + vitest green before committing. Commit + push verified work.
+- **Keep chat replies short.** Say what changed and what's unverified; skip the rationale unless it's asked for or it's a decision Kike has to make. The commit message and the PR body are where the reasoning goes.
+- No `Co-Authored-By: Claude …` trailer — not in commits, not in chat replies.
 - Deeper context for a Claude Project (chat): `docs/claude-project-instructions.md` in the iOS repo.
