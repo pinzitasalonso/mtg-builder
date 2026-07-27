@@ -124,9 +124,12 @@ export async function POST(req: Request) {
         "the deck is a 60-card constructed format (Standard, Pioneer, Modern, Pauper) where what's good right " +
         "now is the whole question; the answer turns on what is legal or banned today; or the player mentions " +
         "a recent release, a tournament result, or a price. Scryfall is the authority on card text and " +
-        "legality. Do your searching BEFORE you start writing the answer, so the reply streams out in one " +
-        "piece. Never narrate the search, paste raw URLs, or hedge about your knowledge cutoff — and every " +
-        "card name you learn from a search still gets wrapped in [[double brackets]] like any other.\n\n") +
+        "legality. START WRITING FIRST: open with your verdict or short take straight away, and only then " +
+        "go and search, before you commit to specific cards. The player is watching a blank screen until " +
+        "your first words arrive, so searching before you have written anything is the one thing that " +
+        "actually costs them. Never narrate the search, paste raw URLs, or hedge about your knowledge " +
+        "cutoff — and every card name you learn from a search still gets wrapped in [[double brackets]] " +
+        "like any other.\n\n") +
     "HOW MANY CARDS TO RECOMMEND: match the count to what the deck actually needs — never to a quota. A rough " +
     "or half-built pool can take a long list. A tuned, competitive list — a tournament decklist, a known " +
     "archetype played as-is — usually needs one or two changes, and sometimes none. 60-card constructed decks " +
@@ -158,31 +161,28 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
-      // The model can go silent for a long stretch — before its first visible
-      // token while it thinks, and again mid-answer whenever it runs a web
-      // search — long enough for proxy/client idle timeouts to kill the
-      // request. Newline heartbeats keep bytes flowing through those gaps.
+      // The model goes silent for long stretches — while it thinks before the
+      // first token, and again every time it runs a web search — long enough
+      // for proxy and client idle timeouts to kill the request. Newline
+      // heartbeats keep bytes flowing through those gaps.
       //
-      // A newline is invisible to Markdown BETWEEN blocks but would break a
-      // sentence in half inside one, so a beat only goes out when the last
-      // byte written was itself a newline (or nothing has been written yet).
-      // That's why the interval runs for the whole request rather than being
-      // killed at first text: with search on, "first text" is no longer the
-      // last quiet moment.
-      let lastByte = "";
+      // The beat is gated on whether a TEXT block is currently open, not on
+      // what the last byte was. Inside a text block, real bytes are already
+      // flowing and an injected newline would break a sentence in half.
+      // Outside one — before the first block, between blocks, and through the
+      // whole of a search — a newline lands on a paragraph boundary, where
+      // it's invisible. Those gaps are exactly when the connection is at risk,
+      // and a text block that happens to end mid-sentence used to leave them
+      // completely uncovered.
+      let inTextBlock = false;
       const heartbeat = setInterval(() => {
-        if (lastByte !== "" && lastByte !== "\n") return;
+        if (inTextBlock) return;
         try {
           controller.enqueue(encoder.encode("\n"));
         } catch {
           // Stream already closed — the clear below is on its way.
         }
       }, 15000);
-      const write = (text: string) => {
-        if (!text) return;
-        lastByte = text.slice(-1);
-        controller.enqueue(encoder.encode(text));
-      };
       try {
         // Opus 5 rejects sampling params (`temperature` → 400) and runs
         // adaptive thinking by default; thinking spends output tokens, so the
@@ -204,7 +204,7 @@ export async function POST(req: Request) {
         // before the first byte that the skip exists to remove.
         const tools = buildingFromCollection
           ? []
-          : [{ type: "web_search_20260209" as const, name: "web_search" as const, max_uses: 6 }];
+          : [{ type: "web_search_20260209" as const, name: "web_search" as const, max_uses: 3 }];
         const convo: Anthropic.MessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
         // A server-tool turn can stop with `stop_reason: "pause_turn"` when the
         // server-side loop hits its iteration limit. Nothing errors — the
@@ -220,10 +220,16 @@ export async function POST(req: Request) {
             messages: convo,
           });
           for await (const event of ai) {
-            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-              write(event.delta.text);
+            if (event.type === "content_block_start") {
+              inTextBlock = event.content_block.type === "text";
+            } else if (event.type === "content_block_stop") {
+              inTextBlock = false;
+            } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+              controller.enqueue(encoder.encode(event.delta.text));
             }
           }
+          // A resume starts a fresh request: nothing is open until it says so.
+          inTextBlock = false;
           const final = await ai.finalMessage();
           if (final.stop_reason !== "pause_turn" || attempt >= MAX_RESUMES) break;
           convo.push({ role: "assistant", content: final.content });
