@@ -30,6 +30,7 @@ Next.js 16 (App Router, Turbopack) + Prisma 7 on better-sqlite3. **Railway auto-
 ## Conventions
 
 - tsc + vitest green before committing. Commit + push verified work.
-- **Keep chat replies short.** Say what changed and what's unverified; skip the rationale unless it's asked for or it's a decision Kike has to make. The commit message and the PR body are where the reasoning goes.
+- **Keep chat replies short.** Say what changed and what's unverified. Skip the rationale unless Kike asks for it, or it's a decision he has to make. The commit message and the PR body are where the reasoning goes.
+- **Use plain language, short sentences, and avoid dense or overly compressed phrasing.** One idea per sentence. Don't stack clauses to save a line.
 - No `Co-Authored-By: Claude …` trailer — not in commits, not in chat replies.
 - Deeper context for a Claude Project (chat): `docs/claude-project-instructions.md` in the iOS repo.
