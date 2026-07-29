@@ -46,6 +46,41 @@ export interface ResearchContext {
   almostCombos: AlmostCombo[];
 }
 
+// ── The research memo, keyed on the URL.
+//
+// A chat conversation re-ran this whole pipeline on every follow-up turn to
+// rebuild grounding that had barely moved. The commander's EDHREC page and the
+// Moxfield search are the same request on turn 4 as on turn 1, so paying for
+// them four times was pure waste.
+//
+// The key is the URL, deliberately, because the URL is what the answer actually
+// depends on. Memoising per COMMANDER instead would look equivalent and isn't:
+// EDHREC is also queried for theme pages, and the themes come from the intent
+// call reading the player's message. A commander key would let turn 1's "what
+// removal should I add?" pin a removal-flavoured pool and then serve it to turn
+// 2's "what about card draw?" — and, since the memo is shared, to every other
+// player on that commander for the next ten minutes. Keying on the URL cannot
+// do that: a different question producing different themes is a different URL,
+// and so a different entry.
+//
+// Reddit falls out of it for free. Its URL embeds the raw prompt, so it misses
+// on every new question, which is exactly right for the source whose whole job
+// is tracking what was just asked. Spellbook doesn't come through here at all
+// (it's a POST), so combos stay live against a deck the player can edit
+// mid-conversation.
+//
+// Per-process, like lib/ratelimit: right on one long-lived Railway instance,
+// and a miss on a second costs only what every call used to cost.
+const RESEARCH_TTL_MS = 10 * 60_000;
+const MAX_RESEARCH_ENTRIES = 300;
+
+const researchMemo = new Map<string, { at: number; value: unknown }>();
+
+/* Test seam: drop everything memoised. */
+export function resetResearchMemo(): void {
+  researchMemo.clear();
+}
+
 // ── Generic safe JSON fetch with a hard timeout. Returns null on ANY failure
 // (404, network error, timeout, non-JSON body) so a dead source is simply
 // skipped rather than failing the whole request.
@@ -53,13 +88,33 @@ async function fetchJsonSafe<T = unknown>(
   url: string,
   opts: { headers?: Record<string, string>; timeoutMs?: number } = {}
 ): Promise<T | null> {
+  const hit = researchMemo.get(url);
+  if (hit) {
+    if (Date.now() - hit.at <= RESEARCH_TTL_MS) return hit.value as T;
+    researchMemo.delete(url);
+  }
+
   const { headers, timeoutMs = 6000 } = opts;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(url, { headers, signal: ctrl.signal, cache: "no-store" });
     if (!res.ok) return null;
-    return (await res.json()) as T;
+    const body = (await res.json()) as T;
+    // Only a real answer is stored. Caching a failure would pin a source
+    // outage in place for ten minutes instead of retrying past a blip — which
+    // is why the two `return null` paths here skip the write entirely.
+    //
+    // Insertion-ordered Map + delete-before-set makes this an LRU: re-writing
+    // a live key moves it to the back, so eviction drops the coldest.
+    researchMemo.delete(url);
+    researchMemo.set(url, { at: Date.now(), value: body });
+    while (researchMemo.size > MAX_RESEARCH_ENTRIES) {
+      const oldest = researchMemo.keys().next();
+      if (oldest.done) break;
+      researchMemo.delete(oldest.value);
+    }
+    return body;
   } catch {
     return null;
   } finally {
@@ -254,30 +309,42 @@ export async function fetchAlmostCombos(ctx: DeckContext): Promise<AlmostCombo[]
   }
 }
 
-// ── The whole pipeline: analyze the prompt → fetch every source + combos in
-// parallel. Uses the deck's commander as an intent hint. Every source degrades
-// gracefully; if all come back empty, callers fall back to Claude's own knowledge.
+// ── The whole pipeline: intent, then the sources that read it, alongside the
+// two that don't. Every source degrades gracefully; if all come back empty,
+// callers fall back to Claude's own knowledge.
+//
+// Reddit and the combo lookup used to sit behind the intent call even though
+// neither reads the intent, so this is a latency win too: nothing waits on
+// Haiku now except the two sources that actually need what it returns.
+//
+// Repeat cost is handled a layer down, in fetchJsonSafe's URL memo — see the
+// note there for why the key is the URL and not the commander.
 export async function gatherContext(
   anthropic: Anthropic,
   prompt: string,
   deckCtx: DeckContext
 ): Promise<ResearchContext> {
+  // Reddit and the combos start immediately; only EDHREC and Moxfield wait on
+  // the intent call, because only they read what it returns.
+  const redditP = fetchReddit(prompt).catch(() => [] as string[]);
+  const combosP = fetchAlmostCombos(deckCtx).catch(() => [] as AlmostCombo[]);
+
   const intentPrompt = deckCtx.commander ? `${prompt} (commander: ${deckCtx.commander})` : prompt;
   const intent = await analyzeIntent(anthropic, intentPrompt);
   if (!intent.commander && deckCtx.commander) intent.commander = deckCtx.commander;
 
-  const [edhrec, reddit, moxfield, almostCombos] = await Promise.all([
+  const [edhrec, moxfield, reddit, almostCombos] = await Promise.all([
     fetchEdhrec(intent).catch(() => [] as string[]),
-    fetchReddit(prompt).catch(() => [] as string[]),
     fetchMoxfield(intent, prompt).catch(() => [] as string[]),
-    fetchAlmostCombos(deckCtx).catch(() => [] as AlmostCombo[]),
+    redditP,
+    combosP,
   ]);
 
   const data: SourceData = { edhrec, reddit, moxfield };
   const sources: string[] = [];
-  if (edhrec.length) sources.push("EDHREC");
-  if (reddit.length) sources.push("Reddit");
-  if (moxfield.length) sources.push("Moxfield");
+  if (data.edhrec.length) sources.push("EDHREC");
+  if (data.reddit.length) sources.push("Reddit");
+  if (data.moxfield.length) sources.push("Moxfield");
 
   return { data, sources, almostCombos };
 }
@@ -322,12 +389,16 @@ export function isCollectionBuild(currentDeck: unknown, collection: string[]): b
 // empty case of buildSourceBlock says community data "could be retrieved" —
 // true when a fetch failed, misleading when we chose not to fetch. Framing a
 // deliberate skip as a degraded state invites the model to hedge, so say plainly
-// that the player's collection (supplied further down the prompt) is the ground
+// that the player's collection (supplied earlier in the prompt) is the ground
 // truth here.
+//
+// "listed above", not below: the chat route orders its system blocks
+// stable-first for prompt caching, which puts the collection ahead of this
+// preamble. A pointer that walks the model the wrong way is worse than none.
 export function buildCollectionFirstBlock(): string {
   return (
     "No community data was gathered for this request — it is a build from the player's own collection, " +
-    "which is listed below and is your primary evidence. Use it together with your own expert Magic " +
+    "which is listed above and is your primary evidence. Use it together with your own expert Magic " +
     "knowledge to pick cards that satisfy EVERY constraint in the request."
   );
 }
