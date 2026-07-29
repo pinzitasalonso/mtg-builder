@@ -37,8 +37,32 @@ const MAX_MESSAGE_CHARS = 8000;
 // How many times a `pause_turn` may be resumed before we stop and return what
 // we have. Each resume is a fresh request, so this bounds a runaway search
 // loop's cost and latency rather than any expected behaviour — one is already
-// unusual with web search capped at 6 uses.
+// unusual with web search capped at 3 uses.
 const MAX_RESUMES = 3;
+
+// NOT set here, deliberately: `output_config: { effort: "medium" }`. Opus 5
+// defaults to `high`, effort governs thinking, and thinking bills as OUTPUT at
+// $25/M — so it is the biggest single lever left on this route. It is also the
+// one that buys the saving with answer quality, and the complaints that led to
+// Opus 5 were quality complaints. The log line below makes the effect of
+// caching measurable first; drop effort once there are real numbers to judge it
+// against, not before. It is one parameter on the stream call.
+
+// One line per model pass in the Railway logs. Caching is invisible without it:
+// `read` climbing while `fresh` stays small is the whole point of the block
+// layout below, and both cache counters sitting at 0 means nothing is being
+// cached at all (the usual cause is a block slipping under Opus 5's 512-token
+// minimum). `think` is the slice of output effort controls; `searches` is the
+// multiplier on everything, since each one costs another full pass.
+function logUsage(u: Anthropic.Usage): void {
+  const write = u.cache_creation_input_tokens ?? 0;
+  const read = u.cache_read_input_tokens ?? 0;
+  console.log(
+    `[chat] fresh=${u.input_tokens} cache_write=${write} cache_read=${read} ` +
+      `out=${u.output_tokens} think=${u.output_tokens_details?.thinking_tokens ?? 0} ` +
+      `searches=${u.server_tool_use?.web_search_requests ?? 0}`
+  );
+}
 
 // Conversational deck assistant. Unlike /api/search (which returns a ranked JSON
 // card list for the swipe UI), this streams a ChatGPT-style Markdown answer that
@@ -103,7 +127,25 @@ export async function POST(req: Request) {
         () => ({ data: { edhrec: [], reddit: [], moxfield: [] }, sources: [] as string[], almostCombos: [] })
       );
 
-  const system =
+  // ── The system prompt, assembled as separately cacheable blocks.
+  //
+  // It used to be one concatenated string, which meant every token of it was
+  // billed at full price on every turn — and, worse, on every internal pass of a
+  // web-search turn, since the server-side tool loop re-reads the whole prompt
+  // each time it comes back from a search. The prompt is ~5–8k tokens, so that
+  // was the single biggest line on the bill.
+  //
+  // Blocks are ordered MOST STABLE FIRST, because the cache is a prefix cache: a
+  // block only reads from cache if everything ahead of it matched too. Hence
+  // instructions → collection → deck → research, which is roughly "never
+  // changes" → "changes when the player buys cards" → "changes when they click a
+  // card in this chat" → "changes every turn". The old order put research
+  // second, which invalidated the two big stable blocks behind it every single
+  // turn and made caching worthless.
+  //
+  // Three explicit breakpoints, of the four a request may carry — the server
+  // tool loop may insert its own, and exceeding four is a 400.
+  const instructions =
     "You are a world-class Magic: The Gathering deckbuilding expert having a focused conversation with a " +
     "player about their deck — Commander/EDH unless they name another format (Standard, Modern, …). They will " +
     "describe an idea, a strategy, or a change they're considering. Give a thoughtful, opinionated answer — " +
@@ -151,12 +193,37 @@ export async function POST(req: Request) {
     "say what it does together.\n\n" +
     "JUDGING: When the player asks you to judge, rate, or review their deck or pool, act as the deck judge — " +
     "there is no separate judge tool. Structure that reply as: a short overall verdict, then '## Working well', " +
-    "'## Consider cutting', and '## Missing' sections, with every specific card bracketed.\n\n" +
-    (buildingFromCollection ? buildCollectionFirstBlock() : buildSourceBlock(data)) +
-    buildDeckBlock(deckCtx) +
-    buildComboBlock(almostCombos) +
-    buildCollectionBlock(collection) +
-    (sources.length ? `\n\n(You may mention these sources informed you: ${sources.join(", ")}.)` : "");
+    "'## Consider cutting', and '## Missing' sections, with every specific card bracketed.";
+
+  // The instructions are byte-identical for every player, so a one-hour write
+  // (2x) is repaid by the second read and then hit by everyone else's traffic
+  // for the rest of the hour. The two per-player blocks get the default 5m,
+  // which a hit refreshes for free — long enough to span a conversation's turns
+  // without paying 2x for data one player will never look at again.
+  const system: Anthropic.TextBlockParam[] = [
+    { type: "text", text: instructions, cache_control: { type: "ephemeral", ttl: "1h" } },
+  ];
+  const collectionBlock = buildCollectionBlock(collection);
+  if (collectionBlock) {
+    system.push({ type: "text", text: collectionBlock, cache_control: { type: "ephemeral" } });
+  }
+  const deckBlock = buildDeckBlock(deckCtx);
+  if (deckBlock) {
+    system.push({ type: "text", text: deckBlock, cache_control: { type: "ephemeral" } });
+  }
+  // Volatile tail — rebuilt every turn, so it carries no breakpoint and is the
+  // only part of the prompt still billed at full input price.
+  system.push({
+    type: "text",
+    // Leading break of its own: adjacent system blocks are concatenated with
+    // nothing between them, and with an empty deck and collection this one
+    // lands directly against the last sentence of the instructions.
+    text:
+      "\n\n" +
+      (buildingFromCollection ? buildCollectionFirstBlock() : buildSourceBlock(data)) +
+      buildComboBlock(almostCombos) +
+      (sources.length ? `\n\n(You may mention these sources informed you: ${sources.join(", ")}.)` : ""),
+  });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
@@ -231,6 +298,7 @@ export async function POST(req: Request) {
           // A resume starts a fresh request: nothing is open until it says so.
           inTextBlock = false;
           const final = await ai.finalMessage();
+          logUsage(final.usage);
           if (final.stop_reason !== "pause_turn" || attempt >= MAX_RESUMES) break;
           convo.push({ role: "assistant", content: final.content });
         }
