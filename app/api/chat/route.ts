@@ -40,13 +40,21 @@ const MAX_MESSAGE_CHARS = 8000;
 // unusual with web search capped at 3 uses.
 const MAX_RESUMES = 3;
 
-// NOT set here, deliberately: `output_config: { effort: "medium" }`. Opus 5
-// defaults to `high`, effort governs thinking, and thinking bills as OUTPUT at
-// $25/M — so it is the biggest single lever left on this route. It is also the
-// one that buys the saving with answer quality, and the complaints that led to
-// Opus 5 were quality complaints. The log line below makes the effect of
-// caching measurable first; drop effort once there are real numbers to judge it
-// against, not before. It is one parameter on the stream call.
+// Reasoning effort. Opus 5 defaults to `high`; effort governs thinking, and
+// thinking is both the slowest and the priciest part of a turn (it bills as
+// OUTPUT at $25/M).
+//
+// This was parked at the default on purpose, waiting for real numbers rather
+// than a hunch — the complaints that led to Opus 5 in the first place were
+// QUALITY complaints, so trading quality back for speed needed evidence. The
+// evidence arrived: "the ai assistant now takes forever", and a probe against
+// production put a trivial rules question ("what does Sol Ring do?") at 5.5s to
+// first byte and 17.7s in total for 2.2KB of answer.
+//
+// Medium, not low: the model still thinks, just not at the depth a 100-card
+// rebuild would want for a question about one card. If answer quality slips,
+// this is the first line to put back.
+const EFFORT = "medium" as const;
 
 // One line per model pass in the Railway logs. Caching is invisible without it:
 // `read` climbing while `fresh` stays small is the whole point of the block
@@ -282,6 +290,7 @@ export async function POST(req: Request) {
           const ai = anthropic.messages.stream({
             model: "claude-opus-5",
             max_tokens: 16000,
+            output_config: { effort: EFFORT },
             system,
             tools,
             messages: convo,

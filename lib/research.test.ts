@@ -195,3 +195,60 @@ describe("research memoisation", () => {
     expect(hits.edhrec).toBe(2);
   });
 });
+
+// The research pipeline is pure latency for a question that isn't asking for
+// cards. "What does Sol Ring do?" was paying for an EDHREC page and a Moxfield
+// search before its first byte, and none of it reached the answer.
+describe("skipping research for questions that need no cards", () => {
+  const deck: DeckContext = { commander: "Atraxa", cards: [] };
+  let edhrec = 0;
+
+  // Same shape as the memoisation fake, but the intent it hands back is what's
+  // under test rather than incidental.
+  function intentReturning(fields: Record<string, unknown>): Anthropic {
+    return {
+      messages: {
+        create: async () => ({ content: [{ type: "text", text: JSON.stringify(fields) }] }),
+      },
+    } as unknown as Anthropic;
+  }
+
+  beforeEach(() => {
+    resetResearchMemo();
+    edhrec = 0;
+    vi.stubGlobal("fetch", async (input: string | URL | Request) => {
+      const url = String(typeof input === "object" && "url" in input ? input.url : input);
+      if (url.includes("edhrec")) edhrec++;
+      return new Response(JSON.stringify({ cardviews: [{ name: "Sol Ring", num_decks: 9 }] }), { status: 200 });
+    });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fetches nothing when the model says no cards are needed", async () => {
+    const ctx = await gatherContext(intentReturning({ needsCards: false, themes: [] }),
+                                    "what does Sol Ring do?", deck);
+    expect(edhrec).toBe(0);
+    expect(ctx.sources).toEqual([]);
+    expect(ctx.data.edhrec).toEqual([]);
+  });
+
+  it("still researches a request for cards", async () => {
+    await gatherContext(intentReturning({ needsCards: true, themes: ["ramp"] }),
+                        "what ramp should I add?", deck);
+    expect(edhrec).toBeGreaterThan(0);
+  });
+
+  it("researches when the field is missing or junk", async () => {
+    // Failing open matters more than the saving: an unresearched card
+    // recommendation is a worse outcome than a slow one, and older or confused
+    // model output must not silently strip the grounding.
+    await gatherContext(intentReturning({ themes: [] }), "ideas?", deck);
+    expect(edhrec).toBeGreaterThan(0);
+
+    edhrec = 0;
+    resetResearchMemo();
+    await gatherContext(intentReturning({ needsCards: "nope", themes: [] }), "ideas?", deck);
+    expect(edhrec).toBeGreaterThan(0);
+  });
+});

@@ -16,6 +16,14 @@ export interface Intent {
   colors: string[];
   types: string[];
   mechanics: string[];
+  /// Whether answering needs a list of CANDIDATE CARDS at all.
+  ///
+  /// "What does Sol Ring do?" and "how do I pilot this?" don't — but they were
+  /// still paying for an EDHREC page, a Moxfield search, a Reddit fetch and a
+  /// combo lookup before a single byte could move. False skips all four.
+  /// Defaults true everywhere it can't be determined, so the fallback is
+  /// today's behaviour rather than an unresearched answer.
+  needsCards: boolean;
 }
 
 // Snapshot of the caller's current deck so Claude can avoid suggesting
@@ -135,7 +143,9 @@ function slugify(s: string): string {
 // no tools. Failures degrade to an empty intent (sources then run on the raw
 // prompt where they can).
 export async function analyzeIntent(anthropic: Anthropic, prompt: string): Promise<Intent> {
-  const empty: Intent = { commander: null, themes: [], colors: [], types: [], mechanics: [] };
+  const empty: Intent = {
+    commander: null, themes: [], colors: [], types: [], mechanics: [], needsCards: true,
+  };
   try {
     const msg = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
@@ -143,8 +153,11 @@ export async function analyzeIntent(anthropic: Anthropic, prompt: string): Promi
       system:
         "You extract structured search intent from a Magic: The Gathering card request. " +
         "Respond with ONLY a JSON object — no prose, no markdown fences — in exactly this shape:\n" +
-        '{"commander": string|null, "themes": string[], "colors": string[], "types": string[], "mechanics": string[]}\n' +
+        '{"commander": string|null, "themes": string[], "colors": string[], "types": string[], "mechanics": string[], "needsCards": boolean}\n' +
         '- commander: exact name of a commander/legendary creature if the request names or clearly implies one, else null.\n' +
+        '- needsCards: true if answering means SUGGESTING OR FINDING CARDS (build, improve, tune, "what should I add", "what fits"). ' +
+        'false for questions answered from knowledge alone: what a card does, a rules or interaction question, how to pilot a deck, ' +
+        'general strategy or theory. When unsure, true.\n' +
         '- themes: archetype/strategy/flavor tags, lowercase (e.g. "sagas", "enchantments", "aristocrats", "villains").\n' +
         '- colors: WUBRG letters the request implies, lowercase (e.g. ["w","g"]). Empty if unspecified.\n' +
         '- types: card types mentioned, lowercase (e.g. "enchantment", "creature", "instant").\n' +
@@ -161,6 +174,9 @@ export async function analyzeIntent(anthropic: Anthropic, prompt: string): Promi
       colors: strArr(parsed.colors),
       types: strArr(parsed.types),
       mechanics: strArr(parsed.mechanics),
+      // Only an explicit false skips the research. A missing or malformed
+      // field leaves the answer grounded, which is the safer way to be wrong.
+      needsCards: parsed.needsCards !== false,
     };
   } catch {
     return empty;
@@ -332,6 +348,17 @@ export async function gatherContext(
   const intentPrompt = deckCtx.commander ? `${prompt} (commander: ${deckCtx.commander})` : prompt;
   const intent = await analyzeIntent(anthropic, intentPrompt);
   if (!intent.commander && deckCtx.commander) intent.commander = deckCtx.commander;
+
+  // A question answered from knowledge alone gets no research. "What does Sol
+  // Ring do?" was paying for an EDHREC page and a Moxfield search before its
+  // first byte, and none of it reached the answer.
+  //
+  // Reddit and the combo lookup are already in flight by now — deliberately, so
+  // they overlap the intent call. They aren't awaited here, so they cost this
+  // request nothing but their own completion; both already carry a `.catch`.
+  if (!intent.needsCards) {
+    return { data: { edhrec: [], reddit: [], moxfield: [] }, sources: [], almostCombos: [] };
+  }
 
   const [edhrec, moxfield, reddit, almostCombos] = await Promise.all([
     fetchEdhrec(intent).catch(() => [] as string[]),
