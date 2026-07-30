@@ -29,7 +29,7 @@ export async function PATCH(
   const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const body = await req.json();
-  const data: { name?: string; format?: string; commander?: string | null; notes?: string | null; shared?: boolean } = {};
+  const data: { name?: string; format?: string; commander?: string | null; notes?: string | null; primer?: string | null; shared?: boolean } = {};
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
   if (typeof body.format === "string" && body.format.trim()) data.format = body.format.trim();
   if ("commander" in body) {
@@ -39,6 +39,12 @@ export async function PATCH(
   if ("notes" in body) {
     const n = typeof body.notes === "string" ? body.notes.slice(0, 20_000) : "";
     data.notes = n.trim() ? n : null;
+  }
+  // The primer is a document, not a field — an AI-drafted one runs several
+  // thousand characters, so it gets its own (larger) cap.
+  if ("primer" in body) {
+    const p = typeof body.primer === "string" ? body.primer.slice(0, 40_000) : "";
+    data.primer = p.trim() ? p : null;
   }
   if (typeof body.shared === "boolean") data.shared = body.shared;
   if (Object.keys(data).length === 0) {

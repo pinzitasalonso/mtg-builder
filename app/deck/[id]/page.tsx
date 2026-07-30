@@ -11,6 +11,7 @@ import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import HandSimModal from "@/components/deck/HandSimModal";
 import GameCodeModal from "@/components/deck/GameCodeModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
+import DeckPrimer from "@/components/deck/DeckPrimer";
 import OrderModal from "@/components/deck/OrderModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, dangerBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
@@ -59,6 +60,8 @@ interface Deck {
   format: string;
   commander: string | null;
   notes: string | null;
+  /** The play primer — written or AI-drafted in the iOS app, read here. */
+  primer: string | null;
   shared?: boolean;
   isPublic?: boolean;
   canEdit?: boolean;
@@ -219,6 +222,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // opens right under it and never runs off-screen on mobile.
   const [toolsPos, setToolsPos] = useState<{ top: number; left: number } | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [primerOpen, setPrimerOpen] = useState(false);
   // Count of offline review decisions waiting to sync (drives the banner).
   const [pendingSync, setPendingSync] = useState(0);
   const [copied, setCopied] = useState<"" | "link" | "list">("");
@@ -834,7 +838,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                     {[
                       { label: "🎲 Sample hand", on: () => setHandSimOpen(true), disabled: deckCards.length === 0 },
                       { label: "🎟 Game code", on: () => setGameCodeOpen(true) },
-                      { label: "📝 Play guide", on: () => setNotesOpen((v) => !v) },
+                      { label: "📖 Primer", on: () => setPrimerOpen((v) => !v) },
+                      { label: "📝 Quick notes", on: () => setNotesOpen((v) => !v) },
                       { label: "🌲 Add lands & staples", on: () => setTool("lands") },
                       { label: "⬆ Export / import", on: () => setTool("export") },
                     ].map((it) => (
@@ -1058,11 +1063,24 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           )}
 
-          {/* play guide — revealed from the Tools menu */}
+          {/* The primer — the deck's play document, written or AI-drafted in the
+              iOS app. The owner reveals it from the Tools menu; someone viewing
+              a shared deck gets it opened for them, since handing over a primer
+              is the point of sharing a deck. */}
+          {(primerOpen || (!canEdit && Boolean(deck?.primer))) && (
+            <DeckPrimer
+              deckId={deckId}
+              primer={deck?.primer ?? ""}
+              canEdit={canEdit}
+              onSaved={(text) => setDeck((d) => (d ? { ...d, primer: text || null } : d))}
+            />
+          )}
+
+          {/* quick notes — the scratchpad, revealed from the Tools menu */}
           {notesOpen && (
             <div className="id-panel" style={{ padding: 16, marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <span className="id-label" style={{ color: "var(--w-2)" }}>Play guide</span>
+                <span className="id-label" style={{ color: "var(--w-2)" }}>Quick notes</span>
                 <span className="id-label" style={{ fontSize: 10, color: noteStatus === "saving" ? "var(--w-3)" : "var(--gold)" }}>
                   {noteStatus === "saving" ? "Saving…" : noteStatus === "saved" ? "Saved" : ""}
                 </span>
