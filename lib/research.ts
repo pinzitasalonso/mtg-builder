@@ -28,8 +28,23 @@ export interface Intent {
 
 // Snapshot of the caller's current deck so Claude can avoid suggesting
 // duplicates, spot synergies, and find missing combo pieces.
+//
+// `board` matters more than it looks. Spellpool decks have two: the DECKLIST,
+// which is what gets played, and the POOL, which is cards the player has
+// gathered as candidates. The client used to send both merged with no marker,
+// so a 60-card deck with 40 cards in its pool was described to Claude as a
+// 100-card deck — and every answer that counted cards, checked a format's size,
+// or reasoned about the curve was working from a deck that doesn't exist.
+export type DeckBoard = "deck" | "pool";
+export interface DeckCard {
+  name: string;
+  manaCost: string | null;
+  typeLine: string | null;
+  quantity: number;
+  board: DeckBoard;
+}
 export interface DeckContext {
-  cards: { name: string; manaCost: string | null; typeLine: string | null; quantity: number }[];
+  cards: DeckCard[];
   commander: string | null;
 }
 
@@ -304,7 +319,13 @@ export async function fetchAlmostCombos(ctx: DeckContext): Promise<AlmostCombo[]
   if (ctx.cards.length === 0) return [];
   const MAX_ALMOST = 10;
   try {
-    const main = ctx.cards.slice(0, 500).map((c) => ({ card: c.name, quantity: Math.max(1, c.quantity) }));
+    // The DECKLIST only. "One card away from a combo" is a claim about what's
+    // being played — counting the pool would report a combo as nearly assembled
+    // when its pieces are sitting in a shortlist.
+    const main = ctx.cards
+      .filter((c) => c.board === "deck")
+      .slice(0, 500)
+      .map((c) => ({ card: c.name, quantity: Math.max(1, c.quantity) }));
     const commanders = ctx.commander ? [ctx.commander] : [];
     const res = await fetch("https://backend.commanderspellbook.com/find-my-combos", {
       method: "POST",
@@ -438,22 +459,51 @@ export function buildCollectionFirstBlock(): string {
   );
 }
 
+// Copies, not rows: a deck with 20 basics is 20 cards, not 1.
+function copies(cards: DeckCard[]): number {
+  return cards.reduce((n, c) => n + Math.max(1, c.quantity), 0);
+}
+
+function cardLines(cards: DeckCard[]): string {
+  return cards
+    .map((c) => `  ${c.quantity > 1 ? `${c.quantity}x ` : ""}${c.name}${c.typeLine ? ` (${c.typeLine})` : ""}`)
+    .join("\n");
+}
+
 export function buildDeckBlock(deckCtx: DeckContext): string {
   if (deckCtx.cards.length === 0 && !deckCtx.commander) return "";
   const commanderLine = deckCtx.commander ? `COMMANDER: ${deckCtx.commander}\n` : "";
-  // Count actual copies, not rows: a deck with 20 basics is 20 cards, not 1.
-  const totalCopies = deckCtx.cards.reduce((n, c) => n + Math.max(1, c.quantity), 0);
-  const cardLines = deckCtx.cards
-    .map((c) => `  ${c.quantity > 1 ? `${c.quantity}x ` : ""}${c.name}${c.typeLine ? ` (${c.typeLine})` : ""}`)
-    .join("\n");
-  return (
-    "\n\nCURRENT DECK COMPOSITION — these cards are ALREADY in the player's pool. " +
-    "Do NOT suggest any of them. Use this list to understand the deck's strategy, mana curve, " +
-    "and synergies so your suggestions complement what's already built. The count in front of a " +
-    "card is how many copies it runs (e.g. basic lands):\n" +
+  const deckCards = deckCtx.cards.filter((c) => c.board === "deck");
+  const poolCards = deckCtx.cards.filter((c) => c.board === "pool");
+
+  // The two boards are stated separately, with separate counts, because they
+  // answer different questions and the old merged block answered neither
+  // honestly: the decklist is the deck's SIZE and curve, the pool is a shortlist
+  // the player has already paid for.
+  const deckSection =
+    "\n\nTHE DECKLIST — the cards actually in the deck. This is the deck's size and " +
+    "curve; when you count cards, count THESE. Do NOT suggest any of them, they are " +
+    "already in. Use the list to understand the strategy and synergies so your " +
+    "suggestions complement what's built. The count in front of a card is how many " +
+    "copies it runs (e.g. basic lands):\n" +
     commanderLine +
-    `${totalCopies} cards total (${deckCtx.cards.length} unique):\n${cardLines}`
-  );
+    `${copies(deckCards)} cards in the deck (${deckCards.length} unique):\n${cardLines(deckCards)}`;
+
+  if (poolCards.length === 0) return deckSection;
+
+  // Recommending a pool card is the cheapest possible suggestion — the player
+  // already owns it and already liked it enough to shortlist it. Worth telling
+  // Claude that explicitly, since its instinct is to name cards it found in
+  // research.
+  const poolSection =
+    `\n\nTHE POOL — ${copies(poolCards)} cards (${poolCards.length} unique) the player has ` +
+    "gathered as CANDIDATES but has NOT put in the deck. These are not in the deck and do " +
+    "NOT count toward its size. You may recommend one — say to promote it from the pool " +
+    "rather than to add it — and a pool card is a better recommendation than a new one, " +
+    "because the player already has it:\n" +
+    cardLines(poolCards);
+
+  return deckSection + poolSection;
 }
 
 export function buildComboBlock(almostCombos: AlmostCombo[]): string {
@@ -504,13 +554,18 @@ export function parseDeckContext(currentDeck: unknown): DeckContext {
   return {
     commander: typeof cd?.commander === "string" ? cd.commander : null,
     cards: Array.isArray(cd?.cards)
-      ? (cd!.cards as { name?: unknown; manaCost?: unknown; typeLine?: unknown; quantity?: unknown }[])
+      ? (cd!.cards as { name?: unknown; manaCost?: unknown; typeLine?: unknown; quantity?: unknown; board?: unknown }[])
           .filter((c) => typeof c?.name === "string" && c.name)
           .map((c) => ({
             name: c.name as string,
             manaCost: typeof c.manaCost === "string" ? c.manaCost : null,
             typeLine: typeof c.typeLine === "string" ? c.typeLine : null,
             quantity: typeof c.quantity === "number" && c.quantity > 0 ? Math.floor(c.quantity) : 1,
+            // A client that doesn't send a board is an older build, whose whole
+            // payload was the merged list. Calling that the decklist keeps its
+            // answers exactly as they are today; the alternative — defaulting to
+            // "pool" — would tell Claude those decks are empty.
+            board: (c as { board?: unknown }).board === "pool" ? ("pool" as const) : ("deck" as const),
           }))
           .slice(0, 500)
       : [],
