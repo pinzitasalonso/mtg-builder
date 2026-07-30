@@ -2,9 +2,11 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildCollectionFirstBlock,
+  buildDeckBlock,
   gatherContext,
   isCollectionBuild,
   parseCollection,
+  parseDeckContext,
   resetResearchMemo,
   type DeckContext,
 } from "./research";
@@ -69,6 +71,69 @@ describe("buildCollectionFirstBlock", () => {
 // pool to the next question — invisible at runtime, because a stale pool still
 // reads like a plausible answer. Keyed on the URL it cannot. That distinction
 // is the whole point, so it gets pinned here.
+describe("buildDeckBlock", () => {
+  const card = (name: string, board: "deck" | "pool", quantity = 1) => ({
+    name,
+    manaCost: "{1}",
+    typeLine: "Artifact",
+    quantity,
+    board,
+  });
+
+  it("counts the decklist and the pool separately", () => {
+    // The bug this exists for: the client sent both boards merged and the
+    // block reported one total, so a 60-card deck with 40 cards shortlisted
+    // was described to Claude as a 100-card deck. Every answer that counted
+    // cards, checked a format's size, or read the curve was working from a
+    // deck that doesn't exist.
+    const block = buildDeckBlock({
+      commander: null,
+      cards: [card("Sol Ring", "deck"), card("Wastes", "deck", 20), card("Mana Crypt", "pool")],
+    });
+    expect(block).toContain("21 cards in the deck (2 unique)");
+    expect(block).toContain("1 cards (1 unique)");
+    // And the pool is named as candidates, not as deck contents.
+    expect(block).toContain("NOT put in the deck");
+    expect(block).toContain("do NOT count toward its size");
+  });
+
+  it("says nothing about a pool when there isn't one", () => {
+    const block = buildDeckBlock({ commander: null, cards: [card("Sol Ring", "deck")] });
+    expect(block).toContain("1 cards in the deck");
+    expect(block).not.toContain("THE POOL");
+  });
+
+  it("counts copies rather than rows", () => {
+    // 20 basics is 20 cards. Counting rows would make every deck look tiny.
+    const block = buildDeckBlock({ commander: null, cards: [card("Island", "deck", 20)] });
+    expect(block).toContain("20 cards in the deck (1 unique)");
+  });
+
+  it("treats a client that sends no board as sending a decklist", () => {
+    // Older builds sent the merged list with no marker. Reading that as the
+    // decklist keeps their answers as they are; defaulting to "pool" would
+    // tell Claude those decks are empty.
+    const ctx = parseDeckContext({
+      commander: "Atraxa, Praetors' Voice",
+      cards: [{ name: "Sol Ring", quantity: 1 }],
+    });
+    expect(ctx.cards[0].board).toBe("deck");
+    expect(buildDeckBlock(ctx)).toContain("1 cards in the deck");
+  });
+
+  it("keeps a board the client did send", () => {
+    const ctx = parseDeckContext({
+      commander: null,
+      cards: [
+        { name: "Sol Ring", quantity: 1, board: "pool" },
+        { name: "Island", quantity: 2, board: "deck" },
+      ],
+    });
+    expect(ctx.cards.map((c) => c.board)).toEqual(["pool", "deck"]);
+    expect(buildDeckBlock(ctx)).toContain("2 cards in the deck (1 unique)");
+  });
+});
+
 describe("research memoisation", () => {
   // analyzeIntent is the only thing gatherContext asks the model for. The
   // themes it returns drive which EDHREC pages get fetched, so the fake hands
@@ -135,7 +200,7 @@ describe("research memoisation", () => {
 
   const deck: DeckContext = {
     commander: "Atraxa, Praetors' Voice",
-    cards: [{ name: "Sol Ring", manaCost: "{1}", typeLine: "Artifact", quantity: 1 }],
+    cards: [{ name: "Sol Ring", manaCost: "{1}", typeLine: "Artifact", quantity: 1, board: "deck" }],
   };
 
   it("reuses the repeated requests across turns and refetches the ones that moved", async () => {
