@@ -88,8 +88,13 @@ model Deck {
   // still restricted to the owner. Independent of ownerless "public" decks
   // (userId null), which stay fully editable by anyone by design.
   shared    Boolean    @default(false)
-  // Free-form play notes: mulligans, lines, win routes.
+  // Free-form play notes: mulligans, lines, win routes. A scratchpad.
   notes     String?
+  // The deck's primer: the Markdown document you read to learn how to pilot
+  // it — the plan, opening hands, lines, combos, what beats it. Written by
+  // hand or drafted by the assistant in the iOS app. Longer and more
+  // structured than `notes`, which is why it's its own column.
+  primer    String?
   // Game-night record: incremented by play-code results (a friend's tracker
   // reporting a finished game) and by the owner's own tracker via /record.
   gamesPlayed Int      @default(0)

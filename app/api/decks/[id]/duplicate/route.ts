@@ -30,6 +30,7 @@ export async function POST(
       format: source.format,
       commander: source.commander,
       notes: source.notes,
+      primer: source.primer,
       userId: user?.id ?? null,
       publicId: newPublicId(),
       cards: {
