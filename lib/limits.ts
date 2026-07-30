@@ -3,7 +3,7 @@
 // User.tier: "free" is the default; "pro" (the future paid tier) lifts
 // every cap.
 
-export const FREE_DECK_LIMIT = 3;
+export const FREE_DECK_LIMIT = 5;
 export const FREE_AI_PER_DAY = 4;
 
 export const DECK_LIMIT_MSG =
