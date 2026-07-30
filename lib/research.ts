@@ -52,6 +52,14 @@ export interface ResearchContext {
   data: SourceData;
   sources: string[];
   almostCombos: AlmostCombo[];
+  /// Whether the community fetches actually ran, as opposed to being skipped
+  /// because the ask needed no cards.
+  ///
+  /// Reported so latency can be diagnosed from OUTSIDE the server. The route
+  /// puts it in a response header, which is the only way to tell a skip from a
+  /// slow fetch without Railway's logs — and not having that is what turned the
+  /// last round of tuning into guesswork.
+  researched: boolean;
 }
 
 // ── The research memo, keyed on the URL.
@@ -357,7 +365,7 @@ export async function gatherContext(
   // they overlap the intent call. They aren't awaited here, so they cost this
   // request nothing but their own completion; both already carry a `.catch`.
   if (!intent.needsCards) {
-    return { data: { edhrec: [], reddit: [], moxfield: [] }, sources: [], almostCombos: [] };
+    return { data: { edhrec: [], reddit: [], moxfield: [] }, sources: [], almostCombos: [], researched: false };
   }
 
   const [edhrec, moxfield, reddit, almostCombos] = await Promise.all([
@@ -373,7 +381,7 @@ export async function gatherContext(
   if (data.reddit.length) sources.push("Reddit");
   if (data.moxfield.length) sources.push("Moxfield");
 
-  return { data, sources, almostCombos };
+  return { data, sources, almostCombos, researched: true };
 }
 
 // ── Prompt-block builders. Shared so the search ranker and the chat assistant

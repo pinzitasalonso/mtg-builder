@@ -129,11 +129,13 @@ export async function POST(req: Request) {
 
   // Gather grounding data (intent → EDHREC/Reddit/Moxfield/Spellbook) before we
   // start streaming — this is the brief "thinking" pause the client shows.
-  const { data, sources, almostCombos } = buildingFromCollection
-    ? { data: { edhrec: [], reddit: [], moxfield: [] }, sources: [] as string[], almostCombos: [] }
+  const researchStart = Date.now();
+  const { data, sources, almostCombos, researched } = buildingFromCollection
+    ? { data: { edhrec: [], reddit: [], moxfield: [] }, sources: [] as string[], almostCombos: [], researched: false }
     : await gatherContext(anthropic, latestUser, deckCtx).catch(
-        () => ({ data: { edhrec: [], reddit: [], moxfield: [] }, sources: [] as string[], almostCombos: [] })
+        () => ({ data: { edhrec: [], reddit: [], moxfield: [] }, sources: [] as string[], almostCombos: [], researched: false })
       );
+  const researchMs = Date.now() - researchStart;
 
   // ── The system prompt, assembled as separately cacheable blocks.
   //
@@ -327,6 +329,19 @@ export async function POST(req: Request) {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
       "X-Accel-Buffering": "no",
+      // Latency diagnostics, readable from outside the server.
+      //
+      // Railway's logs aren't reachable from a cloud session, so the last round
+      // of tuning could only measure the total and guess at the split. These
+      // three say which half a slow answer was spent in: whether the community
+      // fetches ran at all, how long they took, and whether the model was even
+      // handed a web_search tool — each search costs another full pass over the
+      // prompt, so that flag is usually the answer.
+      //
+      // Headers are sent before the body, so none of this delays the stream.
+      "X-Sp-Research": researched ? "ran" : "skipped",
+      "X-Sp-Research-Ms": String(researchMs),
+      "X-Sp-Search": buildingFromCollection ? "off" : "on",
     },
   });
 }
