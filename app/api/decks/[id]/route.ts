@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, canEditDeck, currentUser, viewableDeckByPublicId } from "@/lib/auth";
+import { clampDeckRecord } from "@/lib/deck-record";
 
 export async function GET(
   _req: Request,
@@ -29,7 +30,7 @@ export async function PATCH(
   const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const body = await req.json();
-  const data: { name?: string; format?: string; commander?: string | null; notes?: string | null; primer?: string | null; shared?: boolean } = {};
+  const data: { name?: string; format?: string; commander?: string | null; notes?: string | null; primer?: string | null; shared?: boolean; gamesPlayed?: number; gamesWon?: number } = {};
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
   if (typeof body.format === "string" && body.format.trim()) data.format = body.format.trim();
   if ("commander" in body) {
@@ -45,6 +46,15 @@ export async function PATCH(
   if ("primer" in body) {
     const p = typeof body.primer === "string" ? body.primer.slice(0, 40_000) : "";
     data.primer = p.trim() ? p : null;
+  }
+  // The play record, SET rather than incremented — /record is the tracker
+  // reporting one finished game, this is the owner correcting the totals by
+  // hand. Without it a hand-edited record was local-only on the phone and the
+  // next sync mirrored the server's untouched numbers straight back over it.
+  if ("gamesPlayed" in body || "gamesWon" in body) {
+    const record = clampDeckRecord(body, deck);
+    data.gamesPlayed = record.gamesPlayed;
+    data.gamesWon = record.gamesWon;
   }
   if (typeof body.shared === "boolean") data.shared = body.shared;
   if (Object.keys(data).length === 0) {
