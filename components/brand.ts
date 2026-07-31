@@ -1,10 +1,13 @@
 // Brand constants shared by generated images (apple-icon, opengraph-image).
-// Tabletop palette: dark felt ground, gold accent, warm paper text.
+//
+// Fixed values, and always the DARK dress: an app icon and an OG card are
+// rendered once and served to everyone, so there is no viewer preference to
+// follow. Kept in step with the dark side of globals.css by hand.
 export const BRAND = {
-  bg: "#17131d",
-  accent: "#f5c425",
-  text: "#f4f0e6",
-  muted: "rgba(244,240,230,.6)",
+  bg: "#0c0c0c",
+  accent: "#fdf26f",
+  text: "#ffffff",
+  muted: "#868686",
   disc: "#4a90c9", // blue mana disc — the logo mark
   drop: "#fbfbf8", // the mark's off-white water-drop cut-out
 };

@@ -1,58 +1,127 @@
 @import "tailwindcss";
 
 :root {
-  /* Spellpool "Tabletop" design tokens — the iOS app's dark felt table,
-     gold accents, warm paper text. Generic names (--bg, --surface, --accent,
-     --text…) are mapped to the felt palette so existing components reskin
-     through them. Indigo table (matches the iOS app): #412FDA → #2D1DA1. */
-  --felt-center: #412fda;
-  --felt-mid: #3726be;
-  --felt-edge: #2d1da1;
+  /* The iOS app's palette, token for token — see Theme/Brand.swift there.
+     Generic names (--bg, --surface, --accent, --text…) stay, so every existing
+     component reskins through them rather than being rewritten.
 
-  --app-bg: #1d136b;
-  --app-bg2: #241875;
-  --panel: #241875;
+     The app moved off the indigo felt to a near-black feed ground, off gold
+     type to a blue accent on paper, and off two typefaces to one. This is that
+     same move. Where a value has a name in Brand.swift it is noted, so the two
+     can be checked against each other. */
 
-  --bg: #1d136b;
+  /* Ground. Brand.Feed.ground. */
+  --app-bg: #0c0c0c;
+  --app-bg2: #131313;
+  --panel: #131313;
+  --bg: #0c0c0c;
+  --bg2: #131313;
+  --bg3: rgba(255, 255, 255, 0.08);
   --surface: rgba(255, 255, 255, 0.06);
   --surface2: rgba(255, 255, 255, 0.09);
-  --bg2: #241875;
-  --bg3: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.14);
-  --line: rgba(255, 255, 255, 0.14);
 
-  --accent: #f5c425;
-  --accent-hover: #ffcf3a;
+  /* Rules and hairlines. Brand.Feed.rule. */
+  --border: #2a2a2a;
+  --line: #2a2a2a;
+
+  /* Accent. Brand.gold — the LIFTED yellow the tab bar renders, not the
+     0xF5C425 it is fed. --accent-ink is Brand.onAccent: it flips with the
+     FILL, not with the page, which is why it is near-black here and white in
+     the light block below. */
+  --accent: #fdf26f;
+  --accent-hover: #fdf58c;
   --accent-ink: #181228;
+  --gold: #fdf26f;
+  --gold-bright: #fdf58c;
+  --gold-soft: #fdf26f;
 
-  --text: #f4f0e6;
-  --text-muted: rgba(244, 240, 230, 0.72);
-  --text-dim: rgba(244, 240, 230, 0.52);
-  --t1: #f4f0e6;
-  --t2: rgba(244, 240, 230, 0.72);
-  --t3: rgba(244, 240, 230, 0.52);
-  --danger: #d0563f;
+  /* Type. Brand.ink, then Brand.Feed.secondary for everything below it. */
+  --text: #ffffff;
+  --t1: #ffffff;
+  --text-muted: #868686;
+  --t2: #868686;
+  --text-dim: rgba(255, 255, 255, 0.45);
+  --t3: rgba(255, 255, 255, 0.45);
+  --danger: #c2402a;
 
   --bar-track: rgba(255, 255, 255, 0.12);
   --ring-track: rgba(255, 255, 255, 0.12);
 
-  /* legacy card-frame names — remapped onto the felt so old components reskin */
-  --frame-hi: #241875;
-  --frame-base: #1d136b;
-  --frame-dark: #150e52;
-  --frame-light: #241875;
-  --frame-ink: #f4f0e6;
-  --plate: #1d136b;
-  --paper: #1d136b;
-  --paper-hi: #241875;
-  --paper-lo: #1a1160;
-  --paper-edge: rgba(255, 255, 255, 0.14);
+  /* The indigo is still the palette's — it is what an identity-less deck page
+     and the logo mark are built from — it is just no longer the table.
+     Brand.Felt. */
+  --felt-center: #412fda;
+  --felt-mid: #3726be;
+  --felt-edge: #2d1da1;
+
+  /* Legacy card-frame names, remapped so old components reskin. */
+  --frame-hi: #1a1a1a;
+  --frame-base: #0c0c0c;
+  --frame-dark: #050505;
+  --frame-light: #1a1a1a;
+  --frame-ink: #ffffff;
+  --plate: #0c0c0c;
+  --paper: #0c0c0c;
+  --paper-hi: #1a1a1a;
+  --paper-lo: #060606;
+  --paper-edge: #2a2a2a;
   --ink: #181228;
-  --ink-soft: rgba(244, 240, 230, 0.72);
-  --gold: #f5c425;
-  --gold-bright: #ffcf3a;
-  /* Highlight gold — one gold app-wide, same as the iOS app. */
-  --gold-soft: #f5c425;
+  --ink-soft: rgba(255, 255, 255, 0.72);
+}
+
+/* Light.
+   The app's light dress, and the same rule: light mode is NEUTRAL. Deck pages
+   take the plain ground rather than a paled wash of their identity, because
+   seventeen tinted near-whites read as a smudge and made the deck page the one
+   screen that didn't match the rest.
+
+   The accent CHANGES rather than darkening. Two attempts at a gold that works
+   on paper both read as washed out — a yellow bright enough to feel like this
+   gold has nowhere to go against white — so light takes an electric blue, and
+   the ink on it goes white to match. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --app-bg: #f7f6f3;
+    --app-bg2: #ffffff;
+    --panel: #ffffff;
+    --bg: #f7f6f3;
+    --bg2: #ffffff;
+    --bg3: rgba(20, 18, 16, 0.06);
+    --surface: rgba(20, 18, 16, 0.05);
+    --surface2: rgba(20, 18, 16, 0.08);
+
+    --border: #e0ddd7;
+    --line: #e0ddd7;
+
+    --accent: #1201ff;
+    --accent-hover: #3a2bff;
+    --accent-ink: #ffffff;
+    --gold: #1201ff;
+    --gold-bright: #3a2bff;
+    --gold-soft: #1201ff;
+
+    --text: #141210;
+    --t1: #141210;
+    --text-muted: #6b6862;
+    --t2: #6b6862;
+    --text-dim: rgba(20, 18, 16, 0.5);
+    --t3: rgba(20, 18, 16, 0.5);
+
+    --bar-track: rgba(20, 18, 16, 0.12);
+    --ring-track: rgba(20, 18, 16, 0.12);
+
+    --frame-hi: #ffffff;
+    --frame-base: #f7f6f3;
+    --frame-dark: #e0ddd7;
+    --frame-light: #ffffff;
+    --frame-ink: #141210;
+    --plate: #f7f6f3;
+    --paper: #f7f6f3;
+    --paper-hi: #ffffff;
+    --paper-lo: #eeece7;
+    --paper-edge: #e0ddd7;
+    --ink-soft: rgba(20, 18, 16, 0.72);
+  }
 }
 
 * {
@@ -66,9 +135,12 @@ html {
 body {
   /* Font tokens defined here (not :root) because next/font sets the family
      vars on <html>; a same-element var() chain on :root resolves to empty. */
-  --font-ui: var(--font-hanken), system-ui, sans-serif;
-  --font-body: var(--font-hanken), system-ui, sans-serif;
-  --font-display: var(--font-vadstena), Georgia, serif;
+  /* One face. --font-display stays a separate token because the call sites
+     mean "this is the headline", which is worth keeping expressed — and it
+     makes moving to a different display face one line rather than a hunt. */
+  --font-ui: var(--font-inter), system-ui, sans-serif;
+  --font-body: var(--font-inter), system-ui, sans-serif;
+  --font-display: var(--font-inter), system-ui, sans-serif;
   --font-sc: var(--font-plexmono), monospace;
   --font-mono: var(--font-plexmono), monospace;
 
@@ -76,11 +148,11 @@ body {
   color: var(--text);
   font-family: var(--font-body);
   min-height: 100dvh;
-  /* The indigo table: the same top-to-bottom linear wash the iOS app paints.
-     (No background-attachment: fixed — Chromium repaints it per scroll frame,
-     which stalls scrolling and flashes black.) */
-  background: linear-gradient(180deg, var(--felt-center), var(--felt-edge)), var(--felt-edge);
-  background-color: var(--felt-edge);
+  /* Flat, not a wash. The app's feed ground stopped being the indigo gradient
+     when the home was redrawn: the deck art carries the colour and the table
+     gets out of its way. */
+  background: var(--bg);
+  background-color: var(--bg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -492,7 +564,7 @@ button {
    frosted panels, white card rows. Used by the home + deck views.
    ============================================================ */
 :root {
-  --ink: #181228;            /* dark text on white panels / gold buttons */
+  --ink: #181228;            /* dark text on white panels */
   --w-1: #ffffff;
   --w-2: rgba(255, 255, 255, 0.78);
   --w-3: rgba(255, 255, 255, 0.55);
@@ -502,14 +574,36 @@ button {
   --w-fill-2: rgba(255, 255, 255, 0.16);
 }
 
+/* The --w-* scale is "readable against the ground", not literally white — the
+   same distinction the app draws between Brand.ink and a surviving `.white`.
+   On a light page it has to invert, or a ghost button is white type on paper.
+
+   Pages whose ground IS a saturated field pin it back to white through
+   getIdentityTheme's vars, so a deck page keeps white chrome in either dress. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --w-1: #141210;
+    --w-2: rgba(20, 18, 16, 0.78);
+    --w-3: rgba(20, 18, 16, 0.55);
+    --w-line: rgba(20, 18, 16, 0.16);
+    --w-line-2: rgba(20, 18, 16, 0.28);
+    --w-fill: rgba(20, 18, 16, 0.06);
+    --w-fill-2: rgba(20, 18, 16, 0.11);
+  }
+}
+
 /* display headline — Tabletop blackletter, Title Case (never uppercase: the
    blackletter face is unreadable in all caps). */
 .id-display {
+  /* Bold and tightly tracked, the way the app sets its headlines.
+     The blackletter wanted weight 400 and POSITIVE tracking; Inter at those
+     values reads as body copy set large. The drop shadow goes with it — it was
+     there to lift a thin serif off the felt, and on a flat ground under a
+     700-weight sans it only makes the type look smudged. */
   font-family: var(--font-display);
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 1.02;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
 }
 .id-label {
   font-family: var(--font-ui);
@@ -529,7 +623,7 @@ button {
   font-weight: 700;
   font-size: 14.5px;
   background: var(--gold);
-  color: var(--ink);
+  color: var(--accent-ink);
   border: none;
   cursor: pointer;
   border-radius: 999px;
@@ -591,14 +685,14 @@ button {
 }
 .id-pill-gold:hover {
   background: var(--gold);
-  color: var(--ink);
+  color: var(--accent-ink);
 }
 
 /* floating panel (deck rows etc.) — a darker cut of whatever ground the page
    wears (the theme computes --panel), so it follows identity-tinted deck pages
    instead of staying indigo */
 .id-card {
-  background: var(--panel, #241875);
+  background: var(--panel, #131313);
   color: var(--w-1);
   border-radius: 14px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09), 0 10px 26px -16px rgba(0, 0, 0, 0.6);

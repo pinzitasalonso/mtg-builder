@@ -110,9 +110,17 @@ export function getIdentityTheme(identity: string | null | undefined): IdentityT
   // Floating panels (.id-card) sit on a darker cut of the same ground.
   const panel = mixHex(mid, "#05030a", 0.3);
 
+  // An identity ground is a saturated colour, so everything ON it is inked for
+  // dark whatever the viewer's preference — the same rule the app follows, and
+  // why its `.white` survives over card art and identity fills.
+  //
+  // The accent is the LIFTED yellow (Brand.gold), not the 0xF5C425 that used to
+  // be here: that is the value the iOS tab bar is FED, and Liquid Glass lifts it
+  // on screen. Drawn flat it came out a different yellow from every other yellow
+  // in the product, which is the mismatch the app fixed.
   return {
     bg,
-    text: "#f4f0e6",
+    text: "#fff",
     dotEmpty: "rgba(255,255,255,.18)",
     vars: {
       ["--bg" as string]: bgSolid,
@@ -121,44 +129,58 @@ export function getIdentityTheme(identity: string | null | undefined): IdentityT
       "--bg3": "rgba(255,255,255,.1)",
       "--surface": "rgba(255,255,255,.07)",
       "--surface2": "rgba(255,255,255,.05)",
-      "--text": "#f4f0e6",
-      "--t1": "#f4f0e6",
-      "--text-muted": "rgba(244,240,230,.74)",
-      "--t2": "rgba(244,240,230,.74)",
-      "--text-dim": "rgba(244,240,230,.52)",
-      "--t3": "rgba(244,240,230,.52)",
-      "--accent": "#f5c425",
-      "--accent-hover": "#ffcf3a",
-      "--gold": "#f5c425",
-      "--gold-bright": "#ffcf3a",
+      "--text": "#fff",
+      "--t1": "#fff",
+      "--text-muted": "rgba(255,255,255,.74)",
+      "--t2": "rgba(255,255,255,.74)",
+      "--text-dim": "rgba(255,255,255,.52)",
+      "--t3": "rgba(255,255,255,.52)",
+      "--accent": "#fdf26f",
+      "--accent-hover": "#fdf58c",
+      "--gold": "#fdf26f",
+      "--gold-bright": "#fdf58c",
       "--accent-ink": "#181228",
       "--line": "rgba(255,255,255,.16)",
       "--border": "rgba(255,255,255,.16)",
+      // The white-on-colour scale, pinned back. It follows the PAGE at :root so
+      // a ghost button on a light landing isn't white on paper — but this
+      // ground is a saturated field in either dress, so here it is white again.
+      "--w-1": "#fff",
+      "--w-2": "rgba(255,255,255,.78)",
+      "--w-3": "rgba(255,255,255,.55)",
+      "--w-line": "rgba(255,255,255,.18)",
+      "--w-line-2": "rgba(255,255,255,.32)",
+      "--w-fill": "rgba(255,255,255,.1)",
+      "--w-fill-2": "rgba(255,255,255,.16)",
     } as CSSProperties,
   };
 }
 
-// Panel palette for floating surfaces (modals, the login card). The whole app
-// is dark felt now — like the iOS app, dialogs sit on a slightly lifted felt
-// panel rather than flipping to a light card. (Name kept so call sites don't
-// churn; the values are the Tabletop panel, not a light theme.)
+// Panel palette for floating surfaces (modals, the login card). Dialogs sit on
+// a slightly lifted panel rather than flipping to a light card, the way the
+// app's sheets do. (Name kept so call sites don't churn; the values are the
+// panel set, not a light theme — they have never been one.)
+//
+// Fixed dark, and deliberately so: these ride on top of a deck page's identity
+// ground, which is a saturated colour in the app's dark and Colorful dresses.
+// A panel that followed the PAGE would be a pale card on a red table.
 export const LIGHT_VARS: CSSProperties = {
-  ["--bg" as string]: "#1d136b",
-  "--bg2": "#241875",
+  ["--bg" as string]: "#0c0c0c",
+  "--bg2": "#131313",
   "--bg3": "rgba(255,255,255,.08)",
   "--surface": "rgba(255,255,255,.06)",
   "--surface2": "rgba(255,255,255,.09)",
-  "--text": "#f4f0e6",
-  "--t1": "#f4f0e6",
-  "--text-muted": "rgba(244,240,230,.72)",
-  "--t2": "rgba(244,240,230,.72)",
-  "--text-dim": "rgba(244,240,230,.52)",
-  "--t3": "rgba(244,240,230,.52)",
-  "--accent": "#f5c425",
-  "--accent-hover": "#ffcf3a",
-  "--gold": "#f5c425",
-  "--gold-bright": "#ffcf3a",
+  "--text": "#fff",
+  "--t1": "#fff",
+  "--text-muted": "#868686",
+  "--t2": "#868686",
+  "--text-dim": "rgba(255,255,255,.45)",
+  "--t3": "rgba(255,255,255,.45)",
+  "--accent": "#fdf26f",
+  "--accent-hover": "#fdf58c",
+  "--gold": "#fdf26f",
+  "--gold-bright": "#fdf58c",
   "--accent-ink": "#181228",
-  "--line": "rgba(255,255,255,.14)",
-  "--border": "rgba(255,255,255,.14)",
+  "--line": "#2a2a2a",
+  "--border": "#2a2a2a",
 } as CSSProperties;

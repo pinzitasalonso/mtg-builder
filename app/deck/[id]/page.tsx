@@ -41,7 +41,7 @@ import {
 
 // Category accent colours for the composition matrix (matches the design).
 const CAT_COLOR: Record<string, string> = {
-  Creatures: "#f5c425",
+  Creatures: "#fdf26f",
   Instants: "#7fb8ff",
   Sorceries: "#b5d6ff",
   Artifacts: "#d7dbe2",
