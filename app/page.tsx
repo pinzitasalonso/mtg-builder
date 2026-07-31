@@ -9,11 +9,18 @@ import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
 import { track } from "@/lib/track";
-import { getIdentityTheme, getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
+import { getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
 
 /* The home view wears the commander-blue identity field — the same immersive
    look the deck pages use, matching the Color Identity design. */
-const homeTheme = getIdentityTheme("U");
+// The landing used to wear the blue identity field — a deck page's ground,
+// borrowed for a page that isn't a deck. The app's home is the neutral table,
+// and the card art is what carries the colour, so this follows it: no forced
+// vars, no forced ground, and the page turns over with light and dark like
+// every other screen.
+//
+// `getIdentityField` is still imported below for the card fan, which is meant
+// to look like decks.
 
 interface Deck {
   id: number;
@@ -135,13 +142,13 @@ export default function HomePage() {
   const formatCount = new Set(decks.map((d) => d.format)).size;
 
   return (
-    <main style={{ flex: 1, display: "flex", flexDirection: "column", ...homeTheme.vars, background: "var(--bg)", color: homeTheme.text }}>
-      {/* HERO — on the commander-blue field */}
+    <main style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--t1)" }}>
+      {/* HERO — on the app's own table */}
       <div
         style={{
           position: "relative",
           overflow: "hidden",
-          background: homeTheme.bg,
+          background: "var(--bg)",
         }}
       >
         {/* transparent top nav */}
@@ -166,7 +173,7 @@ export default function HomePage() {
                     PRO
                   </span>
                 )}
-                <span title={me.email} style={{ fontSize: 13, color: "var(--w-3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span title={me.email} style={{ fontSize: 13, color: "var(--t3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {me.email}
                 </span>
                 <button onClick={signOut} className="id-ghost" style={{ padding: "9px 16px" }}>Sign out</button>
@@ -193,13 +200,13 @@ export default function HomePage() {
               </div>
             </Reveal>
             <Reveal delay={90}>
-              <h1 className="id-display" style={{ fontSize: "clamp(52px, 8vw, 104px)", margin: "0 0 22px", color: "var(--w-1)" }}>
+              <h1 className="id-display" style={{ fontSize: "clamp(52px, 8vw, 104px)", margin: "0 0 22px", color: "var(--t1)" }}>
                 Brew the<br />deck in<br />
                 <span style={{ color: "var(--gold)" }}>your head.</span>
               </h1>
             </Reveal>
             <Reveal delay={150}>
-              <p style={{ fontSize: "clamp(16px,1.5vw,19px)", lineHeight: 1.5, color: "var(--w-2)", maxWidth: 440, margin: "0 0 30px" }}>
+              <p style={{ fontSize: "clamp(16px,1.5vw,19px)", lineHeight: 1.5, color: "var(--t2)", maxWidth: 440, margin: "0 0 30px" }}>
                 Describe what you want to play. Spellpool reads every card&apos;s rules text and hands you a pool to swipe — building to a legal 100 with the curve and color identity worked out for you.
               </p>
             </Reveal>
@@ -224,8 +231,8 @@ export default function HomePage() {
         <div style={{ maxWidth: 1180, width: "100%", margin: "0 auto", padding: "clamp(36px,5vw,64px) clamp(20px,4vw,52px) 0" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 30, flexWrap: "wrap" }}>
             <div>
-              <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 12 }}>Your decks</div>
-              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,52px)", margin: 0, color: "var(--w-1)" }}>Pick up where you left off.</h2>
+              <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Your decks</div>
+              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,52px)", margin: 0, color: "var(--t1)" }}>Pick up where you left off.</h2>
             </div>
             <div style={{ display: "flex", gap: 28, paddingBottom: 4 }}>
               <CStat n={decks.length} label="Decks" />
@@ -239,23 +246,25 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* HOW IT WORKS — deep neutral band (signed-out landing) */}
+      {/* HOW IT WORKS — a lifted band (signed-out landing). Tokenised rather
+          than the hard indigo it used to be: that colour is no longer the
+          table, so it read as a stripe of the old design across the new one. */}
       {!me && (
-        <div style={{ background: "#1d136b", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px)" }}>
+        <div style={{ background: "var(--bg2)", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px)" }}>
           <div style={{ maxWidth: 1180, margin: "0 auto" }}>
             <Reveal>
-              <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 12 }}>How it works</div>
-              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: "0 0 48px", maxWidth: 720, color: "var(--w-1)" }}>
+              <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>How it works</div>
+              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: "0 0 48px", maxWidth: 720, color: "var(--t1)" }}>
                 From a sentence to a sideboard.
               </h2>
             </Reveal>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 0 }}>
               {FEATURES.map((f, i) => (
                 <Reveal key={f.n} delay={120 + i * 90}>
-                  <div style={{ padding: "28px 28px 28px 0", borderTop: "1px solid var(--w-line)", marginRight: i < FEATURES.length - 1 ? 28 : 0, height: "100%" }}>
+                  <div style={{ padding: "28px 28px 28px 0", borderTop: "1px solid var(--line)", marginRight: i < FEATURES.length - 1 ? 28 : 0, height: "100%" }}>
                     <div className="id-mono" style={{ fontSize: 13, color: "var(--gold)", marginBottom: 18 }}>{f.n}</div>
-                    <div className="id-display" style={{ fontSize: 26, marginBottom: 10, color: "var(--w-1)" }}>{f.t}</div>
-                    <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--w-2)", margin: 0 }}>{f.d}</p>
+                    <div className="id-display" style={{ fontSize: 26, marginBottom: 10, color: "var(--t1)" }}>{f.t}</div>
+                    <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)", margin: 0 }}>{f.d}</p>
                   </div>
                 </Reveal>
               ))}
@@ -269,8 +278,8 @@ export default function HomePage() {
         <div style={{ maxWidth: 1180, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 40, flexWrap: "wrap" }}>
             <div>
-              <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 12 }}>Public brews</div>
-              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: 0, maxWidth: 640, color: "var(--w-1)" }}>
+              <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Public brews</div>
+              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: 0, maxWidth: 640, color: "var(--t1)" }}>
                 Decks the pool is talking about.
               </h2>
             </div>
@@ -344,13 +353,13 @@ export default function HomePage() {
       )}
 
       {/* footer — legal links + the WotC fan-content line */}
-      <footer style={{ marginTop: "auto", padding: "28px clamp(20px,4vw,52px) 34px", borderTop: "1px solid var(--w-line)", display: "flex", flexDirection: "column", gap: 8 }}>
+      <footer style={{ marginTop: "auto", padding: "28px clamp(20px,4vw,52px) 34px", borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 8 }}>
         <div style={{ display: "flex", gap: 18, fontSize: 13.5 }}>
-          <Link href="/privacy" style={{ color: "var(--w-2)", textDecoration: "none" }}>Privacy</Link>
-          <Link href="/terms" style={{ color: "var(--w-2)", textDecoration: "none" }}>Terms</Link>
-          <a href="mailto:pinzitasalonso@gmail.com" style={{ color: "var(--w-2)", textDecoration: "none" }}>Contact</a>
+          <Link href="/privacy" style={{ color: "var(--t2)", textDecoration: "none" }}>Privacy</Link>
+          <Link href="/terms" style={{ color: "var(--t2)", textDecoration: "none" }}>Terms</Link>
+          <a href="mailto:pinzitasalonso@gmail.com" style={{ color: "var(--t2)", textDecoration: "none" }}>Contact</a>
         </div>
-        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--w-3)", maxWidth: 720 }}>
+        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--t3)", maxWidth: 720 }}>
           Spellpool is unofficial Fan Content permitted under the Wizards of the Coast Fan Content
           Policy. Magic: The Gathering is property of Wizards of the Coast LLC. Card data and imagery
           by Scryfall.
@@ -436,8 +445,8 @@ function CardFan() {
 function CStat({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
   return (
     <div style={{ textAlign: "right" }}>
-      <div className="id-mono" style={{ fontSize: 32, fontWeight: 700, color: accent ? "var(--gold)" : "var(--w-1)", lineHeight: 1 }}>{n}</div>
-      <div className="id-label" style={{ marginTop: 6, color: "var(--w-3)" }}>{label}</div>
+      <div className="id-mono" style={{ fontSize: 32, fontWeight: 700, color: accent ? "var(--gold)" : "var(--t1)", lineHeight: 1 }}>{n}</div>
+      <div className="id-label" style={{ marginTop: 6, color: "var(--t3)" }}>{label}</div>
     </div>
   );
 }
@@ -446,9 +455,9 @@ function CStat({ n, label, accent }: { n: number; label: string; accent?: boolea
 function CollectionBlock({ unique, total, sample, onOpen }: { unique: number; total: number; sample: string[]; onOpen: () => void }) {
   return (
     <div style={{ marginTop: 56 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 14, paddingBottom: 20, borderBottom: "1px solid var(--w-line)" }}>
-        <h2 className="id-display" style={{ margin: 0, fontSize: "clamp(24px, 4vw, 32px)", color: "var(--w-1)" }}>Your collection</h2>
-        <span className="id-mono" style={{ fontSize: 12.5, color: "var(--w-3)" }}>{unique > 0 ? `${unique} unique · ${total} total` : "nothing yet"}</span>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 14, paddingBottom: 20, borderBottom: "1px solid var(--line)" }}>
+        <h2 className="id-display" style={{ margin: 0, fontSize: "clamp(24px, 4vw, 32px)", color: "var(--t1)" }}>Your collection</h2>
+        <span className="id-mono" style={{ fontSize: 12.5, color: "var(--t3)" }}>{unique > 0 ? `${unique} unique · ${total} total` : "nothing yet"}</span>
         <button onClick={onOpen} className="id-ghost" style={{ marginLeft: "auto", padding: "9px 18px" }}>
           {unique > 0 ? "Browse →" : "Import →"}
         </button>
@@ -467,7 +476,7 @@ function CollectionBlock({ unique, total, sample, onOpen }: { unique: number; to
           ))}
         </button>
       ) : (
-        <p style={{ marginTop: 18, fontSize: 15, color: "var(--w-2)", lineHeight: 1.5 }}>
+        <p style={{ marginTop: 18, fontSize: 15, color: "var(--t2)", lineHeight: 1.5 }}>
           Import the cards you own to track them across decks, see what you can build for free, and let the AI factor it in.{" "}
           <button onClick={onOpen} style={{ background: "none", border: "none", padding: 0, color: "var(--gold)", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
             Import your collection
@@ -647,9 +656,9 @@ function NewDeckTile({ onNew }: { onNew: () => void }) {
       style={{
         minHeight: 250,
         borderRadius: 18,
-        border: "1.5px dashed var(--w-line-2)",
-        background: hover ? "var(--w-fill)" : "transparent",
-        color: "var(--w-2)",
+        border: "1.5px dashed var(--border)",
+        background: hover ? "var(--surface)" : "transparent",
+        color: "var(--t2)",
         cursor: "pointer",
         display: "flex",
         flexDirection: "column",
@@ -657,11 +666,11 @@ function NewDeckTile({ onNew }: { onNew: () => void }) {
         justifyContent: "center",
         gap: 10,
         transition: "background .15s, border-color .15s",
-        borderColor: hover ? "var(--gold)" : "var(--w-line-2)",
+        borderColor: hover ? "var(--gold)" : "var(--border)",
       }}
     >
-      <span className="id-display" style={{ fontSize: 34, color: hover ? "var(--gold)" : "var(--w-2)", lineHeight: 1 }}>+</span>
-      <span className="id-label" style={{ color: "var(--w-1)" }}>New deck</span>
+      <span className="id-display" style={{ fontSize: 34, color: hover ? "var(--gold)" : "var(--t2)", lineHeight: 1 }}>+</span>
+      <span className="id-label" style={{ color: "var(--t1)" }}>New deck</span>
     </button>
   );
 }

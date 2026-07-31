@@ -3,11 +3,12 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Logo from "@/components/Logo";
-import { getIdentityTheme, LIGHT_VARS } from "@/lib/identity-theme";
+import { LIGHT_VARS } from "@/lib/identity-theme";
 import { track } from "@/lib/track";
 
-// Same immersive theme as the deck page, neutral palette.
-const loginTheme = getIdentityTheme(null);
+// The app's own table, not a deck page's ground. `getIdentityTheme(null)`
+// returns the indigo felt, which stopped being the table when the home was
+// redrawn — it left sign-in as the last indigo screen in the product.
 
 type Mode = "login" | "signup";
 
@@ -103,7 +104,7 @@ function LoginInner() {
   }
 
   return (
-    <main style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 16px", gap: 26, ...loginTheme.vars, background: loginTheme.bg, color: loginTheme.text, minHeight: "100dvh" }}>
+    <main style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 16px", gap: 26, background: "var(--bg)", color: "var(--t1)", minHeight: "100dvh" }}>
       <Logo />
       <div className="cc-black" style={{ ...LIGHT_VARS, color: "var(--t1)", padding: 9, width: "100%", maxWidth: 400, animation: "sp-pop .18s ease" }}>
         <div className="cc-brown" style={{ padding: "18px 18px 20px" }}>
@@ -248,10 +249,15 @@ const input: React.CSSProperties = {
 };
 
 const goldBtn: React.CSSProperties = {
-  background: "var(--t1)",
+  // The accent, with the ink that flips WITH it. This was `--t1` filled and
+  // `#fff` written — white on white once the panel's text token became pure
+  // white, and near-white on near-white before that. A primary button is the
+  // accent everywhere else in the product; there was no reason for this one to
+  // be its own thing.
+  background: "var(--accent)",
   border: "none",
   borderRadius: 999,
-  color: "#fff",
+  color: "var(--accent-ink)",
   padding: "12px 20px",
   cursor: "pointer",
   fontFamily: "var(--font-ui)",

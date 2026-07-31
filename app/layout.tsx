@@ -1,20 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Hanken_Grotesk, IBM_Plex_Mono } from "next/font/google";
-import localFont from "next/font/local";
+import { IBM_Plex_Mono, Inter } from "next/font/google";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
 
-const hanken = Hanken_Grotesk({
+// Inter, for body AND headlines — the face the designs are drawn in and the
+// only one the iOS app uses now.
+//
+// It replaces two: Hanken Grotesk for UI, and Vadstenakursive for display. The
+// blackletter is retired rather than kept for the pages that hadn't been
+// redrawn, which is the same call the app made — two display faces mid-migration
+// is worse than either on its own. The .otf is still in app/fonts, so bringing
+// it back is this block and the --font-display line in globals.css.
+const inter = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
-  variable: "--font-hanken",
-  display: "swap",
-});
-
-// Tabletop blackletter display face — the same file the iOS app ships.
-const vadstena = localFont({
-  src: "./fonts/Vadstenakursive.otf",
-  variable: "--font-vadstena",
+  variable: "--font-inter",
   display: "swap",
 });
 
@@ -46,12 +46,16 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0e0b12",
+  // The app's two grounds, so the browser chrome matches the page it frames.
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0c0c0c" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f6f3" },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`h-full ${hanken.variable} ${vadstena.variable} ${plexMono.variable}`}>
+    <html lang="en" className={`h-full ${inter.variable} ${plexMono.variable}`}>
       <body className="min-h-full flex flex-col">
         {children}
         <ServiceWorkerRegister />
