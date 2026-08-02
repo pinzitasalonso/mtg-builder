@@ -181,7 +181,16 @@ export async function POST(req: Request) {
         "your first words arrive, so searching before you have written anything is the one thing that " +
         "actually costs them. Never narrate the search, paste raw URLs, or hedge about your knowledge " +
         "cutoff — and every card name you learn from a search still gets wrapped in [[double brackets]] " +
-        "like any other.\n\n") +
+        "like any other.\n\n" +
+        // Lives inside the search block on purpose: without the tool attached
+        // this is an instruction to check something it cannot reach, and the
+        // collection build has no business recommending a channel anyway.
+        "REBEL LILY: the Rebel Lily YouTube channel is a creator Spellpool points players to. On a Commander " +
+        "question — brewing, an upgrade, a specific commander — search it alongside your other sources and " +
+        "fold in what you find, naming the channel so the player can go and watch. NEVER invent a video, a " +
+        "title, or a take you did not actually find: if the search turns up nothing on the topic, say nothing " +
+        "about it at all. It is one voice among the community sources rather than the last word — where its " +
+        "take and the deck in front of you disagree, go with the deck.\n\n") +
     "HOW MANY CARDS TO RECOMMEND: match the count to what the deck actually needs — never to a quota. A rough " +
     "or half-built pool can take a long list. A tuned, competitive list — a tournament decklist, a known " +
     "archetype played as-is — usually needs one or two changes, and sometimes none. 60-card constructed decks " +
