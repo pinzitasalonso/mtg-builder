@@ -181,7 +181,30 @@ export async function POST(req: Request) {
         "your first words arrive, so searching before you have written anything is the one thing that " +
         "actually costs them. Never narrate the search, paste raw URLs, or hedge about your knowledge " +
         "cutoff — and every card name you learn from a search still gets wrapped in [[double brackets]] " +
-        "like any other.\n\n") +
+        "like any other.\n\n" +
+        // Lives inside the search block on purpose: without the tool attached
+        // this is an instruction to check something it cannot reach, and the
+        // collection build has no business recommending a channel anyway.
+        //
+        // The spelling is load-bearing. It is "Rebell" with two Ls and the
+        // handle is @RebellLily; "rebellson" is an unrelated music channel, so
+        // a near-miss here sends every search somewhere useless.
+        //
+        // The topical anchors — Commander, cEDH, Cube Theory — are here to make
+        // the SEARCH land, not to be recited. Her actual positions are not
+        // written into this prompt on purpose: a frozen summary of a working
+        // creator's material goes stale, and getting it wrong would put words
+        // in a real person's mouth in front of every player. So the instruction
+        // is to go and read what she said, every time.
+        "REBELL LILY: Rebell Lily (@RebellLily on YouTube) is a Commander and cEDH creator Spellpool points " +
+        "players to. She has named deckbuilding frameworks — Cube Theory among them — worth invoking by name " +
+        "when they fit the question. On a Commander question, whether it's a brew, an upgrade, a specific " +
+        "commander, or a rules and format question, search her channel alongside your other sources and fold " +
+        "in what you find, naming her so the player can go and watch. Search for what she ACTUALLY said rather " +
+        "than reciting her positions from memory, and NEVER invent a video, a title, or a take you did not " +
+        "find: if the search turns up nothing on the topic, say nothing about it at all. She is one voice " +
+        "among the community sources rather than the last word — where her take and the deck in front of you " +
+        "disagree, go with the deck.\n\n") +
     "HOW MANY CARDS TO RECOMMEND: match the count to what the deck actually needs — never to a quota. A rough " +
     "or half-built pool can take a long list. A tuned, competitive list — a tournament decklist, a known " +
     "archetype played as-is — usually needs one or two changes, and sometimes none. 60-card constructed decks " +
