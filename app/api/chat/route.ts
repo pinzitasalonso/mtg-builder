@@ -15,6 +15,7 @@ import {
   parseCollection,
   parseDeckContext,
 } from "@/lib/research";
+import { buildNewCardsBlock, buildRecentSetsBlock, recentCardContext } from "@/lib/recent-sets";
 
 export const runtime = "nodejs";
 
@@ -129,12 +130,29 @@ export async function POST(req: Request) {
 
   // Gather grounding data (intent → EDHREC/Reddit/Moxfield/Spellbook) before we
   // start streaming — this is the brief "thinking" pause the client shows.
+  //
+  // The recent-set lookups run ALONGSIDE it, not after. Both are Scryfall
+  // reads behind six-hour caches, so on a warm process they cost nothing, and
+  // on a cold one they finish well inside the community fetches. Sequencing
+  // them would add their latency to the pause before the first byte, which is
+  // the one thing this route is repeatedly tuned not to do.
   const researchStart = Date.now();
-  const { data, sources, almostCombos, researched } = buildingFromCollection
-    ? { data: { edhrec: [], reddit: [], moxfield: [] }, sources: [] as string[], almostCombos: [], researched: false }
-    : await gatherContext(anthropic, latestUser, deckCtx).catch(
-        () => ({ data: { edhrec: [], reddit: [], moxfield: [] }, sources: [] as string[], almostCombos: [], researched: false })
-      );
+  const [{ data, sources, almostCombos, researched }, recent] = await Promise.all([
+    buildingFromCollection
+      ? Promise.resolve({
+          data: { edhrec: [], reddit: [], moxfield: [] },
+          sources: [] as string[],
+          almostCombos: [],
+          researched: false,
+        })
+      : gatherContext(anthropic, latestUser, deckCtx).catch(() => ({
+          data: { edhrec: [], reddit: [], moxfield: [] },
+          sources: [] as string[],
+          almostCombos: [],
+          researched: false,
+        })),
+    recentCardContext(deckCtx.commander, !buildingFromCollection).catch(() => ({ sets: [], cards: [] })),
+  ]);
   const researchMs = Date.now() - researchStart;
 
   // ── The system prompt, assembled as separately cacheable blocks.
@@ -155,6 +173,14 @@ export async function POST(req: Request) {
   //
   // Three explicit breakpoints, of the four a request may carry — the server
   // tool loop may insert its own, and exceeding four is a 400.
+  //
+  // The recent-sets block is byte-identical for every player and changes at
+  // most once a day, so it rides INSIDE the cached instructions rather than
+  // spending one of the four breakpoints on itself. It sits ahead of the
+  // search branch on purpose: a collection build needs it too. The player may
+  // own cards from those sets, and the failure it prevents — flatly telling
+  // someone their card isn't real — is worse there than anywhere else.
+  const setsBlock = buildRecentSetsBlock(recent.sets);
   const instructions =
     "You are a world-class Magic: The Gathering deckbuilding expert having a focused conversation with a " +
     "player about their deck — Commander/EDH unless they name another format (Standard, Modern, …). They will " +
@@ -165,6 +191,7 @@ export async function POST(req: Request) {
     "Never respond to a build request with clarifying questions; make reasonable choices and build.\n\n" +
     "FORMAT: Reply in clean GitHub-flavored Markdown. Use short section headings (##), **bold** for emphasis, " +
     "and bullet lists for card recommendations. Keep it tight and skimmable — a few sections, not an essay.\n\n" +
+    (setsBlock ? `${setsBlock}\n\n` : "") +
     // Only when the tool is actually attached below — telling a collection
     // build to "search, don't guess" when it has nothing to search with is
     // just an instruction it can't follow.
@@ -255,6 +282,9 @@ export async function POST(req: Request) {
       "\n\n" +
       (buildingFromCollection ? buildCollectionFirstBlock() : buildSourceBlock(data)) +
       buildComboBlock(almostCombos) +
+      // Per-deck, because it is filtered to the commander's colour identity —
+      // so it belongs here in the volatile tail and not in a cached block.
+      buildNewCardsBlock(recent.cards, recent.sets) +
       (sources.length ? `\n\n(You may mention these sources informed you: ${sources.join(", ")}.)` : ""),
   });
 
@@ -365,6 +395,12 @@ export async function POST(req: Request) {
       "X-Sp-Research": researched ? "ran" : "skipped",
       "X-Sp-Research-Ms": String(researchMs),
       "X-Sp-Search": buildingFromCollection ? "off" : "on",
+      // New-set grounding, same reasoning. Sets at 0 means Scryfall's set list
+      // didn't come back (or the cutoff needs moving); cards at 0 with sets
+      // above 0 means the identity filter matched nothing, which is expected
+      // for a narrow deck the week a set lands and a bug at any other time.
+      "X-Sp-New-Sets": String(recent.sets.length),
+      "X-Sp-New-Cards": String(recent.cards.length),
     },
   });
 }
