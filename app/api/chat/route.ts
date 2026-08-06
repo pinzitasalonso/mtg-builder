@@ -63,14 +63,41 @@ const EFFORT = "medium" as const;
 // cached at all (the usual cause is a block slipping under Opus 5's 512-token
 // minimum). `think` is the slice of output effort controls; `searches` is the
 // multiplier on everything, since each one costs another full pass.
-function logUsage(u: Anthropic.Usage): void {
+function logUsage(u: Anthropic.Usage, stop: Anthropic.Message["stop_reason"]): void {
   const write = u.cache_creation_input_tokens ?? 0;
   const read = u.cache_read_input_tokens ?? 0;
   console.log(
     `[chat] fresh=${u.input_tokens} cache_write=${write} cache_read=${read} ` +
       `out=${u.output_tokens} think=${u.output_tokens_details?.thinking_tokens ?? 0} ` +
-      `searches=${u.server_tool_use?.web_search_requests ?? 0}`
+      `searches=${u.server_tool_use?.web_search_requests ?? 0} stop=${stop ?? "null"}`
   );
+}
+
+/**
+ * Why the stream stopped, when it wasn't because the answer was finished.
+ *
+ * Every one of these used to end the stream in silence. The reply stopped
+ * mid-sentence, the connection closed cleanly, and the player was left looking
+ * at half an answer with no way to tell whether more was coming, whether it had
+ * failed, or whether they should ask again. "The assistant gets blocked mid
+ * generation" is exactly what that looks like from the outside.
+ *
+ * The error path below has always said something. These paths are not errors —
+ * nothing throws — which is precisely why they were the ones that went unheard.
+ */
+function stopNote(stop: Anthropic.Message["stop_reason"]): string | null {
+  switch (stop) {
+    case "max_tokens":
+      return "_(That hit the length limit — ask me to continue and I'll pick up where I left off.)_";
+    case "refusal":
+      return "_(I stopped there and can't continue that one. Try rephrasing it?)_";
+    // Only reaches here having already exhausted MAX_RESUMES: the model kept
+    // wanting another round of searching and we stopped buying them.
+    case "pause_turn":
+      return "_(I ran out of research time on that one — ask again and I'll keep going.)_";
+    default:
+      return null;
+  }
 }
 
 // Conversational deck assistant. Unlike /api/search (which returns a ranked JSON
@@ -312,7 +339,16 @@ export async function POST(req: Request) {
         } catch {
           // Stream already closed — the clear below is on its way.
         }
-      }, 15000);
+      //
+      // TEN seconds, not fifteen. The iOS client's URLSession is configured
+      // with a 20-second inactivity timeout, so a 15-second beat left five
+      // seconds of margin — one slow flush, one proxy buffer, one long gap
+      // between a search finishing and the next token, and the CLIENT hangs up
+      // mid-answer. From the player's side that is indistinguishable from the
+      // model stopping. The client is getting its own longer timeout for the
+      // stream as well; this is the half that protects players who haven't
+      // updated the app.
+      }, 10000);
       try {
         // Opus 5 rejects sampling params (`temperature` → 400) and runs
         // adaptive thinking by default; thinking spends output tokens, so the
@@ -341,10 +377,18 @@ export async function POST(req: Request) {
         // answer simply stops mid-thought — so resume by handing the paused
         // turn back (no extra user message: the API sees the trailing tool
         // block and picks up where it left off).
+        let finalStop: Anthropic.Message["stop_reason"] = null;
         for (let attempt = 0; ; attempt++) {
           const ai = anthropic.messages.stream({
             model: "claude-opus-5",
-            max_tokens: 16000,
+            // Opus 5 allows 128K output. 16000 was chosen when a full decklist
+            // build was starving at 6000, and it is still the ceiling a long
+            // answer runs into — thinking bills against this budget too, so a
+            // heavy think before a 100-line list eats it between them. This is
+            // a cap and not an allocation: raising it costs nothing on the
+            // answers that never approach it, and stops truncating the ones
+            // that do. Not the full 128K, so a runaway still has a bound.
+            max_tokens: 32000,
             output_config: { effort: EFFORT },
             system,
             tools,
@@ -362,10 +406,16 @@ export async function POST(req: Request) {
           // A resume starts a fresh request: nothing is open until it says so.
           inTextBlock = false;
           const final = await ai.finalMessage();
-          logUsage(final.usage);
+          logUsage(final.usage, final.stop_reason);
+          finalStop = final.stop_reason;
           if (final.stop_reason !== "pause_turn" || attempt >= MAX_RESUMES) break;
           convo.push({ role: "assistant", content: final.content });
         }
+        // Say why, when the answer stopped for a reason other than being
+        // finished. A truncated reply that explains itself is a small problem;
+        // one that doesn't is indistinguishable from the app being broken.
+        const note = stopNote(finalStop);
+        if (note) controller.enqueue(encoder.encode(`\n\n${note}`));
         clearInterval(heartbeat);
         controller.close();
       } catch (e) {
