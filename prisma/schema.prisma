@@ -106,6 +106,38 @@ model Deck {
   user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards     PoolCard[]
   playCodes PlayCode[]
+  games     GameLog[]
+}
+
+// One played game against one deck. `Deck.gamesPlayed` / `gamesWon` is the
+// free running summary; this is the log behind it, and KEEPING IT IS A PRO
+// FEATURE.
+//
+// That gate lived only in the iOS client (SyncStore.recordGameResult wrapped
+// the insert in `if isPro`), which meant any other client — the web, a curl —
+// could keep a history without paying for one. It is enforced in the /record
+// route now, and the client-side check is a courtesy rather than the rule.
+//
+// Opponents are NAMES rather than relations, matching iOS: most of them are
+// friends' decks this server has never seen — a seat filled by play code, or
+// a name typed at the table — so a relation could only record the minority of
+// games played against another deck in this database. Stored as JSON because
+// SQLite has no array type.
+model GameLog {
+  id        Int      @id @default(autoincrement())
+  deckId    Int
+  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  won       Boolean
+  // JSON array of opponent deck names, in seat order.
+  opponents String   @default("[]")
+  note      String?
+  // Set when the player typed the game in rather than playing it through the
+  // tracker. Worth distinguishing: a hand-entered record is someone's memory
+  // and the tracker's is a measurement.
+  isManual  Boolean  @default(false)
+  playedAt  DateTime @default(now())
+
+  @@index([deckId, playedAt])
 }
 
 // A short-lived "seat me at your table" code. The deck's owner mints one, a

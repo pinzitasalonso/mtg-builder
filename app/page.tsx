@@ -33,7 +33,17 @@ interface Deck {
   _count: { cards: number };
 }
 
-type Me = { id: number; email: string; tier?: string } | null;
+// `aiRemaining` and `deckLimit` are null for pro (no cap) and absent only if
+// the payload predates them. /api/auth/me has always sent both; nothing on the
+// web read them, which is why a free player got no warning before a cap and no
+// explanation after one.
+type Me = {
+  id: number;
+  email: string;
+  tier?: string;
+  aiRemaining?: number | null;
+  deckLimit?: number | null;
+} | null;
 
 const FEATURES = [
   { n: "01", t: "Pour in a theme", d: "Tell Spellpool a commander, a combo, or just a vibe. It reads the whole Oracle text database — not just card names." },
@@ -45,6 +55,10 @@ export default function HomePage() {
   const router = useRouter();
   // undefined = still resolving the session; null = signed out.
   const [me, setMe] = useState<Me | undefined>(undefined);
+  /// Why a create or a duplicate was refused — almost always the free plan's
+  /// deck cap, which the server explains in the response body.
+  const [createError, setCreateError] = useState("");
+  const [listError, setListError] = useState("");
   const [decks, setDecks] = useState<Deck[]>([]);
   const [publicDecks, setPublicDecks] = useState<Deck[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -110,11 +124,19 @@ export default function HomePage() {
       }),
     });
     const created = await res.json().catch(() => null);
+    setCreating(false);
+    // A free account at its deck limit gets a 403 with the reason. This used to
+    // clear the form, close the modal and silently reload, so hitting the cap
+    // looked like the button simply not working — the one moment the plan most
+    // needs to explain itself.
+    if (!res.ok || !created?.publicId) {
+      setCreateError(created?.error || "Couldn't create that deck. Try again.");
+      return;
+    }
     setForm({ name: "", format: "commander", commander: "" });
     setShowModal(false);
-    setCreating(false);
-    if (created?.publicId) router.push(`/deck/${created.publicId}`);
-    else loadAll();
+    setCreateError("");
+    router.push(`/deck/${created.publicId}`);
   }
 
   async function deleteDeck(id: string) {
@@ -123,8 +145,48 @@ export default function HomePage() {
     loadAll();
   }
 
+  /// The free plan's two counters, side by side: decks held against the cap,
+  /// and AI asks left today. Rendered only for a free account — pro has no
+  /// numbers worth watching, which is what the PRO badge says instead.
+  ///
+  /// `deckLimit` and `aiRemaining` are null on pro and absent on an old
+  /// payload, so both halves are independently optional rather than assumed.
+  const planMeter = (() => {
+    if (!me) return null;
+    const parts: string[] = [];
+    if (typeof me.deckLimit === "number") parts.push(`${decks.length}/${me.deckLimit} decks`);
+    if (typeof me.aiRemaining === "number") parts.push(`${me.aiRemaining} AI left`);
+    if (parts.length === 0) return null;
+    const spent = typeof me.deckLimit === "number" && decks.length >= me.deckLimit;
+    return (
+      <span
+        title="Free plan. Spellpool Pro in the iOS app lifts both limits."
+        style={{
+          fontSize: 11.5,
+          fontWeight: 600,
+          letterSpacing: "0.02em",
+          color: spent ? "var(--danger)" : "var(--t3)",
+          border: "1px solid var(--line)",
+          padding: "3px 9px",
+          borderRadius: 999,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {parts.join(" · ")}
+      </span>
+    );
+  })();
+
   async function duplicateDeck(id: string) {
     const res = await fetch(`/api/decks/${id}/duplicate`, { method: "POST" });
+    // Duplicating is the other way past the deck cap, and it answered a 403 by
+    // doing nothing at all. Its own notice rather than the new-deck modal's —
+    // opening "Begin a new deck" to explain a failed duplicate is a non sequitur.
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      setListError(body?.error || "Couldn't duplicate that deck.");
+      return;
+    }
     if (res.ok) {
       const copy = await res.json();
       if (copy?.publicId) router.push(`/deck/${copy.publicId}`);
@@ -168,10 +230,16 @@ export default function HomePage() {
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             {me ? (
               <>
-                {me.tier === "pro" && (
+                {me.tier === "pro" ? (
                   <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.14em", color: "var(--accent-ink)", background: "var(--gold)", padding: "3px 8px", borderRadius: 999 }}>
                     PRO
                   </span>
+                ) : (
+                  // What the free plan has left, which the web never showed —
+                  // so a player met both caps as a refusal rather than as a
+                  // number they had been watching go down. iOS puts the same
+                  // two figures in Account and beside the assistant's input.
+                  planMeter
                 )}
                 <span title={me.email} style={{ fontSize: 13, color: "var(--t3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {me.email}
@@ -233,6 +301,15 @@ export default function HomePage() {
             <div>
               <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Your decks</div>
               <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,52px)", margin: 0, color: "var(--t1)" }}>Pick up where you left off.</h2>
+              {listError && (
+                <div
+                  role="status"
+                  onClick={() => setListError("")}
+                  style={{ marginTop: 12, fontSize: 13.5, color: "var(--danger)", lineHeight: 1.45, cursor: "pointer", maxWidth: 520 }}
+                >
+                  {listError}
+                </div>
+              )}
             </div>
             <div style={{ display: "flex", gap: 28, paddingBottom: 4 }}>
               <CStat n={decks.length} label="Decks" />
@@ -339,8 +416,13 @@ export default function HomePage() {
               {form.format === "commander" && (
                 <CommanderInput placeholder="Commander (optional)" value={form.commander} onChange={(v) => setForm({ ...form, commander: v })} style={modalInput} />
               )}
+              {createError && (
+                <div style={{ fontSize: 13.5, color: "var(--danger)", lineHeight: 1.45, marginTop: 2 }}>
+                  {createError}
+                </div>
+              )}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>
-                <button type="button" onClick={() => setShowModal(false)} className="mn-ghost" style={{ padding: "10px 20px", fontSize: 14 }}>
+                <button type="button" onClick={() => { setShowModal(false); setCreateError(""); }} className="mn-ghost" style={{ padding: "10px 20px", fontSize: 14 }}>
                   Cancel
                 </button>
                 <button type="submit" disabled={creating} className="mn-btn" style={{ padding: "10px 24px", fontSize: 14 }}>
