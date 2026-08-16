@@ -12,6 +12,7 @@ import HandSimModal from "@/components/deck/HandSimModal";
 import GameCodeModal from "@/components/deck/GameCodeModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
 import DeckPrimer from "@/components/deck/DeckPrimer";
+import DeckInsight from "@/components/deck/DeckInsight";
 import OrderModal from "@/components/deck/OrderModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, dangerBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
@@ -959,6 +960,21 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </div>
             </div>
           </div>
+
+          {/* DECK INSIGHT — bracket · CRISPI · 8x8, the iOS Stats tab's readings */}
+          {statsOnDeck && (
+            <DeckInsight
+              deckId={id}
+              cards={pool.map((c) => ({
+                name: c.name,
+                typeLine: c.typeLine ?? null,
+                role: c.role ?? null,
+                quantity: c.quantity,
+                board: c.board,
+              }))}
+              avgManaValue={stats.avgMv}
+            />
+          )}
 
           {/* STAT STRIP — mana curve · composition · color identity */}
           {statsOnDeck && (
