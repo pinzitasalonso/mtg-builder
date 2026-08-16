@@ -23,6 +23,21 @@ import {
 } from "@/lib/deck-insight";
 import type { ComboResult } from "@/lib/combos";
 
+interface GameRow {
+  id: number;
+  won: boolean;
+  opponents: string[];
+  note: string | null;
+  isManual: boolean;
+  playedAt: string;
+}
+
+interface History {
+  pro: boolean;
+  owns: boolean;
+  games: GameRow[];
+}
+
 interface Crispi {
   consistency: number;
   resilience: number;
@@ -48,6 +63,7 @@ export default function DeckInsight({
   const [gameChangers, setGameChangers] = useState<Set<string> | null>(null);
   const [crispi, setCrispi] = useState<Crispi | null>(null);
   const [combos, setCombos] = useState<ComboResult | null>(null);
+  const [history, setHistory] = useState<History | null>(null);
   const [openBucket, setOpenBucket] = useState<string | null>(null);
   const [showCombos, setShowCombos] = useState(false);
 
@@ -88,6 +104,19 @@ export default function DeckInsight({
       .then((r) => (r.ok ? r.json() : null))
       .then((b) => live && setCombos(b))
       .catch(() => live && setCombos(null));
+    return () => {
+      live = false;
+    };
+  }, [deckId, deckCount]);
+
+  useEffect(() => {
+    let live = true;
+    // Answers with an empty list for a free or non-owning viewer rather than a
+    // 403, so there is nothing to distinguish here — no games is no section.
+    fetch(`/api/decks/${deckId}/games`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => live && setHistory(b))
+      .catch(() => live && setHistory(null));
     return () => {
       live = false;
     };
@@ -187,6 +216,40 @@ export default function DeckInsight({
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {history && history.games.length > 0 && (
+        <div style={{ marginBottom: 22 }}>
+          <div className="id-label" style={{ ...label, marginBottom: 10 }}>
+            Game history · {history.games.length}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {history.games.slice(0, 12).map((g) => (
+              <div
+                key={g.id}
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 10,
+                  padding: "7px 0",
+                  borderTop: "1px solid var(--w-line)",
+                  fontSize: 13,
+                }}
+              >
+                <span style={{ color: g.won ? "var(--gold)" : "var(--w-3)", fontWeight: 600, minWidth: 34 }}>
+                  {g.won ? "Won" : "Lost"}
+                </span>
+                <span style={{ color: "var(--w-2)", flex: 1, minWidth: 0 }}>
+                  {g.opponents.length ? g.opponents.join(" · ") : "—"}
+                </span>
+                {g.isManual && <span style={{ fontSize: 11, color: "var(--w-3)" }}>typed in</span>}
+                <span style={{ fontSize: 11.5, color: "var(--w-3)", fontFamily: "var(--font-mono)" }}>
+                  {new Date(g.playedAt).toLocaleDateString()}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
