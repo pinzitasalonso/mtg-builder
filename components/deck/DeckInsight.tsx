@@ -21,6 +21,7 @@ import {
   suggestedBracket,
   type InsightCard,
 } from "@/lib/deck-insight";
+import type { ComboResult } from "@/lib/combos";
 
 interface Crispi {
   consistency: number;
@@ -46,7 +47,14 @@ export default function DeckInsight({
 }) {
   const [gameChangers, setGameChangers] = useState<Set<string> | null>(null);
   const [crispi, setCrispi] = useState<Crispi | null>(null);
+  const [combos, setCombos] = useState<ComboResult | null>(null);
   const [openBucket, setOpenBucket] = useState<string | null>(null);
+  const [showCombos, setShowCombos] = useState(false);
+
+  // Both server readings are scored from the server's own copy of the deck, so
+  // they follow a sync rather than a keystroke. The decklist's size is the
+  // cheapest signal that one has happened.
+  const deckCount = cards.filter((c) => c.board === "deck").length;
 
   useEffect(() => {
     let live = true;
@@ -72,14 +80,28 @@ export default function DeckInsight({
     };
     // Re-scored when the decklist's size changes — the server reads its own
     // copy, so this follows a sync rather than a keystroke.
-  }, [deckId, cards.filter((c) => c.board === "deck").length]);
+  }, [deckId, deckCount]);
+
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/decks/${deckId}/combos`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => live && setCombos(b))
+      .catch(() => live && setCombos(null));
+    return () => {
+      live = false;
+    };
+  }, [deckId, deckCount]);
 
   const buckets = useMemo(() => cubeBuckets(cards), [cards]);
   const changers = useMemo(
     () => (gameChangers ? countGameChangers(cards, gameChangers) : 0),
     [cards, gameChangers]
   );
-  const bracket = suggestedBracket(changers);
+  // The two-card combo feeds the bracket as well as the list. A deck with one
+  // cannot be bracket 1 or 2 however few Game Changers it runs, which is why
+  // iOS passes the same flag in.
+  const bracket = suggestedBracket(changers, combos?.hasTwoCardCombo ?? false);
 
   const label = { color: "var(--w-3)" } as const;
   const figure = { fontFamily: "var(--font-mono)", color: "var(--w-1)" } as const;
@@ -90,7 +112,9 @@ export default function DeckInsight({
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: "22px 36px", marginBottom: 22 }}>
         <Stat label="Bracket" value={`${BRACKET_NUMBER[bracket]} · ${BRACKET_LABEL[bracket]}`}
-              note={gameChangers === null ? "counting…" : `${changers} game changer${changers === 1 ? "" : "s"}`} />
+              note={gameChangers === null
+                ? "counting…"
+                : `${changers} game changer${changers === 1 ? "" : "s"}${combos?.hasTwoCardCombo ? " · two-card combo" : ""}`} />
         <Stat label="Avg. mana value" value={avgManaValue.toFixed(1)} />
         {crispi && (
           <Stat
@@ -110,6 +134,59 @@ export default function DeckInsight({
           inputs aren&apos;t computed yet
           {crispi.notes?.stubbed?.length ? ` (${crispi.notes.stubbed.length} stubbed)` : ""}. Treat it as
           a rough shape, not a rating.
+        </div>
+      )}
+
+      {combos && combos.combos.length > 0 && (
+        // A line rather than the list, the way the iOS deck page carries it:
+        // combos are reference material you consult when a game goes long, not
+        // something to read on the way past.
+        <div style={{ marginBottom: 22 }}>
+          <button
+            onClick={() => setShowCombos((v) => !v)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "9px 14px",
+              background: "none",
+              border: "1px solid var(--w-line)",
+              borderRadius: 999,
+              cursor: "pointer",
+              color: "var(--w-1)",
+              font: "inherit",
+              fontSize: 13,
+            }}
+          >
+            🔗 {combos.combos.length} combo{combos.combos.length === 1 ? "" : "s"}
+            <span style={{ color: "var(--w-3)", fontSize: 11.5 }}>{showCombos ? "hide" : "show"}</span>
+          </button>
+          {showCombos && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 14, maxWidth: 720 }}>
+              {combos.combos.map((c) => (
+                <div key={c.id}>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--w-1)" }}>
+                    {c.pieces.join("  +  ")}
+                  </div>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 3 }}>
+                    {c.produces.length > 0 && (
+                      <span style={{ fontSize: 12, color: "var(--gold)" }}>{c.produces.join(" · ")}</span>
+                    )}
+                    {c.manaNeeded && (
+                      <span style={{ fontSize: 11.5, fontFamily: "var(--font-mono)", color: "var(--w-3)" }}>
+                        {c.manaNeeded}
+                      </span>
+                    )}
+                  </div>
+                  {c.steps && (
+                    <div style={{ fontSize: 12.5, color: "var(--w-2)", lineHeight: 1.5, marginTop: 5, whiteSpace: "pre-line" }}>
+                      {c.steps}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
