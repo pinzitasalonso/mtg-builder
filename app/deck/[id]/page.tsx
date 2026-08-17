@@ -25,6 +25,7 @@ import { fetchCollection } from "@/lib/collection-client";
 import { track } from "@/lib/track";
 import {
   CardArt,
+  commanderArtName,
   ManaCost,
   ColorPips,
   ClassicCard,
@@ -941,7 +942,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   {(deck?.commander || deck?.name) && (
                     <CardArt
                       key={deck?.commander || deck?.name}
-                      name={deck?.commander || deck?.name || ""}
+                      name={commanderArtName(deck?.commander)}
+                      label={deck?.name}
                       colors={identityPips.length ? identityPips : ["C"]}
                       version="normal"
                       radius={16}

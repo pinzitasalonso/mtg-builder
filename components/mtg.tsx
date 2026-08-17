@@ -166,6 +166,26 @@ export function ColorPips({ colors, size = 16 }: { colors: string[]; size?: numb
   );
 }
 
+/**
+ * The card name to fetch art for, given a deck's stored commander.
+ *
+ * TWO THINGS THIS EXISTS TO STOP, both of which asked Scryfall for a card that
+ * does not exist and got a 404 in the console for it:
+ *
+ *   A PARTNER PAIR is stored as "A + B" — one field, the form iOS writes and
+ *   the web now produces too. Asked for whole, Scryfall has never heard of it,
+ *   so a RogSi deck lost the art it should have had. The first commander's art
+ *   is the deck's face, which is what the app shows.
+ *
+ *   NO COMMANDER AT ALL. Call sites fell back to the deck's NAME, so a Standard
+ *   deck called "Jeskai Control" was looked up as a card. There is no art to
+ *   find; the placeholder is the right answer and needs no request.
+ */
+export function commanderArtName(commander?: string | null): string | undefined {
+  const first = (commander ?? "").split("+")[0].trim();
+  return first || undefined;
+}
+
 /* ---------- card art (prefer stored image; fall back to Scryfall art-crop) ---------- */
 function artURL(name: string, version: string) {
   return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=${version}`;
@@ -173,6 +193,7 @@ function artURL(name: string, version: string) {
 
 export function CardArt({
   name,
+  label: labelText,
   src,
   colors = ["C"],
   version = "art_crop",
@@ -181,7 +202,12 @@ export function CardArt({
   loading,
   style,
 }: {
+  /** A REAL card name. Anything else is a guaranteed 404 — see commanderArtName. */
   name?: string;
+  /** What the placeholder spells when there is no art. Defaults to `name`,
+      so a deck with no commander can still show its own initials without the
+      deck's name being mistaken for a card. */
+  label?: string;
   src?: string;
   colors?: string[];
   version?: string;
@@ -201,7 +227,7 @@ export function CardArt({
   const [loaded, setLoaded] = useState(false);
   const url = stage === "art" && name ? artURL(name, version) : stage === "src" ? src : null;
   const m = MANA[colors[0]] || MANA.C;
-  const label = (name || "—").slice(0, 2);
+  const label = (labelText || name || "—").slice(0, 2);
 
   return (
     <div style={{ position: "relative", overflow: "hidden", borderRadius: radius, ...style }}>
