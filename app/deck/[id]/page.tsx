@@ -775,7 +775,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     const ws = cardWarnings(c, deck?.format, cmdrIdentity);
     return ws.length ? ws.map((w) => w.message).join(" · ") : undefined;
   };
-  const warningCount = pool.reduce((n, c) => n + (warningOf(c) ? 1 : 0), 0);
+  // Counted over the DECK board, not the whole pool. The banner this feeds
+  // sits on the deck pane and says "hover the warning on a card" — counting
+  // pool candidates too sent you looking for cards that aren't on that pane.
+  // A card you are only considering is not a legality problem yet.
+  const deckWarningCount = deckCards.reduce((n, c) => n + (warningOf(c) ? 1 : 0), 0);
 
 
   const groupedFor = (cards: PoolCard[]) =>
@@ -1372,9 +1376,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               )}
             </div>
           </div>
-          {warningCount > 0 && (
+          {deckWarningCount > 0 && (
             <div style={{ fontSize: 12.5, color: "var(--gold)", marginBottom: 12 }}>
-              ⚠ {warningCount} card{warningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ on a card.
+              ⚠ {deckWarningCount} card{deckWarningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ on a card.
             </div>
           )}
 
