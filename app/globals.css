@@ -531,8 +531,15 @@ button {
 }
 
 @media (min-width: 1024px) {
-  .deck-mobile-tabs {
+  /* The switcher STAYS on desktop — Stats is a real pane at every width, and
+     hiding the bar was the only thing keeping desktop from having one.
+     Pool goes, because pool and deck sit side by side up here, so the two
+     buttons would show the same view. */
+  .deck-mobile-tabs button[data-tab="pool"] {
     display: none;
+  }
+  .deck-mobile-tabs {
+    max-width: 420px;
   }
   .deck-layout {
     grid-template-columns: 1fr 340px;
