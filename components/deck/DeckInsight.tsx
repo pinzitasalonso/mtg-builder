@@ -1,7 +1,15 @@
 "use client";
 
-// The three readings the iOS Stats tab shows that the web had no answer for:
-// the bracket, the CRISPI performance index, and 8x8 counting.
+// The Stats pane's readings, in the pieces the pane arranges them in.
+//
+// This file used to export ONE <DeckInsight> block that rendered the bracket,
+// the combos, the game history and the 8x8 back to back. The pane needs them
+// apart. iOS reads top to bottom as "what the deck IS, how it PLAYS, what it's
+// MADE of" — so the profile leads, the combos and the record belong beside the
+// primer under "how it plays", and the 8x8 goes last because it is the densest
+// thing on the pane. One block could not be interleaved with the primer, the
+// notes and the shape strip that sit between those readings, so the fetching is
+// a hook and each reading is its own component.
 //
 // Bracket and 8x8 are computed here from cards the page already holds, exactly
 // as iOS computes them locally — see lib/deck-insight. CRISPI is scored on the
@@ -12,7 +20,7 @@
 // verdict unless it is told not to, and this one is derived from oracle-text
 // pattern matching with three of its inputs not computed at all.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   BRACKET_LABEL,
   BRACKET_NUMBER,
@@ -84,21 +92,30 @@ function axesNote(c: Crispi): string | null {
   return parts.length ? parts.join(" · ") : null;
 }
 
-export default function DeckInsight({
-  deckId,
-  cards,
-  avgManaValue,
-}: {
-  deckId: string;
-  cards: InsightCard[];
-  avgManaValue: number;
-}) {
+export interface DeckInsightData {
+  bracket: ReturnType<typeof suggestedBracket>;
+  /** null while the Game Changer list is still loading. */
+  changers: number | null;
+  crispi: Crispi | null;
+  crispiValue: string | null;
+  combos: ComboResult | null;
+  history: History | null;
+  buckets: ReturnType<typeof cubeBuckets>;
+  /** Whether "how it plays" has anything beyond the primer and the notes. */
+  hasPlayReadings: boolean;
+}
+
+/**
+ * Every reading the Stats pane needs, fetched once.
+ *
+ * Called from the pane rather than the page, so a deck opened on its decklist
+ * never fires these four requests at all.
+ */
+export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsightData {
   const [gameChangers, setGameChangers] = useState<Set<string> | null>(null);
   const [crispi, setCrispi] = useState<Crispi | null>(null);
   const [combos, setCombos] = useState<ComboResult | null>(null);
   const [history, setHistory] = useState<History | null>(null);
-  const [openBucket, setOpenBucket] = useState<string | null>(null);
-  const [showCombos, setShowCombos] = useState(false);
 
   // Both server readings are scored from the server's own copy of the deck, so
   // they follow a sync rather than a keystroke. The decklist's size is the
@@ -157,143 +174,236 @@ export default function DeckInsight({
 
   const buckets = useMemo(() => cubeBuckets(cards), [cards]);
   const changers = useMemo(
-    () => (gameChangers ? countGameChangers(cards, gameChangers) : 0),
+    () => (gameChangers ? countGameChangers(cards, gameChangers) : null),
     [cards, gameChangers]
   );
   // The two-card combo feeds the bracket as well as the list. A deck with one
   // cannot be bracket 1 or 2 however few Game Changers it runs, which is why
   // iOS passes the same flag in.
-  const bracket = suggestedBracket(changers, combos?.hasTwoCardCombo ?? false);
+  const bracket = suggestedBracket(changers ?? 0, combos?.hasTwoCardCombo ?? false);
   // The server's own rounding first, our own only as a fallback, and nothing
   // at all if neither is a number the panel can print.
   const crispiValue = crispi ? (crispi.display ?? trim(crispi.crispi)) : null;
 
-  const label = { color: "var(--w-3)" } as const;
-  const figure = { fontFamily: "var(--font-mono)", color: "var(--w-1)" } as const;
+  return {
+    bracket,
+    changers,
+    crispi,
+    crispiValue,
+    combos,
+    history,
+    buckets,
+    hasPlayReadings: Boolean(combos?.combos.length) || Boolean(history?.games.length),
+  };
+}
+
+/**
+ * A labelled block: a kerned eyebrow with a gold hairline running off it, the
+ * same chrome the iOS Stats pane gives every section.
+ */
+export function StatSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section style={{ marginBottom: 34 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <span className="id-label" style={{ color: "var(--w-2)", whiteSpace: "nowrap" }}>{title}</span>
+        {/* Gold fading to nothing. Plain `var(--gold)` at half opacity rather
+            than a color-mix() — lightningcss mangles those, and there is no
+            reason to find out whether an inline style escapes it. */}
+        <span
+          aria-hidden
+          style={{ flex: 1, height: 1, opacity: 0.5, background: "linear-gradient(to right, var(--gold), transparent)" }}
+        />
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** Label left, figure right, the reasoning under the figure. iOS `profileRow`. */
+function ProfileRow({ label, value, detail }: { label: string; value: string; detail?: string | null }) {
+  return (
+    <div style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "9px 0", borderTop: "1px solid var(--w-line)" }}>
+      <span style={{ fontSize: 13.5, color: "var(--w-2)" }}>{label}</span>
+      <span style={{ flex: 1 }} />
+      <span style={{ textAlign: "right" }}>
+        <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "var(--w-1)" }}>{value}</span>
+        {detail && <span style={{ display: "block", fontSize: 11.5, color: "var(--w-3)", marginTop: 2 }}>{detail}</span>}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * The verdict: bracket, average cost, CRISPI. One glance, the numbers that
+ * judge the deck.
+ */
+export function InsightProfile({
+  insight,
+  avgManaValue,
+}: {
+  insight: DeckInsightData;
+  avgManaValue: number;
+}) {
+  const { bracket, changers, crispi, crispiValue, combos } = insight;
+  // Nil at zero, deliberately — iOS `gameChangerDetail`. `changers` is also
+  // null before the list has loaded, and "from 0 game changers" would be
+  // claiming a measurement we have not taken.
+  const bracketDetail =
+    changers === null
+      ? "counting…"
+      : [
+          changers > 0 ? `${changers} game changer${changers === 1 ? "" : "s"}` : null,
+          combos?.hasTwoCardCombo ? "two-card combo" : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || null;
 
   return (
-    <div style={{ padding: "24px 0", borderBottom: "1px solid var(--w-line)" }}>
-      <div className="id-label" style={{ ...label, marginBottom: 16 }}>Deck insight</div>
-
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "22px 36px", marginBottom: 22 }}>
-        <Stat label="Bracket" value={`${BRACKET_NUMBER[bracket]} · ${BRACKET_LABEL[bracket]}`}
-              note={gameChangers === null
-                ? "counting…"
-                : `${changers} game changer${changers === 1 ? "" : "s"}${combos?.hasTwoCardCombo ? " · two-card combo" : ""}`} />
-        {Number.isFinite(avgManaValue) && (
-          <Stat label="Avg. mana value" value={avgManaValue.toFixed(1)} />
-        )}
-        {crispiValue && (
-          <Stat label="CRISPI" value={crispiValue} note={crispi ? axesNote(crispi) ?? undefined : undefined} />
-        )}
-      </div>
-
+    <div style={{ maxWidth: 560 }}>
+      <ProfileRow label="Bracket" value={`${BRACKET_NUMBER[bracket]} · ${BRACKET_LABEL[bracket]}`} detail={bracketDetail} />
+      {Number.isFinite(avgManaValue) && <ProfileRow label="Average cost" value={avgManaValue.toFixed(2)} />}
+      {crispiValue && <ProfileRow label="CRISPI" value={crispiValue} detail={crispi ? axesNote(crispi) : null} />}
       {crispi?.provisional && (
         // The server says the score is provisional and why. Rendering the
         // number without this would present a pattern-matched estimate as a
         // measurement.
-        <div style={{ fontSize: 12, color: "var(--w-3)", lineHeight: 1.5, marginBottom: 22, maxWidth: 620 }}>
+        <p style={{ fontSize: 12, color: "var(--w-3)", lineHeight: 1.5, margin: "12px 0 0" }}>
           CRISPI is provisional — it reads card roles from oracle text, and some of the rubric&apos;s
           inputs aren&apos;t computed yet
           {crispi.notes?.stubbed?.length ? ` (${crispi.notes.stubbed.length} stubbed)` : ""}. Treat it as
           a rough shape, not a rating.
-        </div>
+        </p>
       )}
+    </div>
+  );
+}
 
-      {combos && combos.combos.length > 0 && (
-        // A line rather than the list, the way the iOS deck page carries it:
-        // combos are reference material you consult when a game goes long, not
-        // something to read on the way past.
-        <div style={{ marginBottom: 22 }}>
-          <button
-            onClick={() => setShowCombos((v) => !v)}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "9px 14px",
-              background: "none",
-              border: "1px solid var(--w-line)",
-              borderRadius: 999,
-              cursor: "pointer",
-              color: "var(--w-1)",
-              font: "inherit",
-              fontSize: 13,
-            }}
-          >
-            🔗 {combos.combos.length} combo{combos.combos.length === 1 ? "" : "s"}
-            <span style={{ color: "var(--w-3)", fontSize: 11.5 }}>{showCombos ? "hide" : "show"}</span>
-          </button>
-          {showCombos && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 14, maxWidth: 720 }}>
-              {combos.combos.map((c) => (
-                <div key={c.id}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--w-1)" }}>
-                    {c.pieces.join("  +  ")}
-                  </div>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 3 }}>
-                    {c.produces.length > 0 && (
-                      <span style={{ fontSize: 12, color: "var(--gold)" }}>{c.produces.join(" · ")}</span>
-                    )}
-                    {c.manaNeeded && (
-                      <span style={{ fontSize: 11.5, fontFamily: "var(--font-mono)", color: "var(--w-3)" }}>
-                        {c.manaNeeded}
-                      </span>
-                    )}
-                  </div>
-                  {c.steps && (
-                    <div style={{ fontSize: 12.5, color: "var(--w-2)", lineHeight: 1.5, marginTop: 5, whiteSpace: "pre-line" }}>
-                      {c.steps}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+/**
+ * The combos and the game record — the two readings that belong with the
+ * primer rather than with the figures.
+ *
+ * Combos stay collapsed by default, the way the iOS deck page carries them:
+ * reference material you consult when a game goes long, not something to read
+ * on the way past.
+ */
+export function InsightPlay({ insight }: { insight: DeckInsightData }) {
+  const [showCombos, setShowCombos] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const { combos, history } = insight;
+  const comboCount = combos?.combos.length ?? 0;
+  const games = history?.games ?? [];
+  if (comboCount === 0 && games.length === 0) return null;
 
-      {history && history.games.length > 0 && (
-        <div style={{ marginBottom: 22 }}>
-          <div className="id-label" style={{ ...label, marginBottom: 10 }}>
-            Game history · {history.games.length}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {history.games.slice(0, 12).map((g) => (
-              <div
-                key={g.id}
-                style={{
-                  display: "flex",
-                  alignItems: "baseline",
-                  gap: 10,
-                  padding: "7px 0",
-                  borderTop: "1px solid var(--w-line)",
-                  fontSize: 13,
-                }}
-              >
-                <span style={{ color: g.won ? "var(--gold)" : "var(--w-3)", fontWeight: 600, minWidth: 34 }}>
-                  {g.won ? "Won" : "Lost"}
-                </span>
-                <span style={{ color: "var(--w-2)", flex: 1, minWidth: 0 }}>
-                  {g.opponents.length ? g.opponents.join(" · ") : "—"}
-                </span>
-                {g.isManual && <span style={{ fontSize: 11, color: "var(--w-3)" }}>typed in</span>}
-                <span style={{ fontSize: 11.5, color: "var(--w-3)", fontFamily: "var(--font-mono)" }}>
-                  {new Date(g.playedAt).toLocaleDateString()}
-                </span>
+  const won = games.filter((g) => g.won).length;
+
+  return (
+    <div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        {comboCount > 0 && (
+          <Pill on={showCombos} onClick={() => setShowCombos((v) => !v)}>
+            🔗 {comboCount} combo{comboCount === 1 ? "" : "s"}
+          </Pill>
+        )}
+        {games.length > 0 && (
+          <Pill on={showHistory} onClick={() => setShowHistory((v) => !v)}>
+            ▤ Record {won}/{games.length}
+          </Pill>
+        )}
+      </div>
+
+      {showCombos && comboCount > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16, maxWidth: 720 }}>
+          {combos!.combos.map((c) => (
+            <div key={c.id}>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--w-1)" }}>{c.pieces.join("  +  ")}</div>
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 3 }}>
+                {c.produces.length > 0 && (
+                  <span style={{ fontSize: 12, color: "var(--gold)" }}>{c.produces.join(" · ")}</span>
+                )}
+                {c.manaNeeded && (
+                  <span style={{ fontSize: 11.5, fontFamily: "var(--font-mono)", color: "var(--w-3)" }}>
+                    {c.manaNeeded}
+                  </span>
+                )}
               </div>
-            ))}
-          </div>
+              {c.steps && (
+                <div style={{ fontSize: 12.5, color: "var(--w-2)", lineHeight: 1.5, marginTop: 5, whiteSpace: "pre-line" }}>
+                  {c.steps}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
-      <div className="id-label" style={{ ...label, marginBottom: 4 }}>8×8 counting</div>
-      <div style={{ fontSize: 12, color: "var(--w-3)", lineHeight: 1.5, marginBottom: 14, maxWidth: 620 }}>
+      {showHistory && games.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", marginTop: 16, maxWidth: 720 }}>
+          {games.slice(0, 12).map((g) => (
+            <div
+              key={g.id}
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 10,
+                padding: "7px 0",
+                borderTop: "1px solid var(--w-line)",
+                fontSize: 13,
+              }}
+            >
+              <span style={{ color: g.won ? "var(--gold)" : "var(--w-3)", fontWeight: 600, minWidth: 34 }}>
+                {g.won ? "Won" : "Lost"}
+              </span>
+              <span style={{ color: "var(--w-2)", flex: 1, minWidth: 0 }}>
+                {g.opponents.length ? g.opponents.join(" · ") : "—"}
+              </span>
+              {g.isManual && <span style={{ fontSize: 11, color: "var(--w-3)" }}>typed in</span>}
+              <span style={{ fontSize: 11.5, color: "var(--w-3)", fontFamily: "var(--font-mono)" }}>
+                {new Date(g.playedAt).toLocaleDateString()}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-expanded={on}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "9px 14px",
+        background: on ? "var(--w-fill)" : "none",
+        border: "1px solid var(--w-line)",
+        borderRadius: 999,
+        cursor: "pointer",
+        color: "var(--w-1)",
+        font: "inherit",
+        fontSize: 13,
+      }}
+    >
+      {children}
+      <span style={{ color: "var(--w-3)", fontSize: 11.5 }}>{on ? "hide" : "show"}</span>
+    </button>
+  );
+}
+
+/** Eight categories of eight plus thirty-five lands, each row openable. */
+export function InsightEightByEight({ insight }: { insight: DeckInsightData }) {
+  const [openBucket, setOpenBucket] = useState<string | null>(null);
+  return (
+    <div>
+      <p style={{ fontSize: 12, color: "var(--w-3)", lineHeight: 1.5, margin: "0 0 14px", maxWidth: 620 }}>
         Eight categories of eight, plus thirty-five lands. A starting shape rather than a rule — one
         category at six and another at nine is fine.
-      </div>
+      </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {buckets.map((b) => {
+        {insight.buckets.map((b) => {
           const open = openBucket === b.id;
           return (
             <div key={b.id}>
@@ -315,7 +425,7 @@ export default function DeckInsight({
                 }}
               >
                 <span style={{ fontSize: 13.5, color: "var(--w-1)", minWidth: 130 }}>{b.label}</span>
-                <span style={{ ...figure, fontSize: 13.5 }}>{b.count}</span>
+                <span style={{ fontFamily: "var(--font-mono)", color: "var(--w-1)", fontSize: 13.5 }}>{b.count}</span>
                 <span style={{ fontSize: 12, color: "var(--w-3)" }}>
                   of {b.target}
                   {b.hint ? ` · ${b.hint}` : ""}
@@ -338,16 +448,6 @@ export default function DeckInsight({
           );
         })}
       </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
-  return (
-    <div style={{ minWidth: 130 }}>
-      <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 6 }}>{label}</div>
-      <div className="id-display" style={{ fontSize: 22, color: "var(--w-1)", lineHeight: 1.05 }}>{value}</div>
-      {note && <div style={{ fontSize: 11.5, color: "var(--w-3)", marginTop: 4 }}>{note}</div>}
     </div>
   );
 }
