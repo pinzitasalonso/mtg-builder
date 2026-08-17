@@ -480,54 +480,149 @@ button {
    that governs the pane below it. Sticky so it stays reachable once you are
    deep in a decklist. It was a mobile-only pool/deck toggle before; the panes
    are real at every width now, so nothing here is width-conditional. */
+/* Tabs, not pills. Three buttons riding a hairline, the active one carrying
+   an accent underline that sits ON that hairline.
+
+   No background and not sticky. It was both: a sticky bar needs a ground to
+   stop the decklist scrolling through it, and the page ground here is a
+   gradient, so any solid band read as a patch of the wrong colour laid over
+   the page. Losing the sticky is what lets the whole thing go transparent. */
 .deck-panes {
-  position: sticky;
-  top: 60px;
-  z-index: 15;
-  padding: 10px 0 12px;
-  margin-top: 20px;
-  margin-bottom: 4px;
-  /* The sticky bar rides over the pane's own panels, so it needs a ground of
-     its own — transparent left the decklist showing through it. It spans the
-     full content column and fades out at the bottom: the page ground is a
-     GRADIENT, so a band only as wide as the buttons reads as a patch of the
-     wrong colour sitting on the page rather than as a bar. */
-  background: linear-gradient(to bottom, var(--bg) 66%, transparent);
+  margin: 22px 0 20px;
+  border-bottom: 1px solid var(--line);
 }
 .deck-panes-row {
   display: flex;
-  gap: 6px;
-  max-width: 520px;
+  gap: 4px;
 }
 .deck-panes-row button {
-  flex: 1;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  padding: 11px 14px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  padding: 11px 4px 12px;
+  margin-right: 22px;
+  border: none;
+  /* Overlaps the strip's hairline so the active underline replaces it rather
+     than stacking a second rule under it. */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  border-radius: 0;
   cursor: pointer;
-  background: var(--bg3);
+  background: none;
   color: var(--text-muted);
   font-family: var(--font-ui);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  transition: background 0.14s, color 0.14s;
+  letter-spacing: 0.08em;
+  transition: color 0.14s, border-color 0.14s;
+}
+.deck-panes-row button:hover {
+  color: var(--text);
 }
 .deck-panes-row button.is-active {
-  background: var(--accent);
-  color: var(--accent-ink);
-  border-color: transparent;
+  color: var(--text);
+  border-bottom-color: var(--accent);
 }
 .deck-panes-row button span {
   font-family: var(--font-mono, monospace);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
-  opacity: 0.85;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg3);
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+.deck-panes-row button.is-active span {
+  color: var(--text);
+}
+
+/* Hero actions — the Add cards / Ask the AI pair, the two tiles the iOS deck
+   page leads every pane with. Matched height: the icon well is 40px and both
+   tiles pad it by 13, so they sit level rather than reading as a hierarchy. */
+.deck-actions {
+  display: flex;
+  gap: 10px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+.deck-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px 13px 13px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg3);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-ui);
+  box-shadow: 0 12px 26px -14px rgba(0, 0, 0, 0.6);
+  transition: border-color 0.14s, transform 0.14s, background 0.14s;
+}
+.deck-action:hover {
+  border-color: var(--text-muted);
+  transform: translateY(-1px);
+}
+/* Ask the AI takes every point Add cards does not — without this the row's
+   width rests on the text wrapping, and the pair clusters to one side. */
+.deck-action-ai {
+  flex: 1;
+  min-width: 260px;
+}
+.deck-action-add {
+  flex: none;
+}
+.deck-action-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+}
+.deck-action-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.deck-action-text b {
+  font-size: 14.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.deck-action-text i {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.deck-action-chev {
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+}
+/* On a phone the pair stacks; Add cards keeps its label rather than becoming a
+   bare + floating on a full-width tile. */
+@media (max-width: 560px) {
+  .deck-action {
+    width: 100%;
+  }
 }
 
 @media (min-width: 1024px) {
