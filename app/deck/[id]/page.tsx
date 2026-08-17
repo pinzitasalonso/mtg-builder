@@ -254,7 +254,13 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   // On mobile the pool and deck stack; this toggles which one is shown so you
   // don't have to scroll the whole pool to reach the deck. Ignored ≥1024px.
-  const [mobileView, setMobileView] = useState<"pool" | "deck">("pool");
+  /// Which pane the deck page shows. Named `mobileView` because Pool-vs-Deck
+  /// started as a mobile-only switch and the CSS still keys off
+  /// `data-mobile-view`; "stats" is not mobile-only — the stats blocks used to
+  /// sit above the decklist at every width, so half a screen of numbers came
+  /// before the cards you opened the page to see.
+  const [mobileView, setMobileView] = useState<"pool" | "deck" | "stats">("pool");
+  const showingStats = mobileView === "stats";
 
   // Hovering a mana-curve bar or a type dot filters the decklist below to that
   // selection. null = no filter (show the whole deck).
@@ -963,6 +969,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
 
+          {/* ── STATS PANE ── everything ABOUT the deck: the insight readings,
+              the shape blocks, the primer and the notes. Behind a tab now,
+              because at every width it pushed the decklist half a screen down
+              and none of it is what you open a deck to look at. Mirrors the
+              iOS deck page's third tab. */}
+          {showingStats && (<>
           {/* DECK INSIGHT — bracket · CRISPI · 8x8, the iOS Stats tab's readings */}
           {statsOnDeck && (
             <DeckInsight
@@ -1082,10 +1094,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           )}
 
           {/* The primer — the deck's play document, written or AI-drafted in the
-              iOS app. The owner reveals it from the Tools menu; someone viewing
-              a shared deck gets it opened for them, since handing over a primer
-              is the point of sharing a deck. */}
-          {(primerOpen || (!canEdit && Boolean(deck?.primer))) && (
+              iOS app.
+              
+              Shown whenever there is one, or whenever the owner asked for it
+              from the Tools menu. It used to be Tools-only for an owner, which
+              meant the deck's own play document was the one thing about the
+              deck you had to go hunting for. This pane is where "how it plays"
+              belongs — the same place iOS puts it. */}
+          {(primerOpen || Boolean(deck?.primer) || !canEdit) && (
             <DeckPrimer
               deckId={deckId}
               primer={deck?.primer ?? ""}
@@ -1094,8 +1110,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             />
           )}
 
-          {/* quick notes — the scratchpad, revealed from the Tools menu */}
-          {notesOpen && (
+          {/* quick notes — the scratchpad. Also no longer Tools-only: a note
+              you wrote about the deck belongs beside the primer, not behind a
+              menu. Still collapses to nothing when it is empty and unopened. */}
+          {(notesOpen || Boolean(notes)) && (
             <div className="id-panel" style={{ padding: 16, marginBottom: 8 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                 <span className="id-label" style={{ color: "var(--w-2)" }}>Quick notes</span>
@@ -1113,6 +1131,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               />
             </div>
           )}
+
+          </>)}
 
           {/* A read-only banner for viewers of a shared deck. */}
           {!canEdit && (
@@ -1135,29 +1155,48 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </section>
           )}
 
-          {/* mobile pool/deck switcher — sticky segmented control, hidden ≥1024px.
-              Only meaningful when the pool column exists (owner). */}
-          {canEdit && (
-            <div className="deck-mobile-tabs">
+          {/* Pane switcher — Pool / Deck / Stats, the iOS deck page's three tabs.
+              
+              Two of them behave differently by width, which is why the Pool
+              button is CSS-hidden on desktop: there, pool and deck sit side by
+              side, so "Pool" and "Deck" would show the same thing. Stats is a
+              real pane at every width.
+              
+              Shown for a non-owner too now. They have no pool, but they do have
+              stats, and the switcher was the only route to them. */}
+          <div className="deck-mobile-tabs">
+            {canEdit && (
               <button
                 type="button"
+                data-tab="pool"
                 aria-pressed={mobileView === "pool"}
                 className={mobileView === "pool" ? "is-active" : ""}
                 onClick={() => setMobileView("pool")}
               >
                 Pool <span>{poolCards.reduce((s, c) => s + c.quantity, 0)}</span>
               </button>
-              <button
-                type="button"
-                aria-pressed={mobileView === "deck"}
-                className={mobileView === "deck" ? "is-active" : ""}
-                onClick={() => setMobileView("deck")}
-              >
-                Deck <span>{deckCount}</span>
-              </button>
-            </div>
-          )}
+            )}
+            <button
+              type="button"
+              data-tab="deck"
+              aria-pressed={mobileView === "deck"}
+              className={mobileView === "deck" ? "is-active" : ""}
+              onClick={() => setMobileView("deck")}
+            >
+              Deck <span>{deckCount}</span>
+            </button>
+            <button
+              type="button"
+              data-tab="stats"
+              aria-pressed={showingStats}
+              className={showingStats ? "is-active" : ""}
+              onClick={() => setMobileView("stats")}
+            >
+              Stats
+            </button>
+          </div>
 
+          {!showingStats && (
           <div className="id-workspace" data-mobile-view={canEdit ? mobileView : "deck"} data-readonly={!canEdit ? "true" : undefined}>
             {/* ── POOL ── (owner only) */}
             {canEdit && <aside className="id-panel id-pool id-poolcol" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
@@ -1465,6 +1504,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           )}
         </section>
         </div>
+        )}
         </div>
       </div>
 
