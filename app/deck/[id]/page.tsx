@@ -12,7 +12,7 @@ import HandSimModal from "@/components/deck/HandSimModal";
 import GameCodeModal from "@/components/deck/GameCodeModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
 import DeckPrimer from "@/components/deck/DeckPrimer";
-import DeckInsight from "@/components/deck/DeckInsight";
+import DeckStatsPane from "@/components/deck/DeckStatsPane";
 import OrderModal from "@/components/deck/OrderModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, dangerBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
@@ -107,6 +107,10 @@ const FORMATS = [
 const EDIT_FORMATS = ["commander", "standard", "modern", "pioneer", "legacy", "vintage", "pauper", "draft"];
 
 type SearchMode = "scryfall" | "name";
+
+/** The deck page's three panes, in the order the switcher shows them. */
+type Pane = "pool" | "deck" | "stats";
+const PANES: Pane[] = ["pool", "deck", "stats"];
 
 /* The query text is the single source of truth. Chips toggle Scryfall tokens
    directly in and out of the input, and their selected state is derived from
@@ -252,15 +256,18 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [deckReviewCards, setDeckReviewCards] = useState<PoolCard[] | null>(null);
   const [deckReviewStart, setDeckReviewStart] = useState(0);
 
-  // On mobile the pool and deck stack; this toggles which one is shown so you
-  // don't have to scroll the whole pool to reach the deck. Ignored ≥1024px.
-  /// Which pane the deck page shows. Named `mobileView` because Pool-vs-Deck
-  /// started as a mobile-only switch and the CSS still keys off
-  /// `data-mobile-view`; "stats" is not mobile-only — the stats blocks used to
-  /// sit above the decklist at every width, so half a screen of numbers came
-  /// before the cards you opened the page to see.
-  const [mobileView, setMobileView] = useState<"pool" | "deck" | "stats">("pool");
-  const showingStats = mobileView === "stats";
+  /// Which pane the deck page shows — Pool, Deck or Stats, the same three the
+  /// iOS deck page has, and one at a time at every width.
+  ///
+  /// This started as a mobile-only Pool/Deck toggle that CSS-hid one column of
+  /// a two-column desktop workspace. That made Pool and Deck a fake pair up
+  /// there: "Deck" showed the pool as well, so the button did nothing and the
+  /// Pool button had to be hidden to cover for it. They are real panes now.
+  /// The cost is that a desktop brewer no longer sees the search and the
+  /// decklist at once, which is the trade iOS already makes.
+  ///
+  /// Opens on the deck, like iOS — you open a deck to look at the deck.
+  const [pane, setPane] = useState<Pane>("deck");
 
   // Hovering a mana-curve bar or a type dot filters the decklist below to that
   // selection. null = no filter (show the whole deck).
@@ -969,170 +976,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
 
-          {/* ── STATS PANE ── everything ABOUT the deck: the insight readings,
-              the shape blocks, the primer and the notes. Behind a tab now,
-              because at every width it pushed the decklist half a screen down
-              and none of it is what you open a deck to look at. Mirrors the
-              iOS deck page's third tab. */}
-          {showingStats && (<>
-          {/* DECK INSIGHT — bracket · CRISPI · 8x8, the iOS Stats tab's readings */}
-          {statsOnDeck && (
-            <DeckInsight
-              deckId={id}
-              cards={pool.map((c) => ({
-                name: c.name,
-                typeLine: c.typeLine ?? null,
-                role: c.role ?? null,
-                quantity: c.quantity,
-                board: c.board,
-              }))}
-              avgManaValue={stats.avgMv}
-            />
-          )}
+          {/* The stats used to sit HERE, above everything, at every width. Half a
+              screen of numbers before the cards you opened the deck to see.
+              They are a pane of their own now — see the switcher below. */}
 
-          {/* STAT STRIP — mana curve · composition · color identity */}
-          {statsOnDeck && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "28px 0", padding: "24px 0", margin: "0 0 8px", borderTop: "1px solid var(--w-line)", borderBottom: "1px solid var(--w-line)" }}>
-              <div style={{ padding: "0 clamp(0px,2vw,28px) 0 0", flex: 1, minWidth: 220 }}>
-                <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 14 }}>Mana curve</div>
-                <ManaCurve
-                  curve={stats.curve}
-                  accent="var(--gold)"
-                  onHoverBar={(i) => setDeckFilter(i === null ? null : { kind: "mv", value: i })}
-                  onClickBar={canEdit ? (i) => startDeckReviewOf(deckCards.filter((c) => categoryOf(c.typeLine) !== "Lands" && Math.min(manaValue(c.manaCost), 7) === i)) : undefined}
-                />
-              </div>
-              <div style={{ width: 1, background: "var(--w-line)", alignSelf: "stretch" }} />
-              <div style={{ padding: "0 clamp(18px,2.4vw,32px)", flex: 1, minWidth: 220 }}>
-                <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 14 }}>Composition · {deckCards.length} cards</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 12 }}>
-                  {deckStats(deckCards).types.flatMap((t) =>
-                    Array.from({ length: t.n }).map((_, i) => (
-                      <span key={t.name + i} style={{ width: 9, height: 9, borderRadius: 2.5, background: CAT_COLOR[t.name] || "#ccc" }} />
-                    ))
-                  )}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 14px" }}>
-                  {deckStats(deckCards).types.map((t) => (
-                    <span key={t.name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--w-2)" }}>
-                      <span style={{ width: 9, height: 9, borderRadius: 2.5, background: CAT_COLOR[t.name] || "#ccc" }} />
-                      {t.name} <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{t.n}</b>
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div style={{ width: 1, background: "var(--w-line)", alignSelf: "stretch" }} />
-              <div style={{ padding: "0 0 0 clamp(18px,2.4vw,32px)", flex: 1, minWidth: 200 }}>
-                <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 10 }}>Color identity</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 10 }}>
-                  {identityPips.length > 0 && <ColorPips colors={identityPips} size={20} />}
-                  <span className="id-display" style={{ fontSize: 16, color: "var(--w-1)", lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0, flex: 1 }}>
-                    {identityPips.length ? identityPips.map((c) => COLOR_NAME[c]).join(" · ") : "Colorless"}
-                  </span>
-                </div>
-                {(() => {
-                  // Colour requirements (spell pips) vs the lands that can
-                  // produce each colour, from what each land actually adds.
-                  // Cards are not either/or: a spell//land MDFC counts on both
-                  // sides.
-                  const spell: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-                  const land: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
-                  const identity = identityPips.filter((c) => "WUBRG".includes(c));
-                  for (const c of deckCards) {
-                    const qty = c.quantity > 0 ? c.quantity : 1;
-                    if (categoryOf(c.typeLine) === "Lands") {
-                      for (const col of landProducedColors(c.typeLine, c.oracleText, c.colorIdentity, identity))
-                        if (land[col] != null) land[col] += qty;
-                    }
-                    for (const col of colorsOf(c.manaCost)) if (spell[col] != null) spell[col] += qty;
-                  }
-                  const order = (["W", "U", "B", "R", "G"] as const).filter((c) => spell[c] > 0 || land[c] > 0);
-                  if (order.length === 0) return null;
-                  const max = Math.max(1, ...order.flatMap((c) => [spell[c], land[c]]));
-                  return (
-                    <div style={{ marginBottom: 10 }}>
-                      <div style={{ display: "flex", gap: 14, marginBottom: 7, fontSize: 10.5, color: "var(--w-2)" }}>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                          <span style={{ width: 9, height: 6, borderRadius: 2, background: "var(--w-1)" }} /> spells
-                        </span>
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                          <span style={{ width: 2, height: 10, background: "var(--w-1)", boxShadow: "0 0 0 1px rgba(0,0,0,.3)" }} /> land sources
-                        </span>
-                      </div>
-                      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-                        {order.map((c) => {
-                          const fill = MANA[c]?.bg ?? "#9aa0a8";
-                          const landPos = Math.min(100, (land[c] / max) * 100);
-                          return (
-                            <div key={c} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                              <ColorPips colors={[c]} size={14} />
-                              <div style={{ flex: 1, position: "relative", height: 7, borderRadius: 4, background: "var(--w-fill)", overflow: "hidden" }}>
-                                {/* spell requirement fill */}
-                                <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(spell[c] / max) * 100}%`, background: fill, borderRadius: 4, transition: "width .4s cubic-bezier(.2,.8,.2,1)" }} />
-                                {/* land-sources marker line */}
-                                <div
-                                  title={`${land[c]} land source${land[c] === 1 ? "" : "s"}`}
-                                  style={{ position: "absolute", top: 0, bottom: 0, left: `calc(${landPos}% - 1px)`, width: 2, background: "var(--w-1)", boxShadow: "0 0 0 1px rgba(0,0,0,.3)", transition: "left .4s cubic-bezier(.2,.8,.2,1)" }}
-                                />
-                              </div>
-                              <span className="id-mono" style={{ fontSize: 11, width: 52, textAlign: "right", whiteSpace: "nowrap", flexShrink: 0 }}>
-                                <span style={{ color: "var(--w-1)" }}>{spell[c]}</span>
-                                <span style={{ color: "var(--w-3)" }}> / {land[c]}</span>
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
-                <p style={{ fontSize: 12.5, color: "var(--w-2)", margin: 0, lineHeight: 1.45 }}>
-                  Avg. mana value <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{stats.avgMv.toFixed(1)}</b> · land sources reflect what each land can produce; fetches and any-colour lands count toward your identity.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* The primer — the deck's play document, written or AI-drafted in the
-              iOS app.
-              
-              Shown whenever there is one, or whenever the owner asked for it
-              from the Tools menu. It used to be Tools-only for an owner, which
-              meant the deck's own play document was the one thing about the
-              deck you had to go hunting for. This pane is where "how it plays"
-              belongs — the same place iOS puts it. */}
-          {(primerOpen || Boolean(deck?.primer) || !canEdit) && (
-            <DeckPrimer
-              deckId={deckId}
-              primer={deck?.primer ?? ""}
-              canEdit={canEdit}
-              onSaved={(text) => setDeck((d) => (d ? { ...d, primer: text || null } : d))}
-            />
-          )}
-
-          {/* quick notes — the scratchpad. Also no longer Tools-only: a note
-              you wrote about the deck belongs beside the primer, not behind a
-              menu. Still collapses to nothing when it is empty and unopened. */}
-          {(notesOpen || Boolean(notes)) && (
-            <div className="id-panel" style={{ padding: 16, marginBottom: 8 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <span className="id-label" style={{ color: "var(--w-2)" }}>Quick notes</span>
-                <span className="id-label" style={{ fontSize: 10, color: noteStatus === "saving" ? "var(--w-3)" : "var(--gold)" }}>
-                  {noteStatus === "saving" ? "Saving…" : noteStatus === "saved" ? "Saved" : ""}
-                </span>
-              </div>
-              <textarea
-                value={notes}
-                onChange={(e) => onNotesChange(e.target.value)}
-                onBlur={() => { if (noteTimer.current) clearTimeout(noteTimer.current); saveNotes(notes); }}
-                placeholder="How does this deck play? Mulligans, key lines, win routes…"
-                rows={4}
-                style={{ width: "100%", border: "none", outline: "none", resize: "vertical", background: "transparent", fontFamily: "var(--font-body)", fontSize: 14.5, lineHeight: 1.55, color: "var(--text)", minHeight: 76, padding: 0 }}
-              />
-            </div>
-          )}
-
-          </>)}
 
           {/* A read-only banner for viewers of a shared deck. */}
           {!canEdit && (
@@ -1155,51 +1002,68 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </section>
           )}
 
-          {/* Pane switcher — Pool / Deck / Stats, the iOS deck page's three tabs.
-              
-              Two of them behave differently by width, which is why the Pool
-              button is CSS-hidden on desktop: there, pool and deck sit side by
-              side, so "Pool" and "Deck" would show the same thing. Stats is a
-              real pane at every width.
-              
-              Shown for a non-owner too now. They have no pool, but they do have
-              stats, and the switcher was the only route to them. */}
-          <div className="deck-mobile-tabs">
-            {canEdit && (
+          {/* Pane switcher — Pool / Deck / Stats, the iOS deck page's three tabs,
+              and one pane at a time at every width.
+
+              It sits directly above the panes because it governs what follows
+              it. It used to sit BELOW the stats, so choosing Stats put the
+              content above the control that chose it.
+
+              A non-owner gets it too. They have no pool, so they get two
+              buttons — but they do have stats, and this is the only route. */}
+          <div className="deck-panes">
+          <div className="deck-panes-row" role="tablist" aria-label="Deck view">
+            {PANES.filter((p) => p !== "pool" || canEdit).map((p) => (
               <button
+                key={p}
                 type="button"
-                data-tab="pool"
-                aria-pressed={mobileView === "pool"}
-                className={mobileView === "pool" ? "is-active" : ""}
-                onClick={() => setMobileView("pool")}
+                role="tab"
+                aria-selected={pane === p}
+                className={pane === p ? "is-active" : ""}
+                onClick={() => setPane(p)}
               >
-                Pool <span>{poolCards.reduce((s, c) => s + c.quantity, 0)}</span>
+                {p === "pool" ? "Pool" : p === "deck" ? "Deck" : "Stats"}
+                {p === "pool" && <span>{poolCards.reduce((s, c) => s + c.quantity, 0)}</span>}
+                {p === "deck" && <span>{deckCount}</span>}
               </button>
-            )}
-            <button
-              type="button"
-              data-tab="deck"
-              aria-pressed={mobileView === "deck"}
-              className={mobileView === "deck" ? "is-active" : ""}
-              onClick={() => setMobileView("deck")}
-            >
-              Deck <span>{deckCount}</span>
-            </button>
-            <button
-              type="button"
-              data-tab="stats"
-              aria-pressed={showingStats}
-              className={showingStats ? "is-active" : ""}
-              onClick={() => setMobileView("stats")}
-            >
-              Stats
-            </button>
+            ))}
+          </div>
           </div>
 
-          {!showingStats && (
-          <div className="id-workspace" data-mobile-view={canEdit ? mobileView : "deck"} data-readonly={!canEdit ? "true" : undefined}>
-            {/* ── POOL ── (owner only) */}
-            {canEdit && <aside className="id-panel id-pool id-poolcol" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
+          {/* ── STATS PANE ── */}
+          {pane === "stats" && (
+            <DeckStatsPane
+              deckId={deckId}
+              deckCards={deckCards}
+              // Both boards. 8x8 and the bracket read the deck board out of
+              // this themselves, and a Game Changer you are only CONSIDERING
+              // must not count — see lib/deck-insight.
+              insightCards={pool.map((c) => ({
+                name: c.name,
+                typeLine: c.typeLine ?? null,
+                role: c.role ?? null,
+                quantity: c.quantity,
+                board: c.board,
+              }))}
+              identity={identityPips}
+              avgManaValue={stats.avgMv}
+              canEdit={canEdit}
+              primer={deck?.primer ?? ""}
+              primerOpen={primerOpen}
+              onPrimerSaved={(text) => setDeck((d) => (d ? { ...d, primer: text || null } : d))}
+              notes={notes}
+              notesOpen={notesOpen}
+              noteStatus={noteStatus}
+              onNotesChange={onNotesChange}
+              onNotesBlur={() => { if (noteTimer.current) clearTimeout(noteTimer.current); saveNotes(notes); }}
+              onHoverCurveBar={(i) => setDeckFilter(i === null ? null : { kind: "mv", value: i })}
+              onClickCurveBar={canEdit ? (i) => { setPane("deck"); startDeckReviewOf(deckCards.filter((c) => categoryOf(c.typeLine) !== "Lands" && Math.min(manaValue(c.manaCost), 7) === i)); } : undefined}
+            />
+          )}
+
+          {/* ── POOL PANE ── (owner only) */}
+          {pane === "pool" && canEdit && (
+            <aside className="id-panel id-pool" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 14, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
                   <span className="id-display" style={{ fontSize: 24, color: "var(--w-1)" }}>Pool</span>
@@ -1402,10 +1266,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           )}
 
-          {/* candidate list — own scroll on desktop, flows with the page on mobile */}
-          <div className="id-cardscroll" style={{ display: "flex", flexDirection: "column", gap: 8, paddingRight: 2 }}>
+          {/* Candidate list. A grid rather than one long column: the pool has the
+              page's full width now that it is a pane of its own, and a single
+              column of card lines stretched to 1180px is width spent on nothing. */}
+          <div className="id-cardscroll" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(310px, 1fr))", gap: 8, paddingRight: 2 }}>
             {poolCards.length === 0 ? (
-              <div style={{ padding: "40px 16px", textAlign: "center", color: "var(--w-3)", borderRadius: 14, border: "1px dashed var(--w-line)", fontSize: 13.5 }}>
+              <div style={{ gridColumn: "1 / -1", padding: "40px 16px", textAlign: "center", color: "var(--w-3)", borderRadius: 14, border: "1px dashed var(--w-line)", fontSize: 13.5 }}>
                 {pool.length === 0
                   ? "Ask for cards above to fill the pool."
                   : "Pool is empty — every card has been promoted to the deck."}
@@ -1425,10 +1291,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               ))
             )}
           </div>
-        </aside>}
+        </aside>
+        )}
 
-        {/* ── THE DECK ── */}
-        <section className="id-panel id-deckcol" style={{ padding: "18px clamp(14px,2vw,24px)" }}>
+        {/* ── DECK PANE ── */}
+        {pane === "deck" && (
+        <section className="id-panel" style={{ padding: "18px clamp(14px,2vw,24px)" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 16, marginBottom: 18, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
               <span className="id-display" style={{ fontSize: "clamp(26px,3vw,38px)", color: "var(--w-1)" }}>The deck</span>
@@ -1459,7 +1327,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           {deckCards.length === 0 ? (
             <div style={{ padding: "54px 20px", textAlign: "center", color: "var(--w-3)" }}>
               <div className="id-display" style={{ fontSize: 26, color: "var(--w-2)", marginBottom: 8 }}>Empty deck</div>
-              <div style={{ fontSize: 13.5 }}>Add cards from the pool with + to start building toward {target}.</div>
+              <div style={{ fontSize: 13.5 }}>
+                {canEdit ? <>Search the <button type="button" onClick={() => setPane("pool")} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--gold)", cursor: "pointer", textDecoration: "underline" }}>pool</button> and add cards with + to start building toward {target}.</> : "This deck has no cards yet."}
+              </div>
             </div>
           ) : deckSort === "type" ? (
             <div>
@@ -1503,7 +1373,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           )}
         </section>
-        </div>
         )}
         </div>
       </div>

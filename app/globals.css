@@ -476,20 +476,30 @@ button {
   flex-direction: column;
 }
 
-/* Mobile pool/deck switcher — a sticky segmented control so you can flip
-   between the pool and the decklist instead of scrolling the whole pool. */
-.deck-mobile-tabs {
+/* Deck page pane switcher — Pool / Deck / Stats, a sticky segmented control
+   that governs the pane below it. Sticky so it stays reachable once you are
+   deep in a decklist. It was a mobile-only pool/deck toggle before; the panes
+   are real at every width now, so nothing here is width-conditional. */
+.deck-panes {
   position: sticky;
   top: 60px;
   z-index: 15;
-  display: flex;
-  gap: 6px;
-  padding: 8px 0 12px;
+  padding: 10px 0 12px;
   margin-top: 20px;
   margin-bottom: 4px;
-  background: transparent;
+  /* The sticky bar rides over the pane's own panels, so it needs a ground of
+     its own — transparent left the decklist showing through it. It spans the
+     full content column and fades out at the bottom: the page ground is a
+     GRADIENT, so a band only as wide as the buttons reads as a patch of the
+     wrong colour sitting on the page rather than as a bar. */
+  background: linear-gradient(to bottom, var(--bg) 66%, transparent);
 }
-.deck-mobile-tabs button {
+.deck-panes-row {
+  display: flex;
+  gap: 6px;
+  max-width: 520px;
+}
+.deck-panes-row button {
   flex: 1;
   display: inline-flex;
   align-items: center;
@@ -508,39 +518,19 @@ button {
   letter-spacing: 0.06em;
   transition: background 0.14s, color 0.14s;
 }
-.deck-mobile-tabs button.is-active {
+.deck-panes-row button.is-active {
   background: var(--accent);
   color: var(--accent-ink);
   border-color: transparent;
 }
-.deck-mobile-tabs button span {
+.deck-panes-row button span {
   font-family: var(--font-mono, monospace);
   font-size: 13px;
   font-weight: 600;
   opacity: 0.85;
 }
 
-/* Below the two-column breakpoint, the switcher decides which side shows. */
-@media (max-width: 1023px) {
-  .deck-layout[data-mobile-view="pool"] > .deck-sidebar {
-    display: none;
-  }
-  .deck-layout[data-mobile-view="deck"] > .deck-pool {
-    display: none;
-  }
-}
-
 @media (min-width: 1024px) {
-  /* The switcher STAYS on desktop — Stats is a real pane at every width, and
-     hiding the bar was the only thing keeping desktop from having one.
-     Pool goes, because pool and deck sit side by side up here, so the two
-     buttons would show the same view. */
-  .deck-mobile-tabs button[data-tab="pool"] {
-    display: none;
-  }
-  .deck-mobile-tabs {
-    max-width: 420px;
-  }
   .deck-layout {
     grid-template-columns: 1fr 340px;
   }
@@ -791,24 +781,6 @@ button {
   color: #ff9c86;
 }
 
-/* two-panel builder workspace */
-.id-workspace {
-  display: grid;
-  grid-template-columns: minmax(0, 392px) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-@media (max-width: 1023px) {
-  .id-workspace {
-    grid-template-columns: 1fr;
-  }
-}
-/* Read-only view (a shared deck opened by a non-owner): no pool column, so the
-   deck spans the full width. */
-.id-workspace[data-readonly="true"] {
-  grid-template-columns: 1fr;
-}
-
 @keyframes id-rise {
   from {
     opacity: 0;
@@ -871,14 +843,6 @@ button {
     display: none !important;
   }
 }
-
-/* deck workspace — single-column mobile view toggle (mirrors .deck-layout).
-   !important so it beats the panels' inline display values. */
-@media (max-width: 1023px) {
-  .id-workspace[data-mobile-view="pool"] .id-deckcol { display: none !important; }
-  .id-workspace[data-mobile-view="deck"] .id-poolcol { display: none !important; }
-}
-
 
 /* AI chat card-link preview affordance. Desktop previews on hover, so the 🔍
    and its tap-to-dismiss backdrop only exist where hover isn't available. */
