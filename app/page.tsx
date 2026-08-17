@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
 import CommanderInput from "@/components/CommanderInput";
-import { CardArt, ColorPips, deckTarget } from "@/components/mtg";
+import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
 import { track } from "@/lib/track";
 import { getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
@@ -629,7 +629,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate }: { deck: Deck; 
           }}
         >
           <div style={{ position: "relative", height: 132 }}>
-            <CardArt name={deck.commander || deck.name} colors={colors} version="art_crop" radius={0} style={{ position: "absolute", inset: 0 }} />
+            <CardArt name={commanderArtName(deck.commander)} label={deck.name} colors={colors} version="art_crop" radius={0} style={{ position: "absolute", inset: 0 }} />
             <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 30%, ${field.deep}ee)` }} />
             <div style={{ position: "absolute", top: 12, left: 14 }}>
               <ColorPips colors={colors} size={20} />

@@ -43,13 +43,46 @@ interface Crispi {
   resilience: number;
   interaction: number;
   speed: number;
-  index: number;
+  /// The Performance Index. Named `crispi`, not `index` — reading the wrong
+  /// key gave undefined, and `.toFixed` on it threw and took the whole deck
+  /// page down with it.
+  crispi: number;
+  /// Already rounded by the server. Use it rather than re-formatting, so the
+  /// app and the web page never disagree by a digit — which is exactly what
+  /// the iOS client's own comment says and what this failed to do.
+  display: string;
   provisional?: boolean;
   notes?: { estimated?: string[]; stubbed?: string[] };
 }
 
-/** Trailing zeros off a quarter-point scale: 6.25 stays, 6.00 becomes 6. */
-const trim = (n: number): string => String(Number(n.toFixed(2)));
+/**
+ * Trailing zeros off a quarter-point scale: 6.25 stays, 6.00 becomes 6.
+ *
+ * Returns null rather than throwing on anything that is not a number. This
+ * panel reads a server payload, and a field that moves or arrives missing must
+ * not be able to take the deck page with it — which is precisely what happened
+ * when it read `index` and the server sends `crispi`.
+ */
+const trim = (n: unknown): string | null =>
+  typeof n === "number" && Number.isFinite(n) ? String(Number(n.toFixed(2))) : null;
+
+/** The four axes, as a line, skipping any the server did not send. */
+function axesNote(c: Crispi): string | null {
+  const parts = (
+    [
+      ["C", c.consistency],
+      ["R", c.resilience],
+      ["I", c.interaction],
+      ["S", c.speed],
+    ] as const
+  )
+    .map(([label, value]) => {
+      const t = trim(value);
+      return t === null ? null : `${label} ${t}`;
+    })
+    .filter((p): p is string => p !== null);
+  return parts.length ? parts.join(" · ") : null;
+}
 
 export default function DeckInsight({
   deckId,
@@ -131,6 +164,9 @@ export default function DeckInsight({
   // cannot be bracket 1 or 2 however few Game Changers it runs, which is why
   // iOS passes the same flag in.
   const bracket = suggestedBracket(changers, combos?.hasTwoCardCombo ?? false);
+  // The server's own rounding first, our own only as a fallback, and nothing
+  // at all if neither is a number the panel can print.
+  const crispiValue = crispi ? (crispi.display ?? trim(crispi.crispi)) : null;
 
   const label = { color: "var(--w-3)" } as const;
   const figure = { fontFamily: "var(--font-mono)", color: "var(--w-1)" } as const;
@@ -144,13 +180,11 @@ export default function DeckInsight({
               note={gameChangers === null
                 ? "counting…"
                 : `${changers} game changer${changers === 1 ? "" : "s"}${combos?.hasTwoCardCombo ? " · two-card combo" : ""}`} />
-        <Stat label="Avg. mana value" value={avgManaValue.toFixed(1)} />
-        {crispi && (
-          <Stat
-            label="CRISPI"
-            value={trim(crispi.index)}
-            note={`C ${trim(crispi.consistency)} · R ${trim(crispi.resilience)} · I ${trim(crispi.interaction)} · S ${trim(crispi.speed)}`}
-          />
+        {Number.isFinite(avgManaValue) && (
+          <Stat label="Avg. mana value" value={avgManaValue.toFixed(1)} />
+        )}
+        {crispiValue && (
+          <Stat label="CRISPI" value={crispiValue} note={crispi ? axesNote(crispi) ?? undefined : undefined} />
         )}
       </div>
 

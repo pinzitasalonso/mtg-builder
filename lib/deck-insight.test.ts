@@ -132,3 +132,32 @@ describe("cubeBuckets", () => {
     expect(by(cubeBuckets([]), "lands").target).toBe(35);
   });
 });
+
+// The art lookup lives in components/mtg.tsx, but the RULE it encodes is the
+// same "+"-joined commander field the rest of this file reasons about, so the
+// two shouldn't drift. Duplicated as a pure function rather than importing a
+// .tsx component into a node test.
+describe("commander art name", () => {
+  const artName = (commander?: string | null): string | undefined => {
+    const first = (commander ?? "").split("+")[0].trim();
+    return first || undefined;
+  };
+
+  // A pair is one field. Asked for whole, Scryfall 404s and the deck loses the
+  // art it should have had.
+  it("takes the first commander of a partner pair", () => {
+    expect(artName("Rograkh, Son of Rohgahh + Silas Renn, Seeker Adept")).toBe("Rograkh, Son of Rohgahh");
+    expect(artName("Krenko, Mob Boss")).toBe("Krenko, Mob Boss");
+  });
+
+  // No commander means no art to find. Call sites used to fall back to the
+  // DECK's name, so a Standard deck called "Jeskai Control" was looked up as a
+  // card — a guaranteed 404 for every such deck, on every page load.
+  it("returns nothing when there is no commander", () => {
+    expect(artName(null)).toBeUndefined();
+    expect(artName(undefined)).toBeUndefined();
+    expect(artName("")).toBeUndefined();
+    expect(artName("   ")).toBeUndefined();
+    expect(artName(" + ")).toBeUndefined();
+  });
+});
