@@ -108,9 +108,10 @@ const EDIT_FORMATS = ["commander", "standard", "modern", "pioneer", "legacy", "v
 
 type SearchMode = "scryfall" | "name";
 
-/** The deck page's three panes, in the order the switcher shows them. */
-type Pane = "pool" | "deck" | "stats";
-const PANES: Pane[] = ["pool", "deck", "stats"];
+/** The deck page's three panes, in the order the switcher shows them.
+    Deck leads: it is what the page opens on and what you came to look at. */
+type Pane = "deck" | "pool" | "stats";
+const PANES: Pane[] = ["deck", "pool", "stats"];
 
 /* The query text is the single source of truth. Chips toggle Scryfall tokens
    directly in and out of the input, and their selected state is derived from
@@ -268,6 +269,24 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   ///
   /// Opens on the deck, like iOS — you open a deck to look at the deck.
   const [pane, setPane] = useState<Pane>("deck");
+
+  /// The assistant lives in a sheet now, the way the iOS deck page opens it.
+  /// It used to be a panel wedged between the hero and the panes, which cost
+  /// every pane a screenful of height whether or not you were talking to it.
+  const [chatOpen, setChatOpen] = useState(false);
+
+  /// "Add cards" jumps to the pool and puts the cursor in its search box.
+  /// Bumped rather than called directly: the pool pane mounts on the same
+  /// state change, so the focus has to wait for the commit that creates it.
+  const poolSearchRef = useRef<HTMLInputElement>(null);
+  const [focusSearchTick, setFocusSearchTick] = useState(0);
+  const goAddCards = useCallback(() => {
+    setPane("pool");
+    setFocusSearchTick((t) => t + 1);
+  }, []);
+  useEffect(() => {
+    if (focusSearchTick > 0) poolSearchRef.current?.focus();
+  }, [focusSearchTick]);
 
   // Hovering a mana-curve bar or a type dot filters the decklist below to that
   // selection. null = no filter (show the whole deck).
@@ -828,7 +847,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             <Logo size={18} />
           </Link>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", minWidth: 0 }}>
-            {canEdit && <div>
+            {/* Shown to a non-owner too. Copy decklist and Buy list were a hero
+                button and a top-bar button, both ungated; folding them in here
+                behind `canEdit` would have quietly taken them away from anyone
+                reading a shared deck. */}
+            <div>
               <button
                 className="id-ghost"
                 style={{ padding: "9px 15px" }}
@@ -850,32 +873,55 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                     className="id-card"
                     style={{ position: "fixed", top: toolsPos?.top ?? 0, left: toolsPos?.left ?? 0, zIndex: 41, width: 210, maxWidth: "calc(100vw - 16px)", padding: 6, display: "flex", flexDirection: "column", gap: 2 }}
                   >
-                    {[
-                      { label: "🎲 Sample hand", on: () => setHandSimOpen(true), disabled: deckCards.length === 0 },
-                      { label: "🎟 Game code", on: () => setGameCodeOpen(true) },
-                      { label: "📖 Primer", on: () => setPrimerOpen((v) => !v) },
-                      { label: "📝 Quick notes", on: () => setNotesOpen((v) => !v) },
-                      { label: "🌲 Add lands & staples", on: () => setTool("lands") },
-                      { label: "⬆ Export / import", on: () => setTool("export") },
-                    ].map((it) => (
-                      <button
-                        key={it.label}
-                        onClick={() => { if (!it.disabled) { it.on(); setToolsOpen(false); } }}
-                        disabled={it.disabled}
-                        style={{ textAlign: "left", padding: "9px 11px", borderRadius: 9, border: "none", background: "transparent", color: "var(--w-1)", fontFamily: "var(--font-ui)", fontSize: 13.5, fontWeight: 600, cursor: it.disabled ? "default" : "pointer", opacity: it.disabled ? 0.45 : 1 }}
-                      >
-                        {it.label}
-                      </button>
-                    ))}
+                    {/* Grouped, because this menu now carries everything that
+                        used to compete with Ask AI for the hero: the list
+                        actions came off the hero and out of the top bar, and an
+                        ungrouped list of eight reads as a junk drawer. */}
+                    {([
+                      { group: "The list" },
+                      // Holds the menu open so the copy is confirmed. As a
+                      // hero button this said "Copied!"; closing on click
+                      // would have made copying silent.
+                      { label: copied === "list" ? "✓ Copied!" : "📋 Copy decklist", on: copyDecklist, disabled: deckCards.length === 0, keepOpen: true },
+                      { label: "🛒 Buy list", on: () => setOrderOpen(true), disabled: deckCards.length === 0 },
+                      ...(canEdit ? [
+                        { label: "🌲 Add lands & staples", on: () => setTool("lands") },
+                        { label: "⬆ Export / import", on: () => setTool("export") },
+                        { group: "At the table" },
+                        { label: "🎟 Game code", on: () => setGameCodeOpen(true) },
+                        { group: "Write-ups" },
+                        { label: "📖 Primer", on: () => { setPrimerOpen(true); setPane("stats"); } },
+                        { label: "📝 Quick notes", on: () => { setNotesOpen(true); setPane("stats"); } },
+                      ] : []),
+                    ] as { group?: string; label?: string; on?: () => void; disabled?: boolean; keepOpen?: boolean }[]).map((it) =>
+                      it.group ? (
+                        <div key={it.group} className="id-label" style={{ color: "var(--w-3)", fontSize: 10, padding: "9px 11px 4px" }}>
+                          {it.group}
+                        </div>
+                      ) : (
+                        <button
+                          key={it.label}
+                          onClick={() => { if (!it.disabled) { it.on!(); if (!it.keepOpen) setToolsOpen(false); } }}
+                          disabled={it.disabled}
+                          style={{ textAlign: "left", padding: "9px 11px", borderRadius: 9, border: "none", background: "transparent", color: "var(--w-1)", fontFamily: "var(--font-ui)", fontSize: 13.5, fontWeight: 600, cursor: it.disabled ? "default" : "pointer", opacity: it.disabled ? 0.45 : 1 }}
+                        >
+                          {it.label}
+                        </button>
+                      )
+                    )}
                   </div>
                 </>
               )}
-            </div>}
+            </div>
+            {/* Playtest was the hero's headline action. It is a thing you do
+                WITH a finished deck, not a thing you do to build one, so it
+                sits up here with Share and Tools — and the hero goes to the two
+                actions that actually build the deck. */}
+            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setHandSimOpen(true)} disabled={deckCards.length === 0}>
+              🎲 Playtest
+            </button>
             <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={shareDeck} disabled={sharing}>
               {copied === "link" ? "Copied!" : sharing ? "Sharing…" : "Share"}
-            </button>
-            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setOrderOpen(true)} disabled={deckCards.length === 0}>
-              Buy list
             </button>
             {canEdit ? (
               <button className="id-btn" style={{ padding: "10px 18px" }} onClick={openSettings}>
@@ -938,14 +984,30 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   Helmed by <b style={{ color: "var(--w-1)" }}>{deck.commander}</b>
                 </div>
               )}
-              <div style={{ display: "flex", gap: 13, flexWrap: "wrap" }}>
-                <button className="id-btn" style={{ padding: "14px 24px", fontSize: 15.5 }} onClick={() => setHandSimOpen(true)} disabled={deckCards.length === 0}>
-                  ▶ Playtest hand
-                </button>
-                <button className="id-ghost" style={{ padding: "13px 20px" }} onClick={copyDecklist} disabled={deckCards.length === 0}>
-                  {copied === "list" ? "Copied!" : "Copy decklist"}
-                </button>
-              </div>
+              {/* The two actions that BUILD the deck, the pair the iOS deck
+                  page leads with. Playtest and Copy decklist used to sit here;
+                  neither builds anything, and both outranked the assistant by
+                  being the only buttons on the page. They are in the header
+                  now. Owner-only: a viewer can build nothing. */}
+              {canEdit && (
+                <div className="deck-actions">
+                  <button className="deck-action deck-action-add" onClick={goAddCards} title="Add cards to the pool">
+                    <span className="deck-action-icon" aria-hidden>+</span>
+                    <span className="deck-action-text">
+                      <b>Add cards</b>
+                      <i>Search, or paste a list.</i>
+                    </span>
+                  </button>
+                  <button className="deck-action deck-action-ai" onClick={() => setChatOpen(true)}>
+                    <span className="deck-action-icon" aria-hidden>✦</span>
+                    <span className="deck-action-text">
+                      <b>Ask the AI about this deck</b>
+                      <i>Lines, cuts and combos.</i>
+                    </span>
+                    <span className="deck-action-chev" aria-hidden>›</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* commander showcase + progress badge */}
@@ -989,18 +1051,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           )}
 
-          {/* Central AI assistant — it fills the pool AND judges/reshapes the
-              deck, so it sits above the pool/deck split rather than inside the
-              pool. One shared conversation for the whole page. Owner-only. */}
-          {canEdit && (
-            <section className="id-panel" style={{ padding: 16, marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 12 }}>
-                <span className="id-display" style={{ fontSize: 20, color: "var(--w-1)" }}>✦ Ask the AI</span>
-                <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>build · judge · refine</span>
-              </div>
-              <DeckChat chat={chat} />
-            </section>
-          )}
+          {/* The assistant used to sit HERE as a permanent panel. It is a sheet
+              off the hero's Ask AI tile now — same single conversation, which
+              still persists for as long as the page is mounted. */}
 
           {/* Pane switcher — Pool / Deck / Stats, the iOS deck page's three tabs,
               and one pane at a time at every width.
@@ -1210,6 +1263,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               <form onSubmit={addByName} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", gap: 10 }}>
                   <input
+                    ref={poolSearchRef}
                     className="cc-paper"
                     placeholder="Search by card name…"
                     value={nameInput}
@@ -1376,6 +1430,25 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         )}
         </div>
       </div>
+
+      {/* The assistant, off the hero tile. Wide, because its answers carry card
+          links you hover to preview. */}
+      {chatOpen && canEdit && (
+        <ModalShell onDismiss={() => setChatOpen(false)} maxWidth={780} zIndex={68}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 14 }}>
+            <span className="id-display" style={{ fontSize: 22, color: "var(--w-1)" }}>✦ Ask the AI</span>
+            <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>build · judge · refine</span>
+            <button
+              onClick={() => setChatOpen(false)}
+              aria-label="Close"
+              style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--w-3)", fontSize: 22, lineHeight: 1, cursor: "pointer", padding: 0 }}
+            >
+              ×
+            </button>
+          </div>
+          <DeckChat chat={chat} />
+        </ModalShell>
+      )}
 
       {/* swipe-to-add modal */}
       {swipeOpen && searchResults.length > 0 && (
@@ -1793,10 +1866,13 @@ const tileQtyBtn: React.CSSProperties = {
   padding: 0,
 };
 
+/* Card tiles. 118px was sized for the deck sharing a page with the pool
+   column; the deck has the full width to itself now, so the art can be read
+   rather than squinted at. */
 const deckTileGrid: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))",
-  gap: 12,
+  gridTemplateColumns: "repeat(auto-fill, minmax(168px, 1fr))",
+  gap: 14,
 };
 
 /* Full card-image tile for the decklist: the card art with quantity / owned /
