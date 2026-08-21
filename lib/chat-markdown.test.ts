@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { boldNamesIn, cardNamesIn, flattenInline, normalizeCardKey, parseBlocks, tokenizeInline } from "./chat-markdown";
+import { boldNamesIn, cardNamesIn, flattenInline, normalizeCardKey, parseBlocks, tokenizeInline, cutCandidates } from "./chat-markdown";
 
 describe("boldNamesIn", () => {
   it("collects unbracketed bold spans as candidate card names", () => {
@@ -124,5 +124,71 @@ describe("cardNamesIn", () => {
 
   it("returns an empty list when there are no card links", () => {
     expect(cardNamesIn("just some prose")).toEqual([]);
+  });
+});
+
+describe("cutCandidates", () => {
+  // THE bug this function exists for. A cut is argued for by naming something
+  // better, and the better card is in the same sentence — so a flat "every
+  // named card already in the deck" scan offered to delete it.
+  it("does not offer the card a cut is compared against", () => {
+    const md = [
+      "## Consider cutting",
+      "- [[Divination]] — [[Rhystic Study]] already does this, better",
+      "- [[Mind Stone]] — strictly worse than [[Arcane Signet]] here",
+    ].join("\n");
+    expect(cutCandidates(md)).toEqual(["Divination", "Mind Stone"]);
+  });
+
+  it("takes only the first card of a paragraph, not the reasoning after it", () => {
+    const md = "## Cuts\n\n[[Sol Ring]] is the weakest slot now that you run [[Mana Crypt]] and [[Mana Vault]].";
+    expect(cutCandidates(md)).toEqual(["Sol Ring"]);
+  });
+
+  // A card praised in one section can never be deleted by another.
+  it("subtracts anything named under a keep or add heading", () => {
+    const md = [
+      "## Working well",
+      "- [[Rhystic Study]] is carrying the draw",
+      "## Consider cutting",
+      "- [[Rhystic Study]]",
+      "- [[Divination]]",
+    ].join("\n");
+    expect(cutCandidates(md)).toEqual(["Divination"]);
+  });
+
+  // No structure means no basis for a bulk delete. Cards stay removable one at
+  // a time by clicking them; nothing here should authorize deleting in bulk.
+  it("offers nothing when the reply has no cut heading", () => {
+    expect(cutCandidates("Cut [[Divination]] — [[Rhystic Study]] is better.")).toEqual([]);
+    expect(cutCandidates("## Working well\n- [[Sol Ring]]")).toEqual([]);
+  });
+
+  // "Cuts and additions" says both things, so it authorizes neither.
+  it("treats an ambiguous heading as neutral", () => {
+    expect(cutCandidates("## Cuts and additions\n- [[Divination]]")).toEqual([]);
+  });
+
+  it("reads a bolded cut the model didn't bracket", () => {
+    const md = "## Consider cutting\n- **Divination** — [[Rhystic Study]] is better";
+    expect(cutCandidates(md)).toEqual(["Divination"]);
+  });
+
+  it("dedupes and survives an empty or headingless reply", () => {
+    expect(cutCandidates("## Cuts\n- [[Sol Ring]]\n- [[Sol Ring]]")).toEqual(["Sol Ring"]);
+    expect(cutCandidates("")).toEqual([]);
+    expect(cutCandidates("Just prose with no cards.")).toEqual([]);
+  });
+
+  // The heading's scope ends at the next heading.
+  it("stops collecting when a new heading changes the advice", () => {
+    const md = [
+      "## Consider cutting",
+      "- [[Divination]]",
+      "## Missing",
+      "- [[Rhystic Study]]",
+      "- [[Mystic Remora]]",
+    ].join("\n");
+    expect(cutCandidates(md)).toEqual(["Divination"]);
   });
 });

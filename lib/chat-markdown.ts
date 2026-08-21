@@ -158,3 +158,116 @@ export function flattenInline(tokens: InlineToken[]): string {
     .map((t) => (t.type === "bold" ? flattenInline(t.tokens) : t.value))
     .join("");
 }
+
+/* ------------------------------------------------------------------ cuts */
+
+/* What a heading says to DO with the cards under it. */
+type SectionAdvice = "cut" | "protect" | "neutral";
+
+const CUT_RE = /\b(cut|cutting|cuts|remove|removing|removals?|trim|drop|swap out)\b/i;
+/* "protect" covers both keeps and adds: a card named under either heading must
+   never end up in a cut list, so they need no distinction here. */
+const PROTECT_RE = /\b(working well|keep|keeping|strengths?|core|missing|add(?:s|ing|ition|itions)?|include|upgrades?)\b/i;
+
+/* Classify a heading. Ambiguous wins nothing: a heading that says both ("Cuts
+   and additions") is neutral, because it does not authorize deleting anything. */
+function adviceOf(heading: string): SectionAdvice {
+  const cut = CUT_RE.test(heading);
+  const protect = PROTECT_RE.test(heading);
+  if (cut && !protect) return "cut";
+  if (protect && !cut) return "protect";
+  return "neutral";
+}
+
+/* The first card named in a run of inline tokens, or null. */
+function firstCardIn(tokens: InlineToken[]): string | null {
+  for (const t of tokens) {
+    if (t.type === "card") return t.value.trim();
+    if (t.type === "bold") {
+      const inner = firstCardIn(t.tokens);
+      if (inner) return inner;
+      // A bold span with no bracketed card inside is itself a candidate name,
+      // which is how the model often writes a cut ("**Sol Ring** — worse than…").
+      const flat = flattenInline(t.tokens).trim().replace(/\s+/g, " ");
+      if (flat && /^[\p{Lu}\d]/u.test(flat) && !flat.endsWith(":") && flat.split(" ").length <= 8) {
+        return flat;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * The cards a reply actually proposes CUTTING.
+ *
+ * This exists because the obvious reading of a reply — "every card named that
+ * is already in the deck" — is wrong in the one direction that costs you a
+ * deck. A cut is almost always argued FOR by naming something better:
+ *
+ *     ## Consider cutting
+ *     - [[Divination]] — [[Rhystic Study]] already does this, better
+ *
+ * Both cards are named, both are in the deck, so a flat scan offers to remove
+ * the card the reply told you to keep. Two rules keep that from happening:
+ *
+ *  1. Only headings that say cut and nothing else contribute candidates. No
+ *     such heading means no bulk cut is offered at all — a free-form answer
+ *     has no structure to trust, and cards stay removable one at a time.
+ *  2. Within a cut section, only the FIRST card of each list item or paragraph
+ *     is a candidate. The rest of that sentence is the justification, which is
+ *     exactly where the cards you must keep get named.
+ *
+ * Anything named under a keep/add heading is then subtracted, so a card praised
+ * in one section can never be cut by another.
+ */
+export function cutCandidates(md: string): string[] {
+  const blocks = parseBlocks(md);
+  let advice: SectionAdvice = "neutral";
+  let sawCutHeading = false;
+  const candidates: string[] = [];
+  const protectedKeys = new Set<string>();
+
+  const protectAll = (tokens: InlineToken[]) => {
+    for (const n of cardNamesIn(flattenCards(tokens))) protectedKeys.add(normalizeCardKey(n));
+  };
+
+  const consume = (run: InlineToken[]) => {
+    if (advice === "cut") {
+      const first = firstCardIn(run);
+      if (first) candidates.push(first);
+    } else if (advice === "protect") {
+      protectAll(run);
+    }
+  };
+
+  for (const b of blocks) {
+    if (b.type === "h1" || b.type === "h2" || b.type === "h3") {
+      // A heading changes what the cards under it mean.
+      advice = adviceOf(flattenInline(b.inline));
+      if (advice === "cut") sawCutHeading = true;
+    } else if (b.type === "p") {
+      consume(b.inline);
+    } else if (b.type === "ul" || b.type === "ol") {
+      for (const item of b.items) consume(item);
+    }
+  }
+
+  if (!sawCutHeading) return [];
+  const seen = new Set<string>();
+  return candidates.filter((n) => {
+    const key = normalizeCardKey(n);
+    if (protectedKeys.has(key) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/* Re-serialize inline tokens far enough that cardNamesIn can read the [[…]]
+   names back out of them. */
+function flattenCards(tokens: InlineToken[]): string {
+  return tokens
+    .map((t) =>
+      t.type === "card" ? `[[${t.value}]]` : t.type === "bold" ? flattenCards(t.tokens) : t.value
+    )
+    .join("");
+}
