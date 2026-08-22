@@ -9,11 +9,13 @@ for (let mask = 1; mask < 32; mask++) {
 
 /** The gradient's top stop — the palest thing anything on the page sits on. */
 function topStop(identity: string): string {
-  const bg = getIdentityTheme(identity).vars as Record<string, string>;
-  void bg;
-  const m = getIdentityTheme(identity);
-  const grad = m.bg.match(/#[0-9a-f]{6}/gi) ?? [];
-  return grad[0];
+  const grad = getIdentityTheme(identity).bg.match(/#[0-9a-f]{6}/gi) ?? [];
+  const first = grad[0];
+  // Throw rather than substitute. An identity whose ground has no hex stop is
+  // a bug in the theme, and every assertion below is about that first stop —
+  // defaulting it would quietly test a colour the page never shows.
+  if (!first) throw new Error(`no gradient stop for identity "${identity}"`);
+  return first;
 }
 
 /** White at `alpha` over `bg`, as opaque hex — what the eye actually sees. */
