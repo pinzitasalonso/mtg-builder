@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
-import { Block, InlineToken, boldNamesIn, cardNamesIn, flattenInline, normalizeCardKey, parseBlocks } from "@/lib/chat-markdown";
+import { Block, InlineToken, boldNamesIn, cardNamesIn, cutCandidates, flattenInline, normalizeCardKey, parseBlocks } from "@/lib/chat-markdown";
 import { collectionByName } from "@/lib/scryfall";
 import { track } from "@/lib/track";
 
@@ -640,9 +640,23 @@ function AssistantMessage({
     [content, poolByLower, validCards, notFound]
   );
   const toAdd = names.filter((n) => !poolByLower.has(normalizeCardKey(n)));
-  const toRemove = names.filter((n) => poolByLower.has(normalizeCardKey(n)));
+  /* NOT "every named card that's already in the deck". A reply argues for a cut
+     by naming something better, and that better card is in the same sentence
+     and also in the deck — so the obvious filter offered to delete the cards
+     the reply told you to keep. cutCandidates reads the reply's structure
+     instead, and returns nothing at all when there is no structure to trust. */
+  const toRemove = useMemo(
+    () => cutCandidates(content).filter((n) => poolByLower.has(normalizeCardKey(n))),
+    [content, poolByLower]
+  );
   // Only worth a bulk bar when the answer suggests more than one card.
   const showBar = showActions && names.length > 1 && (toAdd.length > 0 || toRemove.length > 0);
+  /* Removing is the one action here that destroys work, so it asks first and
+     names what it is about to cut. Adding is reversible and does not. */
+  const [confirmCut, setConfirmCut] = useState(false);
+  useEffect(() => {
+    if (!showBar) setConfirmCut(false);
+  }, [showBar]);
   return (
     <div>
       <ChatMarkdown
@@ -662,12 +676,30 @@ function AssistantMessage({
               {bulkProgress?.mode === "add" ? "Adding…" : `＋ Add all ${toAdd.length}`}
             </button>
           )}
-          {toRemove.length > 0 && (
-            <button type="button" onClick={() => onRemoveAll(toRemove)} disabled={bulkBusy} style={bulkBtn(true)}>
+          {toRemove.length > 0 && !confirmCut && (
+            <button type="button" onClick={() => setConfirmCut(true)} disabled={bulkBusy} style={bulkBtn(true)}>
               {bulkProgress?.mode === "remove"
                 ? `Removing ${bulkProgress.done}/${bulkProgress.total}…`
-                : `✕ Remove all ${toRemove.length}`}
+                : `✕ Cut ${toRemove.length}…`}
             </button>
+          )}
+          {toRemove.length > 0 && confirmCut && (
+            <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 12.5, color: "var(--t2)" }}>
+                Cut <b style={{ color: "var(--t1)" }}>{toRemove.join(", ")}</b>?
+              </span>
+              <button
+                type="button"
+                onClick={() => { setConfirmCut(false); onRemoveAll(toRemove); }}
+                disabled={bulkBusy}
+                style={bulkBtn(true)}
+              >
+                ✕ Cut {toRemove.length}
+              </button>
+              <button type="button" onClick={() => setConfirmCut(false)} disabled={bulkBusy} style={bulkBtn(false)}>
+                Cancel
+              </button>
+            </span>
           )}
           {bulkProgress?.mode === "remove" && (
             <span style={{ flexBasis: "100%", height: 3, borderRadius: 99, background: "var(--line)", overflow: "hidden" }}>
