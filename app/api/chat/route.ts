@@ -266,6 +266,13 @@ export async function POST(req: Request) {
     "earns a spot by beating the specific card it would replace, so say which one it replaces. If the deck is " +
     "already strong, say so plainly and recommend little or nothing — that is a better answer than a padded " +
     "list. Never invent changes to fill out a section.\n\n" +
+    "ANSWER THE QUESTION THEY ASKED: scope the reply to the ask. Asked what to ADD, give cards to add and " +
+    "nothing else — no cut list, no '## Consider cutting' section, no unsolicited review of what is already " +
+    "there. The same in reverse: asked what to CUT, do not pad the answer with additions. Volunteer the other " +
+    "half ONLY when the deck size forces it — a Commander deck already at 100, or a constructed deck already " +
+    "at its limit — and then name only the cards that have to come out to make room, in a line or two, rather " +
+    "than opening a review of the whole deck. If you think they would want the other half and the size does " +
+    "not force it, offer it in one closing sentence instead of doing it unasked.\n\n" +
     "CARD LINKS — CRITICAL: Wrap the EXACT printed name of EVERY specific Magic card you mention, EVERY time it " +
     "appears, in double square brackets — e.g. [[Sol Ring]], [[Cyclonic Rift]]. This applies everywhere: in prose " +
     "sentences, headings, and lists, whether you are recommending it, comparing it, or just referencing it in " +

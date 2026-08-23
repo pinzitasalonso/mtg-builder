@@ -3,7 +3,7 @@
 // The deck page's Stats pane — everything ABOUT the deck rather than in it.
 //
 // Read top to bottom it goes: what the deck IS (the profile), how it PLAYS
-// (the primer, the notes, the combos, the record), what it's MADE of (curve,
+// (the primer, the combos, the record), what it's MADE of (curve,
 // composition, colour identity), then 8x8. That is the iOS Stats tab's order,
 // and the reasoning there applies here: the profile is the verdict, the things
 // you READ come next, and the densest block goes last because it is the one
@@ -56,11 +56,6 @@ export default function DeckStatsPane({
   primer,
   primerOpen,
   onPrimerSaved,
-  notes,
-  notesOpen,
-  noteStatus,
-  onNotesChange,
-  onNotesBlur,
   onHoverCurveBar,
   onClickCurveBar,
 }: {
@@ -74,11 +69,6 @@ export default function DeckStatsPane({
   primer: string;
   primerOpen: boolean;
   onPrimerSaved: (text: string) => void;
-  notes: string;
-  notesOpen: boolean;
-  noteStatus: "idle" | "saving" | "saved";
-  onNotesChange: (text: string) => void;
-  onNotesBlur: () => void;
   onHoverCurveBar: (i: number | null) => void;
   onClickCurveBar?: (i: number) => void;
 }) {
@@ -86,10 +76,9 @@ export default function DeckStatsPane({
   const stats = deckStats(deckCards);
 
   const showPrimer = primerOpen || Boolean(primer) || !canEdit;
-  const showNotes = notesOpen || Boolean(notes);
-  // An owner with no primer, no notes and no readings gets no section — the
-  // Tools menu is how you start one, the same as before this pane existed.
-  const showPlay = showPrimer || showNotes || insight.hasPlayReadings;
+  // An owner with no primer and no readings gets no section — the Tools menu
+  // is how you start one, the same as before this pane existed.
+  const showPlay = showPrimer || insight.hasPlayReadings;
 
   if (deckCards.length === 0) {
     return (
@@ -113,24 +102,6 @@ export default function DeckStatsPane({
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {showPrimer && (
               <DeckPrimer deckId={deckId} primer={primer} canEdit={canEdit} onSaved={onPrimerSaved} />
-            )}
-            {showNotes && (
-              <div className="id-panel" style={{ padding: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <span className="id-label" style={{ color: "var(--w-2)" }}>Quick notes</span>
-                  <span className="id-label" style={{ fontSize: 10, color: noteStatus === "saving" ? "var(--w-3)" : "var(--gold)" }}>
-                    {noteStatus === "saving" ? "Saving…" : noteStatus === "saved" ? "Saved" : ""}
-                  </span>
-                </div>
-                <textarea
-                  value={notes}
-                  onChange={(e) => onNotesChange(e.target.value)}
-                  onBlur={onNotesBlur}
-                  placeholder="How does this deck play? Mulligans, key lines, win routes…"
-                  rows={4}
-                  style={{ width: "100%", border: "none", outline: "none", resize: "vertical", background: "transparent", fontFamily: "var(--font-body)", fontSize: 14.5, lineHeight: 1.55, color: "var(--text)", minHeight: 76, padding: 0 }}
-                />
-              </div>
             )}
             <InsightPlay insight={insight} />
           </div>

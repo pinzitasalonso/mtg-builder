@@ -8,17 +8,16 @@
 // MADE of" — so the profile leads, the combos and the record belong beside the
 // primer under "how it plays", and the 8x8 goes last because it is the densest
 // thing on the pane. One block could not be interleaved with the primer, the
-// notes and the shape strip that sit between those readings, so the fetching is
+// and the shape strip that sit between those readings, so the fetching is
 // a hook and each reading is its own component.
 //
 // Bracket and 8x8 are computed here from cards the page already holds, exactly
-// as iOS computes them locally — see lib/deck-insight. CRISPI is scored on the
-// server because the rubric needs oracle text for every card, and it arrives
-// with a `provisional` flag and a list of what was estimated or stubbed.
+// as iOS computes them locally — see lib/deck-insight. The combos and the game
+// record come from the server.
 //
-// THE PROVISIONAL NOTE IS NOT OPTIONAL. A number on a stats panel reads as a
-// verdict unless it is told not to, and this one is derived from oracle-text
-// pattern matching with three of its inputs not computed at all.
+// A number on a stats panel reads as a verdict, so only put one here that is
+// actually measured. CRISPI used to sit in the profile and did not clear that
+// bar — two of its four axes were constants — so it is gone.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
@@ -46,62 +45,14 @@ interface History {
   games: GameRow[];
 }
 
-interface Crispi {
-  consistency: number;
-  resilience: number;
-  interaction: number;
-  speed: number;
-  /// The Performance Index. Named `crispi`, not `index` — reading the wrong
-  /// key gave undefined, and `.toFixed` on it threw and took the whole deck
-  /// page down with it.
-  crispi: number;
-  /// Already rounded by the server. Use it rather than re-formatting, so the
-  /// app and the web page never disagree by a digit — which is exactly what
-  /// the iOS client's own comment says and what this failed to do.
-  display: string;
-  provisional?: boolean;
-  notes?: { estimated?: string[]; stubbed?: string[] };
-}
-
-/**
- * Trailing zeros off a quarter-point scale: 6.25 stays, 6.00 becomes 6.
- *
- * Returns null rather than throwing on anything that is not a number. This
- * panel reads a server payload, and a field that moves or arrives missing must
- * not be able to take the deck page with it — which is precisely what happened
- * when it read `index` and the server sends `crispi`.
- */
-const trim = (n: unknown): string | null =>
-  typeof n === "number" && Number.isFinite(n) ? String(Number(n.toFixed(2))) : null;
-
-/** The four axes, as a line, skipping any the server did not send. */
-function axesNote(c: Crispi): string | null {
-  const parts = (
-    [
-      ["C", c.consistency],
-      ["R", c.resilience],
-      ["I", c.interaction],
-      ["S", c.speed],
-    ] as const
-  )
-    .map(([label, value]) => {
-      const t = trim(value);
-      return t === null ? null : `${label} ${t}`;
-    })
-    .filter((p): p is string => p !== null);
-  return parts.length ? parts.join(" · ") : null;
-}
-
 export interface DeckInsightData {
   bracket: ReturnType<typeof suggestedBracket>;
   /** null while the Game Changer list is still loading. */
   changers: number | null;
-  crispi: Crispi | null;
-  crispiValue: string | null;
   combos: ComboResult | null;
   history: History | null;
   buckets: ReturnType<typeof cubeBuckets>;
-  /** Whether "how it plays" has anything beyond the primer and the notes. */
+  /** Whether "how it plays" has anything beyond the primer. */
   hasPlayReadings: boolean;
 }
 
@@ -113,7 +64,6 @@ export interface DeckInsightData {
  */
 export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsightData {
   const [gameChangers, setGameChangers] = useState<Set<string> | null>(null);
-  const [crispi, setCrispi] = useState<Crispi | null>(null);
   const [combos, setCombos] = useState<ComboResult | null>(null);
   const [history, setHistory] = useState<History | null>(null);
 
@@ -132,21 +82,6 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
       live = false;
     };
   }, []);
-
-  useEffect(() => {
-    let live = true;
-    // Best-effort, like iOS: a deck with no cards scored yet, or a request that
-    // fails, simply shows no CRISPI row rather than an error about a score.
-    fetch(`/api/decks/${deckId}/crispi`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((b) => live && setCrispi(b))
-      .catch(() => live && setCrispi(null));
-    return () => {
-      live = false;
-    };
-    // Re-scored when the decklist's size changes — the server reads its own
-    // copy, so this follows a sync rather than a keystroke.
-  }, [deckId, deckCount]);
 
   useEffect(() => {
     let live = true;
@@ -181,15 +116,9 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
   // cannot be bracket 1 or 2 however few Game Changers it runs, which is why
   // iOS passes the same flag in.
   const bracket = suggestedBracket(changers ?? 0, combos?.hasTwoCardCombo ?? false);
-  // The server's own rounding first, our own only as a fallback, and nothing
-  // at all if neither is a number the panel can print.
-  const crispiValue = crispi ? (crispi.display ?? trim(crispi.crispi)) : null;
-
   return {
     bracket,
     changers,
-    crispi,
-    crispiValue,
     combos,
     history,
     buckets,
@@ -234,8 +163,8 @@ function ProfileRow({ label, value, detail }: { label: string; value: string; de
 }
 
 /**
- * The verdict: bracket, average cost, CRISPI. One glance, the numbers that
- * judge the deck.
+ * The verdict: bracket and average cost. One glance, the numbers that judge
+ * the deck.
  */
 export function InsightProfile({
   insight,
@@ -244,7 +173,7 @@ export function InsightProfile({
   insight: DeckInsightData;
   avgManaValue: number;
 }) {
-  const { bracket, changers, crispi, crispiValue, combos } = insight;
+  const { bracket, changers, combos } = insight;
   // Nil at zero, deliberately — iOS `gameChangerDetail`. `changers` is also
   // null before the list has loaded, and "from 0 game changers" would be
   // claiming a measurement we have not taken.
@@ -262,18 +191,6 @@ export function InsightProfile({
     <div style={{ maxWidth: 560 }}>
       <ProfileRow label="Bracket" value={`${BRACKET_NUMBER[bracket]} · ${BRACKET_LABEL[bracket]}`} detail={bracketDetail} />
       {Number.isFinite(avgManaValue) && <ProfileRow label="Average cost" value={avgManaValue.toFixed(2)} />}
-      {crispiValue && <ProfileRow label="CRISPI" value={crispiValue} detail={crispi ? axesNote(crispi) : null} />}
-      {crispi?.provisional && (
-        // The server says the score is provisional and why. Rendering the
-        // number without this would present a pattern-matched estimate as a
-        // measurement.
-        <p style={{ fontSize: 12, color: "var(--w-3)", lineHeight: 1.5, margin: "12px 0 0" }}>
-          CRISPI is provisional — it reads card roles from oracle text, and some of the rubric&apos;s
-          inputs aren&apos;t computed yet
-          {crispi.notes?.stubbed?.length ? ` (${crispi.notes.stubbed.length} stubbed)` : ""}. Treat it as
-          a rough shape, not a rating.
-        </p>
-      )}
     </div>
   );
 }

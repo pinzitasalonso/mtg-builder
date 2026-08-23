@@ -4,9 +4,9 @@
    the plan, what to keep, the lines, the combos, what beats it.
 
    It is written in the iOS app (by hand or drafted by the assistant) and stored
-   on the deck, so this is the same text, rendered. Deliberately not the notes
-   field: notes is a scratchpad, a primer is what you hand to someone who asks
-   how the deck works.
+   on the deck, so this is the same text, rendered. It replaced the old notes
+   scratchpad: two boxes for "how does this deck play" was one too many, and
+   the primer is the one you'd hand to someone who asks.
 
    Rendering reuses the chat's Markdown tokenizer, so [[Card Name]] links keep
    working here without a second parser. Cards are styled but not clickable —
