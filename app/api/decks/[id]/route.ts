@@ -11,17 +11,6 @@ export async function GET(
   // View access: the owner, an ownerless public deck, or a shared deck.
   const deck = await viewableDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
-  // One-shot backfill: notes is gone from both clients, and a deck whose
-  // owner only ever wrote notes would otherwise lose that text. It becomes
-  // the primer, which is where it was always headed — iOS already READ it
-  // that way, falling back to notes when there was no primer.
-  //
-  // On read rather than as a migration because this app has no migration
-  // framework (`prisma db push` on boot), and every deck gets read. The guard
-  // means it can only ever fire once per deck.
-  if (!deck.primer?.trim() && deck.notes?.trim()) {
-    await prisma.deck.update({ where: { id: deck.id }, data: { primer: deck.notes } });
-  }
   const counted = await prisma.deck.findUnique({
     where: { id: deck.id },
     include: { _count: { select: { cards: true } } },
