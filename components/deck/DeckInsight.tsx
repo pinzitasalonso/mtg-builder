@@ -8,7 +8,7 @@
 // MADE of" — so the profile leads, the combos and the record belong beside the
 // primer under "how it plays", and the 8x8 goes last because it is the densest
 // thing on the pane. One block could not be interleaved with the primer, the
-// notes and the shape strip that sit between those readings, so the fetching is
+// and the shape strip that sit between those readings, so the fetching is
 // a hook and each reading is its own component.
 //
 // Bracket and 8x8 are computed here from cards the page already holds, exactly
@@ -52,7 +52,7 @@ export interface DeckInsightData {
   combos: ComboResult | null;
   history: History | null;
   buckets: ReturnType<typeof cubeBuckets>;
-  /** Whether "how it plays" has anything beyond the primer and the notes. */
+  /** Whether "how it plays" has anything beyond the primer. */
   hasPlayReadings: boolean;
 }
 

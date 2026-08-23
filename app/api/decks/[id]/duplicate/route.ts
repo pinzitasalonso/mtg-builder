@@ -29,7 +29,6 @@ export async function POST(
       name: `${source.name} (copy)`,
       format: source.format,
       commander: source.commander,
-      notes: source.notes,
       primer: source.primer,
       userId: user?.id ?? null,
       publicId: newPublicId(),

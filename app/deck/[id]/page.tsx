@@ -61,7 +61,6 @@ interface Deck {
   name: string;
   format: string;
   commander: string | null;
-  notes: string | null;
   /** The play primer — written or AI-drafted in the iOS app, read here. */
   primer: string | null;
   shared?: boolean;
@@ -228,7 +227,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // Fixed viewport coords for the tools menu, measured from the button so it
   // opens right under it and never runs off-screen on mobile.
   const [toolsPos, setToolsPos] = useState<{ top: number; left: number } | null>(null);
-  const [notesOpen, setNotesOpen] = useState(false);
   const [primerOpen, setPrimerOpen] = useState(false);
   // Count of offline review decisions waiting to sync (drives the banner).
   const [pendingSync, setPendingSync] = useState(0);
@@ -309,37 +307,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [ownedNames, setOwnedNames] = useState<string[]>([]);
   const ownedSet = new Set(ownedNames.map((n) => n.toLowerCase()));
 
-  // play notes — autosaved, debounced
-  const [notes, setNotes] = useState("");
-  const [noteStatus, setNoteStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastSavedNotes = useRef("");
-
-  const saveNotes = useCallback(
-    async (text: string) => {
-      if (text === lastSavedNotes.current) return;
-      setNoteStatus("saving");
-      const res = await fetch(`/api/decks/${deckId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes: text }),
-      });
-      if (res.ok) {
-        lastSavedNotes.current = text;
-        setNoteStatus("saved");
-      } else {
-        setNoteStatus("idle");
-      }
-    },
-    [deckId]
-  );
-
-  function onNotesChange(text: string) {
-    setNotes(text);
-    if (noteTimer.current) clearTimeout(noteTimer.current);
-    noteTimer.current = setTimeout(() => saveNotes(text), 900);
-  }
-
   const loadPool = useCallback(async () => {
     let res: Response;
     try {
@@ -401,8 +368,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         if (r.ok) {
           const d: Deck = await r.json();
           setDeck(d);
-          setNotes(d.notes ?? "");
-          lastSavedNotes.current = d.notes ?? "";
         } else if (r.status === 401) router.replace("/login");
         else setDeckMissing(true);
       })
@@ -895,7 +860,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                         { label: "🎟 Game code", on: () => setGameCodeOpen(true) },
                         { group: "Write-ups" },
                         { label: "📖 Primer", on: () => { setPrimerOpen(true); setPane("stats"); } },
-                        { label: "📝 Quick notes", on: () => { setNotesOpen(true); setPane("stats"); } },
                       ] : []),
                     ] as { group?: string; label?: string; on?: () => void; disabled?: boolean; keepOpen?: boolean }[]).map((it) =>
                       it.group ? (
@@ -1108,11 +1072,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               primer={deck?.primer ?? ""}
               primerOpen={primerOpen}
               onPrimerSaved={(text) => setDeck((d) => (d ? { ...d, primer: text || null } : d))}
-              notes={notes}
-              notesOpen={notesOpen}
-              noteStatus={noteStatus}
-              onNotesChange={onNotesChange}
-              onNotesBlur={() => { if (noteTimer.current) clearTimeout(noteTimer.current); saveNotes(notes); }}
               onHoverCurveBar={(i) => setDeckFilter(i === null ? null : { kind: "mv", value: i })}
               onClickCurveBar={canEdit ? (i) => { setPane("deck"); startDeckReviewOf(deckCards.filter((c) => categoryOf(c.typeLine) !== "Lands" && Math.min(manaValue(c.manaCost), 7) === i)); } : undefined}
             />

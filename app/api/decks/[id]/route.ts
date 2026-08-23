@@ -11,6 +11,17 @@ export async function GET(
   // View access: the owner, an ownerless public deck, or a shared deck.
   const deck = await viewableDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
+  // One-shot backfill: notes is gone from both clients, and a deck whose
+  // owner only ever wrote notes would otherwise lose that text. It becomes
+  // the primer, which is where it was always headed — iOS already READ it
+  // that way, falling back to notes when there was no primer.
+  //
+  // On read rather than as a migration because this app has no migration
+  // framework (`prisma db push` on boot), and every deck gets read. The guard
+  // means it can only ever fire once per deck.
+  if (!deck.primer?.trim() && deck.notes?.trim()) {
+    await prisma.deck.update({ where: { id: deck.id }, data: { primer: deck.notes } });
+  }
   const counted = await prisma.deck.findUnique({
     where: { id: deck.id },
     include: { _count: { select: { cards: true } } },
@@ -30,16 +41,12 @@ export async function PATCH(
   const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const body = await req.json();
-  const data: { name?: string; format?: string; commander?: string | null; notes?: string | null; primer?: string | null; shared?: boolean; gamesPlayed?: number; gamesWon?: number } = {};
+  const data: { name?: string; format?: string; commander?: string | null; primer?: string | null; shared?: boolean; gamesPlayed?: number; gamesWon?: number } = {};
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
   if (typeof body.format === "string" && body.format.trim()) data.format = body.format.trim();
   if ("commander" in body) {
     const c = typeof body.commander === "string" ? body.commander.trim() : "";
     data.commander = c || null;
-  }
-  if ("notes" in body) {
-    const n = typeof body.notes === "string" ? body.notes.slice(0, 20_000) : "";
-    data.notes = n.trim() ? n : null;
   }
   // The primer is a document, not a field — an AI-drafted one runs several
   // thousand characters, so it gets its own (larger) cap.
