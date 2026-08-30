@@ -31,12 +31,21 @@ export async function readExistingState(identity: ProviderIdentity): Promise<Exi
   };
 }
 
-/* Carry out a decision. Returns the user id to open a session for, or null
-   when the decision was a rejection. */
+export interface LinkedUser {
+  id: number;
+  email: string;
+}
+
+/* Carry out a decision. Returns the account to open a session for, or null
+   when the decision was a rejection.
+
+   The email comes back from the row rather than from the identity: Apple
+   sends an address only on the first authorization, so on every later
+   sign-in the identity has none and only the database knows it. */
 export async function applyLinkDecision(
   identity: ProviderIdentity,
   decision: LinkDecision
-): Promise<number | null> {
+): Promise<LinkedUser | null> {
   if (decision.action === "reject") return null;
 
   const userId =
@@ -89,5 +98,6 @@ export async function applyLinkDecision(
     update: { lastUsedAt: new Date(), email: identity.email },
   });
 
-  return userId;
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, email: true } });
+  return user;
 }
