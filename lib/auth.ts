@@ -72,6 +72,10 @@ export interface AuthUser {
   tier: string;
   aiDay: string | null;
   aiCount: number;
+  // Whether a password is set at all. False for accounts that only ever
+  // signed in with Apple or Google, which is what tells the clients not to
+  // ask for a current password they don't have.
+  hasPassword: boolean;
 }
 
 /* The logged-in user, or null. Expired sessions are deleted on sight. */
@@ -81,14 +85,20 @@ export async function currentUser(): Promise<AuthUser | null> {
   sweepExpired();
   const session = await prisma.session.findUnique({
     where: { id: tokenHash(token) },
-    include: { user: { select: { id: true, email: true, tier: true, aiDay: true, aiCount: true } } },
+    include: {
+      user: {
+        select: { id: true, email: true, tier: true, aiDay: true, aiCount: true, passwordHash: true },
+      },
+    },
   });
   if (!session) return null;
   if (session.expiresAt < new Date()) {
     await prisma.session.delete({ where: { id: session.id } }).catch(() => {});
     return null;
   }
-  return session.user;
+  // Map the hash to a boolean here so no caller can accidentally serialize it.
+  const { passwordHash, ...user } = session.user;
+  return { ...user, hasPassword: passwordHash !== null };
 }
 
 /* Access check for deck-scoped routes. Public decks (userId null) are open

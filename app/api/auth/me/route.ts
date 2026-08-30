@@ -15,6 +15,7 @@ export async function GET() {
       tier: user.tier,
       aiRemaining: aiRemaining(user),
       deckLimit: isPro(user) ? null : FREE_DECK_LIMIT,
+      hasPassword: user.hasPassword,
     },
   });
 }
