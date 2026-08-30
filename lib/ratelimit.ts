@@ -60,3 +60,52 @@ export function anonAiAllowed(ip: string): boolean {
 
 export const ANON_LIMIT_MSG =
   "The free AI budget is busy right now (a couple of calls per minute, shared by all guests). Try again in a minute — or sign in for unlimited use.";
+
+/* ---- auth throttles ----------------------------------------------------- */
+
+// Every auth route was unthrottled: login accepted unlimited password guesses,
+// and reset/resend were open "send an email to this address" triggers. Caps
+// are deliberately loose enough that a person fumbling their own password
+// never meets them.
+export type AuthAction =
+  | "login"
+  | "signup"
+  | "resend"
+  | "reset-request"
+  | "reset-confirm"
+  | "password"
+  | "delete"
+  | "verify"
+  | "apple"
+  | "oauth-start"
+  | "oauth-exchange";
+
+// [per-IP max, per-IP window, per-subject max, per-subject window]. A subject
+// bucket of 0 means the action has no meaningful subject to key on.
+const AUTH_LIMITS: Record<AuthAction, [number, number, number, number]> = {
+  login: [10, 5 * 60_000, 5, 15 * 60_000],
+  signup: [5, 15 * 60_000, 3, 60 * 60_000],
+  resend: [5, 15 * 60_000, 3, 60 * 60_000],
+  "reset-request": [5, 15 * 60_000, 3, 60 * 60_000],
+  "reset-confirm": [10, 15 * 60_000, 0, 0],
+  password: [10, 15 * 60_000, 0, 0],
+  delete: [5, 60 * 60_000, 0, 0],
+  verify: [20, 5 * 60_000, 0, 0],
+  apple: [20, 5 * 60_000, 0, 0],
+  "oauth-start": [20, 5 * 60_000, 0, 0],
+  "oauth-exchange": [20, 5 * 60_000, 0, 0],
+};
+
+/* Consume one attempt at `action`. The IP bucket is checked first, so an
+   abusive client is turned away without spending a victim's per-email budget
+   — same ordering, and the same reason, as anonAiAllowed. */
+export function authRateLimit(action: AuthAction, ip: string, subject?: string): boolean {
+  const [ipMax, ipWindow, subMax, subWindow] = AUTH_LIMITS[action];
+  if (!rateLimit(`auth:${action}:ip:${ip}`, ipMax, ipWindow)) return false;
+  if (subMax > 0 && subject) {
+    if (!rateLimit(`auth:${action}:sub:${subject}`, subMax, subWindow)) return false;
+  }
+  return true;
+}
+
+export const AUTH_LIMIT_MSG = "Too many attempts — try again in a few minutes.";

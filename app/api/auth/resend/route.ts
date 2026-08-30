@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { createVerifyToken, requestOrigin } from "@/lib/auth";
+import { createVerifyToken, normalizeEmail, requestOrigin } from "@/lib/auth";
 import { sendVerificationEmail } from "@/lib/email";
+import { AUTH_LIMIT_MSG, authRateLimit, clientIp } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,12 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const email = normalizeEmail(body.email);
+  if (!authRateLimit("resend", clientIp(req), email)) {
+    // Still the same shape as success — a 429 here would confirm the address
+    // is worth retrying, which is exactly what this route refuses to say.
+    return NextResponse.json({ ok: true });
+  }
   if (email) {
     const user = await prisma.user.findUnique({ where: { email } });
     if (user && !user.emailVerifiedAt) {
