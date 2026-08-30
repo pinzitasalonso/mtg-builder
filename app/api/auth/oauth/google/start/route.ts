@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { newToken, requestOrigin, safeNextPath, tokenHash } from "@/lib/auth";
-import { authorizeUrl, googleClientId, googleConfigured, newVerifier } from "@/lib/google-auth";
+import {
+  authorizeUrl,
+  googleCallbackUrl,
+  googleClientId,
+  googleConfigured,
+  newVerifier,
+} from "@/lib/google-auth";
 import { authRateLimit, clientIp } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
@@ -9,8 +15,6 @@ export const runtime = "nodejs";
 // Ten minutes is plenty to pick an account and long enough to survive a
 // password manager prompt.
 const STATE_MINUTES = 10;
-
-export const googleCallbackUrl = (origin: string) => `${origin}/api/auth/oauth/google/callback`;
 
 /* Begin the flow. `mode=app` marks a sign-in started by the iOS app, which
    needs a one-time code handed back over the custom scheme rather than a

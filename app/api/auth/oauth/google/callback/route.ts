@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createSession, newToken, requestOrigin, tokenHash } from "@/lib/auth";
-import { exchangeCode } from "@/lib/google-auth";
+import { exchangeCode, googleCallbackUrl } from "@/lib/google-auth";
 import { applyLinkDecision, readExistingState } from "@/lib/oauth-link-db";
 import { decideLink, type ProviderIdentity } from "@/lib/oauth-link";
 import { recordEvent } from "@/lib/analytics";
@@ -54,7 +54,7 @@ export async function GET(req: Request) {
 
   const google = await exchangeCode({
     code,
-    redirectUri: `${origin}/api/auth/oauth/google/callback`,
+    redirectUri: googleCallbackUrl(origin),
     verifier: pending.verifier,
     nonce: pending.nonce,
   });

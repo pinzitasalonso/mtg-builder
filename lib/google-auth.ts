@@ -16,6 +16,11 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 // Google mints tokens with either spelling of the issuer.
 export const GOOGLE_ISS = ["https://accounts.google.com", "accounts.google.com"];
 
+/* The redirect_uri, which Google compares byte for byte against the console
+   entry and against the value sent at authorize time. Defined once so those
+   three can't drift apart. */
+export const googleCallbackUrl = (origin: string) => `${origin}/api/auth/oauth/google/callback`;
+
 export const googleClientId = () => process.env.GOOGLE_CLIENT_ID ?? "";
 const googleClientSecret = () => process.env.GOOGLE_CLIENT_SECRET ?? "";
 export const googleConfigured = () => Boolean(googleClientId() && googleClientSecret());
