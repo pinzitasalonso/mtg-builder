@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { createSession, verifyPassword } from "@/lib/auth";
+import { createSession, normalizeEmail, verifyPassword } from "@/lib/auth";
 import { recordEvent } from "@/lib/analytics";
+import { AUTH_LIMIT_MSG, authRateLimit, clientIp } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -12,8 +13,11 @@ export async function POST(req: Request) {
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const email = normalizeEmail(body.email);
   const password = typeof body.password === "string" ? body.password : "";
+  if (!authRateLimit("login", clientIp(req), email)) {
+    return NextResponse.json({ error: AUTH_LIMIT_MSG }, { status: 429 });
+  }
 
   // One generic message for both bad email and bad password — no account
   // enumeration via the error text. verifyPassword runs even when there is no

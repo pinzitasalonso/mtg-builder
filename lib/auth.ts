@@ -1,56 +1,23 @@
-// Email + password auth: scrypt hashing (no extra deps) and server-side
-// sessions in SQLite, referenced by an httpOnly cookie. Server-only.
+// Server-side sessions in SQLite, referenced by an httpOnly cookie, plus the
+// deck access checks. The pure half — hashing, token minting, validators —
+// lives in lib/auth-core.ts and is re-exported here, so every existing import
+// from "@/lib/auth" keeps working. Server-only.
 
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import prisma from "@/lib/prisma";
+import {
+  RESET_MINUTES,
+  SESSION_COOKIE,
+  SESSION_DAYS,
+  VERIFY_HOURS,
+  newToken,
+  tokenHash,
+} from "@/lib/auth-core";
 
-export const SESSION_COOKIE = "sp_session";
-const SESSION_DAYS = 30;
-
-// scrypt parameters, recorded in the hash string so they can evolve later.
-const SCRYPT = { N: 16384, r: 8, p: 1, keylen: 64 };
-
-export function hashPassword(password: string): string {
-  const salt = randomBytes(16);
-  const hash = scryptSync(password, salt, SCRYPT.keylen, SCRYPT);
-  return `s1:${SCRYPT.N}:${salt.toString("base64url")}:${hash.toString("base64url")}`;
-}
-
-// A real s1 hash of a value nobody knows. Checking against it costs the same
-// ~56ms of scrypt as a genuine check, so "no such account", "that account has
-// no password" and "wrong password" are indistinguishable by timing. Without
-// it, skipping the hash for an unknown email leaks which addresses exist.
-const DUMMY_HASH =
-  "s1:16384:BivtZzfMNLvWrXs16r1nuQ:YKFT8tHZCbWNcpz2L4HwfARrd9C4d901pEssoTwFdMY7Xa9mmBc9e5MxF2OgVT8KHtByrhQs1P1EztbWRy1ITQ";
-
-/* Check a password against a stored hash. `stored` is null for accounts that
-   only ever signed in with Apple or Google — they always fail, but they burn
-   the same time doing it. */
-export function verifyPassword(password: string, stored: string | null): boolean {
-  const target = stored ?? DUMMY_HASH;
-  const [v, nStr, saltB64, hashB64] = target.split(":");
-  if (v !== "s1" || !nStr || !saltB64 || !hashB64) {
-    // Still spend the time, so a corrupt hash isn't a fast "no" either.
-    scryptSync(password, Buffer.alloc(16), SCRYPT.keylen, SCRYPT);
-    return false;
-  }
-  // N arrives as text from the database; a wild value would hang the process.
-  const n = Number(nStr);
-  if (!Number.isInteger(n) || n < 1024 || n > 1 << 20) return false;
-  const salt = Buffer.from(saltB64, "base64url");
-  const expected = Buffer.from(hashB64, "base64url");
-  const actual = scryptSync(password, salt, expected.length, { ...SCRYPT, N: n });
-  const match = timingSafeEqual(actual, expected);
-  return stored !== null && match;
-}
-
-// The cookie holds the raw token; the DB stores only its SHA-256, so a copy
-// of the database alone is not enough to hijack a session.
-const tokenHash = (token: string) => createHash("sha256").update(token).digest("hex");
+export * from "@/lib/auth-core";
 
 export async function createSession(userId: number): Promise<void> {
-  const token = randomBytes(32).toString("base64url");
+  const token = newToken();
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86400_000);
   await prisma.session.create({ data: { id: tokenHash(token), userId, expiresAt } });
   (await cookies()).set(SESSION_COOKIE, token, {
@@ -69,6 +36,36 @@ export async function destroySession(): Promise<void> {
   store.delete(SESSION_COOKIE);
 }
 
+/* Drop every session for this user — used when a password changes, so a
+   stolen cookie dies with it. `exceptToken` keeps the caller signed in. */
+export async function revokeSessions(userId: number, exceptToken?: string): Promise<void> {
+  await prisma.session.deleteMany({
+    where: { userId, ...(exceptToken ? { id: { not: tokenHash(exceptToken) } } : {}) },
+  });
+}
+
+/* The raw session token on this request, for revokeSessions' exception. */
+export async function currentSessionToken(): Promise<string | undefined> {
+  return (await cookies()).get(SESSION_COOKIE)?.value;
+}
+
+// Expired rows are only noticed when re-presented, so sessions, OAuth states
+// and auth codes would pile up forever. Sweep them on a request that was
+// going to hit the database anyway, at most every 15 minutes. Fire and
+// forget — a failed sweep must never fail the request that triggered it.
+let lastSweep = 0;
+function sweepExpired(): void {
+  const now = Date.now();
+  if (now - lastSweep < 15 * 60_000) return;
+  lastSweep = now;
+  const cutoff = new Date();
+  void Promise.all([
+    prisma.session.deleteMany({ where: { expiresAt: { lt: cutoff } } }),
+    prisma.oAuthState.deleteMany({ where: { expiresAt: { lt: cutoff } } }),
+    prisma.authCode.deleteMany({ where: { expiresAt: { lt: cutoff } } }),
+  ]).catch(() => {});
+}
+
 export interface AuthUser {
   id: number;
   email: string;
@@ -81,6 +78,7 @@ export interface AuthUser {
 export async function currentUser(): Promise<AuthUser | null> {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
   if (!token) return null;
+  sweepExpired();
   const session = await prisma.session.findUnique({
     where: { id: tokenHash(token) },
     include: { user: { select: { id: true, email: true, tier: true, aiDay: true, aiCount: true } } },
@@ -136,17 +134,12 @@ export function canEditDeck(deck: { userId: number | null }, userId: number | nu
   return deck.userId === null || deck.userId === userId;
 }
 
-export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-export const MIN_PASSWORD = 8;
-
 /* ---- email verification ----------------------------------------------- */
-
-const VERIFY_HOURS = 24;
 
 /* Issue a fresh verification token for the user (replacing any prior one)
    and return the raw token for the email link. Only the SHA-256 is stored. */
 export async function createVerifyToken(userId: number): Promise<string> {
-  const token = randomBytes(32).toString("base64url");
+  const token = newToken();
   await prisma.user.update({
     where: { id: userId },
     data: {
@@ -169,11 +162,32 @@ export async function consumeVerifyToken(token: string) {
   });
 }
 
-/* Public origin for links in emails. APP_URL wins (set it in production);
-   otherwise reconstructed from proxy headers (Railway) or the Host header. */
-export function requestOrigin(req: Request): string {
-  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, "");
-  const proto = req.headers.get("x-forwarded-proto") ?? "http";
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "localhost:3000";
-  return `${proto}://${host}`;
+/* ---- password reset ---------------------------------------------------- */
+
+/* Issue a reset token, replacing any outstanding one. Only the SHA-256 is
+   stored; the raw token goes in the emailed link. */
+export async function createResetToken(userId: number): Promise<string> {
+  const token = newToken();
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      resetTokenHash: tokenHash(token),
+      resetTokenExpiry: new Date(Date.now() + RESET_MINUTES * 60_000),
+    },
+  });
+  return token;
+}
+
+/* Spend a reset token. Returns the user it belonged to, or null if it is
+   unknown or expired. Clears the token in the same write, so a link works
+   once even if two tabs race it. */
+export async function consumeResetToken(token: string) {
+  if (!token) return null;
+  const user = await prisma.user.findUnique({ where: { resetTokenHash: tokenHash(token) } });
+  if (!user || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) return null;
+  const spent = await prisma.user.updateMany({
+    where: { id: user.id, resetTokenHash: tokenHash(token) },
+    data: { resetTokenHash: null, resetTokenExpiry: null },
+  });
+  return spent.count === 1 ? user : null;
 }
