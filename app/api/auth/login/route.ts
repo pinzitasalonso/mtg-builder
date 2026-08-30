@@ -16,9 +16,12 @@ export async function POST(req: Request) {
   const password = typeof body.password === "string" ? body.password : "";
 
   // One generic message for both bad email and bad password — no account
-  // enumeration via the error text.
-  const user = email && password ? await prisma.user.findUnique({ where: { email } }) : null;
-  if (!user || !verifyPassword(password, user.passwordHash)) {
+  // enumeration via the error text. verifyPassword runs even when there is no
+  // user, so an unknown address costs the same as a known one; without that
+  // the error text hides nothing the response time doesn't give away.
+  const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
+  const ok = verifyPassword(password, user?.passwordHash ?? null);
+  if (!user || !ok) {
     return NextResponse.json({ error: "Wrong email or password." }, { status: 401 });
   }
 

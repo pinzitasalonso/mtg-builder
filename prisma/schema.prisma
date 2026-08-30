@@ -21,13 +21,23 @@ model AnalyticsDaily {
 model User {
   id           Int       @id @default(autoincrement())
   email        String    @unique
-  passwordHash String
+  // Null for accounts that only ever signed in with Apple or Google. The
+  // reset flow doubles as "set a password", which fills it in later.
+  passwordHash String?
   createdAt    DateTime  @default(now())
   // Email verification: null until the emailed link is clicked. The token is
   // stored as its SHA-256 (same discipline as Session ids) with a 24h expiry.
   emailVerifiedAt   DateTime?
   verifyTokenHash   String?   @unique
   verifyTokenExpiry DateTime?
+  // Password reset: same discipline as verification, but one hour and single
+  // use. Both columns are cleared the moment the token is spent.
+  resetTokenHash    String?   @unique
+  resetTokenExpiry  DateTime?
+  // The name a provider handed us. Apple sends it exactly once, at first
+  // authorization, and never again — captured because it is unrecoverable,
+  // not because anything renders it yet.
+  displayName       String?
   // Plan gating: "free" (3 decks, 4 AI asks/day) or "pro" — the future
   // paid tier — which lifts every cap.
   tier         String    @default("free")
@@ -36,6 +46,8 @@ model User {
   aiCount      Int       @default(0)
   decks        Deck[]
   sessions     Session[]
+  accounts     Account[]
+  authCodes    AuthCode[]
   collection   CollectionCard[]
   playCodes    PlayCode[]
 }
@@ -73,6 +85,54 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// A third-party identity (Sign in with Apple, Google) linked to an account.
+// The join key is the provider's stable subject, never its email, so someone
+// changing their Google address keeps the same Spellpool account.
+model Account {
+  id                Int      @id @default(autoincrement())
+  userId            Int
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          String   // "google" | "apple"
+  providerAccountId String   // the `sub` claim
+  // The address the provider asserted when we linked, lowercased. Kept for
+  // support questions only — User.email stays the identity.
+  email             String?
+  createdAt         DateTime @default(now())
+  lastUsedAt        DateTime @default(now())
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// An OAuth handshake in flight: the PKCE verifier and the nonce we have to
+// remember between /start and /callback, since there is nowhere else to put
+// them. Ten minutes, single use — the same shape as PlayCode.
+model OAuthState {
+  id        String   @id             // sha256 of the raw `state`
+  provider  String
+  verifier  String                   // PKCE code_verifier
+  nonce     String
+  mode      String   @default("web") // "web" | "app"
+  next      String?                  // same-origin path to land on (web only)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+// A one-time code handed to the iOS app across the spellpool:// redirect and
+// traded for a real session cookie on the app's OWN URLSession request. The
+// browser that finished the OAuth dance is ASWebAuthenticationSession's, not
+// the app's, so its cookie jar is useless to us — this row is the bridge.
+model AuthCode {
+  id         String   @id            // sha256 of the raw code
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  consumedAt DateTime?
 }
 
 model Deck {

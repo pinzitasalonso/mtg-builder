@@ -17,13 +17,32 @@ export function hashPassword(password: string): string {
   return `s1:${SCRYPT.N}:${salt.toString("base64url")}:${hash.toString("base64url")}`;
 }
 
-export function verifyPassword(password: string, stored: string): boolean {
-  const [v, nStr, saltB64, hashB64] = stored.split(":");
-  if (v !== "s1" || !nStr || !saltB64 || !hashB64) return false;
+// A real s1 hash of a value nobody knows. Checking against it costs the same
+// ~56ms of scrypt as a genuine check, so "no such account", "that account has
+// no password" and "wrong password" are indistinguishable by timing. Without
+// it, skipping the hash for an unknown email leaks which addresses exist.
+const DUMMY_HASH =
+  "s1:16384:BivtZzfMNLvWrXs16r1nuQ:YKFT8tHZCbWNcpz2L4HwfARrd9C4d901pEssoTwFdMY7Xa9mmBc9e5MxF2OgVT8KHtByrhQs1P1EztbWRy1ITQ";
+
+/* Check a password against a stored hash. `stored` is null for accounts that
+   only ever signed in with Apple or Google — they always fail, but they burn
+   the same time doing it. */
+export function verifyPassword(password: string, stored: string | null): boolean {
+  const target = stored ?? DUMMY_HASH;
+  const [v, nStr, saltB64, hashB64] = target.split(":");
+  if (v !== "s1" || !nStr || !saltB64 || !hashB64) {
+    // Still spend the time, so a corrupt hash isn't a fast "no" either.
+    scryptSync(password, Buffer.alloc(16), SCRYPT.keylen, SCRYPT);
+    return false;
+  }
+  // N arrives as text from the database; a wild value would hang the process.
+  const n = Number(nStr);
+  if (!Number.isInteger(n) || n < 1024 || n > 1 << 20) return false;
   const salt = Buffer.from(saltB64, "base64url");
   const expected = Buffer.from(hashB64, "base64url");
-  const actual = scryptSync(password, salt, expected.length, { ...SCRYPT, N: Number(nStr) });
-  return timingSafeEqual(actual, expected);
+  const actual = scryptSync(password, salt, expected.length, { ...SCRYPT, N: n });
+  const match = timingSafeEqual(actual, expected);
+  return stored !== null && match;
 }
 
 // The cookie holds the raw token; the DB stores only its SHA-256, so a copy
