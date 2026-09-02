@@ -19,6 +19,7 @@ Next.js 16 (App Router, Turbopack) + Prisma 7 on better-sqlite3. **Railway auto-
 - Tiers: `User.tier` is written by the RevenueCat webhook (`app/api/revenuecat/webhook`) and `app/api/subscription/sync`, both via `lib/revenuecat.ts` `isProOnRevenueCat` — **tri-state**: a null (indeterminate) result must never change a stored tier; the webhook returns 500 on null so RevenueCat retries. Clients read tier from `/api/auth/me`. Free limits in `lib/limits.ts`; upgrade copy points at Spellpool Pro in the iOS app.
 - Theming: `lib/identity-theme.ts` — a deck page's ground is its identity field sinking into a darkened cut of itself (mono + ten guilds hand-tuned, charcoal B, 3+ colors blend the monos); empty identity → the indigo felt. `LIGHT_VARS` is, despite the name, the dark panel set. Floating panels ride the JS-computed `--panel` var.
 - Play codes are single-use with per-IP throttles; security headers are set app-wide.
+- Deck Score: `lib/deck-score.ts` is the rubric maths (DeckCheck's published CRISPI ladders), `lib/deck-score-classify.ts` reads a decklist into its counts (curated staples in `lib/deck-score-cards.ts`, oracle text for the rest), `lib/goldfish.ts` simulates hands for the Speed axis, and `lib/deck-score-report.ts` assembles the payload `app/api/decks/[id]/score` serves to both clients. A card scored wrongly is fixed by a line in the cards file, not by a special case in the classifier.
 
 ## Gotchas
 

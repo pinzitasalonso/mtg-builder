@@ -12,14 +12,17 @@
 // a hook and each reading is its own component.
 //
 // Bracket and 8x8 are computed here from cards the page already holds, exactly
-// as iOS computes them locally — see lib/deck-insight. The combos and the game
-// record come from the server.
+// as iOS computes them locally — see lib/deck-insight. The combos, the game
+// record and the Score come from the server.
 //
 // A number on a stats panel reads as a verdict, so only put one here that is
-// actually measured. CRISPI used to sit in the profile and did not clear that
-// bar — two of its four axes were constants — so it is gone.
+// actually measured. The Score's predecessor did not clear that bar — two of
+// its four axes were constants — and was removed. The Score measures all four
+// (lib/deck-score-report) and arrives with its working, which the profile
+// shows under the number so anyone can check it.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import type { DeckScoreReport } from "@/lib/deck-score-report";
 import {
   BRACKET_LABEL,
   BRACKET_NUMBER,
@@ -51,6 +54,8 @@ export interface DeckInsightData {
   changers: number | null;
   combos: ComboResult | null;
   history: History | null;
+  /** null until scored, or when the server could not score it. */
+  score: DeckScoreReport | null;
   buckets: ReturnType<typeof cubeBuckets>;
   /** Whether "how it plays" has anything beyond the primer. */
   hasPlayReadings: boolean;
@@ -66,11 +71,23 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
   const [gameChangers, setGameChangers] = useState<Set<string> | null>(null);
   const [combos, setCombos] = useState<ComboResult | null>(null);
   const [history, setHistory] = useState<History | null>(null);
+  const [score, setScore] = useState<DeckScoreReport | null>(null);
 
-  // Both server readings are scored from the server's own copy of the deck, so
+  // The server readings are scored from the server's own copy of the deck, so
   // they follow a sync rather than a keystroke. The decklist's size is the
   // cheapest signal that one has happened.
   const deckCount = cards.filter((c) => c.board === "deck").length;
+  // The Score is keyed on the decklist's CONTENT: a swap keeps the size and
+  // must still re-score, which is the most common edit there is.
+  const deckKey = useMemo(
+    () =>
+      cards
+        .filter((c) => c.board === "deck")
+        .map((c) => `${c.name}x${c.quantity}`)
+        .sort()
+        .join("|"),
+    [cards]
+  );
 
   useEffect(() => {
     let live = true;
@@ -107,6 +124,22 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
     };
   }, [deckId, deckCount]);
 
+  useEffect(() => {
+    let live = true;
+    if (!deckKey) {
+      setScore(null);
+      return;
+    }
+    // Best-effort: a deck the server cannot score simply shows no Score row.
+    fetch(`/api/decks/${deckId}/score`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => live && setScore(b && typeof b.index === "number" ? b : null))
+      .catch(() => live && setScore(null));
+    return () => {
+      live = false;
+    };
+  }, [deckId, deckKey]);
+
   const buckets = useMemo(() => cubeBuckets(cards), [cards]);
   const changers = useMemo(
     () => (gameChangers ? countGameChangers(cards, gameChangers) : null),
@@ -121,6 +154,7 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
     changers,
     combos,
     history,
+    score,
     buckets,
     hasPlayReadings: Boolean(combos?.combos.length) || Boolean(history?.games.length),
   };
@@ -163,8 +197,8 @@ function ProfileRow({ label, value, detail }: { label: string; value: string; de
 }
 
 /**
- * The verdict: bracket and average cost. One glance, the numbers that judge
- * the deck.
+ * The verdict: bracket, average cost, Score. One glance, the numbers that
+ * judge the deck — and, under the Score, the working.
  */
 export function InsightProfile({
   insight,
@@ -173,7 +207,7 @@ export function InsightProfile({
   insight: DeckInsightData;
   avgManaValue: number;
 }) {
-  const { bracket, changers, combos } = insight;
+  const { bracket, changers, combos, score } = insight;
   // Nil at zero, deliberately — iOS `gameChangerDetail`. `changers` is also
   // null before the list has loaded, and "from 0 game changers" would be
   // claiming a measurement we have not taken.
@@ -187,10 +221,101 @@ export function InsightProfile({
           .filter(Boolean)
           .join(" · ") || null;
 
+  // The Score's floors only ever bump a deck UP, and only as a note: the
+  // bracket is Wizards' rule set, and this is a reading of the same list.
+  const floorNote =
+    score && score.bracketFloor > BRACKET_NUMBER[bracket]
+      ? `plays like at least Bracket ${score.bracketFloor} by its Score`
+      : null;
+
   return (
     <div style={{ maxWidth: 560 }}>
-      <ProfileRow label="Bracket" value={`${BRACKET_NUMBER[bracket]} · ${BRACKET_LABEL[bracket]}`} detail={bracketDetail} />
+      <ProfileRow
+        label="Bracket"
+        value={`${BRACKET_NUMBER[bracket]} · ${BRACKET_LABEL[bracket]}`}
+        detail={[bracketDetail, floorNote].filter(Boolean).join(" · ") || null}
+      />
       {Number.isFinite(avgManaValue) && <ProfileRow label="Average cost" value={avgManaValue.toFixed(2)} />}
+      {score && <InsightScore score={score} />}
+    </div>
+  );
+}
+
+/** Trailing zeros off the quarter grid: 6.25 stays, 6.00 becomes 6. */
+const trim = (n: number): string => String(Number(n.toFixed(2)));
+
+/**
+ * The Score row, the four axes under it, and the working behind a toggle.
+ *
+ * The axes are always shown because the index alone hides the shape: 9/3/3/9
+ * and 6/7/7/6 average to nearly the same number and play nothing alike. The
+ * working stays folded — it runs to a few dozen lines on a real deck.
+ */
+function InsightScore({ score }: { score: DeckScoreReport }) {
+  const [open, setOpen] = useState(false);
+  const [openAxis, setOpenAxis] = useState<string | null>(null);
+  return (
+    <div>
+      <ProfileRow label="Score" value={score.label} detail={`${score.axes.map((a) => `${a.label[0]} ${trim(a.score)}`).join(" · ")}`} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "2px 0 10px" }}>
+        {score.axes.map((a) => (
+          <div key={a.key} style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "var(--font-mono)", fontSize: 15, color: "var(--w-1)" }}>{trim(a.score)}</div>
+            <div className="id-label" style={{ fontSize: 10, color: "var(--w-3)", marginTop: 2 }}>{a.label}</div>
+            <div style={{ fontSize: 11, color: "var(--w-2)", marginTop: 1 }}>{a.descriptor}</div>
+          </div>
+        ))}
+      </div>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", fontSize: 12, color: "var(--gold)" }}
+      >
+        {open ? "Hide the working" : "Show the working"}
+      </button>
+      {open && (
+        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 12 }}>
+          {score.axes.map((a) => {
+            const showCards = openAxis === a.key;
+            return (
+              <div key={a.key} style={{ borderTop: "1px solid var(--w-line)", paddingTop: 10 }}>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--w-1)" }}>{a.label} {trim(a.score)}</span>
+                  <span style={{ fontSize: 12, color: "var(--w-3)" }}>{a.summary}</span>
+                </div>
+                <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12.5, color: "var(--w-2)", lineHeight: 1.5 }}>
+                  {a.facts.map((f, i) => (
+                    <li key={i}>{f}</li>
+                  ))}
+                </ul>
+                {a.cards.length > 0 && (
+                  <button
+                    onClick={() => setOpenAxis(showCards ? null : a.key)}
+                    aria-expanded={showCards}
+                    style={{ background: "none", border: "none", padding: 0, marginTop: 6, cursor: "pointer", font: "inherit", fontSize: 11.5, color: "var(--w-3)" }}
+                  >
+                    {showCards ? "hide the cards it counted" : `the ${a.cards.reduce((n, g) => n + g.names.length, 0)} cards it counted`}
+                  </button>
+                )}
+                {showCards &&
+                  a.cards.map((g) => (
+                    <div key={g.label} style={{ marginTop: 6 }}>
+                      <span className="id-label" style={{ fontSize: 10, color: "var(--w-3)" }}>{g.label}</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginTop: 3 }}>
+                        {g.names.map((n) => (
+                          <span key={n} style={{ fontSize: 12, color: "var(--w-2)" }}>{n}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            );
+          })}
+          <p style={{ fontSize: 11.5, color: "var(--w-3)", lineHeight: 1.5, margin: 0 }}>
+            {score.caveats.join(" ")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

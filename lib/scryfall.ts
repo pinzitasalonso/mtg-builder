@@ -6,7 +6,14 @@ export interface ScryfallCard {
   id: string;
   name: string;
   image_uris?: { normal?: string; large?: string };
-  card_faces?: { image_uris?: { normal?: string; large?: string } }[];
+  card_faces?: {
+    image_uris?: { normal?: string; large?: string };
+    oracle_text?: string;
+    mana_cost?: string;
+    type_line?: string;
+    power?: string;
+    toughness?: string;
+  }[];
   mana_cost?: string;
   type_line?: string;
   oracle_text?: string;
@@ -15,6 +22,11 @@ export interface ScryfallCard {
   set?: string;
   collector_number?: string;
   digital?: boolean;
+  cmc?: number;
+  power?: string;
+  toughness?: string;
+  keywords?: string[];
+  produced_mana?: string[];
 }
 
 // The card shape the rest of the app speaks — API responses, pool rows, UI.
@@ -337,4 +349,103 @@ export async function scryfallSearch(query: string): Promise<ScryfallSearchResul
   }
 
   return { cards: raw.map(toOutCard), totalCards, truncated: Boolean(pageUrl) };
+}
+
+// ---------------------------------------------------------------------------
+// Card facts for scoring
+// ---------------------------------------------------------------------------
+
+/**
+ * What CRISPI needs about a card that a PoolCard row does not store: mana
+ * value as Scryfall computes it, power and toughness, keywords, the mana a
+ * permanent produces, and the oracle text of BOTH faces of a double-faced or
+ * adventure card (the row keeps only the front).
+ */
+export interface CardFacts {
+  id: string;
+  name: string;
+  manaCost: string | null;
+  typeLine: string | null;
+  oracleText: string | null;
+  manaValue: number;
+  power: number | null;
+  toughness: number | null;
+  keywords: string[];
+  producedMana: string[];
+}
+
+const parseStat = (raw: string | undefined): number | null => {
+  if (raw == null) return null;
+  const n = Number.parseInt(raw.replace(/[^\d-]/g, "") || "0", 10);
+  return Number.isFinite(n) ? n : 0;
+};
+
+export function toCardFacts(c: ScryfallCard): CardFacts {
+  const faces = c.card_faces ?? [];
+  const front = faces[0];
+  const oracle =
+    c.oracle_text ??
+    (faces.length ? faces.map((f) => f.oracle_text ?? "").filter(Boolean).join("\n//\n") : null);
+  return {
+    id: c.id,
+    name: c.name,
+    manaCost: c.mana_cost ?? front?.mana_cost ?? null,
+    typeLine: c.type_line ?? front?.type_line ?? null,
+    oracleText: oracle,
+    manaValue: typeof c.cmc === "number" ? c.cmc : 0,
+    power: parseStat(c.power ?? front?.power),
+    toughness: parseStat(c.toughness ?? front?.toughness),
+    keywords: Array.isArray(c.keywords) ? c.keywords : [],
+    producedMana: Array.isArray(c.produced_mana) ? c.produced_mana : [],
+  };
+}
+
+// Per-process, a day: a card's rules text does not change, and the same deck
+// is scored on every visit to its Stats pane.
+const factsCache = new Map<string, { at: number; facts: CardFacts }>();
+const FACTS_TTL_MS = 24 * 60 * 60_000;
+
+/* Test seam. */
+export function resetCardFactsCache(): void {
+  factsCache.clear();
+}
+
+/**
+ * Bulk id → facts via /cards/collection (75 per request).
+ *
+ * Best-effort: an id Scryfall does not return is simply absent, and the caller
+ * scores that card from the row it already holds. A whole chunk failing loses
+ * only that chunk.
+ */
+export async function cardFactsByIds(ids: string[]): Promise<Map<string, CardFacts>> {
+  const out = new Map<string, CardFacts>();
+  const missing: string[] = [];
+  const now = Date.now();
+  for (const id of new Set(ids)) {
+    const hit = factsCache.get(id);
+    if (hit && now - hit.at < FACTS_TTL_MS) out.set(id, hit.facts);
+    else missing.push(id);
+  }
+  for (let i = 0; i < missing.length; i += 75) {
+    const chunk = missing.slice(i, i + 75);
+    try {
+      const res = await fetch("https://api.scryfall.com/cards/collection", {
+        method: "POST",
+        headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
+        body: JSON.stringify({ identifiers: chunk.map((id) => ({ id })) }),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      for (const c of (data.data ?? []) as ScryfallCard[]) {
+        if (!c?.id) continue;
+        const facts = toCardFacts(c);
+        factsCache.set(c.id, { at: now, facts });
+        out.set(c.id, facts);
+      }
+    } catch {
+      // skip the chunk — the caller falls back to the stored row
+    }
+    if (i + 75 < missing.length) await new Promise((r) => setTimeout(r, 100));
+  }
+  return out;
 }
