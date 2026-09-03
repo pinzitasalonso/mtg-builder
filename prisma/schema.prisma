@@ -44,6 +44,10 @@ model User {
   // Daily AI meter: calls made on aiDay (UTC); stale aiDay means zero used.
   aiDay        String?
   aiCount      Int       @default(0)
+  // Daily deck-scan meter, same shape. Separate from the AI meter because a
+  // scan is a different, dearer thing: one free scan a day, unlimited on Pro.
+  scanDay      String?
+  scanCount    Int       @default(0)
   decks        Deck[]
   sessions     Session[]
   accounts     Account[]
@@ -156,6 +160,13 @@ model Deck {
   // deck play?" was one too many, and this is the one you'd hand to someone
   // who asks.
   primer    String?
+  // The deck's last scan — its Score with the working, and the AI's written
+  // analysis — as JSON. Written only by /scan, on demand, and read back by
+  // both clients; a deck that was never scanned has none. JSON rather than
+  // columns because the shape is the report's, and the report changes more
+  // often than a schema should.
+  analysis   String?
+  analyzedAt DateTime?
   // Game-night record: incremented by play-code results (a friend's tracker
   // reporting a finished game) and by the owner's own tracker via /record.
   gamesPlayed Int      @default(0)
