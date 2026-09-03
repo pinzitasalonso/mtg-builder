@@ -17,6 +17,7 @@ import {
   type DeckScoreResult,
 } from "./deck-score";
 import { classify, manaValue, type ComboLineInput, type ScoredCard } from "./deck-score-classify";
+import type { CommanderDependency } from "./deck-score";
 import { goldfish, type GoldfishLine } from "./goldfish";
 
 export interface AxisReport {
@@ -54,8 +55,50 @@ function lineMana(manaNeeded: string): number {
   return manaValue(manaNeeded) + (manaNeeded.includes("X") ? 6 : 0);
 }
 
-export function scoreDeck(cards: ScoredCard[], lines: ComboLineInput[], rulesBracket = 1): DeckScoreReport {
+/**
+ * The two judgements the rubric leaves to a reader, applied on top of the
+ * computed read — within bounds. The goldfish's turn can move by at most one
+ * turn either way and commander dependency by one step, and each carries the
+ * reason it moved, which the working shows. Wider than that and the number
+ * would be the judgement rather than the deck.
+ */
+export interface Judgement {
+  /** −1, −0.5, 0, 0.5 or 1 turns on the goldfish's fundamental turn. */
+  turnDelta?: number;
+  turnReason?: string;
+  commanderDependency?: CommanderDependency;
+  dependencyReason?: string;
+}
+
+const DEPENDENCY_ORDER: CommanderDependency[] = ["none", "moderate", "high"];
+
+/** Clamp a judgement to its bounds against the computed read. */
+export function boundJudgement(j: Judgement, computedDependency: CommanderDependency): Judgement {
+  const out: Judgement = {};
+  const delta = Number(j.turnDelta ?? 0);
+  if (Number.isFinite(delta) && delta !== 0) {
+    out.turnDelta = Math.max(-1, Math.min(1, Math.round(delta * 2) / 2));
+    out.turnReason = j.turnReason;
+  }
+  if (j.commanderDependency && DEPENDENCY_ORDER.includes(j.commanderDependency) && j.commanderDependency !== computedDependency) {
+    const from = DEPENDENCY_ORDER.indexOf(computedDependency);
+    const to = DEPENDENCY_ORDER.indexOf(j.commanderDependency);
+    const step = Math.max(-1, Math.min(1, to - from));
+    out.commanderDependency = DEPENDENCY_ORDER[from + step];
+    out.dependencyReason = j.dependencyReason;
+  }
+  return out;
+}
+
+export function scoreDeck(
+  cards: ScoredCard[],
+  lines: ComboLineInput[],
+  rulesBracket = 1,
+  judgement: Judgement = {}
+): DeckScoreReport {
   const c = classify(cards, lines);
+  const j = boundJudgement(judgement, c.resilience.commanderDependency);
+  if (j.commanderDependency) c.resilience.commanderDependency = j.commanderDependency;
 
   const consistency = consistencyReading(c.consistency);
   const interaction = interactionReading(c.interaction);
@@ -67,7 +110,8 @@ export function scoreDeck(cards: ScoredCard[], lines: ComboLineInput[], rulesBra
     lethal: l.produces.some((p) => /win the game|loses? the game|infinite (damage|lifeloss|life loss|mill|poison|combat)/i.test(p)),
   }));
   const fish = goldfish(c.reads, goldfishLines);
-  const speed = speedFromFundamentalTurn(fish.fundamentalTurn);
+  const fundamentalTurn = Math.max(1, Math.min(14, fish.fundamentalTurn + (j.turnDelta ?? 0)));
+  const speed = speedFromFundamentalTurn(fundamentalTurn);
 
   const result = deckScore({
     consistency: consistency.score,
@@ -119,13 +163,16 @@ export function scoreDeck(cards: ScoredCard[], lines: ComboLineInput[], rulesBra
       ? `${plural(c.comboLines.total, "win line")} count as ${trim(c.comboLines.counted)}${c.comboLines.clunky ? ` (${c.comboLines.clunky} clunky at half)` : ""}${c.comboLines.sharedFailure ? ", sharing a point of failure" : ""}; ${trim(resilience.effectiveLines)} after the tutor-access adjustment.`
       : "No combo line that wins or goes infinite.",
     `Combat rows: ${trim(combat.threats)} threats, ${combat.protectionCards} protection cards (${combat.protectionEffective} effective), ${trim(combat.recursionPoints)} recursion points with ${plural(combat.rebuildEngines, "rebuild engine")}, ${plural(combat.boardLevelProtection, "board-level protection effect")}.`,
-    `Commander dependency: ${c.commanderDependencyReason}`,
+    j.commanderDependency
+      ? `Commander dependency read as ${j.commanderDependency} rather than the computed ${c.commanderDependencyReason.split(":")[0]!.toLowerCase()}: ${j.dependencyReason ?? "the scan's judgement"}.`
+      : `Commander dependency: ${c.commanderDependencyReason}`,
   ];
   if ((c.resilience.engineExposure ?? 0) < 0 && c.exposure.className) {
     resilienceFacts.push(`Engine exposure ${c.resilience.engineExposure}: ${Math.round(c.exposure.share * 100)}% of the nonland cards are ${c.exposure.className}-based with ${plural(c.exposure.answers, "answer")} to an artifact or enchantment.`);
   }
 
   const speedFacts = [...fish.notes];
+  if (j.turnDelta) speedFacts.push(`Read as turn ${trim(fundamentalTurn)} rather than the goldfish's ${trim(fish.fundamentalTurn)}: ${j.turnReason ?? "the scan's judgement"}.`);
   if (speed !== result.speed) speedFacts.push(`Speed ${trim(speed)} capped at 8: Consistency is ${trim(consistency.score)} and a turn-3 deck needs a 7.5 or better.`);
 
   const axes: AxisReport[] = [
@@ -161,7 +208,7 @@ export function scoreDeck(cards: ScoredCard[], lines: ComboLineInput[], rulesBra
       label: "Speed",
       score: result.speed,
       descriptor: describe("speed", result.speed),
-      summary: `fundamental turn ${trim(fish.fundamentalTurn)}${fish.fundamentalTurn >= 14 ? "+" : ""} · ${fish.comboWins > fish.combatWins ? "combo" : "combat"} kills`,
+      summary: `fundamental turn ${trim(fundamentalTurn)}${fundamentalTurn >= 14 ? "+" : ""} · ${fish.comboWins > fish.combatWins ? "combo" : "combat"} kills`,
       facts: speedFacts,
       cards: [],
     },
@@ -176,7 +223,7 @@ export function scoreDeck(cards: ScoredCard[], lines: ComboLineInput[], rulesBra
     ...result,
     label: trim(result.index),
     bracketFloor: bracketFloor(result, rulesBracket),
-    fundamentalTurn: fish.fundamentalTurn,
+    fundamentalTurn,
     commanderDependency: c.resilience.commanderDependency,
     axes,
     caveats,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FREE_AI_PER_DAY, aiRemaining, isPro, utcDay } from "./limits";
+import { FREE_AI_PER_DAY, FREE_SCANS_PER_DAY, aiRemaining, isPro, scansRemaining, utcDay } from "./limits";
 
 describe("utcDay", () => {
   it("stamps the UTC calendar day", () => {
@@ -27,5 +27,16 @@ describe("aiRemaining", () => {
     expect(isPro({ tier: "pro" })).toBe(true);
     expect(isPro({ tier: "free" })).toBe(false);
     expect(isPro(null)).toBe(false);
+  });
+});
+
+describe("scansRemaining", () => {
+  const now = new Date("2026-07-11T10:00:00Z");
+
+  it("gives free users one scan a day, and pro unlimited", () => {
+    expect(scansRemaining({ tier: "free", scanDay: null, scanCount: 0 }, now)).toBe(FREE_SCANS_PER_DAY);
+    expect(scansRemaining({ tier: "free", scanDay: "2026-07-10", scanCount: 1 }, now)).toBe(FREE_SCANS_PER_DAY);
+    expect(scansRemaining({ tier: "free", scanDay: "2026-07-11", scanCount: 1 }, now)).toBe(0);
+    expect(scansRemaining({ tier: "pro", scanDay: "2026-07-11", scanCount: 9 }, now)).toBeNull();
   });
 });

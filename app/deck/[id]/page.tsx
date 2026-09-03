@@ -228,6 +228,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // opens right under it and never runs off-screen on mobile.
   const [toolsPos, setToolsPos] = useState<{ top: number; left: number } | null>(null);
   const [primerOpen, setPrimerOpen] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
   // Count of offline review decisions waiting to sync (drives the banner).
   const [pendingSync, setPendingSync] = useState(0);
   const [copied, setCopied] = useState<"" | "link" | "list">("");
@@ -860,6 +861,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                         { label: "🎟 Game code", on: () => setGameCodeOpen(true) },
                         { group: "Write-ups" },
                         { label: "📖 Primer", on: () => { setPrimerOpen(true); setPane("stats"); } },
+                        { label: "🔍 Scan deck", on: () => { setScanOpen(true); setPane("stats"); }, disabled: deckCards.length < 40 },
                       ] : []),
                     ] as { group?: string; label?: string; on?: () => void; disabled?: boolean; keepOpen?: boolean }[]).map((it) =>
                       it.group ? (
@@ -1072,6 +1074,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               primer={deck?.primer ?? ""}
               primerOpen={primerOpen}
               onPrimerSaved={(text) => setDeck((d) => (d ? { ...d, primer: text || null } : d))}
+              scanOpen={scanOpen}
               onHoverCurveBar={(i) => setDeckFilter(i === null ? null : { kind: "mv", value: i })}
               onClickCurveBar={canEdit ? (i) => { setPane("deck"); startDeckReviewOf(deckCards.filter((c) => categoryOf(c.typeLine) !== "Lands" && Math.min(manaValue(c.manaCost), 7) === i)); } : undefined}
             />

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth";
-import { FREE_DECK_LIMIT, aiRemaining, isPro } from "@/lib/limits";
+import { FREE_DECK_LIMIT, aiRemaining, isPro, scansRemaining } from "@/lib/limits";
 
 export const runtime = "nodejs";
 
@@ -14,6 +14,7 @@ export async function GET() {
       email: user.email,
       tier: user.tier,
       aiRemaining: aiRemaining(user),
+      scansRemaining: scansRemaining(user),
       deckLimit: isPro(user) ? null : FREE_DECK_LIMIT,
       hasPassword: user.hasPassword,
     },

@@ -13,16 +13,19 @@
 //
 // Bracket and 8x8 are computed here from cards the page already holds, exactly
 // as iOS computes them locally — see lib/deck-insight. The combos, the game
-// record and the Score come from the server.
+// record and the last scan come from the server.
 //
 // A number on a stats panel reads as a verdict, so only put one here that is
 // actually measured. The Score's predecessor did not clear that bar — two of
 // its four axes were constants — and was removed. The Score measures all four
 // (lib/deck-score-report) and arrives with its working, which the profile
-// shows under the number so anyone can check it.
+// shows under the number so anyone can check it. It is run ON DEMAND — a scan
+// is metered — so the pane reads whatever the last scan stored and offers the
+// button to run a new one.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { DeckScoreReport } from "@/lib/deck-score-report";
+import type { AnalysisDocument, DeckScan } from "@/lib/deck-analysis";
 import {
   BRACKET_LABEL,
   BRACKET_NUMBER,
@@ -54,8 +57,10 @@ export interface DeckInsightData {
   changers: number | null;
   combos: ComboResult | null;
   history: History | null;
-  /** null until scored, or when the server could not score it. */
-  score: DeckScoreReport | null;
+  /** The last scan, or null when the deck has never been scanned. */
+  scan: DeckScan | null;
+  /** Replace the stored scan after running a new one. */
+  setScan: (scan: DeckScan | null) => void;
   buckets: ReturnType<typeof cubeBuckets>;
   /** Whether "how it plays" has anything beyond the primer. */
   hasPlayReadings: boolean;
@@ -71,23 +76,12 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
   const [gameChangers, setGameChangers] = useState<Set<string> | null>(null);
   const [combos, setCombos] = useState<ComboResult | null>(null);
   const [history, setHistory] = useState<History | null>(null);
-  const [score, setScore] = useState<DeckScoreReport | null>(null);
+  const [scan, setScan] = useState<DeckScan | null>(null);
 
   // The server readings are scored from the server's own copy of the deck, so
   // they follow a sync rather than a keystroke. The decklist's size is the
   // cheapest signal that one has happened.
   const deckCount = cards.filter((c) => c.board === "deck").length;
-  // The Score is keyed on the decklist's CONTENT: a swap keeps the size and
-  // must still re-score, which is the most common edit there is.
-  const deckKey = useMemo(
-    () =>
-      cards
-        .filter((c) => c.board === "deck")
-        .map((c) => `${c.name}x${c.quantity}`)
-        .sort()
-        .join("|"),
-    [cards]
-  );
 
   useEffect(() => {
     let live = true;
@@ -126,19 +120,15 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
 
   useEffect(() => {
     let live = true;
-    if (!deckKey) {
-      setScore(null);
-      return;
-    }
-    // Best-effort: a deck the server cannot score simply shows no Score row.
-    fetch(`/api/decks/${deckId}/score`)
+    // The stored scan only. Nothing is computed until the player asks.
+    fetch(`/api/decks/${deckId}/scan`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((b) => live && setScore(b && typeof b.index === "number" ? b : null))
-      .catch(() => live && setScore(null));
+      .then((b) => live && setScan(b?.scan ?? null))
+      .catch(() => live && setScan(null));
     return () => {
       live = false;
     };
-  }, [deckId, deckKey]);
+  }, [deckId]);
 
   const buckets = useMemo(() => cubeBuckets(cards), [cards]);
   const changers = useMemo(
@@ -154,7 +144,8 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
     changers,
     combos,
     history,
-    score,
+    scan,
+    setScan,
     buckets,
     hasPlayReadings: Boolean(combos?.combos.length) || Boolean(history?.games.length),
   };
@@ -207,7 +198,8 @@ export function InsightProfile({
   insight: DeckInsightData;
   avgManaValue: number;
 }) {
-  const { bracket, changers, combos, score } = insight;
+  const { bracket, changers, combos, scan } = insight;
+  const score = scan?.score ?? null;
   // Nil at zero, deliberately — iOS `gameChangerDetail`. `changers` is also
   // null before the list has loaded, and "from 0 game changers" would be
   // claiming a measurement we have not taken.
@@ -236,7 +228,7 @@ export function InsightProfile({
         detail={[bracketDetail, floorNote].filter(Boolean).join(" · ") || null}
       />
       {Number.isFinite(avgManaValue) && <ProfileRow label="Average cost" value={avgManaValue.toFixed(2)} />}
-      {score && <InsightScore score={score} />}
+      {score && <InsightScore score={score} scannedAt={scan?.scannedAt ?? null} />}
     </div>
   );
 }
@@ -251,12 +243,17 @@ const trim = (n: number): string => String(Number(n.toFixed(2)));
  * and 6/7/7/6 average to nearly the same number and play nothing alike. The
  * working stays folded — it runs to a few dozen lines on a real deck.
  */
-function InsightScore({ score }: { score: DeckScoreReport }) {
+function InsightScore({ score, scannedAt }: { score: DeckScoreReport; scannedAt: string | null }) {
   const [open, setOpen] = useState(false);
   const [openAxis, setOpenAxis] = useState<string | null>(null);
+  const when = scannedAt ? new Date(scannedAt).toLocaleDateString() : null;
   return (
     <div>
-      <ProfileRow label="Score" value={score.label} detail={`${score.axes.map((a) => `${a.label[0]} ${trim(a.score)}`).join(" · ")}`} />
+      <ProfileRow
+        label="Score"
+        value={score.label}
+        detail={[score.axes.map((a) => `${a.label[0]} ${trim(a.score)}`).join(" · "), when ? `scanned ${when}` : null].filter(Boolean).join(" · ")}
+      />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "2px 0 10px" }}>
         {score.axes.map((a) => (
           <div key={a.key} style={{ textAlign: "center" }}>
@@ -490,6 +487,196 @@ export function InsightEightByEight({ insight }: { insight: DeckInsightData }) {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The scan action: an optional note to guide the analysis, the button, and
+ * the plan's meter. The Score and the analysis it produces land in the
+ * profile and under "How it plays" the moment the server answers.
+ *
+ * Metered on purpose — a scan is two third-party calls, a goldfish and a
+ * model pass — so the free plan gets one a day and the button says so.
+ */
+export function InsightScan({
+  deckId,
+  insight,
+  canEdit,
+  open,
+}: {
+  deckId: string;
+  insight: DeckInsightData;
+  canEdit: boolean;
+  /** Opened from the Tools menu: the notes box is shown straight away. */
+  open: boolean;
+}) {
+  const [showNotes, setShowNotes] = useState(open);
+  const [notes, setNotes] = useState(insight.scan?.notes ?? "");
+  const [running, setRunning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [remaining, setRemaining] = useState<number | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (open) setShowNotes(true);
+  }, [open]);
+
+  // The meter, read once and after every scan. `undefined` is "not loaded",
+  // null is "unlimited".
+  useEffect(() => {
+    let live = true;
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b) => live && setRemaining(b?.user ? (b.user.scansRemaining ?? null) : 0))
+      .catch(() => live && setRemaining(undefined));
+    return () => {
+      live = false;
+    };
+  }, [insight.scan?.scannedAt]);
+
+  if (!canEdit) return null;
+
+  async function run() {
+    setRunning(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/decks/${deckId}/scan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notes }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body?.error ?? "The scan failed.");
+        if (res.status === 429) setRemaining(0);
+        return;
+      }
+      insight.setScan(body.scan ?? null);
+      setShowNotes(false);
+    } catch {
+      setError("The scan failed — check the connection and try again.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  const meter =
+    remaining === undefined ? null : remaining === null ? "Unlimited scans on Pro" : `${remaining} free scan${remaining === 1 ? "" : "s"} left today`;
+  const exhausted = remaining === 0;
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      {!showNotes ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <Pill on={false} onClick={() => setShowNotes(true)}>🔍 {insight.scan ? "Scan again" : "Scan deck"}</Pill>
+          {meter && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>{meter}</span>}
+        </div>
+      ) : (
+        <div className="id-panel" style={{ padding: 14, maxWidth: 560 }}>
+          <div style={{ fontSize: 13.5, color: "var(--w-1)", fontWeight: 600, marginBottom: 4 }}>Scan the deck</div>
+          <div style={{ fontSize: 12.5, color: "var(--w-2)", lineHeight: 1.5, marginBottom: 10 }}>
+            The Score on four measured axes, plus a written analysis: the plan, the mulligans, the key cards, the
+            weaknesses. Know this deck? A line or two about how it actually plays makes the read more accurate.
+          </div>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value.slice(0, 1500))}
+            placeholder="Optional — the intended strategy, the combos that matter, anything the list doesn't say…"
+            rows={3}
+            style={{ width: "100%", border: "1px solid var(--w-line)", borderRadius: 8, outline: "none", resize: "vertical", background: "transparent", fontFamily: "var(--font-body)", fontSize: 13.5, lineHeight: 1.5, color: "var(--text)", padding: 8, boxSizing: "border-box" }}
+          />
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={run}
+              disabled={running || exhausted}
+              style={{ padding: "9px 16px", borderRadius: 999, border: "none", background: "var(--gold)", color: "#181228", font: "inherit", fontSize: 13, fontWeight: 700, cursor: running || exhausted ? "default" : "pointer", opacity: running || exhausted ? 0.6 : 1 }}
+            >
+              {running ? "Scanning…" : "Run the scan"}
+            </button>
+            <button
+              onClick={() => setShowNotes(false)}
+              disabled={running}
+              style={{ background: "none", border: "none", padding: 0, font: "inherit", fontSize: 13, color: "var(--w-2)", cursor: "pointer" }}
+            >
+              Cancel
+            </button>
+            {meter && <span style={{ fontSize: 11.5, color: exhausted ? "var(--gold)" : "var(--w-3)" }}>{meter}</span>}
+          </div>
+          {running && (
+            <div style={{ fontSize: 12, color: "var(--w-3)", marginTop: 8 }}>Reading the list, goldfishing a few hundred hands, writing it up — about half a minute.</div>
+          )}
+          {error && <div style={{ fontSize: 12.5, color: "var(--gold)", marginTop: 8, lineHeight: 1.5 }}>{error}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The scan's written analysis — the document a pilot would hand you. */
+export function InsightAnalysis({ analysis }: { analysis: AnalysisDocument }) {
+  const [open, setOpen] = useState(true);
+  const Section = ({ title, children }: { title: string; children: ReactNode }) => (
+    <div style={{ marginTop: 14 }}>
+      <div className="id-label" style={{ fontSize: 10, color: "var(--w-3)", marginBottom: 5 }}>{title}</div>
+      {children}
+    </div>
+  );
+  const List = ({ items, ordered }: { items: string[]; ordered?: boolean }) =>
+    items.length === 0 ? null : ordered ? (
+      <ol style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: "var(--w-2)", lineHeight: 1.55 }}>
+        {items.map((t, i) => <li key={i}>{t}</li>)}
+      </ol>
+    ) : (
+      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--w-2)", lineHeight: 1.55 }}>
+        {items.map((t, i) => <li key={i}>{t}</li>)}
+      </ul>
+    );
+  return (
+    <div className="id-panel" style={{ padding: 16, maxWidth: 720 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span className="id-label" style={{ color: "var(--w-2)" }}>Analysis</span>
+        <button onClick={() => setOpen((v) => !v)} aria-expanded={open} style={{ background: "none", border: "none", padding: 0, font: "inherit", fontSize: 11.5, color: "var(--w-3)", cursor: "pointer" }}>
+          {open ? "hide" : "show"}
+        </button>
+      </div>
+      <p style={{ fontSize: 13.5, color: "var(--w-1)", lineHeight: 1.55, margin: "8px 0 0" }}>{analysis.overview}</p>
+      {open && (
+        <>
+          {analysis.strategy.length > 0 && <Section title="Core strategy"><List items={analysis.strategy} ordered /></Section>}
+          {analysis.mulligan.length > 0 && <Section title="Mulligan priorities"><List items={analysis.mulligan} /></Section>}
+          {analysis.keyCards.length > 0 && (
+            <Section title="Key cards">
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--w-2)", lineHeight: 1.55 }}>
+                {analysis.keyCards.map((c) => (
+                  <li key={c.name}><b style={{ color: "var(--w-1)" }}>{c.name}</b>{" "}— {c.why}</li>
+                ))}
+              </ul>
+            </Section>
+          )}
+          {analysis.tips.length > 0 && <Section title="Key tips"><List items={analysis.tips} /></Section>}
+          {(analysis.weaknesses.critical.length > 0 || analysis.weaknesses.minor.length > 0) && (
+            <Section title="Weaknesses">
+              {analysis.weaknesses.critical.length > 0 && (
+                <div style={{ fontSize: 12, color: "var(--gold)", marginBottom: 3 }}>Critical</div>
+              )}
+              <List items={analysis.weaknesses.critical} />
+              {analysis.weaknesses.minor.length > 0 && (
+                <div style={{ fontSize: 12, color: "var(--w-3)", margin: "8px 0 3px" }}>Minor</div>
+              )}
+              <List items={analysis.weaknesses.minor} />
+            </Section>
+          )}
+          {analysis.axes.length > 0 && (
+            <Section title="On the axes">
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--w-2)", lineHeight: 1.55 }}>
+                {analysis.axes.map((a) => (
+                  <li key={a.key}><b style={{ color: "var(--w-1)", textTransform: "capitalize" }}>{a.key}</b>{" "}— {a.note}</li>
+                ))}
+              </ul>
+            </Section>
+          )}
+        </>
+      )}
     </div>
   );
 }

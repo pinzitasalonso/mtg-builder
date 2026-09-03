@@ -14,9 +14,11 @@
 // tall for no gain.
 
 import {
+  InsightAnalysis,
   InsightEightByEight,
   InsightPlay,
   InsightProfile,
+  InsightScan,
   StatSection,
   useDeckInsight,
 } from "@/components/deck/DeckInsight";
@@ -56,6 +58,7 @@ export default function DeckStatsPane({
   primer,
   primerOpen,
   onPrimerSaved,
+  scanOpen,
   onHoverCurveBar,
   onClickCurveBar,
 }: {
@@ -69,6 +72,8 @@ export default function DeckStatsPane({
   primer: string;
   primerOpen: boolean;
   onPrimerSaved: (text: string) => void;
+  /** Opened from the Tools menu: the scan box shows straight away. */
+  scanOpen: boolean;
   onHoverCurveBar: (i: number | null) => void;
   onClickCurveBar?: (i: number) => void;
 }) {
@@ -78,7 +83,7 @@ export default function DeckStatsPane({
   const showPrimer = primerOpen || Boolean(primer) || !canEdit;
   // An owner with no primer and no readings gets no section — the Tools menu
   // is how you start one, the same as before this pane existed.
-  const showPlay = showPrimer || insight.hasPlayReadings;
+  const showPlay = showPrimer || insight.hasPlayReadings || Boolean(insight.scan?.analysis);
 
   if (deckCards.length === 0) {
     return (
@@ -95,6 +100,7 @@ export default function DeckStatsPane({
     <div>
       <StatSection title="Profile">
         <InsightProfile insight={insight} avgManaValue={avgManaValue} />
+        <InsightScan deckId={deckId} insight={insight} canEdit={canEdit} open={scanOpen} />
       </StatSection>
 
       {showPlay && (
@@ -103,6 +109,7 @@ export default function DeckStatsPane({
             {showPrimer && (
               <DeckPrimer deckId={deckId} primer={primer} canEdit={canEdit} onSaved={onPrimerSaved} />
             )}
+            {insight.scan?.analysis && <InsightAnalysis analysis={insight.scan.analysis} />}
             <InsightPlay insight={insight} />
           </div>
         </StatSection>
