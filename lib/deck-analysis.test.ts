@@ -50,8 +50,9 @@ describe("parseAnalysis", () => {
 });
 
 describe("judgement bounds", () => {
-  it("clamps the turn to one turn either way on the half-turn grid", () => {
-    expect(boundJudgement({ turnDelta: 3 }, "moderate").turnDelta).toBe(1);
+  it("clamps the turn to two turns either way on the half-turn grid", () => {
+    expect(boundJudgement({ turnDelta: 3 }, "moderate").turnDelta).toBe(2);
+    expect(boundJudgement({ turnDelta: -1.5 }, "moderate").turnDelta).toBe(-1.5);
     expect(boundJudgement({ turnDelta: -0.7 }, "moderate").turnDelta).toBe(-0.5);
     expect(boundJudgement({ turnDelta: 0 }, "moderate").turnDelta).toBeUndefined();
   });
@@ -69,7 +70,7 @@ describe("judgement bounds", () => {
       analysis: { overview: "x", strategy: [], mulligan: [], keyCards: [], tips: [], weaknesses: { critical: [], minor: [] }, axes: [] },
       judgement: { fundamentalTurn: computed.fundamentalTurn - 4, turnReason: "Sneak Attack package.", commanderDependency: "high", dependencyReason: "Voltron." },
     }, computed.fundamentalTurn));
-    expect(judged.fundamentalTurn).toBe(computed.fundamentalTurn - 1);
+    expect(judged.fundamentalTurn).toBe(computed.fundamentalTurn - 2);
     expect(judged.speed).toBeGreaterThanOrEqual(computed.speed);
     const speed = judged.axes.find((a) => a.key === "speed")!;
     expect(speed.facts.some((f) => f.includes("Sneak Attack package"))).toBe(true);

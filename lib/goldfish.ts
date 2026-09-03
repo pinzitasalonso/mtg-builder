@@ -27,6 +27,8 @@ export interface GoldfishLine {
   manaNeeded: number;
   /** Whether firing it wins or takes a player out — the goldfish only cares about those. */
   lethal: boolean;
+  /** Any one of these is also needed — an outlet that turns infinite mana into a kill. */
+  anyOf?: string[];
 }
 
 export interface GoldfishResult {
@@ -73,6 +75,8 @@ interface SimCard {
   drainX: boolean;
   equipBonus: number;
   equipCost: number;
+  /** Puts a permanent from hand onto the battlefield: each turn, or once. */
+  cheat: "turn" | "once" | null;
 }
 
 const MAX_TURN = 14;
@@ -136,8 +140,17 @@ export function toSimCard(r: CardRead): SimCard {
     drainX: false,
     equipBonus: 0,
     equipCost: 0,
+    cheat: null,
   };
   if (r.isLand) return card;
+
+  // Cheating a permanent into play — Braids, Sneak Attack, Show and Tell,
+  // Elvish Piper — is the whole speed of the decks that do it, and the
+  // curve says nothing about it.
+  const cheats = /put (a|an|any number of|up to one|target) (artifact|creature|enchantment|land|permanent|artifact, creature, enchantment, or land|artifact, creature, enchantment, or planeswalker|creature or artifact)[^.]*card[^.]* from (your|their) hand onto the battlefield/.test(t);
+  if (cheats && !/exile|graveyard/.test(t.split(".")[0] ?? "")) {
+    card.cheat = r.isPermanent && /at the beginning of|whenever|\{t\}|: put/.test(t) ? "turn" : "once";
+  }
 
   // Mana.
   const producesMana = /\{t\}[^:]*: add|: add \{|^add \{|add one mana|add two mana|add three mana|mana of any/.test(t);
@@ -171,6 +184,10 @@ export function toSimCard(r: CardRead): SimCard {
       if (d.kind === "burst") card.drawNow = 6;
       else if (d.kind === "oneshot") card.drawNow = 2;
       else if (d.kind === "selection") card.drawNow = 1;
+    } else if (d.kind === "burst") {
+      // Necropotence, Bolas's Citadel: a permanent that refills at once.
+      card.drawNow = 7;
+      card.drawPerTurn = 1;
     } else if (d.kind !== "oneshot" && d.kind !== "symmetric") {
       card.drawPerTurn = 1;
     } else if (d.kind === "oneshot") {
@@ -226,8 +243,9 @@ interface Creature {
 export function goldfish(
   reads: CardRead[],
   lines: GoldfishLine[],
-  options: { hands?: number; seed?: number } = {}
+  options: { hands?: number; seed?: number; trace?: (line: string) => void } = {}
 ): GoldfishResult {
+  const trace = options.trace;
   const deck: SimCard[] = [];
   const commanders: SimCard[] = [];
   for (const r of reads) {
@@ -238,17 +256,22 @@ export function goldfish(
     }
     for (let i = 0; i < r.copies; i++) deck.push(sim);
   }
+  // Ad Nauseam draws until the life runs out, and the curve decides how far
+  // that is: a cEDH pile at an average of 1.2 sees fifteen cards.
+  const nonland = reads.filter((r) => !r.isLand && !r.card.isCommander);
+  const avgMv = nonland.length ? nonland.reduce((n, r) => n + r.mv * r.copies, 0) / nonland.reduce((n, r) => n + r.copies, 0) : 3;
+  for (const c of deck) if (c.key === "ad nauseam") c.drawNow = Math.max(6, Math.min(16, Math.round(30 / Math.max(1, avgMv * 1.6))));
   const hands = options.hands ?? 300;
   const seed = options.seed ?? hashNames(reads.map((r) => `${r.key}x${r.copies}`));
   const random = rng(seed);
 
   const lethalLines = lines
     .filter((l) => l.lethal && l.pieces.length > 0)
-    .map((l) => ({ pieces: l.pieces.map(nameKey), manaNeeded: l.manaNeeded }));
+    .map((l) => ({ pieces: l.pieces.map(nameKey), manaNeeded: l.manaNeeded, anyOf: (l.anyOf ?? []).map(nameKey) }));
   const commanderKeys = new Set(commanders.map((c) => c.key));
   // A tutor that is itself a piece of a win line (Demonic Consultation) is
   // held for the line, never spent finding something else.
-  const pieceKeys = new Set(lethalLines.flatMap((l) => l.pieces));
+  const pieceKeys = new Set(lethalLines.flatMap((l) => [...l.pieces, ...l.anyOf]));
   for (const c of deck) if (c.tutor && pieceKeys.has(c.key)) c.tutor = false;
 
   const wonAt: number[] = [];
@@ -277,8 +300,14 @@ export function goldfish(
     }
     let hand = library.splice(0, 7);
     const landsIn = (cards: SimCard[]) => cards.filter((c) => c.isLand).length;
+    const manaIn = (cards: SimCard[]) => cards.filter((c) => c.isLand || c.rock > 0 || c.dork > 0 || c.ritualAmount > 0).length;
+    // A combo deck also ships a hand with no way to the line: no tutor, no
+    // piece, no refill. Its pilots mulligan for exactly that.
+    const live = (cards: SimCard[]) => cards.some((c) => c.tutor || c.drawNow >= 6 || pieceKeys.has(c.key));
+    const dead = (cards: SimCard[]) =>
+      lethalLines.length > 0 ? manaIn(cards) < 2 || manaIn(cards) > 5 || !live(cards) : landsIn(cards) < 2 || landsIn(cards) > 5;
     // One London mulligan on a hand that cannot function.
-    if (landsIn(hand) < 2 || landsIn(hand) > 5) {
+    if (dead(hand)) {
       library.push(...hand);
       for (let i = library.length - 1; i > 0; i--) {
         const j = Math.floor(random() * (i + 1));
@@ -303,6 +332,7 @@ export function goldfish(
     let extraCombatPerm = false;
     let drawEngines = 0;
     let extraLandDrops = 0;
+    let cheatEngines = 0;
     let commanderCasts = 0;
     let drainPerTurn = 0;
     let life = 40;
@@ -339,6 +369,7 @@ export function goldfish(
         rocks.reduce((n, r) => n + (r.activeFrom <= t ? r.mana : 0), 0) +
         dorks.reduce((n, d) => n + (d.castTurn < t ? d.mana : 0), 0);
       if (t >= 3 && t <= 5) manaSamples[t]!.push(mana);
+      if (trace && h < 3) trace(`hand ${h} turn ${t}: mana ${mana} | hand: ${hand.map((c) => c.name).join(", ")} | board: ${[...battlefieldKeys].join(", ")}`);
 
       const ritualMana = () => hand.filter((c) => c.ritualNet > 0).reduce((n, c) => n + c.ritualNet, 0);
       const spendRituals = (needed: number) => {
@@ -352,6 +383,28 @@ export function goldfish(
         }
       };
       const attackers = () => creatures.filter((c) => c.castTurn < t || c.haste);
+      /** Land a permanent on the battlefield with all its effects, paying nothing. */
+      const materialise = (c: SimCard) => {
+        hand.splice(hand.indexOf(c), 1);
+        battlefieldKeys.add(c.key);
+        if (c.creature) creatures.push({ power: c.power, castTurn: t, haste: c.haste, infect: c.infect, isCommander: false, bonus: 0 });
+        if (c.rock > 0) rocks.push({ mana: c.rock, activeFrom: t + 1 });
+        if (c.dork > 0) dorks.push({ mana: c.dork, castTurn: t });
+        if (c.anthem) anthems += c.anthem;
+        if (c.extraCombat === "permanent") extraCombatPerm = true;
+        if (c.drawPerTurn) drawEngines += c.drawPerTurn;
+        drainPerTurn += c.drainPerTurn;
+        if (c.cheat === "turn") cheatEngines += 1;
+      };
+      // A cheat engine in play (Braids, Sneak Attack) lands the most
+      // expensive permanent in hand for free once a turn — pieces of a line
+      // first, then the biggest body.
+      if (cheatEngines > 0) {
+        const isPieceKey = (k: string) => lethalLines.some((l) => l.pieces.includes(k) || l.anyOf.includes(k));
+        const candidates = hand.filter((c) => !c.isLand && (c.creature || c.rock > 0 || c.anthem > 0 || c.drawPerTurn > 0 || c.drainPerTurn > 0 || isPieceKey(c.key)) && c.mv >= 3);
+        candidates.sort((a, b) => (Number(isPieceKey(b.key)) - Number(isPieceKey(a.key))) || b.mv - a.mv);
+        if (candidates[0]) materialise(candidates[0]);
+      }
       const combatDamage = (bonusAll = 0, craterhoof = false) => {
         const att = attackers();
         const boardSize = creatures.length;
@@ -363,7 +416,6 @@ export function goldfish(
 
       // The casting loop: greedy, best thing first, until nothing fits.
       let progress = true;
-      let castTutorThisTurn = false;
       while (progress && !won) {
         progress = false;
 
@@ -372,6 +424,16 @@ export function goldfish(
           let cost = line.manaNeeded;
           let ok = true;
           const toCast: SimCard[] = [];
+          // The outlet, when the line needs one: any one that is around.
+          if (line.anyOf.length) {
+            const held = line.anyOf.find((k) => battlefieldKeys.has(k) || hand.some((c) => c.key === k) || commanderKeys.has(k));
+            if (!held) continue;
+            if (!battlefieldKeys.has(held)) {
+              const inHand = hand.find((c) => c.key === held);
+              const cz = commanders.find((c) => c.key === held);
+              cost += inHand ? inHand.mv : cz ? commanderCost(cz) : 0;
+            }
+          }
           for (const key of line.pieces) {
             if (battlefieldKeys.has(key)) continue;
             const inHand = hand.find((c) => c.key === key);
@@ -390,10 +452,14 @@ export function goldfish(
             break;
           }
           if (!ok) continue;
+          // Spellbook's mana-needed already covers casting the pieces, so
+          // the two are not summed: a line costs the larger of the two.
+          cost = Math.max(cost - line.manaNeeded, line.manaNeeded);
           if (mana + ritualMana() >= cost) {
             spendRituals(cost);
             won = t;
             wonBy = "combo";
+            if (trace && h < 3) trace(`  WIN via ${line.pieces.join("+")} cost ${cost}`);
             break;
           }
         }
@@ -433,21 +499,53 @@ export function goldfish(
           }
         }
 
-        // 3. A tutor for the one missing piece of a lethal line.
-        if (!castTutorThisTurn) {
-          const tutor = hand.find((c) => c.tutor && c.mv <= mana);
+        // 2b. A burst refill (Ad Nauseam, a wheel, Necropotence) before any
+        // tutor: it is the strongest thing a hand can do, and chaining a
+        // second tutor past it spends the mana it needs.
+        {
+          const burst = hand.find((c) => c.drawNow >= 6 && !c.creature && c.mv <= mana + ritualMana());
+          if (burst) {
+            if (trace && h < 3) trace(`  draw ${burst.name} (+${burst.drawNow})`);
+            if (burst.mv > mana) spendRituals(burst.mv);
+            mana -= burst.mv;
+            hand.splice(hand.indexOf(burst), 1);
+            if (burst.drawPerTurn) {
+              battlefieldKeys.add(burst.key);
+              drawEngines += burst.drawPerTurn;
+            }
+            draw(burst.drawNow);
+            progress = true;
+            continue;
+          }
+        }
+
+        // 3. A tutor: for the missing piece of the closest lethal line, or
+        // for a refill when nothing is close. Tutors chain as long as the
+        // mana holds — a cEDH turn is Vampiric into Consultation into the
+        // win — and a ritual pays for the tutor that completes a line.
+        {
+          const oneAway = lethalLines.some((line) => {
+            const missing = line.pieces.filter((k) => !battlefieldKeys.has(k) && !hand.some((c) => c.key === k) && !commanderKeys.has(k));
+            return missing.length === 1 && library.some((c) => c.key === missing[0]);
+          });
+          const tutor = hand.find((c) => c.tutor && c.mv <= mana + (oneAway ? ritualMana() : 0));
           if (tutor) {
             let fetched = false;
             // The line closest to assembled gets the tutor; its first
             // missing piece comes to hand. Two tutors over two turns finds a
             // two-card line from nothing, which is what a player does.
             const ranked = lethalLines
-              .map((line) => ({
-                line,
-                missing: line.pieces.filter(
+              .map((line) => {
+                const missing = line.pieces.filter(
                   (k) => !battlefieldKeys.has(k) && !hand.some((c) => c.key === k) && !commanderKeys.has(k)
-                ),
-              }))
+                );
+                // An outlet counts as missing only when none is held.
+                if (line.anyOf.length && !line.anyOf.some((k) => battlefieldKeys.has(k) || hand.some((c) => c.key === k) || commanderKeys.has(k))) {
+                  const inLibrary = line.anyOf.find((k) => library.some((c) => c.key === k));
+                  if (inLibrary) missing.push(inLibrary);
+                }
+                return { line, missing };
+              })
               .filter((x) => x.missing.length > 0 && x.missing.every((k) => library.some((c) => c.key === k)))
               .sort((a, b) => a.missing.length - b.missing.length);
             const pick = ranked[0];
@@ -456,6 +554,18 @@ export function goldfish(
               if (idx >= 0) {
                 hand.push(...library.splice(idx, 1));
                 fetched = true;
+              }
+            }
+            // Two or more pieces short of every line: a tutor finds the
+            // refill that digs for all of them at once, when it is castable
+            // this turn or next.
+            if (fetched && pick && pick.missing.length >= 2 && !hand.some((c) => c.drawNow >= 6)) {
+              // Undo the piece fetch in favour of the refill, if one is there.
+              const refill = library.findIndex((c) => c.drawNow >= 6 && c.mv <= mana + ritualMana() + 2);
+              if (refill >= 0) {
+                const piece = hand.pop()!;
+                library.push(piece);
+                hand.push(...library.splice(refill, 1));
               }
             }
             if (!fetched && lethalLines.length === 0) {
@@ -471,9 +581,10 @@ export function goldfish(
               }
             }
             if (fetched) {
+              if (trace && h < 3) trace(`  tutor ${tutor.name} -> ${hand[hand.length - 1]!.name}`);
+              if (tutor.mv > mana) spendRituals(tutor.mv);
               mana -= tutor.mv;
               hand.splice(hand.indexOf(tutor), 1);
-              castTutorThisTurn = true;
               progress = true;
               continue;
             }
@@ -515,9 +626,14 @@ export function goldfish(
           continue;
         }
 
-        // 5. Draw, when the hand is thin enough to want it.
-        const drawSpell = hand.find((c) => c.drawNow > 0 && c.mv <= mana && !c.creature && (hand.length <= 4 || c.drawNow >= 3));
+        // 5. Draw, when the hand is thin enough to want it. A burst refill
+        // (Ad Nauseam, a wheel) is worth a ritual.
+        const drawSpell = hand.find(
+          (c) => c.drawNow > 0 && !c.creature && (hand.length <= 4 || c.drawNow >= 3) && c.mv <= mana + (c.drawNow >= 6 ? ritualMana() : 0)
+        );
         if (drawSpell) {
+          if (trace && h < 3) trace(`  draw ${drawSpell.name} (+${drawSpell.drawNow})`);
+          if (drawSpell.mv > mana) spendRituals(drawSpell.mv);
           mana -= drawSpell.mv;
           hand.splice(hand.indexOf(drawSpell), 1);
           draw(drawSpell.drawNow);
@@ -537,12 +653,29 @@ export function goldfish(
           if (cz.anthem) anthems += cz.anthem;
           if (cz.extraCombat === "permanent") extraCombatPerm = true;
           drainPerTurn += cz.drainPerTurn;
+          if (cz.cheat === "turn") cheatEngines += 1;
+          progress = true;
+          continue;
+        }
+
+        // 6b. Show and Tell, Sneak Attack: the cheat itself, when there is
+        // something worth cheating.
+        const cheatSpell = hand.find((c) => c.cheat && c.mv <= mana && hand.some((o) => o !== c && !o.isLand && o.mv >= 5 && (o.creature || o.rock > 0 || o.drawPerTurn > 0)));
+        if (cheatSpell) {
+          mana -= cheatSpell.mv;
+          if (cheatSpell.cheat === "turn") {
+            materialise(cheatSpell);
+          } else {
+            hand.splice(hand.indexOf(cheatSpell), 1);
+            const best = hand.filter((o) => !o.isLand && o.mv >= 5 && (o.creature || o.rock > 0 || o.drawPerTurn > 0)).sort((a, b) => b.mv - a.mv)[0];
+            if (best) materialise(best);
+          }
           progress = true;
           continue;
         }
 
         // 7. The best permanent that fits: a threat, an engine, a combo piece.
-        const isPiece = (c: SimCard) => lethalLines.some((l) => l.pieces.includes(c.key));
+        const isPiece = (c: SimCard) => lethalLines.some((l) => l.pieces.includes(c.key) || l.anyOf.includes(c.key));
         const candidates = hand.filter(
           (c) =>
             !c.isLand &&
@@ -563,6 +696,7 @@ export function goldfish(
           if (c.drawPerTurn) drawEngines += c.drawPerTurn;
           drainPerTurn += c.drainPerTurn;
           if (c.equipBonus) equipmentOnBoard.push({ bonus: c.equipBonus, cost: c.equipCost, attached: false });
+          if (c.cheat === "turn") cheatEngines += 1;
           progress = true;
           continue;
         }

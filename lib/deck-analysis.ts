@@ -41,11 +41,16 @@ export interface AnalysisOutput {
 export interface DeckScan {
   score: DeckScoreReport;
   analysis: AnalysisDocument | null;
+  /** What the player typed for this scan, if anything. */
   notes: string | null;
+  /** What guided the analysis: typed notes, the deck's primer, or nothing. */
+  source?: "notes" | "primer" | null;
   scannedAt: string;
 }
 
 export const MAX_NOTES_CHARS = 1500;
+/** A primer runs longer than a note; this is the slice the model reads. */
+export const MAX_PRIMER_CHARS = 6000;
 
 const AXIS_KEYS = ["consistency", "resilience", "interaction", "speed"];
 
@@ -181,7 +186,7 @@ export const ANALYSIS_INSTRUCTIONS =
 
 /** The user turn: the deck, the working, the combos, the notes. */
 export function buildAnalysisPrompt(cards: ScoredCard[], report: DeckScoreReport, lines: ComboLineInput[], notes: string | null): string {
-  const trimmedNotes = (notes ?? "").trim().slice(0, MAX_NOTES_CHARS);
+  const trimmedNotes = (notes ?? "").trim().slice(0, MAX_PRIMER_CHARS);
   return [
     "DECKLIST\n" + decklistBlock(cards),
     "\nSCORE AND WORKING\n" + scoreBlock(report),

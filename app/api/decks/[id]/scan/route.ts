@@ -12,6 +12,7 @@ import {
   ANALYSIS_INSTRUCTIONS,
   ANALYSIS_SCHEMA,
   MAX_NOTES_CHARS,
+  MAX_PRIMER_CHARS,
   buildAnalysisPrompt,
   judgementFrom,
   parseAnalysis,
@@ -71,7 +72,13 @@ export async function POST(
   }
 
   const body = await req.json().catch(() => ({}));
-  const notes = typeof body?.notes === "string" ? body.notes.trim().slice(0, MAX_NOTES_CHARS) : "";
+  // What guides the analysis: the player's notes if they wrote any, else the
+  // deck's primer — which already says how the deck plays, so a deck with
+  // one is never asked to describe itself again.
+  const typed = typeof body?.notes === "string" ? body.notes.trim().slice(0, MAX_NOTES_CHARS) : "";
+  const primer = (deck.primer ?? "").trim().slice(0, MAX_PRIMER_CHARS);
+  const notes = typed || primer;
+  const source: DeckScan["source"] = typed ? "notes" : primer ? "primer" : null;
 
   // The DECK board only. The pool is candidates, and scoring a pile of
   // maybes would describe a deck nobody is playing.
@@ -152,7 +159,8 @@ export async function POST(
     const scan: DeckScan = {
       score,
       analysis: parsed.analysis,
-      notes: notes || null,
+      notes: typed || null,
+      source,
       scannedAt: new Date().toISOString(),
     };
     await prisma.deck.update({

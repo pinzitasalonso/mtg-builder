@@ -237,11 +237,13 @@ export function InsightProfile({
 const trim = (n: number): string => String(Number(n.toFixed(2)));
 
 /**
- * The Score row, the four axes under it, and the working behind a toggle.
+ * The Score row. The four axes and the working sit behind a click on the
+ * row itself, DeckCheck-style: the profile is a glance, and a real deck's
+ * working runs to a few dozen lines.
  *
- * The axes are always shown because the index alone hides the shape: 9/3/3/9
- * and 6/7/7/6 average to nearly the same number and play nothing alike. The
- * working stays folded — it runs to a few dozen lines on a real deck.
+ * The axes are the first thing the detail shows because the index alone
+ * hides the shape: 9/3/3/9 and 6/7/7/6 average to nearly the same number and
+ * play nothing alike.
  */
 function InsightScore({ score, scannedAt }: { score: DeckScoreReport; scannedAt: string | null }) {
   const [open, setOpen] = useState(false);
@@ -249,67 +251,62 @@ function InsightScore({ score, scannedAt }: { score: DeckScoreReport; scannedAt:
   const when = scannedAt ? new Date(scannedAt).toLocaleDateString() : null;
   return (
     <div>
-      <ProfileRow
-        label="Score"
-        value={score.label}
-        detail={[score.axes.map((a) => `${a.label[0]} ${trim(a.score)}`).join(" · "), when ? `scanned ${when}` : null].filter(Boolean).join(" · ")}
-      />
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, padding: "2px 0 10px" }}>
-        {score.axes.map((a) => (
-          <div key={a.key} style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 15, color: "var(--w-1)" }}>{trim(a.score)}</div>
-            <div className="id-label" style={{ fontSize: 10, color: "var(--w-3)", marginTop: 2 }}>{a.label}</div>
-            <div style={{ fontSize: 11, color: "var(--w-2)", marginTop: 1 }}>{a.descriptor}</div>
-          </div>
-        ))}
-      </div>
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", fontSize: 12, color: "var(--gold)" }}
+        style={{ display: "block", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", color: "inherit", textAlign: "left" }}
       >
-        {open ? "Hide the working" : "Show the working"}
+        <ProfileRow
+          label="Score"
+          value={`${score.label} ${open ? "▾" : "▸"}`}
+          detail={[score.axes.map((a) => `${a.label[0]} ${trim(a.score)}`).join(" · "), when ? `scanned ${when}` : null].filter(Boolean).join(" · ")}
+        />
       </button>
       {open && (
-        <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 12 }}>
-          {score.axes.map((a) => {
-            const showCards = openAxis === a.key;
-            return (
-              <div key={a.key} style={{ borderTop: "1px solid var(--w-line)", paddingTop: 10 }}>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                  <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--w-1)" }}>{a.label} {trim(a.score)}</span>
-                  <span style={{ fontSize: 12, color: "var(--w-3)" }}>{a.summary}</span>
-                </div>
-                <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12.5, color: "var(--w-2)", lineHeight: 1.5 }}>
-                  {a.facts.map((f, i) => (
-                    <li key={i}>{f}</li>
-                  ))}
-                </ul>
-                {a.cards.length > 0 && (
+        <div style={{ padding: "4px 0 12px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {score.axes.map((a) => {
+              const showAxis = openAxis === a.key;
+              return (
+                <div key={a.key}>
                   <button
-                    onClick={() => setOpenAxis(showCards ? null : a.key)}
-                    aria-expanded={showCards}
-                    style={{ background: "none", border: "none", padding: 0, marginTop: 6, cursor: "pointer", font: "inherit", fontSize: 11.5, color: "var(--w-3)" }}
+                    onClick={() => setOpenAxis(showAxis ? null : a.key)}
+                    aria-expanded={showAxis}
+                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", background: "none", border: "none", padding: "4px 0", cursor: "pointer", font: "inherit", color: "inherit", textAlign: "left" }}
                   >
-                    {showCards ? "hide the cards it counted" : `the ${a.cards.reduce((n, g) => n + g.names.length, 0)} cards it counted`}
+                    <span className="id-label" style={{ fontSize: 10, color: "var(--w-3)", width: 92 }}>{a.label}</span>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, color: "var(--w-1)", width: 38 }}>{trim(a.score)}</span>
+                    <span style={{ flex: 1, height: 6, borderRadius: 3, background: "var(--w-fill)", overflow: "hidden" }}>
+                      <span style={{ display: "block", height: "100%", width: `${Math.max(2, (a.score / 10) * 100)}%`, background: "var(--gold)", borderRadius: 3 }} />
+                    </span>
+                    <span style={{ fontSize: 11, color: "var(--w-2)", width: 140, textAlign: "right" }}>{a.descriptor}</span>
                   </button>
-                )}
-                {showCards &&
-                  a.cards.map((g) => (
-                    <div key={g.label} style={{ marginTop: 6 }}>
-                      <span className="id-label" style={{ fontSize: 10, color: "var(--w-3)" }}>{g.label}</span>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginTop: 3 }}>
-                        {g.names.map((n) => (
-                          <span key={n} style={{ fontSize: 12, color: "var(--w-2)" }}>{n}</span>
+                  {showAxis && (
+                    <div style={{ padding: "4px 0 8px 102px" }}>
+                      <div style={{ fontSize: 12, color: "var(--w-3)" }}>{a.summary}</div>
+                      <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12.5, color: "var(--w-2)", lineHeight: 1.5 }}>
+                        {a.facts.map((f, i) => (
+                          <li key={i}>{f}</li>
                         ))}
-                      </div>
+                      </ul>
+                      {a.cards.map((g) => (
+                        <div key={g.label} style={{ marginTop: 8 }}>
+                          <span className="id-label" style={{ fontSize: 10, color: "var(--w-3)" }}>{g.label} · {g.names.length}</span>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginTop: 3 }}>
+                            {g.names.map((n) => (
+                              <span key={n} style={{ fontSize: 12, color: "var(--w-2)" }}>{n}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-              </div>
-            );
-          })}
-          <p style={{ fontSize: 11.5, color: "var(--w-3)", lineHeight: 1.5, margin: 0 }}>
-            {score.caveats.join(" ")}
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ fontSize: 11.5, color: "var(--w-3)", lineHeight: 1.5, margin: "12px 0 0" }}>
+            Select an axis to see how it was calculated. {score.caveats.join(" ")}
           </p>
         </div>
       )}
@@ -504,22 +501,31 @@ export function InsightScan({
   insight,
   canEdit,
   open,
+  primer,
 }: {
   deckId: string;
   insight: DeckInsightData;
   canEdit: boolean;
   /** Opened from the Tools menu: the notes box is shown straight away. */
   open: boolean;
+  /** The deck's primer. When there is one it guides the scan, and nothing is asked. */
+  primer: string;
 }) {
-  const [showNotes, setShowNotes] = useState(open);
+  const hasPrimer = primer.trim().length > 0;
+  const [showNotes, setShowNotes] = useState(open && !hasPrimer);
   const [notes, setNotes] = useState(insight.scan?.notes ?? "");
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null | undefined>(undefined);
 
+  // From the Tools menu: a deck with a primer runs at once, one without
+  // gets the notes box.
+  const [pendingOpen, setPendingOpen] = useState(0);
   useEffect(() => {
-    if (open) setShowNotes(true);
-  }, [open]);
+    if (!open) return;
+    if (hasPrimer) setPendingOpen((n) => n + 1);
+    else setShowNotes(true);
+  }, [open, hasPrimer]);
 
   // The meter, read once and after every scan. `undefined` is "not loaded",
   // null is "unlimited".
@@ -533,6 +539,11 @@ export function InsightScan({
       live = false;
     };
   }, [insight.scan?.scannedAt]);
+
+  useEffect(() => {
+    if (pendingOpen > 0 && !running) void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingOpen]);
 
   if (!canEdit) return null;
 
@@ -568,8 +579,13 @@ export function InsightScan({
     <div style={{ marginTop: 12 }}>
       {!showNotes ? (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <Pill on={false} onClick={() => setShowNotes(true)}>🔍 {insight.scan ? "Scan again" : "Scan deck"}</Pill>
-          {meter && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>{meter}</span>}
+          <Pill on={running} onClick={() => (hasPrimer ? void run() : setShowNotes(true))}>
+            🔍 {running ? "Scanning…" : insight.scan ? "Scan again" : "Scan deck"}
+          </Pill>
+          {hasPrimer && !running && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>guided by your primer</span>}
+          {meter && <span style={{ fontSize: 11.5, color: exhausted ? "var(--gold)" : "var(--w-3)" }}>{meter}</span>}
+          {running && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>about half a minute — you can keep working</span>}
+          {error && <span style={{ fontSize: 12, color: "var(--gold)" }}>{error}</span>}
         </div>
       ) : (
         <div className="id-panel" style={{ padding: 14, maxWidth: 560 }}>

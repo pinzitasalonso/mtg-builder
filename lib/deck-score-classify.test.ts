@@ -165,9 +165,10 @@ describe("resilience", () => {
         { pieces: ["B", "D"], produces: ["Untap all lands"], manaNeeded: "" },
       ]
     );
-    // A+B full, A+C shares A (half), the four-card line is clunky (half), the value line is not a win.
+    // A+B and A+C share A, so they are one cluster worth 1.5; the four-card
+    // line is clunky (half); the value line is not a win.
     expect(c.comboLines.total).toBe(3);
-    expect(c.comboLines.counted).toBe(1 + 0.5 + 0.5);
+    expect(c.comboLines.counted).toBe(1.5 + 0.5);
     expect(c.comboLines.sharedFailure).toBe(true);
   });
 

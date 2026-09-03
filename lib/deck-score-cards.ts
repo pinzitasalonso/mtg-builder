@@ -119,6 +119,8 @@ Armored Skyhunter
 Sidisi, Undead Vizier
 Thalia's Lancers
 Sunforger
+Lim-Dûl's Vault
+Lim-Dul's Vault
 Brainstorm
 `);
 // Brainstorm is NOT a tutor — it is listed so the text reader does not mistake
@@ -135,6 +137,7 @@ Plunge into Darkness
 /** 2 points — narrow or expensive true tutors (CMC 5+). */
 export const NARROW_TUTORS = list(`
 Rune-Scarred Demon
+Enter the Infinite
 Increasing Ambition
 Ranger of Eos
 Diabolic Revelation
@@ -1028,6 +1031,37 @@ export const MANA_OUTPUT: Record<string, { amount: number; kind: "rock" | "dork"
   "chromatic lantern": { amount: 1, kind: "rock" },
   "smothering tithe": { amount: 2, kind: "rock" },
 };
+
+/** Mana sinks that turn infinite mana into a kill, so a mana line is lethal. */
+export const INFINITE_MANA_OUTLETS = list(`
+Walking Ballista
+Blue Sun's Zenith
+Stroke of Genius
+Braingeyser
+Exsanguinate
+Torment of Hailfire
+Comet Storm
+Crackle with Power
+Helix Pinnacle
+Aetherflux Reservoir
+Thrasios, Triton Hero
+Villainous Wealth
+Rolling Earthquake
+Fireball
+Banefire
+Jaya's Immolating Inferno
+Electrodominance
+Finale of Devastation
+Hydroid Krasis
+Mind Grind
+Ezuri, Claw of Progress
+Goblin Cannon
+Rocket Launcher
+Grapeshot
+Brain Freeze
+Kessig Wolf Run
+Halo Forager
+`);
 
 /** Win-the-table finishers the goldfish should recognise. */
 export const OVERRUN_FINISHERS = list(`
