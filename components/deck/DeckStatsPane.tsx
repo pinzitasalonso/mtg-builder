@@ -100,7 +100,7 @@ export default function DeckStatsPane({
     <div>
       <StatSection title="Profile">
         <InsightProfile insight={insight} avgManaValue={avgManaValue} />
-        <InsightScan deckId={deckId} insight={insight} canEdit={canEdit} open={scanOpen} />
+        <InsightScan deckId={deckId} insight={insight} canEdit={canEdit} open={scanOpen} primer={primer} />
       </StatSection>
 
       {showPlay && (
