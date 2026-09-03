@@ -181,9 +181,13 @@ export function toSimCard(r: CardRead): SimCard {
   const d = drawReading(r);
   if (d) {
     if (!r.isPermanent) {
-      if (d.kind === "burst") card.drawNow = /^ad nauseam$/.test(r.key) ? 10 : 6;
+      if (d.kind === "burst") card.drawNow = 6;
       else if (d.kind === "oneshot") card.drawNow = 2;
       else if (d.kind === "selection") card.drawNow = 1;
+    } else if (d.kind === "burst") {
+      // Necropotence, Bolas's Citadel: a permanent that refills at once.
+      card.drawNow = 7;
+      card.drawPerTurn = 1;
     } else if (d.kind !== "oneshot" && d.kind !== "symmetric") {
       card.drawPerTurn = 1;
     } else if (d.kind === "oneshot") {
@@ -239,8 +243,9 @@ interface Creature {
 export function goldfish(
   reads: CardRead[],
   lines: GoldfishLine[],
-  options: { hands?: number; seed?: number } = {}
+  options: { hands?: number; seed?: number; trace?: (line: string) => void } = {}
 ): GoldfishResult {
+  const trace = options.trace;
   const deck: SimCard[] = [];
   const commanders: SimCard[] = [];
   for (const r of reads) {
@@ -251,6 +256,11 @@ export function goldfish(
     }
     for (let i = 0; i < r.copies; i++) deck.push(sim);
   }
+  // Ad Nauseam draws until the life runs out, and the curve decides how far
+  // that is: a cEDH pile at an average of 1.2 sees fifteen cards.
+  const nonland = reads.filter((r) => !r.isLand && !r.card.isCommander);
+  const avgMv = nonland.length ? nonland.reduce((n, r) => n + r.mv * r.copies, 0) / nonland.reduce((n, r) => n + r.copies, 0) : 3;
+  for (const c of deck) if (c.key === "ad nauseam") c.drawNow = Math.max(6, Math.min(16, Math.round(30 / Math.max(1, avgMv * 1.6))));
   const hands = options.hands ?? 300;
   const seed = options.seed ?? hashNames(reads.map((r) => `${r.key}x${r.copies}`));
   const random = rng(seed);
@@ -290,8 +300,14 @@ export function goldfish(
     }
     let hand = library.splice(0, 7);
     const landsIn = (cards: SimCard[]) => cards.filter((c) => c.isLand).length;
+    const manaIn = (cards: SimCard[]) => cards.filter((c) => c.isLand || c.rock > 0 || c.dork > 0 || c.ritualAmount > 0).length;
+    // A combo deck also ships a hand with no way to the line: no tutor, no
+    // piece, no refill. Its pilots mulligan for exactly that.
+    const live = (cards: SimCard[]) => cards.some((c) => c.tutor || c.drawNow >= 6 || pieceKeys.has(c.key));
+    const dead = (cards: SimCard[]) =>
+      lethalLines.length > 0 ? manaIn(cards) < 2 || manaIn(cards) > 5 || !live(cards) : landsIn(cards) < 2 || landsIn(cards) > 5;
     // One London mulligan on a hand that cannot function.
-    if (landsIn(hand) < 2 || landsIn(hand) > 5) {
+    if (dead(hand)) {
       library.push(...hand);
       for (let i = library.length - 1; i > 0; i--) {
         const j = Math.floor(random() * (i + 1));
@@ -353,6 +369,7 @@ export function goldfish(
         rocks.reduce((n, r) => n + (r.activeFrom <= t ? r.mana : 0), 0) +
         dorks.reduce((n, d) => n + (d.castTurn < t ? d.mana : 0), 0);
       if (t >= 3 && t <= 5) manaSamples[t]!.push(mana);
+      if (trace && h < 3) trace(`hand ${h} turn ${t}: mana ${mana} | hand: ${hand.map((c) => c.name).join(", ")} | board: ${[...battlefieldKeys].join(", ")}`);
 
       const ritualMana = () => hand.filter((c) => c.ritualNet > 0).reduce((n, c) => n + c.ritualNet, 0);
       const spendRituals = (needed: number) => {
@@ -399,7 +416,6 @@ export function goldfish(
 
       // The casting loop: greedy, best thing first, until nothing fits.
       let progress = true;
-      let castTutorThisTurn = false;
       while (progress && !won) {
         progress = false;
 
@@ -436,10 +452,14 @@ export function goldfish(
             break;
           }
           if (!ok) continue;
+          // Spellbook's mana-needed already covers casting the pieces, so
+          // the two are not summed: a line costs the larger of the two.
+          cost = Math.max(cost - line.manaNeeded, line.manaNeeded);
           if (mana + ritualMana() >= cost) {
             spendRituals(cost);
             won = t;
             wonBy = "combo";
+            if (trace && h < 3) trace(`  WIN via ${line.pieces.join("+")} cost ${cost}`);
             break;
           }
         }
@@ -479,9 +499,36 @@ export function goldfish(
           }
         }
 
-        // 3. A tutor for the one missing piece of a lethal line.
-        if (!castTutorThisTurn) {
-          const tutor = hand.find((c) => c.tutor && c.mv <= mana);
+        // 2b. A burst refill (Ad Nauseam, a wheel, Necropotence) before any
+        // tutor: it is the strongest thing a hand can do, and chaining a
+        // second tutor past it spends the mana it needs.
+        {
+          const burst = hand.find((c) => c.drawNow >= 6 && !c.creature && c.mv <= mana + ritualMana());
+          if (burst) {
+            if (trace && h < 3) trace(`  draw ${burst.name} (+${burst.drawNow})`);
+            if (burst.mv > mana) spendRituals(burst.mv);
+            mana -= burst.mv;
+            hand.splice(hand.indexOf(burst), 1);
+            if (burst.drawPerTurn) {
+              battlefieldKeys.add(burst.key);
+              drawEngines += burst.drawPerTurn;
+            }
+            draw(burst.drawNow);
+            progress = true;
+            continue;
+          }
+        }
+
+        // 3. A tutor: for the missing piece of the closest lethal line, or
+        // for a refill when nothing is close. Tutors chain as long as the
+        // mana holds — a cEDH turn is Vampiric into Consultation into the
+        // win — and a ritual pays for the tutor that completes a line.
+        {
+          const oneAway = lethalLines.some((line) => {
+            const missing = line.pieces.filter((k) => !battlefieldKeys.has(k) && !hand.some((c) => c.key === k) && !commanderKeys.has(k));
+            return missing.length === 1 && library.some((c) => c.key === missing[0]);
+          });
+          const tutor = hand.find((c) => c.tutor && c.mv <= mana + (oneAway ? ritualMana() : 0));
           if (tutor) {
             let fetched = false;
             // The line closest to assembled gets the tutor; its first
@@ -509,6 +556,18 @@ export function goldfish(
                 fetched = true;
               }
             }
+            // Two or more pieces short of every line: a tutor finds the
+            // refill that digs for all of them at once, when it is castable
+            // this turn or next.
+            if (fetched && pick && pick.missing.length >= 2 && !hand.some((c) => c.drawNow >= 6)) {
+              // Undo the piece fetch in favour of the refill, if one is there.
+              const refill = library.findIndex((c) => c.drawNow >= 6 && c.mv <= mana + ritualMana() + 2);
+              if (refill >= 0) {
+                const piece = hand.pop()!;
+                library.push(piece);
+                hand.push(...library.splice(refill, 1));
+              }
+            }
             if (!fetched && lethalLines.length === 0) {
               // No lines: a tutor finds the biggest threat in the library.
               let best = -1;
@@ -522,9 +581,10 @@ export function goldfish(
               }
             }
             if (fetched) {
+              if (trace && h < 3) trace(`  tutor ${tutor.name} -> ${hand[hand.length - 1]!.name}`);
+              if (tutor.mv > mana) spendRituals(tutor.mv);
               mana -= tutor.mv;
               hand.splice(hand.indexOf(tutor), 1);
-              castTutorThisTurn = true;
               progress = true;
               continue;
             }
@@ -572,6 +632,7 @@ export function goldfish(
           (c) => c.drawNow > 0 && !c.creature && (hand.length <= 4 || c.drawNow >= 3) && c.mv <= mana + (c.drawNow >= 6 ? ritualMana() : 0)
         );
         if (drawSpell) {
+          if (trace && h < 3) trace(`  draw ${drawSpell.name} (+${drawSpell.drawNow})`);
           if (drawSpell.mv > mana) spendRituals(drawSpell.mv);
           mana -= drawSpell.mv;
           hand.splice(hand.indexOf(drawSpell), 1);

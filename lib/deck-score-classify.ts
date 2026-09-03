@@ -196,7 +196,7 @@ export function tutorReading(r: Read): TutorReading | null {
   const attackMaterialise = r.isPermanent && combatLine(r, /onto the battlefield/) && combatLine(r, /(search your library|look at the top|reveal the top)/);
 
   if (TUTOR_ENGINES.has(r.key) && repeatable) return { ...none, points: 6, premium: true, engine: true, battlefield };
-  if (STANDARD_TUTORS.has(r.key) && (searches || attackMaterialise)) return { ...none, points: 4, battlefield: attackMaterialise };
+  if (STANDARD_TUTORS.has(r.key) && (searches || attackMaterialise || /look at the top/.test(r.text))) return { ...none, points: 4, battlefield: attackMaterialise };
   if (NARROW_TUTORS.has(r.key)) return { ...none, points: 2 };
   if (attackMaterialise) return { ...none, points: 4, battlefield: true };
   if (!searches) return null;
@@ -231,7 +231,7 @@ export interface DrawReading {
 }
 
 const DRAW = /draw(s)? (a|an|one|two|three|four|five|six|seven|x|that many|\w+)( additional| extra)? cards?/;
-const WHEEL = /each player discards (their|his or her) hand(,| and| then|,)? (then )?(draws|and draws) (seven|\w+) cards/;
+const WHEEL = /each player (discards|shuffles) (their|his or her) hand[^.]*draws? (seven |\w+ )?cards/;
 
 export function drawReading(r: Read): DrawReading | null {
   if (BURST_DRAW.has(r.key) || (has(r, WHEEL) && !r.isLand)) return { points: 6, kind: "burst" };
@@ -376,10 +376,16 @@ export function interactionReadingCard(r: Read, creatureCards: number): Interact
   out.removal = destroys || damages || shrinks || edicts || fights;
   out.wipe = WIPE.test(t);
   const graveyardHate = GRAVEYARD_HATE.test(t);
-  const handAttack = HAND_ATTACK.test(t);
+  // A wheel empties three opponents' hands: targeted hand attack, at scale.
+  const handAttack = HAND_ATTACK.test(t) || WHEEL.test(t);
   const theft = THEFT.test(t) && !/gain control of target spell/.test(t);
   out.attackDeterrent = DETERRENT.test(t);
-  out.stax = (STAX_PIECES.has(r.key) && !ENGINES_NOT_STAX.has(r.key)) || (STAX_TEXT.test(t) && !ENGINES_NOT_STAX.has(r.key));
+  // Taxes on opponents' spells (Rhystic Study, Mystic Remora, Esper
+  // Sentinel, Smothering Tithe) are draw engines first, but they are also
+  // the "hoser punishers" the count includes: they change what an opponent
+  // can do on the stack.
+  const tax = ENGINES_NOT_STAX.has(r.key) || /whenever an opponent casts (a|their first) (spell|noncreature spell)[^.]*unless (that player|they) pays?/.test(t);
+  out.stax = STAX_PIECES.has(r.key) || STAX_TEXT.test(t) || tax;
   out.protection = PROTECT_GRANT.test(t) || out.attackDeterrent;
   out.boardLevel =
     BOARD_LEVEL.test(t) &&
@@ -740,9 +746,13 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
   let clunky = 0;
   const sharedFailure = realLines.length > clusters.size;
   for (const members of clusters.values()) {
+    // "Lines sharing a single point of failure count as 1.5, not 2": a
+    // cluster of two or more combos is 1.5, a lone combo is 1, and a cluster
+    // whose every member is clunky reads half of that.
     const allClunky = members.every(isClunky);
     if (allClunky) clunky += 1;
-    comboCounted += allClunky ? 0.5 : 1;
+    const credit = members.length > 1 ? 1.5 : 1;
+    comboCounted += allClunky ? credit / 2 : credit;
     const best = members.find((m) => !isClunky(m)) ?? members[0]!;
     group("combos", "Win lines", `${best.pieces.join(" + ")}${members.length > 1 ? ` (+${members.length - 1} sharing a piece)` : ""}${allClunky ? " · half (clunky)" : ""}`);
   }

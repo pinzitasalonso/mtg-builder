@@ -119,6 +119,8 @@ Armored Skyhunter
 Sidisi, Undead Vizier
 Thalia's Lancers
 Sunforger
+Lim-Dûl's Vault
+Lim-Dul's Vault
 Brainstorm
 `);
 // Brainstorm is NOT a tutor — it is listed so the text reader does not mistake
