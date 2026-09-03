@@ -19,6 +19,7 @@ import {
 import { classify, manaValue, type ComboLineInput, type ScoredCard } from "./deck-score-classify";
 import type { CommanderDependency } from "./deck-score";
 import { goldfish, type GoldfishLine } from "./goldfish";
+import { INFINITE_MANA_OUTLETS } from "./deck-score-cards";
 
 export interface AxisReport {
   key: "consistency" | "resilience" | "interaction" | "speed";
@@ -57,13 +58,14 @@ function lineMana(manaNeeded: string): number {
 
 /**
  * The two judgements the rubric leaves to a reader, applied on top of the
- * computed read — within bounds. The goldfish's turn can move by at most one
- * turn either way and commander dependency by one step, and each carries the
+ * computed read — within bounds. The goldfish's turn can move by at most two
+ * turns either way (it does not see reanimation, Show and Tell, or the
+ * player's notes) and commander dependency by one step, and each carries the
  * reason it moved, which the working shows. Wider than that and the number
  * would be the judgement rather than the deck.
  */
 export interface Judgement {
-  /** −1, −0.5, 0, 0.5 or 1 turns on the goldfish's fundamental turn. */
+  /** Up to two turns either way on the goldfish's fundamental turn, on the half-turn grid. */
   turnDelta?: number;
   turnReason?: string;
   commanderDependency?: CommanderDependency;
@@ -77,7 +79,7 @@ export function boundJudgement(j: Judgement, computedDependency: CommanderDepend
   const out: Judgement = {};
   const delta = Number(j.turnDelta ?? 0);
   if (Number.isFinite(delta) && delta !== 0) {
-    out.turnDelta = Math.max(-1, Math.min(1, Math.round(delta * 2) / 2));
+    out.turnDelta = Math.max(-2, Math.min(2, Math.round(delta * 2) / 2));
     out.turnReason = j.turnReason;
   }
   if (j.commanderDependency && DEPENDENCY_ORDER.includes(j.commanderDependency) && j.commanderDependency !== computedDependency) {
@@ -104,11 +106,17 @@ export function scoreDeck(
   const interaction = interactionReading(c.interaction);
   const resilience = resilienceReading(c.resilience);
 
-  const goldfishLines: GoldfishLine[] = lines.map((l) => ({
-    pieces: l.pieces,
-    manaNeeded: lineMana(l.manaNeeded),
-    lethal: l.produces.some((p) => /win the game|loses? the game|infinite (damage|lifeloss|life loss|mill|poison|combat)/i.test(p)),
-  }));
+  // Infinite mana is a kill when the deck holds something to pour it into.
+  const outletsInDeck = cards.filter((c) => INFINITE_MANA_OUTLETS.has(c.name.toLowerCase())).map((c) => c.name);
+  const goldfishLines: GoldfishLine[] = lines.map((l) => {
+    const wins = l.produces.some((p) => /win the game|loses? the game|infinite (damage|lifeloss|life loss|mill|poison|combat)/i.test(p));
+    const infiniteMana = l.produces.some((p) => /infinite (colorless |colou?red )?mana/i.test(p));
+    if (wins) return { pieces: l.pieces, manaNeeded: lineMana(l.manaNeeded), lethal: true };
+    if (infiniteMana && outletsInDeck.length) {
+      return { pieces: l.pieces, manaNeeded: lineMana(l.manaNeeded), lethal: true, anyOf: outletsInDeck };
+    }
+    return { pieces: l.pieces, manaNeeded: lineMana(l.manaNeeded), lethal: false };
+  });
   const fish = goldfish(c.reads, goldfishLines);
   const fundamentalTurn = Math.max(1, Math.min(14, fish.fundamentalTurn + (j.turnDelta ?? 0)));
   const speed = speedFromFundamentalTurn(fundamentalTurn);

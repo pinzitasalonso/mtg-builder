@@ -381,10 +381,12 @@ export function assemblyMultiplier(tutorPoints: number, battlefieldTutorCommande
 
 /** The combo channel's row readings, including the assembly-discounted rows. */
 export function comboChannelScore(lines: number): number {
+  // Between the rows the read interpolates, the way the other ladders do:
+  // 2.25 lines read 9.25, not 9.
   if (lines >= 3) return 10;
-  if (lines >= 2) return 9;
-  if (lines >= 1.5) return 8;
-  if (lines >= 1) return 7;
+  if (lines >= 2) return 9 + (lines - 2);
+  if (lines >= 1.5) return 8 + (lines - 1.5) * 2;
+  if (lines >= 1) return 7 + (lines - 1) * 2;
   // "Assembly-discounted totals read below the rows above: 0.75 lines read a 5,
   // 0.5 lines a 3.5."
   if (lines >= 0.75) return 5;

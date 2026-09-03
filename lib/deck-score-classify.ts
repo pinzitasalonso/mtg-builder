@@ -182,6 +182,9 @@ export function tutorReading(r: Read): TutorReading | null {
   if (COMBO_TUTORS.has(r.key)) return { ...none, points: 4 };
   if (GRAVEYARD_TUTORS.has(r.key)) return { ...none, points: 4, graveyardDestination: true };
 
+  // Transmute's search lives in reminder text, which read() strips; the
+  // keyword is the tutor. Standard tier: restricted to one mana value.
+  if (r.keywords.has("transmute") || /^transmute \{/m.test(r.text)) return { ...none, points: 4 };
   const searches = SEARCH.test(r.text);
   const repeatable =
     r.isPermanent &&
@@ -709,25 +712,39 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
   const lineMana = (l: ComboLineInput) => manaValue(l.manaNeeded) + (l.manaNeeded.includes("X") ? 99 : 0);
   const realLines = lines.filter(winsOrEngine);
   const commanderInLine = (l: ComboLineInput) => l.pieces.some((p) => commanderKeys.has(nameKey(p)));
+  // Distinct win conditions, not registered combos: Spellbook lists every
+  // pairing, and Isochron Scepter with three different spells is one line
+  // with a single point of failure, not three. Combos sharing a piece are one
+  // cluster; a cluster is a line, at half credit when every member is clunky.
+  const isClunky = (l: ComboLineInput) => l.pieces.length >= 4 || lineMana(l) > 6;
+  const parent = new Map<string, string>();
+  const find = (k: string): string => {
+    const p = parent.get(k) ?? k;
+    if (p === k) return k;
+    const root = find(p);
+    parent.set(k, root);
+    return root;
+  };
+  const union = (a: string, b: string) => parent.set(find(a), find(b));
+  for (const l of realLines) {
+    const keys = l.pieces.map(nameKey).filter((k) => !commanderKeys.has(k));
+    for (let i = 1; i < keys.length; i++) union(keys[0]!, keys[i]!);
+  }
+  const clusters = new Map<string, ComboLineInput[]>();
+  for (const l of realLines) {
+    const keys = l.pieces.map(nameKey).filter((k) => !commanderKeys.has(k));
+    const root = keys.length ? find(keys[0]!) : `cz:${l.pieces.join("+")}`;
+    (clusters.get(root) ?? clusters.set(root, []).get(root)!).push(l);
+  }
   let comboCounted = 0;
   let clunky = 0;
-  const seenPieces = new Set<string>();
-  let sharedFailure = false;
-  for (const l of realLines) {
-    const pieceKeys = l.pieces.map(nameKey);
-    // Lines that hinge on a card already counted share a point of failure —
-    // the second reads 0.5 instead of 1 (1.5 for the pair).
-    const shares = pieceKeys.some((k) => seenPieces.has(k) && !commanderKeys.has(k));
-    const isClunky = pieceKeys.length >= 4 || lineMana(l) > 6;
-    let credit = isClunky ? 0.5 : 1;
-    if (shares) {
-      credit *= 0.5;
-      sharedFailure = true;
-    }
-    if (isClunky) clunky += 1;
-    comboCounted += credit;
-    for (const k of pieceKeys) seenPieces.add(k);
-    group("combos", "Win lines", `${l.pieces.join(" + ")}${isClunky ? " · half (clunky)" : ""}`);
+  const sharedFailure = realLines.length > clusters.size;
+  for (const members of clusters.values()) {
+    const allClunky = members.every(isClunky);
+    if (allClunky) clunky += 1;
+    comboCounted += allClunky ? 0.5 : 1;
+    const best = members.find((m) => !isClunky(m)) ?? members[0]!;
+    group("combos", "Win lines", `${best.pieces.join(" + ")}${members.length > 1 ? ` (+${members.length - 1} sharing a piece)` : ""}${allClunky ? " · half (clunky)" : ""}`);
   }
   const commanderComboPiece = realLines.some(commanderInLine);
   const sisayClass = battlefieldTutorCommander && comboCounted > 0;
@@ -742,7 +759,14 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
   for (const c of commanders) {
     const t = tutorReads.get(c);
     const d = drawReads.get(c);
-    if ((t && t.engine) || (d && d.kind === "selection" && activatedLine(c, /look at the top|scry|surveil/))) commandZoneEngine = "access";
+    // A commander that repeatedly puts cards from hand or library straight
+    // onto the battlefield (Braids, Sneak Attack class) is an access engine:
+    // it is how the deck's pieces arrive.
+    const materialises =
+      c.isPermanent &&
+      (triggeredLine(c, /from (your|their) hand onto the battlefield|from your library onto the battlefield/) ||
+        activatedLine(c, /from your hand onto the battlefield|from your library onto the battlefield/));
+    if ((t && t.engine) || materialises || (d && d.kind === "selection" && activatedLine(c, /look at the top|scry|surveil/))) commandZoneEngine = "access";
     else if (d && (d.kind === "engine" || d.kind === "premium" || d.kind === "combat" || d.kind === "burst") && !commandZoneEngine) commandZoneEngine = "volume";
   }
   // Trigger amplifiers count only with 10+ cards in the amplified family.
