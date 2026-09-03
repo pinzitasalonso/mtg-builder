@@ -8,7 +8,8 @@
     "start": "mkdir -p /data && prisma db push --accept-data-loss && next start",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "calibrate": "vitest run --config calibration/vitest.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.101.0",

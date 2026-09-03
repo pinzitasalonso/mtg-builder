@@ -1,0 +1,119 @@
+{
+  "name": "Braids, Conjurer Adept (mono-blue combo)",
+  "source": {
+    "kind": "deckcheck",
+    "scannedAt": "2026-09-02",
+    "url": "deckcheck.co"
+  },
+  "commanders": [
+    "Braids, Conjurer Adept"
+  ],
+  "list": [
+    "Braids, Conjurer Adept",
+    "1 Ancient Tomb",
+    "1 Arcane Denial",
+    "1 Back to Basics",
+    "1 Basalt Monolith",
+    "1 Blinkmoth Nexus",
+    "1 Blue Sun's Zenith",
+    "1 Brainstorm",
+    "1 Codex Shredder",
+    "1 Consecrated Sphinx",
+    "1 Counterspell",
+    "1 Cybermen Squadron",
+    "1 Cyclonic Rift",
+    "1 Deadeye Navigator",
+    "1 Displacer Kitten",
+    "1 Diversion Unit",
+    "1 Dramatic Reversal",
+    "1 Enter the Infinite",
+    "1 Extraplanar Lens",
+    "1 Faerie Mastermind",
+    "1 Fierce Guardianship",
+    "1 Force of Will",
+    "1 Ghostly Flicker",
+    "1 Grim Monolith",
+    "1 High Tide",
+    "1 Hullbreaker Horror",
+    "1 Imprisoned in the Moon",
+    "1 Inkmoth Nexus",
+    "1 Inkwell Leviathan",
+    "1 Iron Man, Armored Avenger",
+    "1 Isochron Scepter",
+    "1 Jace, Wielder of Mysteries",
+    "1 Jace, the Mind Sculptor",
+    "1 Jin-Gitaxias, Core Augur",
+    "1 Krang, Utrom Warlord",
+    "1 Laboratory Maniac",
+    "1 Leveler",
+    "1 Mana Drain",
+    "1 Mana Vault",
+    "1 Mathemagics",
+    "1 Metalwork Colossus",
+    "1 Muddle the Mixture",
+    "1 Mystic Remora",
+    "1 Mystic Sanctuary",
+    "1 Mystical Tutor",
+    "1 Narset's Reversal",
+    "1 Omniscience",
+    "1 Otawara, Soaring City",
+    "1 Palinchron",
+    "1 Peregrine Drake",
+    "1 Phyrexian Metamorph",
+    "1 Propaganda",
+    "1 Reliquary Tower",
+    "1 Rhystic Study",
+    "1 Rings of Brighthearth",
+    "1 Show and Tell",
+    "1 Snap",
+    "1 Snapcaster Mage",
+    "1 Sol Ring",
+    "1 Sphinx of the Second Sun",
+    "1 Steel Hellkite",
+    "1 Stroke of Genius",
+    "1 Thassa's Oracle",
+    "1 The One Ring",
+    "1 Thought Lash",
+    "1 Thought Vessel",
+    "1 Tidespout Tyrant",
+    "1 Torrential Gearhulk",
+    "1 Treachery",
+    "1 Turnabout",
+    "1 Unwinding Clock",
+    "1 Walking Ballista",
+    "1 Windfall",
+    "27 Island"
+  ],
+  "expected": {
+    "index": 7.88,
+    "consistency": 6,
+    "resilience": 9.75,
+    "interaction": 8.75,
+    "speed": 7,
+    "bracket": 4
+  },
+  "cards": {
+    "Mystical Tutor": {
+      "tutor": 6
+    },
+    "Muddle the Mixture": {
+      "tutor": 4
+    },
+    "Enter the Infinite": {
+      "tutor": 2
+    },
+    "Arcane Denial": {
+      "piece": true,
+      "stack": 3
+    },
+    "Back to Basics": {
+      "piece": true,
+      "stack": 0
+    },
+    "Counterspell": {
+      "piece": true,
+      "stack": 3
+    }
+  },
+  "notes": "DeckCheck's Consistency screen listed 3 tutor cards; its Interaction screen counted 28 pieces. Only the cards visible in the screenshots are recorded here — a fuller export from the Complete Breakdown screens would tighten this deck."
+}
