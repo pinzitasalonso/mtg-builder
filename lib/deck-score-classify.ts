@@ -549,16 +549,6 @@ export interface NamedCount {
   names: string[];
 }
 
-/** What the classifier read on one card, for calibration against a reference. */
-export interface CardReading {
-  tutor?: number;
-  draw?: number;
-  piece?: boolean;
-  stack?: number;
-  threat?: number;
-  recursion?: number;
-}
-
 export interface Classification {
   consistency: ConsistencyInput;
   interaction: InteractionInput;
@@ -572,8 +562,6 @@ export interface Classification {
   exposure: { className: string | null; share: number; answers: number };
   redundancy: { subtype: string | null; count: number; bonus: number };
   groups: Record<string, NamedCount>;
-  /** Per-card readings, by printed name — what calibration diffs against DeckCheck. */
-  cardReadings: Record<string, CardReading>;
   /** Per-card readings the goldfish reuses. */
   reads: Read[];
   creatureCards: number;
@@ -613,10 +601,6 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
   const group = (id: string, label: string, name: string) => {
     (groups[id] ??= { label, names: [] }).names.push(name);
   };
-  const cardReadings: Record<string, CardReading> = {};
-  const note = (r: Read, patch: CardReading) => {
-    cardReadings[r.card.name] = { ...(cardReadings[r.card.name] ?? {}), ...patch };
-  };
 
   // --- Consistency ---------------------------------------------------------
   let tutorPoints99 = 0;
@@ -642,7 +626,6 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     }
     tutorPoints99 += t.points * copies(r);
     if (t.premium) premiumTutors += copies(r);
-    note(r, { tutor: t.points });
     group("tutors", "Tutors", `${r.card.name} · ${t.points}`);
   }
 
@@ -660,7 +643,6 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
       group("draw", "Card advantage", `${r.card.name} (commander)`);
       continue;
     }
-    note(r, { draw: d.points });
     if (d.kind === "selection") {
       selectionPoints += d.points * copies(r);
       group("draw", "Card advantage", `${r.card.name} · ${d.points}`);
@@ -691,7 +673,6 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     if (r.card.isCommander) continue; // counted as the recursion commander below
     recursionCards += copies(r);
     recursionPoints += rec.points * copies(r);
-    note(r, { recursion: rec.points });
     if (rec.engine) rebuildEngines += copies(r);
     group("recursion", "Recursion", `${r.card.name} · ${rec.points}`);
   }
@@ -706,10 +687,8 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     const t = tutorReads.get(r)!;
     if (hasRecursionPackage) {
       tutorPoints99 += t.points * copies(r);
-      note(r, { tutor: t.points });
       group("tutors", "Tutors", `${r.card.name} · ${t.points}`);
     } else {
-      note(r, { tutor: 0 });
       group("tutors", "Tutors", `${r.card.name} · 0 (no recursion package)`);
     }
   }
@@ -886,7 +865,6 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     if (i.instantSpeed && !(i.bounce && !i.removal && !i.counterspell && !i.protection)) pts += 1;
     if (i.hardWipe) pts += 1;
     stackPoints += pts * n;
-    note(r, { piece: true, stack: pts });
     if (i.symmetricWipe) symmetricWipes += n;
     if (i.stackProtection) stackProtection += n;
     if (i.protection || i.boardLevel) protectionCards += n;
@@ -922,7 +900,6 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     const n = copies(r);
     if (th.weight > 0) {
       threats += th.weight * n;
-      note(r, { threat: th.weight });
       group("threats", "Threats", `${r.card.name}${th.weight < 1 ? " · half (vanilla)" : ""}`);
     }
     if (th.selfProtecting && r.isCreature) selfProtecting += n;
@@ -1062,7 +1039,6 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     exposure,
     redundancy,
     groups,
-    cardReadings,
     reads,
     creatureCards,
   };

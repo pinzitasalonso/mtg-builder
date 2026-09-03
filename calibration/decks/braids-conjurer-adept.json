@@ -92,28 +92,5 @@
     "speed": 7,
     "bracket": 4
   },
-  "cards": {
-    "Mystical Tutor": {
-      "tutor": 6
-    },
-    "Muddle the Mixture": {
-      "tutor": 4
-    },
-    "Enter the Infinite": {
-      "tutor": 2
-    },
-    "Arcane Denial": {
-      "piece": true,
-      "stack": 3
-    },
-    "Back to Basics": {
-      "piece": true,
-      "stack": 0
-    },
-    "Counterspell": {
-      "piece": true,
-      "stack": 3
-    }
-  },
-  "notes": "DeckCheck's Consistency screen listed 3 tutor cards; its Interaction screen counted 28 pieces. Only the cards visible in the screenshots are recorded here — a fuller export from the Complete Breakdown screens would tighten this deck."
+  "notes": "DeckCheck's Consistency screen listed 3 tutor cards; its Interaction screen counted 28 pieces. Only the cards visible in the screenshots are recorded here \u2014 a fuller export from the Complete Breakdown screens would tighten this deck."
 }

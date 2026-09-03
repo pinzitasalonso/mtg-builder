@@ -16,7 +16,7 @@ import {
   speedFromFundamentalTurn,
   type DeckScoreResult,
 } from "./deck-score";
-import { classify, manaValue, type CardReading, type ComboLineInput, type ScoredCard } from "./deck-score-classify";
+import { classify, manaValue, type ComboLineInput, type ScoredCard } from "./deck-score-classify";
 import type { CommanderDependency } from "./deck-score";
 import { goldfish, type GoldfishLine } from "./goldfish";
 import { INFINITE_MANA_OUTLETS } from "./deck-score-cards";
@@ -46,8 +46,6 @@ export interface DeckScoreReport extends DeckScoreResult {
   cardsScored: number;
   /** Fraction of goldfish hands that had taken a player out by each turn (index = turn). */
   wonByTurn: number[];
-  /** What the classifier read on each card. Calibration diffs this against DeckCheck. */
-  cardReadings: Record<string, CardReading>;
 }
 
 const trim = (n: number): string => String(Number(n.toFixed(2)));
@@ -239,6 +237,5 @@ export function scoreDeck(
     caveats,
     cardsScored: cards.reduce((n, card) => n + Math.max(1, card.quantity), 0),
     wonByTurn: fish.wonByTurn,
-    cardReadings: c.cardReadings,
   };
 }

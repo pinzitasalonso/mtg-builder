@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from "node:path";
 import { cardFactsByIds, collectionByName, type CardFacts } from "../lib/scryfall";
 import { findCombos, type ComboLine } from "../lib/combos";
-import { nameKey, type CardReading, type ScoredCard } from "../lib/deck-score-classify";
+import { nameKey, type ScoredCard } from "../lib/deck-score-classify";
 import { scoreDeck, type DeckScoreReport } from "../lib/deck-score-report";
 
 interface DeckFile {
@@ -16,7 +16,6 @@ interface DeckFile {
   commanders: string[];
   list: string[];
   expected: Record<string, number | [number, number]> & { tolerance?: number };
-  cards?: Record<string, CardReading>;
   notes?: string;
 }
 
@@ -130,24 +129,11 @@ describe("calibration", () => {
           const e = deck.expected[a.key];
           const tag = e === undefined ? "" : Array.isArray(e) ? ` (want ${e[0]}–${e[1]})` : ` (want ${e}, Δ ${fmt(a.score - e)})`;
           report.push(`- ${a.label} ${fmt(a.score)}${tag} — ${a.summary}`);
+          for (const g of a.cards) if (g.names.length) report.push(`    ${g.label}: ${g.names.join(", ")}`);
         }
 
-        const cardIssues: string[] = [];
-        for (const [name, want] of Object.entries(deck.cards ?? {})) {
-          const got = r.cardReadings[name] ?? {};
-          const diffs: string[] = [];
-          for (const key of ["tutor", "draw", "stack", "recursion", "threat"] as const) {
-            if (want[key] === undefined) continue;
-            const g = got[key] ?? (key === "stack" && got.piece ? 0 : 0);
-            if (g !== want[key]) diffs.push(`${key} ${g} vs ${want[key]}`);
-          }
-          if (want.piece !== undefined && Boolean(got.piece) !== want.piece) diffs.push(`piece ${Boolean(got.piece)} vs ${want.piece}`);
-          if (diffs.length) cardIssues.push(`${name}: ${diffs.join(", ")}`);
-        }
-        if (deck.cards) report.push(`Cards checked: ${Object.keys(deck.cards).length}, differing: ${cardIssues.length}`);
-        for (const c of cardIssues) report.push(`  ✗ ${c}`);
         for (const a of axisIssues) report.push(`  ✗ ${a}`);
-        if (!axisIssues.length && !cardIssues.length) report.push("  ✓ within tolerance");
+        if (!axisIssues.length) report.push("  ✓ within tolerance");
         for (const a of axisIssues) failures.push(`${deck.name}: ${a}`);
       }
 
@@ -156,9 +142,7 @@ describe("calibration", () => {
       const text = `# Calibration run ${new Date().toISOString()}\n${report.join("\n")}\n`;
       writeFileSync(join(HERE, "last-run.md"), text);
       console.log(text);
-      // Card diffs are findings, not failures: the reference is DeckCheck's
-      // reading of a card and ours can legitimately differ. Axes out of
-      // tolerance fail the run.
+      // Axes out of tolerance fail the run.
       expect(failures, failures.join("\n")).toEqual([]);
     },
     600_000
