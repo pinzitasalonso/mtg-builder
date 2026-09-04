@@ -81,7 +81,14 @@ export async function collectionByName(names: string[]): Promise<Map<string, Out
       if (!res.ok) continue;
       const data = await res.json();
       for (const c of (data.data ?? []) as ScryfallCard[]) {
-        if (c?.id) out.set(c.name.toLowerCase(), toOutCard(c));
+        if (!c?.id) continue;
+        const card = toOutCard(c);
+        out.set(c.name.toLowerCase(), card);
+        // Scryfall answers a front-face request ("Dusk") with the full name
+        // ("Dusk // Dawn"). Callers look the card up by what they asked for,
+        // so a double-faced card is keyed by its front face as well.
+        const front = c.name.split(" // ")[0]!.trim().toLowerCase();
+        if (front && !out.has(front)) out.set(front, card);
       }
     } catch {
       // skip the chunk — callers treat missing entries as unresolved
