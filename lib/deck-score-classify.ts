@@ -322,6 +322,8 @@ export function drawReading(r: Read): DrawReading | null {
 export interface InteractionReadingCard {
   piece: boolean;
   counterspell: boolean;
+  /** Changes a spell's target or takes it over — protection, not a counter. */
+  redirect: boolean;
   free: boolean;
   turnProtection: boolean;
   instantSpeed: boolean;
@@ -358,7 +360,13 @@ const SHRINK = /(target|each|all) (creature|creatures|creature or planeswalker)[
 const EDICT = /(each opponent|target player|target opponent|each player|that player) sacrifices/;
 const FIGHT = /\bfights? (target|another target|up to)|deals damage equal to its power to (target|another target)/;
 const BOUNCE = new RegExp(`return ${TARGETS} (creature|creatures|nonland permanent|nonland permanents|permanent|permanents|artifact|enchantment|planeswalker)[^.]* to (its|their) owner'?s'? hands?`);
-const COUNTER = /counter target (spell|ability|activated|triggered|noncreature|creature|instant|sorcery|artifact|enchantment|planeswalker|\w+ spell)|counter (it|that spell|that ability)|change the target of target spell|gain control of target spell/;
+const COUNTER = /counter target (spell|ability|activated|triggered|noncreature|creature|instant|sorcery|artifact|enchantment|planeswalker|\w+ spell)|counter (it|that spell|that ability)/;
+// A redirect (Bolt Bend, Deflecting Swat, Misdirection) answers the one spell
+// pointed at your piece; it is not a counterspell and does not stop a wrath
+// or a combo. A colour hoser (Pyroblast, Hydroblast) counters only when the
+// table plays the colour: interaction, but not a counter suite.
+const REDIRECT = /change the targets? of target spell|choose new targets for target spell|gain control of target (noncreature )?spell/;
+const COLOUR_HOSER = /counter target (blue|black|red|green|white) (spell|instant|sorcery|creature spell|noncreature spell)|counter target spell if it's (blue|black|red|green|white)/;
 const WIPE = /(destroy|exile) (all|each) (creature|creatures|nonland permanent|nonland permanents|permanent|permanents|artifact|artifacts|enchantment|enchantments|other creatures|other permanents|artifacts and enchantments|artifacts, creatures, and enchantments|nontoken|creatures and planeswalkers)|each player sacrifices all|all creatures get -\d+\/-\d+|each creature gets -x\/-x|all creatures get -x\/-x|each creature gets -\d+\/-\d+|deals? \d+ damage to each creature/;
 const GRAVEYARD_HATE = /exile (target|all|each) (player's|opponent's|card|cards)[^.]*graveyard|exile all (cards from all )?graveyards|exile target card from a graveyard|exile each opponent's graveyard|cards in graveyards can't|from graveyards? can't/;
 const HAND_ATTACK = /target (player|opponent) (reveals|discards)|each opponent discards/;
@@ -370,7 +378,7 @@ const STAX_TEXT = /(players|opponents|your opponents|each opponent|each player|y
 
 export function interactionReadingCard(r: Read, creatureCards: number): InteractionReadingCard {
   const none: InteractionReadingCard = {
-    piece: false, counterspell: false, free: false, turnProtection: false, instantSpeed: false,
+    piece: false, counterspell: false, redirect: false, free: false, turnProtection: false, instantSpeed: false,
     hardWipe: false, wipe: false, symmetricWipe: false, creatureOnlyWipe: false, removal: false, bounce: false,
     answersCreatures: false, answersArtifacts: false, answersEnchantments: false,
     protection: false, boardLevel: false, attackDeterrent: false, stax: false, stackProtection: false,
@@ -378,7 +386,8 @@ export function interactionReadingCard(r: Read, creatureCards: number): Interact
   const out = { ...none };
   const t = r.text;
 
-  out.counterspell = COUNTER.test(t) || EFFECTIVE_COUNTERS.has(r.key);
+  out.redirect = REDIRECT.test(t);
+  out.counterspell = (COUNTER.test(t) && !COLOUR_HOSER.test(t)) || EFFECTIVE_COUNTERS.has(r.key);
   out.turnProtection =
     TURN_PROTECTION.has(r.key) ||
     /(opponents|players|your opponents) can't cast spells (during your turn|this turn)|can't cast spells this turn|your opponents can't cast spells during your turn|can cast spells only (any time they could cast a sorcery|during their own turns?)/.test(t);
@@ -394,7 +403,7 @@ export function interactionReadingCard(r: Read, creatureCards: number): Interact
   const graveyardHate = GRAVEYARD_HATE.test(t);
   // A wheel empties three opponents' hands: targeted hand attack, at scale.
   const handAttack = HAND_ATTACK.test(t) || WHEEL.test(t);
-  const theft = THEFT.test(t) && !/gain control of target spell/.test(t);
+  const theft = THEFT.test(t) && !out.redirect;
   out.attackDeterrent = DETERRENT.test(t);
   // Taxes on opponents' spells (Rhystic Study, Mystic Remora, Esper
   // Sentinel, Smothering Tithe) are draw engines first, but they are also
@@ -438,7 +447,7 @@ export function interactionReadingCard(r: Read, creatureCards: number): Interact
   }
 
   out.piece =
-    out.removal || out.counterspell || out.wipe || out.bounce || graveyardHate || handAttack || theft ||
+    out.removal || out.counterspell || out.redirect || COLOUR_HOSER.test(t) || out.wipe || out.bounce || graveyardHate || handAttack || theft ||
     out.protection || out.stax || out.turnProtection || out.boardLevel;
 
   if (!out.piece) return none;
@@ -455,7 +464,7 @@ export function interactionReadingCard(r: Read, creatureCards: number): Interact
   out.free = (!r.isPermanent || r.keywords.has("flash")) && (r.mv === 0 || altCost || FREE_INTERACTION.has(r.key));
   if (r.isLand) out.free = false;
 
-  out.stackProtection = out.counterspell || out.free || out.turnProtection;
+  out.stackProtection = out.counterspell || out.redirect || out.free || out.turnProtection;
   return out;
 }
 
@@ -873,6 +882,8 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     if (i.counterspell) {
       pts += 2;
       counterspells += n;
+    } else if (i.redirect) {
+      pts += 1;
     }
     if (i.free) pts += 2;
     if (i.turnProtection) pts += 2;
@@ -891,7 +902,7 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     if (i.answersEnchantments) answersEnchantments = true;
     if (i.answersArtifacts || i.answersEnchantments) artifactEnchantmentAnswers += n;
     const tags = [
-      i.counterspell ? "counter" : null,
+      i.counterspell ? "counter" : i.redirect ? "redirect" : null,
       i.free ? "free" : null,
       i.turnProtection ? "turn protection" : null,
       i.boardLevel ? "board protection" : i.protection ? "protection" : null,

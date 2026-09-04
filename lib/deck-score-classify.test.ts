@@ -141,6 +141,20 @@ describe("interaction", () => {
     expect(c.resilience.stackProtectionPieces).toBe(3);
   });
 
+  it("prices redirects and colour hosers below a counterspell", () => {
+    const c = classify([
+      ...lands,
+      spell("Bolt Bend", "Instant", "This spell costs {3} less to cast if you control a creature with power 4 or greater.\nChange the target of target spell or ability with a single target.", 4),
+      spell("Pyroblast", "Instant", "Choose one —\n• Counter target spell if it's blue.\n• Destroy target permanent if it's blue.", 1),
+      spell("Counterspell", "Instant", "Counter target spell.", 2),
+    ]);
+    expect(c.interaction.pieces).toBe(3);
+    expect(c.interaction.counterspells).toBe(1);
+    // Bolt Bend 1 (redirect) + 2 (free, listed) + 1 (instant), Pyroblast 1 (instant), Counterspell 3.
+    expect(c.interaction.stackPoints).toBe(4 + 1 + 3);
+    expect(c.resilience.stackProtectionPieces).toBe(2);
+  });
+
   it("judges a creature-only wrath one-sided in a creature-light deck", () => {
     const wrath = spell("Wrath of God", "Sorcery", "Destroy all creatures. They can't be regenerated.", 4);
     const few = classify([...lands, wrath, wrath, wrath]);

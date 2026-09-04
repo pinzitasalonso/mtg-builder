@@ -538,26 +538,19 @@ Torpor Orb
 Angel's Grace
 `);
 
-/** Effective counterspells that text alone would miss. */
+/**
+ * Effective counterspells that text alone would miss. Redirects (Bolt Bend,
+ * Deflecting Swat, Misdirection) and colour hosers (Pyroblast, Hydroblast)
+ * are deliberately NOT here: the classifier reads them as interaction pieces
+ * below a true counterspell.
+ */
 export const EFFECTIVE_COUNTERS = list(`
 Veil of Summer
 Autumn's Veil
-Imp's Mischief
-Bolt Bend
-Deflecting Swat
-Pyroblast
-Red Elemental Blast
-Hydroblast
-Blue Elemental Blast
-Misdirection
-Commandeer
 Tibalt's Trickery
-Guttural Response
 Dovin's Veto
 Lapse of Certainty
 Mana Tithe
-Ricochet Trap
-Shunt
 Redirect
 Swerve
 Reroute
