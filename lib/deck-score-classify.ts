@@ -233,14 +233,29 @@ export interface DrawReading {
 const DRAW = /draw(s)? (a|an|one|two|three|four|five|six|seven|x|that many|\w+)( additional| extra)? cards?/;
 const WHEEL = /each player (discards|shuffles) (their|his or her) hand[^.]*draws? (seven |\w+ )?cards/;
 
+/**
+ * The curated lists, consulted whenever the text reader has nothing: a card
+ * put on a list is there to be counted, whatever its first line says.
+ */
+function curatedDraw(r: Read): DrawReading | null {
+  if (STANDARD_DRAW.has(r.key)) return { points: 4, kind: "engine" };
+  if (SELECTION.has(r.key)) return { points: 3, kind: "selection" };
+  if (ONE_SHOT_DRAW.has(r.key)) return { points: 2, kind: "oneshot" };
+  return null;
+}
+
 export function drawReading(r: Read): DrawReading | null {
   if (BURST_DRAW.has(r.key) || (has(r, WHEEL) && !r.isLand)) return { points: 6, kind: "burst" };
   if (PREMIUM_DRAW.has(r.key)) return { points: 5, kind: "premium" };
   if (SELECTION.has(r.key)) return { points: 3, kind: "selection" };
   // "Cards that trigger on your opponents' draws are punishers, not draw
   // sources — they score as Interaction, never here."
-  if (has(r, /whenever an opponent draws/) && !has(r, /you draw|draw a card\./)) return null;
-  if (r.keywords.has("cycling") && !has(r, DRAW) && !has(r, /scry|surveil/)) return null;
+  if (has(r, /whenever an opponent draws/) && !has(r, /you draw|draw a card\./)) return curatedDraw(r);
+  // Cycling on a nonland is a one-shot draw: the card cycles itself away for
+  // another, which is how DeckCheck reads it too ("One-shot draw (cycling)").
+  if (r.keywords.has("cycling") && !has(r, DRAW) && !has(r, /scry|surveil/)) {
+    return curatedDraw(r) ?? (r.isLand ? null : { points: 2, kind: "oneshot" });
+  }
 
   const draws = has(r, DRAW) || has(r, /draws? cards? equal to/);
   const selectionText = /\b(scry \d|surveil \d|look at the top (\w+ )?cards?|loot|connive|discard a card, then draw|draw a card, then discard)\b/;
@@ -270,19 +285,23 @@ export function drawReading(r: Read): DrawReading | null {
     if (firstHas(r, DRAW) || firstHas(r, /target player draws/)) {
       const single = firstHas(r, /draw a card/) && !firstHas(r, /draw (two|three|four|five|x|\w+ cards)/);
       if (single && (has(r, selectionText) || r.text.length < 60)) return { points: 3, kind: "selection" };
-      if (single) return null; // a cantrip stapled to another effect is not a draw source
+      if (single) return curatedDraw(r) ?? { points: r.mv <= 3 ? 3 : 2, kind: r.mv <= 3 ? "selection" : "oneshot" };
       return { points: 2, kind: "oneshot" };
     }
     if (has(r, selectionText) && r.mv <= 2) return { points: 3, kind: "selection" };
-    return null;
+    // A cantrip stapled to another effect — Charge Through, a pump spell that
+    // replaces itself — is card flow all the same: DeckCheck counts it as
+    // selection, and a deck of sixteen of them does see more cards.
+    const stapled = has(r, /\bdraw a card\b/) && !has(r, /draw (two|three|four|five|x|\w+ cards)/);
+    if (stapled) return curatedDraw(r) ?? { points: r.mv <= 3 ? 3 : 2, kind: r.mv <= 3 ? "selection" : "oneshot" };
+    return curatedDraw(r) ?? { points: 2, kind: "oneshot" };
   }
 
   // Selection with no draw: scry, surveil, dig — the primary effect, cheap.
   if (has(r, selectionText)) {
     if (!r.isPermanent && firstHas(r, selectionText)) return { points: 3, kind: "selection" };
     if (r.isPermanent && !r.isCreature && !r.isLand && activatedLine(r, selectionText)) return { points: 3, kind: "selection" };
-    if (SELECTION.has(r.key)) return { points: 3, kind: "selection" };
-    return null;
+    return curatedDraw(r);
   }
   if (has(r, /investigate|create a clue/)) return { points: 2, kind: "oneshot" };
   // Impulse draw: exile the top and play it.
@@ -293,10 +312,7 @@ export function drawReading(r: Read): DrawReading | null {
     return { points: 2, kind: "oneshot" };
   }
 
-  if (STANDARD_DRAW.has(r.key)) return { points: 4, kind: "engine" };
-  if (SELECTION.has(r.key)) return { points: 3, kind: "selection" };
-  if (ONE_SHOT_DRAW.has(r.key)) return { points: 2, kind: "oneshot" };
-  return null;
+  return curatedDraw(r);
 }
 
 // ---------------------------------------------------------------------------
