@@ -574,6 +574,24 @@ export interface NamedCount {
   names: string[];
 }
 
+/**
+ * The jobs a card can fill for the redundancy count. Each is a thing the
+ * deck does a lot of when it does it at all, so eight of them is a plan and
+ * not a coincidence.
+ */
+const FUNCTIONAL_ROLES: Record<string, (r: Read) => boolean> = {
+  untapper: (r) => has(r, /\buntap (target|another target|all|each|up to|~|those|that|it|them|x target|two target|three target|a )/),
+  "gives-trample": (r) => has(r, /(gains?|have|has|get|gets|with)[^.]*\btrample\b|trample until end of turn/),
+  "gives-haste": (r) => has(r, /(gains?|have|has|get|gets)[^.]*\bhaste\b/),
+  "manaless-value": (r) =>
+    r.mv === 0 || has(r, /rather than pay (this spell's|its|~'s) mana cost|without paying its mana cost|if you control a commander, you may cast/) || /\/p\}/i.test(r.card.manaCost ?? ""),
+  "adds-multiple-mana": (r) => has(r, /add (\{[wubrgc]\}){2,}|add (two|three|four|five|six|x) mana|add an amount of/),
+  "life-payment": (r) =>
+    has(r, /pay (\d+|half|x|any amount of) (your )?life|you lose (\d+|half) (your )?life|lose life equal to/) || /\/p\}/i.test(r.card.manaCost ?? ""),
+  "sac-outlet": (r) => r.text.split("\n").some((line) => /^[^:]*sacrifice (a|another|an|x|two) (creature|permanent|artifact|creature or artifact)[^:]*:/.test(line)),
+  "extra-combat": (r) => has(r, /additional combat phase/),
+};
+
 export interface Classification {
   consistency: ConsistencyInput;
   interaction: InteractionInput;
@@ -585,7 +603,7 @@ export interface Classification {
   commanderDependencyReason: string;
   mana: { lands: number; rocks: number; dorks: number; effectiveSources: number; target: number; averageManaValue: number; weakColor: string | null };
   exposure: { className: string | null; share: number; answers: number };
-  redundancy: { subtype: string | null; count: number; bonus: number };
+  redundancy: { subtype: string | null; count: number; bonus: number; roles: { role: string; count: number }[] };
   groups: Record<string, NamedCount>;
   /** Per-card readings the goldfish reuses. */
   reads: Read[];
@@ -718,23 +736,39 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     }
   }
 
-  // Tribal / synergy redundancy.
+  // Functional redundancy: "N cards filling the X role". A role is a tribe
+  // the deck names, or a job the text does — untapping, granting trample,
+  // making several mana, costing nothing, paying life. The biggest role is
+  // worth +10 at ten cards and +5 at eight (six for a tribe); each further
+  // role of eight is +5 more, to +20. Tutor points, per DeckCheck's sheet.
+  const roles: { role: string; count: number }[] = [];
   const subtypeCounts = new Map<string, number>();
   for (const r of reads) {
     if (!r.isCreature || r.isLand) continue;
     const sub = (r.type.split("—")[1] ?? "").trim().split(/\s+/).filter(Boolean);
     for (const s of new Set(sub)) subtypeCounts.set(s, (subtypeCounts.get(s) ?? 0) + copies(r));
   }
-  let redundancy = { subtype: null as string | null, count: 0, bonus: 0 };
+  let tribe = { subtype: null as string | null, count: 0 };
   for (const [sub, count] of subtypeCounts) {
-    if (count < 6 || count <= redundancy.count) continue;
+    if (count < 6 || count <= tribe.count) continue;
     // The type has to be a ROLE the deck cares about, not a coincidence: some
     // other card (or the commander) has to name it.
-    const singular = sub;
-    const mentions = reads.filter((r) => !r.type.includes(singular) && new RegExp(`\\b${singular.replace(/s$/, "")}(s|es)?\\b`).test(r.text)).length;
-    if (mentions < 3 && !commanders.some((c) => c.text.includes(singular))) continue;
-    redundancy = { subtype: sub, count, bonus: count >= 10 ? 10 : 5 };
+    const mentions = reads.filter((r) => !r.type.includes(sub) && new RegExp(`\\b${sub.replace(/s$/, "")}(s|es)?\\b`).test(r.text)).length;
+    if (mentions < 3 && !commanders.some((c) => c.text.includes(sub))) continue;
+    tribe = { subtype: sub, count };
   }
+  if (tribe.subtype) roles.push({ role: tribe.subtype, count: tribe.count });
+  for (const [role, matches] of Object.entries(FUNCTIONAL_ROLES)) {
+    const count = reads.filter((r) => !r.isLand && matches(r)).reduce((n, r) => n + copies(r), 0);
+    if (count >= 8) roles.push({ role, count });
+  }
+  roles.sort((a, b) => b.count - a.count);
+  let redundancyBonus = 0;
+  if (roles[0]) redundancyBonus += roles[0].count >= 10 ? 10 : 5;
+  for (const extra of roles.slice(1)) if (extra.count >= 8) redundancyBonus += 5;
+  redundancyBonus = Math.min(20, redundancyBonus);
+  const redundancy = { subtype: roles[0]?.role ?? null, count: roles[0]?.count ?? 0, bonus: redundancyBonus, roles };
+  for (const role of roles) group("tutors", "Tutors", `${role.count} cards in the ${role.role} role`);
   const leansOnRedundancy = redundancy.bonus > 0 && readLadder(tutorPoints99, TUTOR_LADDER) < 7;
 
   // Combo lines and the commander's part in them.
@@ -794,14 +828,7 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
   for (const c of commanders) {
     const t = tutorReads.get(c);
     const d = drawReads.get(c);
-    // A commander that repeatedly puts cards from hand or library straight
-    // onto the battlefield (Braids, Sneak Attack class) is an access engine:
-    // it is how the deck's pieces arrive.
-    const materialises =
-      c.isPermanent &&
-      (triggeredLine(c, /from (your|their) hand onto the battlefield|from your library onto the battlefield/) ||
-        activatedLine(c, /from your hand onto the battlefield|from your library onto the battlefield/));
-    if ((t && t.engine) || materialises || (d && d.kind === "selection" && activatedLine(c, /look at the top|scry|surveil/))) commandZoneEngine = "access";
+    if ((t && t.engine) || (d && d.kind === "selection" && activatedLine(c, /look at the top|scry|surveil/))) commandZoneEngine = "access";
     else if (d && (d.kind === "engine" || d.kind === "premium" || d.kind === "combat" || d.kind === "burst") && !commandZoneEngine) commandZoneEngine = "volume";
   }
   // Trigger amplifiers count only with 10+ cards in the amplified family.

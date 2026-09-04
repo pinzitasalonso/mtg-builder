@@ -137,7 +137,7 @@ export function scoreDeck(
       ? `${plural(c.consistency.premiumTutors, "premium tutor")} — the 9 and 10 rows are open.`
       : `${plural(c.consistency.premiumTutors, "premium tutor")} — rows 9 and 10 need two, so the score caps at 8.`,
   ];
-  if (c.redundancy.bonus > 0) consistencyFacts.push(`${c.redundancy.count} ${c.redundancy.subtype} add +${c.redundancy.bonus} tutor points as redundancy${c.consistency.leansOnRedundancy ? " (capped at a 7 without real search)" : ""}.`);
+  if (c.redundancy.bonus > 0) consistencyFacts.push(`Functional redundancy adds +${c.redundancy.bonus} tutor points: ${c.redundancy.roles.map((x) => `${x.count} cards in the ${x.role} role`).join(", ")}${c.consistency.leansOnRedundancy ? " (capped at a 7 without real search)" : ""}.`);
   if (c.consistency.commandZoneEngine) consistencyFacts.push(`The commander is a${c.consistency.commandZoneEngine === "access" ? "n access" : " volume"} engine, lifting a column by up to two rows.`);
   if ((c.consistency.manaReliability ?? 0) < 0) {
     consistencyFacts.push(

@@ -899,78 +899,6 @@ Ephemerate
 // is a one-shot. The classifier reads the tier (2 / 1.5 / 1) from what each
 // card does; this list only guarantees the card is READ as recursion.
 
-/** Fast mana: rocks and rituals the goldfish should play at full value. */
-export const FAST_MANA = list(`
-Sol Ring
-Mana Crypt
-Mana Vault
-Grim Monolith
-Jeweled Lotus
-Lotus Petal
-Chrome Mox
-Mox Diamond
-Mox Amber
-Mox Opal
-Lion's Eye Diamond
-Dark Ritual
-Cabal Ritual
-Rite of Flame
-Seething Song
-Pyretic Ritual
-Desperate Ritual
-Jeska's Will
-Simian Spirit Guide
-Elvish Spirit Guide
-Ancient Tomb
-City of Traitors
-Gemstone Caverns
-Mana Geyser
-Culling the Weak
-Sacrifice
-Burnt Offering
-Songs of the Damned
-Manamorphose
-Treasonous Ogre
-Dockside Extortionist
-Arcane Signet
-Fellwar Stone
-Mind Stone
-Talisman of Dominance
-Talisman of Progress
-Talisman of Indulgence
-Talisman of Impulse
-Talisman of Unity
-Talisman of Creativity
-Talisman of Hierarchy
-Talisman of Resilience
-Talisman of Conviction
-Talisman of Curiosity
-Thought Vessel
-Wild Growth
-Utopia Sprawl
-Carpet of Flowers
-Birds of Paradise
-Llanowar Elves
-Elvish Mystic
-Fyndhorn Elves
-Deathrite Shaman
-Noble Hierarch
-Ignoble Hierarch
-Bloom Tender
-Priest of Titania
-Elves of Deep Shadow
-Boreal Druid
-Avacyn's Pilgrim
-Delighted Halfling
-Springleaf Drum
-Exploration
-Burgeoning
-Azusa, Lost but Seeking
-Oracle of Mul Daya
-Dryad of the Ilysian Grove
-Wayward Swordtooth
-`);
-
 /** Named mana rocks/dorks/rituals whose output the text reader can't count. */
 export const MANA_OUTPUT: Record<string, { amount: number; kind: "rock" | "dork" | "ritual" | "land"; net?: number }> = {
   "sol ring": { amount: 2, kind: "rock" },
@@ -987,6 +915,12 @@ export const MANA_OUTPUT: Record<string, { amount: number; kind: "rock" | "dork"
   "dark ritual": { amount: 3, kind: "ritual" },
   "cabal ritual": { amount: 3, kind: "ritual" },
   "culling the weak": { amount: 4, kind: "ritual" },
+  "sacrifice": { amount: 3, kind: "ritual" },
+  "burnt offering": { amount: 3, kind: "ritual" },
+  "wild growth": { amount: 1, kind: "rock" },
+  "utopia sprawl": { amount: 1, kind: "rock" },
+  "carpet of flowers": { amount: 1, kind: "rock" },
+  "deathrite shaman": { amount: 1, kind: "dork" },
   "rite of flame": { amount: 2, kind: "ritual" },
   "seething song": { amount: 5, kind: "ritual" },
   "pyretic ritual": { amount: 3, kind: "ritual" },
