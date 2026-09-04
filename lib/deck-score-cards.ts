@@ -35,6 +35,8 @@ Personal Tutor
 Sylvan Tutor
 Eladamri's Call
 Cruel Tutor
+Diabolic Intent
+Wishclaw Talisman
 `);
 // Cruel Tutor is 3 mana but unrestricted and to the top: DeckCheck reads it
 // with the premium row in practice. Everything else is the rubric's own list.
@@ -51,7 +53,6 @@ Sisay, Weatherlight Captain
 Goblin Recruiter
 Goblin Matron
 Moggcatcher
-Squirrel Nest
 Rune-Scarred Demon
 Razaketh, the Foulblooded
 Thrumming Stone
@@ -67,12 +68,10 @@ Scroll Rack
 /** 4 points — standard true tutors, CMC 3–4 or restricted. */
 export const STANDARD_TUTORS = list(`
 Grim Tutor
-Wishclaw Talisman
 Fabricate
 Eldritch Evolution
 Finale of Devastation
 Green Sun's Zenith
-Diabolic Intent
 Beseech the Mirror
 Profane Tutor
 Scheming Symmetry
@@ -120,7 +119,6 @@ Sidisi, Undead Vizier
 Thalia's Lancers
 Sunforger
 Lim-Dûl's Vault
-Lim-Dul's Vault
 Brainstorm
 `);
 // Brainstorm is NOT a tutor — it is listed so the text reader does not mistake
@@ -188,7 +186,6 @@ Marchesa, the Black Rose
 Syr Konrad, the Grim
 Nethroi, Apex of Death
 Kaalia of the Vast
-Gitrog Monster
 The Gitrog Monster
 Varina, Lich Queen
 Grenzo, Dungeon Warden
@@ -234,7 +231,7 @@ Dark Deal
 Wheel and Deal
 Winds of Change
 Day's Undoing
-Commit // Memory
+Commit
 Jace's Archivist
 Khorvath's Fury
 Incendiary Command
@@ -459,7 +456,7 @@ Unexpected Windfall
 Seize the Spoils
 Painful Lesson
 Secret Rendezvous
-Behold the Multitude
+Behold the Multiverse
 `);
 // Skullclamp is both premium (in a token deck) and one-shot; the classifier
 // takes the highest tier a card appears in.
@@ -541,26 +538,19 @@ Torpor Orb
 Angel's Grace
 `);
 
-/** Effective counterspells that text alone would miss. */
+/**
+ * Effective counterspells that text alone would miss. Redirects (Bolt Bend,
+ * Deflecting Swat, Misdirection) and colour hosers (Pyroblast, Hydroblast)
+ * are deliberately NOT here: the classifier reads them as interaction pieces
+ * below a true counterspell.
+ */
 export const EFFECTIVE_COUNTERS = list(`
 Veil of Summer
 Autumn's Veil
-Imp's Mischief
-Bolt Bend
-Deflecting Swat
-Pyroblast
-Red Elemental Blast
-Hydroblast
-Blue Elemental Blast
-Misdirection
-Commandeer
 Tibalt's Trickery
-Guttural Response
 Dovin's Veto
 Lapse of Certainty
 Mana Tithe
-Ricochet Trap
-Shunt
 Redirect
 Swerve
 Reroute
@@ -698,7 +688,7 @@ Merciless Eviction
 Austere Command
 Terminus
 Hallowed Burial
-Dusk // Dawn
+Dusk
 Anger of the Gods
 Sweltering Suns
 Fiery Confluence
@@ -909,78 +899,6 @@ Ephemerate
 // is a one-shot. The classifier reads the tier (2 / 1.5 / 1) from what each
 // card does; this list only guarantees the card is READ as recursion.
 
-/** Fast mana: rocks and rituals the goldfish should play at full value. */
-export const FAST_MANA = list(`
-Sol Ring
-Mana Crypt
-Mana Vault
-Grim Monolith
-Jeweled Lotus
-Lotus Petal
-Chrome Mox
-Mox Diamond
-Mox Amber
-Mox Opal
-Lion's Eye Diamond
-Dark Ritual
-Cabal Ritual
-Rite of Flame
-Seething Song
-Pyretic Ritual
-Desperate Ritual
-Jeska's Will
-Simian Spirit Guide
-Elvish Spirit Guide
-Ancient Tomb
-City of Traitors
-Gemstone Caverns
-Mana Geyser
-Culling the Weak
-Sacrifice
-Burnt Offering
-Songs of the Damned
-Manamorphose
-Treasonous Ogre
-Dockside Extortionist
-Arcane Signet
-Fellwar Stone
-Mind Stone
-Talisman of Dominance
-Talisman of Progress
-Talisman of Indulgence
-Talisman of Impulse
-Talisman of Unity
-Talisman of Creativity
-Talisman of Hierarchy
-Talisman of Resilience
-Talisman of Conviction
-Talisman of Curiosity
-Thought Vessel
-Wild Growth
-Utopia Sprawl
-Carpet of Flowers
-Birds of Paradise
-Llanowar Elves
-Elvish Mystic
-Fyndhorn Elves
-Deathrite Shaman
-Noble Hierarch
-Ignoble Hierarch
-Bloom Tender
-Priest of Titania
-Elves of Deep Shadow
-Boreal Druid
-Avacyn's Pilgrim
-Delighted Halfling
-Springleaf Drum
-Exploration
-Burgeoning
-Azusa, Lost but Seeking
-Oracle of Mul Daya
-Dryad of the Ilysian Grove
-Wayward Swordtooth
-`);
-
 /** Named mana rocks/dorks/rituals whose output the text reader can't count. */
 export const MANA_OUTPUT: Record<string, { amount: number; kind: "rock" | "dork" | "ritual" | "land"; net?: number }> = {
   "sol ring": { amount: 2, kind: "rock" },
@@ -996,6 +914,13 @@ export const MANA_OUTPUT: Record<string, { amount: number; kind: "rock" | "dork"
   "mox opal": { amount: 1, kind: "rock" },
   "dark ritual": { amount: 3, kind: "ritual" },
   "cabal ritual": { amount: 3, kind: "ritual" },
+  "culling the weak": { amount: 4, kind: "ritual" },
+  "sacrifice": { amount: 3, kind: "ritual" },
+  "burnt offering": { amount: 3, kind: "ritual" },
+  "wild growth": { amount: 1, kind: "rock" },
+  "utopia sprawl": { amount: 1, kind: "rock" },
+  "carpet of flowers": { amount: 1, kind: "rock" },
+  "deathrite shaman": { amount: 1, kind: "dork" },
   "rite of flame": { amount: 2, kind: "ritual" },
   "seething song": { amount: 5, kind: "ritual" },
   "pyretic ritual": { amount: 3, kind: "ritual" },
@@ -1008,6 +933,7 @@ export const MANA_OUTPUT: Record<string, { amount: number; kind: "rock" | "dork"
   "dockside extortionist": { amount: 3, kind: "ritual" },
   "ancient tomb": { amount: 2, kind: "land" },
   "city of traitors": { amount: 2, kind: "land" },
+  "gemstone caverns": { amount: 2, kind: "land" },
   "gaea's cradle": { amount: 2, kind: "land" },
   "serra's sanctum": { amount: 2, kind: "land" },
   "cabal coffers": { amount: 2, kind: "land" },

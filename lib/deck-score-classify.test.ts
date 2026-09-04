@@ -98,6 +98,20 @@ describe("draw", () => {
     expect(c.consistency.drawPoints).toBe(4 + 3 + 2 + 3 + 2 + 2);
   });
 
+  it("reaches the curated lists past the text reader, and counts cycling and stapled cantrips", () => {
+    const c = classify([
+      ...lands,
+      // Village Rites is on ONE_SHOT_DRAW; its first line is the additional cost.
+      spell("Village Rites", "Instant", "As an additional cost to cast this spell, sacrifice a creature.\nDraw two cards.", 1),
+      spell("Charge Through", "Instant", "Target creature gains trample until end of turn.\nDraw a card.", 1),
+      card("Barrier Breach", { typeLine: "Instant", oracleText: "Exile up to three target enchantments.\nCycling {2}", manaValue: 3, power: null, toughness: null, keywords: ["Cycling"] }),
+    ]);
+    const names = c.groups.draw?.names ?? [];
+    expect(names).toContain("Village Rites · 2");
+    expect(names).toContain("Charge Through · 3");
+    expect(names).toContain("Barrier Breach · 2");
+  });
+
   it("caps selection at thirty points", () => {
     const cantrips = Array.from({ length: 15 }, (_, i) => spell(`Cantrip ${i}`, "Instant", "Scry 1. Draw a card.", 1));
     expect(classify([...lands, ...cantrips]).consistency.drawPoints).toBe(30);
@@ -125,6 +139,20 @@ describe("interaction", () => {
     expect(c.interaction.answersArtifacts).toBe(true);
     expect(c.interaction.answersEnchantments).toBe(true);
     expect(c.resilience.stackProtectionPieces).toBe(3);
+  });
+
+  it("prices redirects and colour hosers below a counterspell", () => {
+    const c = classify([
+      ...lands,
+      spell("Bolt Bend", "Instant", "This spell costs {3} less to cast if you control a creature with power 4 or greater.\nChange the target of target spell or ability with a single target.", 4),
+      spell("Pyroblast", "Instant", "Choose one —\n• Counter target spell if it's blue.\n• Destroy target permanent if it's blue.", 1),
+      spell("Counterspell", "Instant", "Counter target spell.", 2),
+    ]);
+    expect(c.interaction.pieces).toBe(3);
+    expect(c.interaction.counterspells).toBe(1);
+    // Bolt Bend 1 (redirect) + 2 (free, listed) + 1 (instant), Pyroblast 1 (instant), Counterspell 3.
+    expect(c.interaction.stackPoints).toBe(4 + 1 + 3);
+    expect(c.resilience.stackProtectionPieces).toBe(2);
   });
 
   it("judges a creature-only wrath one-sided in a creature-light deck", () => {

@@ -50,3 +50,7 @@ dev.db-*
 # calibration: fetched card data and the last report
 /calibration/.cache.json
 /calibration/last-run.md
+
+# calibration: the generated database (rebuild with calibration/db/build.sh)
+/calibration/calibration.db
+/calibration/calibration.db-*

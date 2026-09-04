@@ -18,7 +18,7 @@ import {
 } from "./deck-score";
 import { classify, manaValue, type ComboLineInput, type ScoredCard } from "./deck-score-classify";
 import type { CommanderDependency } from "./deck-score";
-import { goldfish, type GoldfishLine } from "./goldfish";
+import { goldfish, toSimCard, type GoldfishLine } from "./goldfish";
 import { INFINITE_MANA_OUTLETS } from "./deck-score-cards";
 
 export interface AxisReport {
@@ -107,7 +107,14 @@ export function scoreDeck(
   const resilience = resilienceReading(c.resilience);
 
   // Infinite mana is a kill when the deck holds something to pour it into.
-  const outletsInDeck = cards.filter((c) => INFINITE_MANA_OUTLETS.has(c.name.toLowerCase())).map((c) => c.name);
+  const outletsInDeck = [
+    ...new Set([
+      ...cards.filter((c) => INFINITE_MANA_OUTLETS.has(c.name.toLowerCase())).map((c) => c.name),
+      // A repeatable mana sink read from the text — Walking Ballista, Thrasios,
+      // Kinnan's own activation — pours infinite mana into a kill just as well.
+      ...c.reads.filter((r) => toSimCard(r).sink).map((r) => r.card.name),
+    ]),
+  ];
   const goldfishLines: GoldfishLine[] = lines.map((l) => {
     const wins = l.produces.some((p) => /win the game|loses? the game|infinite (damage|lifeloss|life loss|mill|poison|combat)/i.test(p));
     const infiniteMana = l.produces.some((p) => /infinite (colorless |colou?red )?mana/i.test(p));
@@ -137,7 +144,7 @@ export function scoreDeck(
       ? `${plural(c.consistency.premiumTutors, "premium tutor")} — the 9 and 10 rows are open.`
       : `${plural(c.consistency.premiumTutors, "premium tutor")} — rows 9 and 10 need two, so the score caps at 8.`,
   ];
-  if (c.redundancy.bonus > 0) consistencyFacts.push(`${c.redundancy.count} ${c.redundancy.subtype} add +${c.redundancy.bonus} tutor points as redundancy${c.consistency.leansOnRedundancy ? " (capped at a 7 without real search)" : ""}.`);
+  if (c.redundancy.bonus > 0) consistencyFacts.push(`Functional redundancy adds +${c.redundancy.bonus} tutor points: ${c.redundancy.roles.map((x) => `${x.count} cards in the ${x.role} role`).join(", ")}${c.consistency.leansOnRedundancy ? " (capped at a 7 without real search)" : ""}.`);
   if (c.consistency.commandZoneEngine) consistencyFacts.push(`The commander is a${c.consistency.commandZoneEngine === "access" ? "n access" : " volume"} engine, lifting a column by up to two rows.`);
   if ((c.consistency.manaReliability ?? 0) < 0) {
     consistencyFacts.push(

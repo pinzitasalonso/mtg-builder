@@ -233,14 +233,29 @@ export interface DrawReading {
 const DRAW = /draw(s)? (a|an|one|two|three|four|five|six|seven|x|that many|\w+)( additional| extra)? cards?/;
 const WHEEL = /each player (discards|shuffles) (their|his or her) hand[^.]*draws? (seven |\w+ )?cards/;
 
+/**
+ * The curated lists, consulted whenever the text reader has nothing: a card
+ * put on a list is there to be counted, whatever its first line says.
+ */
+function curatedDraw(r: Read): DrawReading | null {
+  if (STANDARD_DRAW.has(r.key)) return { points: 4, kind: "engine" };
+  if (SELECTION.has(r.key)) return { points: 3, kind: "selection" };
+  if (ONE_SHOT_DRAW.has(r.key)) return { points: 2, kind: "oneshot" };
+  return null;
+}
+
 export function drawReading(r: Read): DrawReading | null {
   if (BURST_DRAW.has(r.key) || (has(r, WHEEL) && !r.isLand)) return { points: 6, kind: "burst" };
   if (PREMIUM_DRAW.has(r.key)) return { points: 5, kind: "premium" };
   if (SELECTION.has(r.key)) return { points: 3, kind: "selection" };
   // "Cards that trigger on your opponents' draws are punishers, not draw
   // sources — they score as Interaction, never here."
-  if (has(r, /whenever an opponent draws/) && !has(r, /you draw|draw a card\./)) return null;
-  if (r.keywords.has("cycling") && !has(r, DRAW) && !has(r, /scry|surveil/)) return null;
+  if (has(r, /whenever an opponent draws/) && !has(r, /you draw|draw a card\./)) return curatedDraw(r);
+  // Cycling on a nonland is a one-shot draw: the card cycles itself away for
+  // another, which is how DeckCheck reads it too ("One-shot draw (cycling)").
+  if (r.keywords.has("cycling") && !has(r, DRAW) && !has(r, /scry|surveil/)) {
+    return curatedDraw(r) ?? (r.isLand ? null : { points: 2, kind: "oneshot" });
+  }
 
   const draws = has(r, DRAW) || has(r, /draws? cards? equal to/);
   const selectionText = /\b(scry \d|surveil \d|look at the top (\w+ )?cards?|loot|connive|discard a card, then draw|draw a card, then discard)\b/;
@@ -270,19 +285,23 @@ export function drawReading(r: Read): DrawReading | null {
     if (firstHas(r, DRAW) || firstHas(r, /target player draws/)) {
       const single = firstHas(r, /draw a card/) && !firstHas(r, /draw (two|three|four|five|x|\w+ cards)/);
       if (single && (has(r, selectionText) || r.text.length < 60)) return { points: 3, kind: "selection" };
-      if (single) return null; // a cantrip stapled to another effect is not a draw source
+      if (single) return curatedDraw(r) ?? { points: r.mv <= 3 ? 3 : 2, kind: r.mv <= 3 ? "selection" : "oneshot" };
       return { points: 2, kind: "oneshot" };
     }
     if (has(r, selectionText) && r.mv <= 2) return { points: 3, kind: "selection" };
-    return null;
+    // A cantrip stapled to another effect — Charge Through, a pump spell that
+    // replaces itself — is card flow all the same: DeckCheck counts it as
+    // selection, and a deck of sixteen of them does see more cards.
+    const stapled = has(r, /\bdraw a card\b/) && !has(r, /draw (two|three|four|five|x|\w+ cards)/);
+    if (stapled) return curatedDraw(r) ?? { points: r.mv <= 3 ? 3 : 2, kind: r.mv <= 3 ? "selection" : "oneshot" };
+    return curatedDraw(r) ?? { points: 2, kind: "oneshot" };
   }
 
   // Selection with no draw: scry, surveil, dig — the primary effect, cheap.
   if (has(r, selectionText)) {
     if (!r.isPermanent && firstHas(r, selectionText)) return { points: 3, kind: "selection" };
     if (r.isPermanent && !r.isCreature && !r.isLand && activatedLine(r, selectionText)) return { points: 3, kind: "selection" };
-    if (SELECTION.has(r.key)) return { points: 3, kind: "selection" };
-    return null;
+    return curatedDraw(r);
   }
   if (has(r, /investigate|create a clue/)) return { points: 2, kind: "oneshot" };
   // Impulse draw: exile the top and play it.
@@ -293,10 +312,7 @@ export function drawReading(r: Read): DrawReading | null {
     return { points: 2, kind: "oneshot" };
   }
 
-  if (STANDARD_DRAW.has(r.key)) return { points: 4, kind: "engine" };
-  if (SELECTION.has(r.key)) return { points: 3, kind: "selection" };
-  if (ONE_SHOT_DRAW.has(r.key)) return { points: 2, kind: "oneshot" };
-  return null;
+  return curatedDraw(r);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,6 +322,8 @@ export function drawReading(r: Read): DrawReading | null {
 export interface InteractionReadingCard {
   piece: boolean;
   counterspell: boolean;
+  /** Changes a spell's target or takes it over — protection, not a counter. */
+  redirect: boolean;
   free: boolean;
   turnProtection: boolean;
   instantSpeed: boolean;
@@ -342,7 +360,13 @@ const SHRINK = /(target|each|all) (creature|creatures|creature or planeswalker)[
 const EDICT = /(each opponent|target player|target opponent|each player|that player) sacrifices/;
 const FIGHT = /\bfights? (target|another target|up to)|deals damage equal to its power to (target|another target)/;
 const BOUNCE = new RegExp(`return ${TARGETS} (creature|creatures|nonland permanent|nonland permanents|permanent|permanents|artifact|enchantment|planeswalker)[^.]* to (its|their) owner'?s'? hands?`);
-const COUNTER = /counter target (spell|ability|activated|triggered|noncreature|creature|instant|sorcery|artifact|enchantment|planeswalker|\w+ spell)|counter (it|that spell|that ability)|change the target of target spell|gain control of target spell/;
+const COUNTER = /counter target (spell|ability|activated|triggered|noncreature|creature|instant|sorcery|artifact|enchantment|planeswalker|\w+ spell)|counter (it|that spell|that ability)/;
+// A redirect (Bolt Bend, Deflecting Swat, Misdirection) answers the one spell
+// pointed at your piece; it is not a counterspell and does not stop a wrath
+// or a combo. A colour hoser (Pyroblast, Hydroblast) counters only when the
+// table plays the colour: interaction, but not a counter suite.
+const REDIRECT = /change the targets? of target spell|choose new targets for target spell|gain control of target (noncreature )?spell/;
+const COLOUR_HOSER = /counter target (blue|black|red|green|white) (spell|instant|sorcery|creature spell|noncreature spell)|counter target spell if it's (blue|black|red|green|white)/;
 const WIPE = /(destroy|exile) (all|each) (creature|creatures|nonland permanent|nonland permanents|permanent|permanents|artifact|artifacts|enchantment|enchantments|other creatures|other permanents|artifacts and enchantments|artifacts, creatures, and enchantments|nontoken|creatures and planeswalkers)|each player sacrifices all|all creatures get -\d+\/-\d+|each creature gets -x\/-x|all creatures get -x\/-x|each creature gets -\d+\/-\d+|deals? \d+ damage to each creature/;
 const GRAVEYARD_HATE = /exile (target|all|each) (player's|opponent's|card|cards)[^.]*graveyard|exile all (cards from all )?graveyards|exile target card from a graveyard|exile each opponent's graveyard|cards in graveyards can't|from graveyards? can't/;
 const HAND_ATTACK = /target (player|opponent) (reveals|discards)|each opponent discards/;
@@ -354,7 +378,7 @@ const STAX_TEXT = /(players|opponents|your opponents|each opponent|each player|y
 
 export function interactionReadingCard(r: Read, creatureCards: number): InteractionReadingCard {
   const none: InteractionReadingCard = {
-    piece: false, counterspell: false, free: false, turnProtection: false, instantSpeed: false,
+    piece: false, counterspell: false, redirect: false, free: false, turnProtection: false, instantSpeed: false,
     hardWipe: false, wipe: false, symmetricWipe: false, creatureOnlyWipe: false, removal: false, bounce: false,
     answersCreatures: false, answersArtifacts: false, answersEnchantments: false,
     protection: false, boardLevel: false, attackDeterrent: false, stax: false, stackProtection: false,
@@ -362,7 +386,8 @@ export function interactionReadingCard(r: Read, creatureCards: number): Interact
   const out = { ...none };
   const t = r.text;
 
-  out.counterspell = COUNTER.test(t) || EFFECTIVE_COUNTERS.has(r.key);
+  out.redirect = REDIRECT.test(t);
+  out.counterspell = (COUNTER.test(t) && !COLOUR_HOSER.test(t)) || EFFECTIVE_COUNTERS.has(r.key);
   out.turnProtection =
     TURN_PROTECTION.has(r.key) ||
     /(opponents|players|your opponents) can't cast spells (during your turn|this turn)|can't cast spells this turn|your opponents can't cast spells during your turn|can cast spells only (any time they could cast a sorcery|during their own turns?)/.test(t);
@@ -378,7 +403,7 @@ export function interactionReadingCard(r: Read, creatureCards: number): Interact
   const graveyardHate = GRAVEYARD_HATE.test(t);
   // A wheel empties three opponents' hands: targeted hand attack, at scale.
   const handAttack = HAND_ATTACK.test(t) || WHEEL.test(t);
-  const theft = THEFT.test(t) && !/gain control of target spell/.test(t);
+  const theft = THEFT.test(t) && !out.redirect;
   out.attackDeterrent = DETERRENT.test(t);
   // Taxes on opponents' spells (Rhystic Study, Mystic Remora, Esper
   // Sentinel, Smothering Tithe) are draw engines first, but they are also
@@ -422,7 +447,7 @@ export function interactionReadingCard(r: Read, creatureCards: number): Interact
   }
 
   out.piece =
-    out.removal || out.counterspell || out.wipe || out.bounce || graveyardHate || handAttack || theft ||
+    out.removal || out.counterspell || out.redirect || COLOUR_HOSER.test(t) || out.wipe || out.bounce || graveyardHate || handAttack || theft ||
     out.protection || out.stax || out.turnProtection || out.boardLevel;
 
   if (!out.piece) return none;
@@ -439,7 +464,7 @@ export function interactionReadingCard(r: Read, creatureCards: number): Interact
   out.free = (!r.isPermanent || r.keywords.has("flash")) && (r.mv === 0 || altCost || FREE_INTERACTION.has(r.key));
   if (r.isLand) out.free = false;
 
-  out.stackProtection = out.counterspell || out.free || out.turnProtection;
+  out.stackProtection = out.counterspell || out.redirect || out.free || out.turnProtection;
   return out;
 }
 
@@ -549,6 +574,24 @@ export interface NamedCount {
   names: string[];
 }
 
+/**
+ * The jobs a card can fill for the redundancy count. Each is a thing the
+ * deck does a lot of when it does it at all, so eight of them is a plan and
+ * not a coincidence.
+ */
+const FUNCTIONAL_ROLES: Record<string, (r: Read) => boolean> = {
+  untapper: (r) => has(r, /\buntap (target|another target|all|each|up to|~|those|that|it|them|x target|two target|three target|a )/),
+  "gives-trample": (r) => has(r, /(gains?|have|has|get|gets|with)[^.]*\btrample\b|trample until end of turn/),
+  "gives-haste": (r) => has(r, /(gains?|have|has|get|gets)[^.]*\bhaste\b/),
+  "manaless-value": (r) =>
+    r.mv === 0 || has(r, /rather than pay (this spell's|its|~'s) mana cost|without paying its mana cost|if you control a commander, you may cast/) || /\/p\}/i.test(r.card.manaCost ?? ""),
+  "adds-multiple-mana": (r) => has(r, /add (\{[wubrgc]\}){2,}|add (two|three|four|five|six|x) mana|add an amount of/),
+  "life-payment": (r) =>
+    has(r, /pay (\d+|half|x|any amount of) (your )?life|you lose (\d+|half) (your )?life|lose life equal to/) || /\/p\}/i.test(r.card.manaCost ?? ""),
+  "sac-outlet": (r) => r.text.split("\n").some((line) => /^[^:]*sacrifice (a|another|an|x|two) (creature|permanent|artifact|creature or artifact)[^:]*:/.test(line)),
+  "extra-combat": (r) => has(r, /additional combat phase/),
+};
+
 export interface Classification {
   consistency: ConsistencyInput;
   interaction: InteractionInput;
@@ -560,7 +603,7 @@ export interface Classification {
   commanderDependencyReason: string;
   mana: { lands: number; rocks: number; dorks: number; effectiveSources: number; target: number; averageManaValue: number; weakColor: string | null };
   exposure: { className: string | null; share: number; answers: number };
-  redundancy: { subtype: string | null; count: number; bonus: number };
+  redundancy: { subtype: string | null; count: number; bonus: number; roles: { role: string; count: number }[] };
   groups: Record<string, NamedCount>;
   /** Per-card readings the goldfish reuses. */
   reads: Read[];
@@ -693,23 +736,39 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     }
   }
 
-  // Tribal / synergy redundancy.
+  // Functional redundancy: "N cards filling the X role". A role is a tribe
+  // the deck names, or a job the text does — untapping, granting trample,
+  // making several mana, costing nothing, paying life. The biggest role is
+  // worth +10 at ten cards and +5 at eight (six for a tribe); each further
+  // role of eight is +5 more, to +20. Tutor points, per DeckCheck's sheet.
+  const roles: { role: string; count: number }[] = [];
   const subtypeCounts = new Map<string, number>();
   for (const r of reads) {
     if (!r.isCreature || r.isLand) continue;
     const sub = (r.type.split("—")[1] ?? "").trim().split(/\s+/).filter(Boolean);
     for (const s of new Set(sub)) subtypeCounts.set(s, (subtypeCounts.get(s) ?? 0) + copies(r));
   }
-  let redundancy = { subtype: null as string | null, count: 0, bonus: 0 };
+  let tribe = { subtype: null as string | null, count: 0 };
   for (const [sub, count] of subtypeCounts) {
-    if (count < 6 || count <= redundancy.count) continue;
+    if (count < 6 || count <= tribe.count) continue;
     // The type has to be a ROLE the deck cares about, not a coincidence: some
     // other card (or the commander) has to name it.
-    const singular = sub;
-    const mentions = reads.filter((r) => !r.type.includes(singular) && new RegExp(`\\b${singular.replace(/s$/, "")}(s|es)?\\b`).test(r.text)).length;
-    if (mentions < 3 && !commanders.some((c) => c.text.includes(singular))) continue;
-    redundancy = { subtype: sub, count, bonus: count >= 10 ? 10 : 5 };
+    const mentions = reads.filter((r) => !r.type.includes(sub) && new RegExp(`\\b${sub.replace(/s$/, "")}(s|es)?\\b`).test(r.text)).length;
+    if (mentions < 3 && !commanders.some((c) => c.text.includes(sub))) continue;
+    tribe = { subtype: sub, count };
   }
+  if (tribe.subtype) roles.push({ role: tribe.subtype, count: tribe.count });
+  for (const [role, matches] of Object.entries(FUNCTIONAL_ROLES)) {
+    const count = reads.filter((r) => !r.isLand && matches(r)).reduce((n, r) => n + copies(r), 0);
+    if (count >= 8) roles.push({ role, count });
+  }
+  roles.sort((a, b) => b.count - a.count);
+  let redundancyBonus = 0;
+  if (roles[0]) redundancyBonus += roles[0].count >= 10 ? 10 : 5;
+  for (const extra of roles.slice(1)) if (extra.count >= 8) redundancyBonus += 5;
+  redundancyBonus = Math.min(20, redundancyBonus);
+  const redundancy = { subtype: roles[0]?.role ?? null, count: roles[0]?.count ?? 0, bonus: redundancyBonus, roles };
+  for (const role of roles) group("tutors", "Tutors", `${role.count} cards in the ${role.role} role`);
   const leansOnRedundancy = redundancy.bonus > 0 && readLadder(tutorPoints99, TUTOR_LADDER) < 7;
 
   // Combo lines and the commander's part in them.
@@ -769,14 +828,7 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
   for (const c of commanders) {
     const t = tutorReads.get(c);
     const d = drawReads.get(c);
-    // A commander that repeatedly puts cards from hand or library straight
-    // onto the battlefield (Braids, Sneak Attack class) is an access engine:
-    // it is how the deck's pieces arrive.
-    const materialises =
-      c.isPermanent &&
-      (triggeredLine(c, /from (your|their) hand onto the battlefield|from your library onto the battlefield/) ||
-        activatedLine(c, /from your hand onto the battlefield|from your library onto the battlefield/));
-    if ((t && t.engine) || materialises || (d && d.kind === "selection" && activatedLine(c, /look at the top|scry|surveil/))) commandZoneEngine = "access";
+    if ((t && t.engine) || (d && d.kind === "selection" && activatedLine(c, /look at the top|scry|surveil/))) commandZoneEngine = "access";
     else if (d && (d.kind === "engine" || d.kind === "premium" || d.kind === "combat" || d.kind === "burst") && !commandZoneEngine) commandZoneEngine = "volume";
   }
   // Trigger amplifiers count only with 10+ cards in the amplified family.
@@ -857,6 +909,8 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     if (i.counterspell) {
       pts += 2;
       counterspells += n;
+    } else if (i.redirect) {
+      pts += 1;
     }
     if (i.free) pts += 2;
     if (i.turnProtection) pts += 2;
@@ -875,7 +929,7 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
     if (i.answersEnchantments) answersEnchantments = true;
     if (i.answersArtifacts || i.answersEnchantments) artifactEnchantmentAnswers += n;
     const tags = [
-      i.counterspell ? "counter" : null,
+      i.counterspell ? "counter" : i.redirect ? "redirect" : null,
       i.free ? "free" : null,
       i.turnProtection ? "turn protection" : null,
       i.boardLevel ? "board protection" : i.protection ? "protection" : null,

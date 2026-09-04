@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { classify, type ScoredCard } from "./deck-score-classify";
-import { goldfish } from "./goldfish";
+import { goldfish, toSimCard } from "./goldfish";
 
 function card(name: string, over: Partial<ScoredCard> = {}): ScoredCard {
   return {
@@ -51,6 +51,47 @@ describe("goldfish", () => {
     expect(r.fundamentalTurn).toBeLessThanOrEqual(7);
     const slow = goldfish(classify(beatdown()).reads, [], { hands: 120 });
     expect(r.fundamentalTurn).toBeLessThan(slow.fundamentalTurn);
+  });
+
+  it("reads a token engine with a haste lord as a real clock", () => {
+    const deck: ScoredCard[] = [
+      ...lands(34),
+      ...Array.from({ length: 40 }, (_, i) => card(`Goblin ${i}`, { typeLine: "Creature — Goblin", manaCost: "{1}{R}", manaValue: 2, power: 2 })),
+      ...Array.from({ length: 4 }, (_, i) => card(`Warchief ${i}`, { typeLine: "Creature — Goblin", oracleText: "Goblins you control have haste.", manaCost: "{1}{R}{R}", manaValue: 3, power: 2 })),
+      ...Array.from({ length: 21 }, (_, i) => card(`Filler ${i}`, { typeLine: "Instant", oracleText: "Counter target spell.", manaCost: "{1}{U}", manaValue: 2, power: null })),
+      card("Krenko", { isCommander: true, typeLine: "Legendary Creature — Goblin", oracleText: "{T}: Create X 1/1 red Goblin creature tokens, where X is the number of Goblins you control.", manaCost: "{2}{R}{R}", manaValue: 4, power: 3 }),
+    ];
+    const r = goldfish(classify(deck).reads, [], { hands: 120 });
+    const slow = goldfish(classify(beatdown()).reads, [], { hands: 120 });
+    expect(r.fundamentalTurn).toBeLessThan(slow.fundamentalTurn);
+    expect(r.fundamentalTurn).toBeLessThanOrEqual(7);
+  });
+
+  it("reads a deathtouch-poison commander as a ten-counter clock", () => {
+    const deck: ScoredCard[] = [
+      ...lands(36),
+      ...Array.from({ length: 40 }, (_, i) => card(`Snake ${i}`, { typeLine: "Creature — Snake", keywords: ["Deathtouch"], oracleText: "Deathtouch", manaCost: "{1}{G}", manaValue: 2, power: 1 })),
+      ...Array.from({ length: 23 }, (_, i) => card(`Filler ${i}`, { typeLine: "Instant", oracleText: "Counter target spell.", manaCost: "{1}{U}", manaValue: 2, power: null })),
+      card("Fynn", { isCommander: true, typeLine: "Legendary Creature — Human Warrior", keywords: ["Deathtouch"], oracleText: "Deathtouch\nWhenever a creature you control with deathtouch deals combat damage to a player, that player gets two poison counters.", manaCost: "{1}{G}", manaValue: 2, power: 1 }),
+    ];
+    const r = goldfish(classify(deck).reads, [], { hands: 120 });
+    expect(r.fundamentalTurn).toBeLessThanOrEqual(6);
+  });
+
+  it("reads a repeatable mana sink as an outlet, and a mana rock as not one", () => {
+    const reads = classify([
+      ...lands(36),
+      card("Kinnan", { isCommander: true, oracleText: "Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.\n{5}{G}{U}: Look at the top five cards of your library. You may put a non-Human creature card from among them onto the battlefield.", manaCost: "{G}{U}", manaValue: 2 }),
+      card("Walking Ballista", { typeLine: "Artifact Creature — Construct", oracleText: "This creature enters with X +1/+1 counters on it.\n{4}: Put a +1/+1 counter on this creature.\nRemove a +1/+1 counter from this creature: It deals 1 damage to any target.", manaCost: "{X}{X}", manaValue: 0, power: 0 }),
+      card("Mind Stone", { typeLine: "Artifact", oracleText: "{T}: Add {C}.\n{1}, {T}, Sacrifice this artifact: Draw a card.", manaCost: "{2}", manaValue: 2, power: null }),
+      card("Stroke of Genius", { typeLine: "Instant", oracleText: "Target player draws X cards.", manaCost: "{X}{2}{U}", manaValue: 3, power: null }),
+    ]).reads;
+    const sim = Object.fromEntries(reads.map((r) => [r.card.name, toSimCard(r)]));
+    expect(sim["Kinnan"]!.sink).toBe(true);
+    expect(sim["Kinnan"]!.doubler).toBe("nonland");
+    expect(sim["Walking Ballista"]!.sink).toBe(true);
+    expect(sim["Stroke of Genius"]!.sink).toBe(true);
+    expect(sim["Mind Stone"]!.sink).toBe(false);
   });
 
   it("refuses to goldfish a list that is not a deck", () => {

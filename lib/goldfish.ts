@@ -10,11 +10,15 @@
 // commander damage at twenty-one, pump finishers and drains.
 //
 // It is an ESTIMATE, and the result says so in its notes. What it does not
-// model: colour, cost reducers, reanimation, cheating threats into play, and
-// the opponent doing anything at all — which is the rubric's own definition.
-// What it gets right is the thing the constant never could: a deck with fast
-// mana and a two-card combo reads turn 3–4, a precon reads turn 9–11, and
-// swapping a card moves the number.
+// model: colour, cost reducers, reanimation, and the opponent doing anything
+// at all — which is the rubric's own definition. What it does model, because
+// each was the whole clock of a deck that read three turns slow without it:
+// token makers (Krenko), haste lords, a commander that cheats permanents in
+// (Braids), poison from a deathtouch trigger (Fynn), mana doublers and the
+// commander's own mana sink as a combo outlet (Kinnan), and tutors chained
+// into a win in the same turn. What it gets right is the thing the constant
+// never could: a deck with fast mana and a two-card combo reads turn 3–5, a
+// precon reads turn 7–9, and swapping a card moves the number.
 //
 // Seeded, so the same decklist scores the same every time.
 
@@ -50,6 +54,7 @@ interface SimCard {
   key: string;
   mv: number;
   isLand: boolean;
+  isPermanent: boolean;
   entersTapped: boolean;
   landMana: number;
   rock: number;
@@ -77,6 +82,17 @@ interface SimCard {
   equipCost: number;
   /** Puts a permanent from hand onto the battlefield: each turn, or once. */
   cheat: "turn" | "once" | null;
+  /** Tokens the card makes: how many, when, and what each hits for. */
+  tokens: { amount: number | "board" | "power"; when: "etb" | "turn" | "attack" | "tap"; power: number; haste: boolean } | null;
+  /** Grants haste to the creatures you control (Goblin Warchief, Fervor). */
+  hasteAll: boolean;
+  deathtouch: boolean;
+  /** Fynn: poison counters per deathtouch creature that connects. */
+  poisonPerHit: number;
+  /** One extra mana per nonland source (Kinnan), per land (Mirari's Wake), or both. */
+  doubler: "nonland" | "land" | "all" | null;
+  /** A repeatable mana sink — Walking Ballista, Thrasios, Kinnan's activation — that turns infinite mana into a kill. */
+  sink: boolean;
 }
 
 const MAX_TURN = 14;
@@ -116,6 +132,7 @@ export function toSimCard(r: CardRead): SimCard {
     key: r.key,
     mv: r.mv,
     isLand: r.isLand,
+    isPermanent: r.isPermanent,
     entersTapped: r.isLand && /enters (the battlefield )?tapped/.test(t) && !/unless/.test(t),
     landMana: r.isLand ? (named?.kind === "land" ? named.amount : 1) : 0,
     rock: 0,
@@ -141,8 +158,56 @@ export function toSimCard(r: CardRead): SimCard {
     equipBonus: 0,
     equipCost: 0,
     cheat: null,
+    tokens: null,
+    hasteAll: false,
+    deathtouch: r.keywords.has("deathtouch"),
+    poisonPerHit: 0,
+    doubler: null,
+    sink: false,
   };
   if (r.isLand) return card;
+
+  // Tokens: the clock of every go-wide deck, and the whole of Krenko's.
+  const tok = t.match(/create (a|an|two|three|four|five|x|\d+|a number of|that many) (\d+)\/\d+ [^.]*tokens?/);
+  if (tok) {
+    const line = t.split("\n").find((l) => /create (a|an|two|three|four|five|x|\d+|a number of|that many) \d+\/\d+/.test(l)) ?? t;
+    const byPower = /equal to (~'s|its|that creature's) power/.test(line);
+    const byBoard = /where x is the number of (creatures|\w+s) you control|equal to the number of (creatures|\w+s) you control/.test(line);
+    const amount: number | "board" | "power" = byPower ? "power" : byBoard ? "board" : /^(x|a number of|that many)$/.test(tok[1]!) ? 2 : wordNumber(tok[1]!);
+    const when: "etb" | "turn" | "attack" | "tap" = /^\{t\}/.test(line)
+      ? "tap"
+      : /^whenever ~ attacks|^whenever [^,]* attacks/.test(line)
+        ? "attack"
+        : /^at the beginning of/.test(line)
+          ? "turn"
+          : /^when ~ enters/.test(line)
+            ? "etb"
+            : /^whenever/.test(line) && r.isPermanent
+              ? "turn"
+              : "etb";
+    card.tokens = { amount, when, power: Number(tok[2]), haste: /tokens? with haste|token with haste|haste until end of turn/.test(line) };
+  }
+  if (r.isPermanent && /(creatures|creature tokens|\w+s|\w+ creatures) you control have haste|other (\w+ )?creatures you control (get \+\d\/\+\d and )?have haste/.test(t)) card.hasteAll = true;
+  const poison = t.match(/deathtouch deals combat damage to a player, that player gets (\w+) poison/);
+  if (poison && r.isPermanent) card.poisonPerHit = wordNumber(poison[1]!);
+  if (/whenever you tap a nonland permanent for mana, add (one|an additional)/.test(t)) card.doubler = "nonland";
+  else if (/whenever you tap a permanent for mana, (it produces twice|add)/.test(t)) card.doubler = "all";
+  else if (/whenever you tap a (land|forest|plains|island|swamp|mountain) for mana, (add|it produces)/.test(t)) card.doubler = "land";
+  // A sink: an activated ability with a mana cost that draws, damages, makes
+  // tokens or puts cards onto the battlefield, repeatably; or an X spell that
+  // draws or burns.
+  card.sink =
+    (r.isPermanent &&
+      !r.isLand &&
+      t.split("\n").some((line) => {
+        const m = line.match(/^([^:]{1,60}):(.*)$/);
+        if (!m) return false;
+        const [, cost, effect] = m;
+        if (!/\{[0-9xwubrg]/.test(cost!) || /sacrifice ~|discard ~/.test(cost!)) return false;
+        if (/^\s*add \{|each player draws/.test(effect!)) return false;
+        return /\bdraws?\b|deals? [^.]*damage|\bcreate\b|onto the battlefield|\bscry\b|\bmills?\b|loses \d+ life|\+1\/\+1 counter/.test(effect!);
+      })) ||
+    (!r.isPermanent && /\{x\}/i.test(r.card.manaCost ?? "") && /damage|draws?|loses? x life|each opponent loses/.test(t));
 
   // Cheating a permanent into play — Braids, Sneak Attack, Show and Tell,
   // Elvish Piper — is the whole speed of the decks that do it, and the
@@ -200,8 +265,8 @@ export function toSimCard(r: CardRead): SimCard {
   card.tutor = Boolean(tu && !tu.graveyardDestination && !r.isPermanent);
 
   // Combat helpers.
-  const anthem = t.match(/(creatures|other creatures|creature tokens|\w+ creatures) you control get \+(\d)\/\+\d/);
-  if (anthem && r.isPermanent) card.anthem = Number(anthem[2]);
+  const anthem = t.match(/(creatures|other creatures|creature tokens|\w+ creatures|other \w+s|\w+s) you control get \+(\d)\/\+\d|other (\w+s|\w+ creatures) get \+(\d)\/\+\d/);
+  if (anthem && r.isPermanent) card.anthem = Number(anthem[2] ?? anthem[4]);
   if (/additional combat phase/.test(t)) card.extraCombat = r.isPermanent ? "permanent" : "spell";
   if (!r.isPermanent || OVERRUN_FINISHERS.has(r.key) || r.isCreature) {
     if (/creatures you control get \+x\/\+x[^.]*(where x is|equal to)[^.]*number of creatures/.test(t)) {
@@ -236,8 +301,11 @@ interface Creature {
   castTurn: number;
   haste: boolean;
   infect: boolean;
+  deathtouch: boolean;
   isCommander: boolean;
   bonus: number;
+  /** The card, for what it does each turn (a token maker). */
+  sim: SimCard | null;
 }
 
 export function goldfish(
@@ -265,9 +333,16 @@ export function goldfish(
   const seed = options.seed ?? hashNames(reads.map((r) => `${r.key}x${r.copies}`));
   const random = rng(seed);
 
+  // Anything in the deck that pours infinite mana into a kill is an outlet
+  // for every line that makes it — the commander's own activation included.
+  const sinkKeys = [...deck, ...commanders].filter((c) => c.sink).map((c) => c.key);
   const lethalLines = lines
     .filter((l) => l.lethal && l.pieces.length > 0)
-    .map((l) => ({ pieces: l.pieces.map(nameKey), manaNeeded: l.manaNeeded, anyOf: (l.anyOf ?? []).map(nameKey) }));
+    .map((l) => ({
+      pieces: l.pieces.map(nameKey),
+      manaNeeded: l.manaNeeded,
+      anyOf: l.anyOf ? [...new Set([...l.anyOf.map(nameKey), ...sinkKeys])] : [],
+    }));
   const commanderKeys = new Set(commanders.map((c) => c.key));
   // A tutor that is itself a piece of a win line (Demonic Consultation) is
   // held for the line, never spent finding something else.
@@ -300,12 +375,14 @@ export function goldfish(
     }
     let hand = library.splice(0, 7);
     const landsIn = (cards: SimCard[]) => cards.filter((c) => c.isLand).length;
-    const manaIn = (cards: SimCard[]) => cards.filter((c) => c.isLand || c.rock > 0 || c.dork > 0 || c.ritualAmount > 0).length;
+    // Mana the hand can actually make by turn two: lands, and the rocks and
+    // rituals a land pays for. A Signet behind one land is not a source.
+    const earlyMana = (cards: SimCard[]) => cards.filter((c) => c.isLand || ((c.rock > 0 || c.dork > 0) && c.mv <= 1)).length;
     // A combo deck also ships a hand with no way to the line: no tutor, no
     // piece, no refill. Its pilots mulligan for exactly that.
     const live = (cards: SimCard[]) => cards.some((c) => c.tutor || c.drawNow >= 6 || pieceKeys.has(c.key));
     const dead = (cards: SimCard[]) =>
-      lethalLines.length > 0 ? manaIn(cards) < 2 || manaIn(cards) > 5 || !live(cards) : landsIn(cards) < 2 || landsIn(cards) > 5;
+      landsIn(cards) < 1 || landsIn(cards) > 5 || earlyMana(cards) < 2 || (lethalLines.length > 0 && !live(cards));
     // One London mulligan on a hand that cannot function.
     if (dead(hand)) {
       library.push(...hand);
@@ -335,6 +412,12 @@ export function goldfish(
     let cheatEngines = 0;
     let commanderCasts = 0;
     let drainPerTurn = 0;
+    let hasteAll = false;
+    let poisonPerHit = 0;
+    let doublerNonland = 0;
+    let doublerLand = 0;
+    const tokens = { ready: 0, fresh: 0, power: 1 };
+    const tokenEngines: NonNullable<SimCard["tokens"]>[] = [];
     let life = 40;
     let poison = 0;
     let commanderDamage = 0;
@@ -364,10 +447,15 @@ export function goldfish(
         drops--;
       }
 
+      const liveLands = lands.filter((l) => !(l.tapped && l.playedTurn === t));
+      const liveRocks = rocks.filter((r) => r.activeFrom <= t);
+      const liveDorks = dorks.filter((d) => d.castTurn < t);
       let mana =
-        lands.reduce((n, l) => n + (l.tapped && l.playedTurn === t ? 0 : l.mana), 0) +
-        rocks.reduce((n, r) => n + (r.activeFrom <= t ? r.mana : 0), 0) +
-        dorks.reduce((n, d) => n + (d.castTurn < t ? d.mana : 0), 0);
+        liveLands.reduce((n, l) => n + l.mana, 0) +
+        liveRocks.reduce((n, r) => n + r.mana, 0) +
+        liveDorks.reduce((n, d) => n + d.mana, 0) +
+        (liveRocks.length + liveDorks.length) * doublerNonland +
+        liveLands.length * doublerLand;
       if (t >= 3 && t <= 5) manaSamples[t]!.push(mana);
       if (trace && h < 3) trace(`hand ${h} turn ${t}: mana ${mana} | hand: ${hand.map((c) => c.name).join(", ")} | board: ${[...battlefieldKeys].join(", ")}`);
 
@@ -382,20 +470,60 @@ export function goldfish(
           }
         }
       };
-      const attackers = () => creatures.filter((c) => c.castTurn < t || c.haste);
-      /** Land a permanent on the battlefield with all its effects, paying nothing. */
-      const materialise = (c: SimCard) => {
-        hand.splice(hand.indexOf(c), 1);
+      const attackers = () => creatures.filter((c) => c.castTurn < t || c.haste || hasteAll);
+      const makeTokens = (tk: NonNullable<SimCard["tokens"]>, maker?: Creature) => {
+        const n =
+          tk.amount === "board"
+            ? creatures.length + tokens.ready + tokens.fresh
+            : tk.amount === "power"
+              ? (maker ? maker.power + maker.bonus + anthems : 1)
+              : tk.amount;
+        if (tk.haste || hasteAll) tokens.ready += n;
+        else tokens.fresh += n;
+        tokens.power = Math.max(tokens.power, tk.power);
+      };
+      /** Put a permanent's effects on the board, however it got there. */
+      const landPermanent = (c: SimCard, isCommander = false) => {
         battlefieldKeys.add(c.key);
-        if (c.creature) creatures.push({ power: c.power, castTurn: t, haste: c.haste, infect: c.infect, isCommander: false, bonus: 0 });
-        if (c.rock > 0) rocks.push({ mana: c.rock, activeFrom: t + 1 });
+        if (c.creature) creatures.push({ power: c.power, castTurn: t, haste: c.haste, infect: c.infect, deathtouch: c.deathtouch, isCommander, bonus: 0, sim: c });
         if (c.dork > 0) dorks.push({ mana: c.dork, castTurn: t });
         if (c.anthem) anthems += c.anthem;
         if (c.extraCombat === "permanent") extraCombatPerm = true;
         if (c.drawPerTurn) drawEngines += c.drawPerTurn;
         drainPerTurn += c.drainPerTurn;
         if (c.cheat === "turn") cheatEngines += 1;
+        if (c.hasteAll) hasteAll = true;
+        poisonPerHit = Math.max(poisonPerHit, c.poisonPerHit);
+        if (c.doubler === "nonland" || c.doubler === "all") doublerNonland += 1;
+        if (c.doubler === "land" || c.doubler === "all") doublerLand += 1;
+        if (c.tokens) {
+          if (c.tokens.when === "etb") makeTokens(c.tokens);
+          else if (c.tokens.when === "turn") {
+            makeTokens(c.tokens, creatures[creatures.length - 1]);
+            if (!c.creature) tokenEngines.push(c.tokens);
+          }
+        }
       };
+      /** Land a permanent on the battlefield with all its effects, paying nothing. */
+      const materialise = (c: SimCard) => {
+        hand.splice(hand.indexOf(c), 1);
+        landPermanent(c);
+        if (c.rock > 0) rocks.push({ mana: c.rock, activeFrom: t + 1 });
+      };
+      // What the board makes before combat: Krenko's tokens, a Rabblemaster's,
+      // an enchantment's upkeep trigger, Tin Street's attack trigger.
+      for (const cr of creatures) {
+        const tk = cr.sim?.tokens;
+        if (!tk) continue;
+        const ready = cr.castTurn < t || cr.haste || hasteAll;
+        if (tk.when === "tap" && ready) makeTokens(tk, cr);
+        else if (tk.when === "turn" && cr.castTurn < t) makeTokens(tk, cr);
+        else if (tk.when === "attack" && ready) {
+          if (tk.amount === "power") cr.bonus += 1;
+          makeTokens(tk, cr);
+        }
+      }
+      for (const tk of tokenEngines) makeTokens(tk);
       // A cheat engine in play (Braids, Sneak Attack) lands the most
       // expensive permanent in hand for free once a turn — pieces of a line
       // first, then the biggest body.
@@ -407,9 +535,10 @@ export function goldfish(
       }
       const combatDamage = (bonusAll = 0, craterhoof = false) => {
         const att = attackers();
-        const boardSize = creatures.length;
+        const boardSize = creatures.length + tokens.ready + tokens.fresh;
         let total = 0;
         for (const c of att) total += c.power + c.bonus + anthems + bonusAll + (craterhoof ? boardSize : 0);
+        total += tokens.ready * (tokens.power + anthems + bonusAll + (craterhoof ? boardSize : 0));
         return total * (extraCombatPerm ? 2 : 1);
       };
       const commanderCost = (c: SimCard) => c.mv + 2 * commanderCasts;
@@ -434,6 +563,7 @@ export function goldfish(
               cost += inHand ? inHand.mv : cz ? commanderCost(cz) : 0;
             }
           }
+          const missing: string[] = [];
           for (const key of line.pieces) {
             if (battlefieldKeys.has(key)) continue;
             const inHand = hand.find((c) => c.key === key);
@@ -448,18 +578,33 @@ export function goldfish(
               toCast.push(cz);
               continue;
             }
-            ok = false;
-            break;
+            missing.push(key);
+          }
+          // A tutor in hand finds a missing piece this turn: Vampiric into
+          // Consultation into the win is one turn, not three.
+          const tutorsSpent: SimCard[] = [];
+          if (missing.length) {
+            const tutors = hand.filter((c) => c.tutor && !toCast.includes(c)).sort((a, b) => a.mv - b.mv);
+            if (tutors.length < missing.length) ok = false;
+            for (const key of missing) {
+              const idx = library.findIndex((c) => c.key === key);
+              if (idx < 0) {
+                ok = false;
+                break;
+              }
+              cost += library[idx]!.mv;
+            }
+            if (ok) for (const tu of tutors.slice(0, missing.length)) tutorsSpent.push(tu);
           }
           if (!ok) continue;
           // Spellbook's mana-needed already covers casting the pieces, so
           // the two are not summed: a line costs the larger of the two.
-          cost = Math.max(cost - line.manaNeeded, line.manaNeeded);
+          cost = Math.max(cost - line.manaNeeded, line.manaNeeded) + tutorsSpent.reduce((n, c) => n + c.mv, 0);
           if (mana + ritualMana() >= cost) {
             spendRituals(cost);
             won = t;
             wonBy = "combo";
-            if (trace && h < 3) trace(`  WIN via ${line.pieces.join("+")} cost ${cost}`);
+            if (trace && h < 3) trace(`  WIN via ${line.pieces.join("+")} cost ${cost}${tutorsSpent.length ? ` (tutoring ${missing.join(", ")})` : ""}`);
             break;
           }
         }
@@ -469,7 +614,8 @@ export function goldfish(
         {
           const base = combatDamage();
           const infectPower = attackers().filter((c) => c.infect).reduce((n, c) => n + c.power + c.bonus + anthems, 0);
-          if (base >= life || infectPower >= 10 - poison) break; // combat will finish it
+          const poisonHits = attackers().filter((c) => c.deathtouch).length * poisonPerHit;
+          if (base >= life || infectPower + poisonHits >= 10 - poison) break; // combat will finish it
           const finisher = hand.find((c) => c.overrun && c.mv <= mana + ritualMana() && attackers().length > 0);
           if (finisher && finisher.overrun) {
             const dmg =
@@ -601,9 +747,11 @@ export function goldfish(
           mana -= c.mv;
           hand.splice(hand.indexOf(c), 1);
           if (c.rock > 0) rocks.push({ mana: c.rock, activeFrom: c.entersTapped ? t + 1 : t });
-          if (c.dork > 0) {
-            dorks.push({ mana: c.dork, castTurn: t });
-            creatures.push({ power: c.power, castTurn: t, haste: c.haste, infect: c.infect, isCommander: false, bonus: 0 });
+          if (c.dork > 0) landPermanent(c);
+          else {
+            battlefieldKeys.add(c.key);
+            if (c.doubler === "nonland" || c.doubler === "all") doublerNonland += 1;
+            if (c.doubler === "land" || c.doubler === "all") doublerLand += 1;
           }
           if (c.extraLandDrop) {
             extraLandDrops += 1;
@@ -620,8 +768,7 @@ export function goldfish(
             const land = library.splice(idx, 1)[0]!;
             lands.push({ mana: land.landMana, playedTurn: t, tapped: true });
           }
-          if (c.drawPerTurn) drawEngines += c.drawPerTurn;
-          battlefieldKeys.add(c.key);
+          if (c.drawPerTurn && c.dork === 0) drawEngines += c.drawPerTurn;
           progress = true;
           continue;
         }
@@ -646,14 +793,7 @@ export function goldfish(
         if (cz) {
           mana -= commanderCost(cz);
           commanderCasts += 1;
-          battlefieldKeys.add(cz.key);
-          if (cz.creature) creatures.push({ power: cz.power, castTurn: t, haste: cz.haste, infect: cz.infect, isCommander: true, bonus: 0 });
-          if (cz.dork > 0) dorks.push({ mana: cz.dork, castTurn: t });
-          if (cz.drawPerTurn) drawEngines += cz.drawPerTurn;
-          if (cz.anthem) anthems += cz.anthem;
-          if (cz.extraCombat === "permanent") extraCombatPerm = true;
-          drainPerTurn += cz.drainPerTurn;
-          if (cz.cheat === "turn") cheatEngines += 1;
+          landPermanent(cz, true);
           progress = true;
           continue;
         }
@@ -680,23 +820,21 @@ export function goldfish(
           (c) =>
             !c.isLand &&
             c.mv <= mana &&
-            (c.creature || c.anthem > 0 || c.extraCombat === "permanent" || c.drawPerTurn > 0 || c.drainPerTurn > 0 || c.equipBonus > 0 || isPiece(c))
+            (c.creature || c.anthem > 0 || c.extraCombat === "permanent" || c.drawPerTurn > 0 || c.drainPerTurn > 0 || c.equipBonus > 0 || c.tokens !== null || c.hasteAll || c.doubler !== null || isPiece(c))
         );
         if (candidates.length) {
+          const board = creatures.length + tokens.ready + tokens.fresh;
+          const tokenValue = (c: SimCard) =>
+            !c.tokens ? 0 : c.tokens.amount === "board" ? 4 + board : c.tokens.amount === "power" ? 6 : c.tokens.when === "etb" ? c.tokens.amount : c.tokens.amount * 3;
           const score = (c: SimCard) =>
-            (isPiece(c) ? 50 : 0) + c.power * 2 + c.anthem * Math.max(1, creatures.length) + c.drainPerTurn * 3 + c.drawPerTurn * 4 + (c.extraCombat ? 6 : 0) + c.equipBonus + c.mv;
+            (isPiece(c) ? 50 : 0) + c.power * 2 + c.anthem * Math.max(1, board) + c.drainPerTurn * 3 + c.drawPerTurn * 4 + (c.extraCombat ? 6 : 0) + c.equipBonus + tokenValue(c) + (c.hasteAll ? board : 0) + c.mv;
           candidates.sort((a, b) => score(b) - score(a));
           const c = candidates[0]!;
           mana -= c.mv;
           hand.splice(hand.indexOf(c), 1);
-          battlefieldKeys.add(c.key);
-          if (c.creature) creatures.push({ power: c.power, castTurn: t, haste: c.haste, infect: c.infect, isCommander: false, bonus: 0 });
-          if (c.anthem) anthems += c.anthem;
-          if (c.extraCombat === "permanent") extraCombatPerm = true;
-          if (c.drawPerTurn) drawEngines += c.drawPerTurn;
-          drainPerTurn += c.drainPerTurn;
+          if (c.isPermanent) landPermanent(c);
+          else if (c.tokens) makeTokens(c.tokens);
           if (c.equipBonus) equipmentOnBoard.push({ bonus: c.equipBonus, cost: c.equipCost, attached: false });
-          if (c.cheat === "turn") cheatEngines += 1;
           progress = true;
           continue;
         }
@@ -726,8 +864,9 @@ export function goldfish(
 
       // Combat and drains.
       const att = attackers();
-      let damage = 0;
+      let damage = tokens.ready * (tokens.power + anthems);
       let infectDamage = 0;
+      let poisonHits = 0;
       for (const c of att) {
         const p = c.power + c.bonus + anthems;
         if (c.infect) infectDamage += p;
@@ -735,11 +874,15 @@ export function goldfish(
           damage += p;
           if (c.isCommander) commanderDamage += p * (extraCombatPerm ? 2 : 1);
         }
+        if (c.deathtouch) poisonHits += poisonPerHit;
       }
       damage *= extraCombatPerm ? 2 : 1;
       infectDamage *= extraCombatPerm ? 2 : 1;
+      poisonHits *= extraCombatPerm ? 2 : 1;
       life -= damage + drainPerTurn;
-      poison += infectDamage;
+      poison += infectDamage + poisonHits;
+      tokens.ready += tokens.fresh;
+      tokens.fresh = 0;
       if (life <= 0 || poison >= 10 || commanderDamage >= 21) won = t;
     }
 
