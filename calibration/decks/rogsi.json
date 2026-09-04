@@ -3,7 +3,7 @@
   "source": {
     "kind": "deckcheck",
     "scannedAt": "2026-09-03",
-    "url": "deckcheck.co"
+    "url": "https://deckcheck.co/app/decklist/kYIIDZ5dUUrp"
   },
   "commanders": [
     "Rograkh, Son of Rohgahh",
@@ -119,5 +119,5 @@
     "speed": 9.5,
     "bracket": 5
   },
-  "notes": "DeckCheck: 68+ tutor points, 60+ draw points, 3+ combo lines, answer density 16/8/40, ~24 interaction pieces with 52+ stack points, goldfish turns 2-3. No per-card breakdown captured yet."
+  "notes": "DeckCheck scan of https://deckcheck.co/app/decklist/kYIIDZ5dUUrp (creator user3684658), CRISPI 9.81, Bracket 5. Decklist verified card-for-card against this file (100 cards, no diffs).\n\nCONSISTENCY 10 — Complete Breakdown.\nBase tutor points, 13 cards = 66 pts. Premium tutor +6 each: Demonic Tutor, Diabolic Intent, Gamble, Imperial Seal, Mystical Tutor, Vampiric Tutor, Wishclaw Talisman. Standard / restricted tutor +4 each: Demonic Consultation, Doomsday, Grim Tutor, Lim-Dul's Vault, Opposition Agent, Tainted Pact.\nFunctional redundancy bonus = +20 pts, lifting the read to 10: +10 \"15 cards filling the 'manaless-value' role\"; +5 \"11 cards filling the 'adds-multiple-mana' role\"; +5 \"11 cards filling the 'life-payment' role\".\n66 pts + 20 redundancy bonus = 86 tutor points -> counts as 10.\nCard draw & selection: base draw points listed over 20 cards (Ad Nauseam +6 the largest single entry); the column total was not captured.\n\nRESILIENCE 10 - multiple non-overlapping combo vectors (Thassa's Oracle, Underworld Breach, Doomsday); Silas Renn adds incidental artifact recursion if an engine is countered.\n\nINTERACTION 9.75 - a robust 25-card interaction suite; free counterspells named: Force of Will, Deflecting Swat, Fierce Guardianship.\n\nSPEED 9.5 - band table maps Speed 9.5 to win turns 2-3. Judged by the AI, not by formula (see the Speed RULE APPLIED text recorded in braids-conjurer-adept.json).\nDeckCheck's stated curve: T1 cast Rograkh, play an untapped land, drop fast mana (Mox Amber or Sol Ring) and hold up interaction or cast a tutor; T2 leverage rituals - Dark Ritual or Culling the Weak - into Ad Nauseam, drawing into Lotus Petal and Lion's Eye Diamond to cast Thassa's Oracle plus Demonic Consultation for the win. Stated bottleneck: assembling enough initial black and red mana to cast both a card engine and combo protection on the same turn."
 }
