@@ -8,7 +8,7 @@ import Logo from "@/components/Logo";
 import CommanderInput from "@/components/CommanderInput";
 import SwipeModal from "@/components/SwipeModal";
 import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
-import HandSimModal from "@/components/deck/HandSimModal";
+import PlaytestModal from "@/components/deck/PlaytestModal";
 import GameCodeModal from "@/components/deck/GameCodeModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
 import DeckPrimer from "@/components/deck/DeckPrimer";
@@ -293,8 +293,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     { kind: "mv"; value: number } | { kind: "type"; value: string } | null
   >(null);
 
-  // sample-hand simulator
-  const [handSimOpen, setHandSimOpen] = useState(false);
+  // playtest table
+  const [playtestOpen, setPlaytestOpen] = useState(false);
   const [gameCodeOpen, setGameCodeOpen] = useState(false);
 
   // "Order on CardTrader" — runs in <OrderModal> while open
@@ -887,7 +887,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 WITH a finished deck, not a thing you do to build one, so it
                 sits up here with Share and Tools — and the hero goes to the two
                 actions that actually build the deck. */}
-            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setHandSimOpen(true)} disabled={deckCards.length === 0}>
+            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setPlaytestOpen(true)} disabled={deckCards.length === 0}>
               🎲 Playtest
             </button>
             <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={shareDeck} disabled={sharing}>
@@ -1591,12 +1591,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         />
       )}
 
-      {/* sample-hand simulator */}
-      {handSimOpen && (
-        <HandSimModal
+      {/* playtest table — a solo game with this deck */}
+      {playtestOpen && (
+        <PlaytestModal
           cards={statsOnDeck ? deckCards : pool}
           sourceLabel={statsOnDeck ? "the deck" : "the whole pool"}
-          onClose={() => setHandSimOpen(false)}
+          commander={deck?.commander}
+          format={deck?.format}
+          onClose={() => setPlaytestOpen(false)}
         />
       )}
 

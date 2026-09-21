@@ -980,3 +980,464 @@ button {
     display: none !important;
   }
 }
+
+/* ── Playtest table (components/deck/PlaytestModal) ─────────────────────
+   Full-screen so the cards are readable. Card widths are two custom
+   properties: --pt-card for the battlefield and piles, --pt-hand-max for the
+   hand (the hand row sets --pt-hand itself so seven cards always fit). */
+.pt-root {
+  position: fixed;
+  inset: 0;
+  z-index: 72;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(120% 70% at 50% -10%, rgba(255, 255, 255, 0.07), transparent 60%),
+    linear-gradient(180deg, #181327, #0d0a16);
+  color: #fff;
+  --pt-card: clamp(80px, 9vw, 140px);
+  --pt-hand-max: clamp(96px, 11vw, 168px);
+  /* Piles are smaller than cards in play: four of them (plus the command
+     zone) have to fit beside the battlefield as a 2×2 grid. */
+  --pt-pile: calc(var(--pt-card) * 0.74);
+  animation: sp-fade 0.15s ease;
+}
+.pt-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pt-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.pt-sub {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pt-top-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pt-turn {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+}
+.pt-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.pt-status {
+  margin-left: auto;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.pt-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pt-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.pt-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.pt-btn-gold {
+  background: var(--gold);
+  color: var(--accent-ink);
+  border-color: transparent;
+}
+.pt-btn-gold:hover {
+  background: var(--gold);
+  filter: brightness(1.06);
+}
+.pt-life {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.pt-life-label {
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  margin-right: 3px;
+}
+.pt-life-value {
+  min-width: 34px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 16px;
+}
+.pt-life button {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pt-life button:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.pt-main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 16px;
+}
+.pt-zones {
+  display: grid;
+  /* A column is at least a pile wide, but may grow to fit its label —
+     "GRAVEYARD 0" is wider than a small pile on an iPad. */
+  grid-template-columns: repeat(2, minmax(var(--pt-pile), max-content));
+  gap: 10px 8px;
+  align-content: start;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+}
+.pt-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+}
+.pt-zones .pt-pile,
+.pt-zones .pt-card {
+  width: var(--pt-pile);
+}
+.pt-zone-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.55);
+}
+.pt-zone-label span {
+  color: #fff;
+  font-family: var(--font-mono);
+}
+.pt-zone-action {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  color: var(--gold);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pt-field {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.pt-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-content: flex-start;
+}
+.pt-row-perms {
+  flex: 1;
+}
+.pt-row-lands {
+  border-top: 1px dashed rgba(255, 255, 255, 0.14);
+  padding-top: 10px;
+}
+.pt-empty {
+  margin: auto;
+  padding: 18px;
+  text-align: center;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.5);
+}
+.pt-hand {
+  --pt-hand: var(--pt-hand-max);
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 12px 16px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  min-height: calc(var(--pt-hand) * 1.4 + 26px);
+}
+.pt-card {
+  position: relative;
+  width: var(--pt-card);
+  aspect-ratio: 5 / 7;
+  flex: none;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.pt-hand .pt-card {
+  width: var(--pt-hand);
+}
+.pt-hand .pt-card:hover {
+  transform: translateY(-6px);
+}
+.pt-card-inner {
+  position: absolute;
+  inset: 0;
+  border-radius: 4.8% / 3.5%;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.7);
+  transition: transform 0.18s ease, filter 0.18s ease;
+}
+.pt-card[data-tapped="true"] .pt-card-inner {
+  transform: rotate(90deg) scale(0.72);
+  filter: brightness(0.75);
+}
+.pt-card-btn {
+  position: absolute;
+  top: 4px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.pt-card-menu {
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.pt-card:hover .pt-card-menu,
+.pt-card:focus-within .pt-card-menu {
+  opacity: 1;
+}
+/* Touch has no hover: the menu is always there and 🔍 stands in for it. */
+.pt-card-zoom {
+  left: 4px;
+  display: none;
+}
+.pt-zoom-backdrop {
+  display: none;
+}
+@media (hover: none) {
+  .pt-card-menu {
+    opacity: 1;
+  }
+  .pt-card-zoom {
+    display: flex;
+  }
+  .pt-zoom-backdrop {
+    display: block;
+  }
+}
+.pt-cmdr {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--accent-ink);
+  font-size: 10px;
+  font-weight: 800;
+}
+.pt-pile {
+  position: relative;
+  width: var(--pt-card);
+  aspect-ratio: 5 / 7;
+  border-radius: 4.8% / 3.5%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 18px;
+}
+.pt-pile-library {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.06) 0 6px, rgba(255, 255, 255, 0.015) 6px 12px),
+    #251d3c;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.18), inset 0 0 0 4px #251d3c;
+}
+.pt-pile-count {
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
+}
+.pt-pile-empty {
+  background: transparent;
+  box-shadow: none;
+  border: 1px dashed rgba(255, 255, 255, 0.22);
+}
+.pt-menu {
+  background: #1d1729;
+  color: #fff;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 20px 50px -18px rgba(0, 0, 0, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: sp-pop 0.14s ease;
+}
+.pt-menu-title {
+  padding: 6px 10px 4px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pt-menu button {
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pt-menu button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.pt-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: sp-fade 0.15s ease;
+}
+.pt-panel {
+  width: 100%;
+  max-width: min(960px, 94vw);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  background: #1a1526;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 30px 70px -20px rgba(0, 0, 0, 0.8);
+  animation: sp-pop 0.18s ease;
+}
+.pt-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pt-panel-body {
+  overflow: auto;
+  padding: 14px 18px 18px;
+}
+.pt-panel-note {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+}
+@media (max-width: 760px) {
+  .pt-root {
+    --pt-card: clamp(64px, 17vw, 96px);
+    --pt-hand-max: clamp(76px, 21vw, 112px);
+  }
+  .pt-main {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 10px 12px;
+  }
+  .pt-field {
+    order: 1;
+  }
+  .pt-zones {
+    order: 2;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-right: 0;
+    padding-bottom: 2px;
+    --pt-pile: var(--pt-card);
+  }
+  .pt-hand {
+    padding: 8px 12px 12px;
+  }
+  .pt-status {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}
