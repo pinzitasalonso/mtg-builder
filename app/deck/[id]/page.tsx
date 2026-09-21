@@ -1872,15 +1872,20 @@ function DeckCardTile({
       onClick={onOpen}
       title={card.name}
       style={{
+        cursor: onOpen ? "pointer" : "default",
+        transform: hover ? "translateY(-3px)" : "none",
+        transition: "transform .16s ease",
+      }}
+    >
+    <div
+      style={{
         position: "relative",
         borderRadius: "4.8%/3.5%",
         overflow: "hidden",
-        cursor: onOpen ? "pointer" : "default",
         aspectRatio: "5 / 7",
         background: "rgba(0,0,0,.25)",
         boxShadow: hover ? "0 14px 30px -10px rgba(0,0,0,.6)" : "0 4px 12px -4px rgba(0,0,0,.45)",
-        transform: hover ? "translateY(-3px)" : "none",
-        transition: "transform .16s ease, box-shadow .16s ease",
+        transition: "box-shadow .16s ease",
       }}
     >
       {/* stored scan first; a stale/404 URL falls back to a fresh name-based
@@ -1940,6 +1945,12 @@ function DeckCardTile({
           ✕
         </button>
       )}
+    </div>
+      {/* The name as real text, not just the scan: the browser's find-in-page
+          can then jump to a card in the deck. */}
+      <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 600, lineHeight: 1.25, color: "var(--w-1)", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {card.name}
+      </div>
     </div>
   );
 }
