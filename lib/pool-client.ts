@@ -1,7 +1,7 @@
 // Client-side helpers for adding cards to a deck's pool. Shared by decklist
 // import, bulk lands, AI-chat tap-to-add and name-mode add.
 
-import { OutCard, collectionByName, resolveNamed } from "./scryfall";
+import { NAMED_GAP_MS, OutCard, cardNameKey, lookupCollection, resolveNamed, resolveNamedDetailed } from "./scryfall";
 import { enqueue } from "./offline-queue";
 
 export type Board = "pool" | "deck";
@@ -91,72 +91,137 @@ export async function deleteCard(deckId: string, dbId: number): Promise<boolean>
   }
 }
 
-// Add many cards by name in one go: resolve them all with a single batched
-// Scryfall lookup (75 names/request) instead of one fuzzy call each, then insert
-// them in a single bulk request. Far faster and far less rate-limit-prone than
-// looping resolveAndAdd. Names already in `known` (the pool) are reused without
-// a Scryfall hit. Returns how many were added and which names couldn't resolve.
+export interface ImportEntry {
+  name: string;
+  qty: number;
+}
+
+export interface ImportResult {
+  /** Copies inserted (quantities summed). */
+  added: number;
+  /** Names Scryfall doesn't know — a typo or not a real card. Needs a human fix. */
+  notFound: string[];
+  /** Entries whose lookup or insert errored (Scryfall busy, offline). Safe to
+      retry exactly as they are — nothing about the name is wrong. */
+  failed: ImportEntry[];
+}
+
+// The bulk route accepts this many cards per request.
+const BULK_INSERT_MAX = 500;
+
+/**
+ * Import many named cards, with quantities, as few requests as possible.
+ *
+ * A 100-card decklist used to be ~100 fuzzy lookups fired in a burst, and
+ * Scryfall's 429s were reported as "card not found" — Sol Ring, allegedly
+ * missing. Now: names already in the pool (`known`) need no lookup at all;
+ * the rest go through POST /cards/collection, 75 per call; only the names
+ * that batch genuinely can't match (typos, odd DFC spellings) fall back to a
+ * fuzzy lookup, one at a time with a gap; and everything resolved is inserted
+ * in one bulk request. "Not found" and "failed" are kept apart so the caller
+ * can offer a retry for the latter.
+ */
+export async function importByName(
+  deckId: string,
+  entries: ImportEntry[],
+  known: Map<string, OutCard>,
+  board: Board = "pool"
+): Promise<ImportResult> {
+  // Merge repeats so "2 Plains" twice is one entry of 4.
+  const merged = new Map<string, ImportEntry>();
+  for (const e of entries) {
+    const name = e.name.trim();
+    if (!name) continue;
+    const qty = Math.max(1, Math.floor(e.qty || 1));
+    const prev = merged.get(cardNameKey(name));
+    if (prev) prev.qty += qty;
+    else merged.set(cardNameKey(name), { name, qty });
+  }
+  const want = [...merged.values()];
+  const result: ImportResult = { added: 0, notFound: [], failed: [] };
+  if (want.length === 0) return result;
+
+  const resolved: { entry: ImportEntry; card: OutCard }[] = [];
+  const toResolve: ImportEntry[] = [];
+  for (const entry of want) {
+    const ex = known.get(cardNameKey(entry.name));
+    if (ex) resolved.push({ entry, card: ex });
+    else toResolve.push(entry);
+  }
+
+  if (toResolve.length) {
+    const lookup = await lookupCollection(toResolve.map((e) => e.name));
+    const failedKeys = new Set(lookup.failed.map(cardNameKey));
+    const fuzzy: ImportEntry[] = [];
+    for (const entry of toResolve) {
+      const card =
+        lookup.found.get(cardNameKey(entry.name)) ??
+        lookup.found.get(cardNameKey(entry.name.split(" // ")[0]!));
+      if (card?.imageUri) resolved.push({ entry, card });
+      else if (failedKeys.has(cardNameKey(entry.name))) result.failed.push(entry);
+      else fuzzy.push(entry);
+    }
+    // Exact-name misses get one fuzzy try each, spaced out — these are the few
+    // typos and quirks, not the whole list.
+    for (let i = 0; i < fuzzy.length; i++) {
+      if (i > 0) await new Promise((r) => setTimeout(r, NAMED_GAP_MS));
+      const entry = fuzzy[i];
+      const r = await resolveNamedDetailed(entry.name);
+      if (r.status === "ok" && r.card.imageUri) resolved.push({ entry, card: r.card });
+      else if (r.status === "failed") result.failed.push(entry);
+      else result.notFound.push(entry.name);
+    }
+  }
+
+  for (let i = 0; i < resolved.length; i += BULK_INSERT_MAX) {
+    const batch = resolved.slice(i, i + BULK_INSERT_MAX);
+    let ok = false;
+    try {
+      const res = await fetch(`/api/decks/${deckId}/cards/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          board,
+          cards: batch.map(({ entry, card }) => ({
+            scryfallId: card.id,
+            name: card.name,
+            imageUri: card.imageUri,
+            manaCost: card.manaCost,
+            typeLine: card.typeLine,
+            oracleText: card.oracleText,
+            colorIdentity: card.colorIdentity,
+            legalities: card.legalities,
+            quantity: entry.qty,
+          })),
+        }),
+      });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      result.failed.push(...batch.map((b) => b.entry));
+      continue;
+    }
+    for (const { entry, card } of batch) {
+      result.added += entry.qty;
+      // So a later call in the same session merges into this row without a lookup.
+      known.set(cardNameKey(card.name), card);
+    }
+  }
+  return result;
+}
+
+// Add one copy each of many names — the AI "Add all" path. Any miss, whether
+// unknown or throttled, comes back in `failed` so the caller can name it.
 export async function addManyByName(
   deckId: string,
   names: string[],
   known: Map<string, OutCard>,
   board: Board = "pool"
 ): Promise<{ added: number; failed: string[] }> {
-  const want = [...new Set(names.map((n) => n.trim()).filter(Boolean))];
-  if (want.length === 0) return { added: 0, failed: [] };
-
-  const cards: OutCard[] = [];
-  const unresolved: string[] = [];
-  // Names already pooled — reuse their card data, no Scryfall needed.
-  const toResolve: string[] = [];
-  for (const name of want) {
-    const ex = known.get(name.toLowerCase());
-    if (ex) cards.push(ex);
-    else toResolve.push(name);
-  }
-
-  if (toResolve.length) {
-    const resolved = await collectionByName(toResolve); // exact-name batch
-    const missed: string[] = [];
-    for (const name of toResolve) {
-      const card = resolved.get(name.toLowerCase());
-      if (card?.imageUri) cards.push(card);
-      else missed.push(name);
-    }
-    // Fuzzy-resolve the few the exact batch didn't match (DFC names, etc).
-    for (const name of missed) {
-      const card = await resolveNamed(name);
-      if (card?.imageUri) cards.push(card);
-      else unresolved.push(name);
-    }
-  }
-
-  if (cards.length === 0) return { added: 0, failed: unresolved };
-
-  try {
-    const res = await fetch(`/api/decks/${deckId}/cards/bulk`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        board,
-        cards: cards.map((c) => ({
-          scryfallId: c.id,
-          name: c.name,
-          imageUri: c.imageUri,
-          manaCost: c.manaCost,
-          typeLine: c.typeLine,
-          oracleText: c.oracleText,
-          colorIdentity: c.colorIdentity,
-          legalities: c.legalities,
-          quantity: 1,
-        })),
-      }),
-    });
-    if (!res.ok) return { added: 0, failed: names };
-  } catch {
-    return { added: 0, failed: names };
-  }
-  return { added: cards.length, failed: unresolved };
+  const r = await importByName(deckId, names.map((name) => ({ name, qty: 1 })), known, board);
+  return { added: r.added, failed: [...r.notFound, ...r.failed.map((f) => f.name)] };
 }
 
 // Add `qty` copies of a card by name. If a card of that name is already in the
