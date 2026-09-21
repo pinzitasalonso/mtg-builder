@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { mapPool } from "@/lib/async";
 import { parseDecklist } from "@/lib/decklist";
-import { PoolEntry, poolByName, resolveAndAdd, setQuantity, deleteCard } from "@/lib/pool-client";
+import { ImportEntry, ImportResult, PoolEntry, importByName, poolByName, setQuantity, deleteCard } from "@/lib/pool-client";
 import { ModalShell, ghostBtn, goldBtn, paperInput } from "./ui";
 
 export type Tool = "export" | "import" | "lands";
@@ -13,9 +12,6 @@ const PRESET_LANDS = [
   "Plains", "Island", "Swamp", "Mountain", "Forest",
   "Command Tower", "Sol Ring", "Arcane Signet", "Evolving Wilds",
 ];
-
-// How many Scryfall name lookups to run at once during an import.
-const IMPORT_CONCURRENCY = 4;
 
 const summaryBox: React.CSSProperties = {
   fontSize: 13.5,
@@ -62,7 +58,10 @@ export default function ToolSheet({
   const [copied, setCopied] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
-  const [importSummary, setImportSummary] = useState<string | null>(null);
+  // Outcome of the last import, in three buckets so a throttled lookup is
+  // never presented as a card that doesn't exist. `failed` is retryable.
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importNote, setImportNote] = useState<string | null>(null);
   const [landSel, setLandSel] = useState<Record<string, number>>({});
   const [landBusy, setLandBusy] = useState(false);
   const [landSummary, setLandSummary] = useState<string | null>(null);
@@ -87,32 +86,34 @@ export default function ToolSheet({
     }
   }
 
-  // ── Import — parse "{qty} {name}" lines, resolve each on Scryfall (bounded
-  // concurrency) and add the copies, merging quantities for repeated names.
+  // ── Import — parse "{qty} {name}" lines and add them in bulk (batched
+  // Scryfall lookup, one insert). Shared by the first run and by Retry, which
+  // re-submits only the entries whose lookup failed and folds the outcome in.
+  async function importEntries(entries: ImportEntry[], prior: ImportResult | null) {
+    setImporting(true);
+    setImportNote(null);
+    const r = await importByName(deckId, entries, poolByName(pool));
+    await onChanged();
+    setImportResult({
+      added: (prior?.added ?? 0) + r.added,
+      notFound: [...(prior?.notFound ?? []), ...r.notFound],
+      failed: r.failed,
+    });
+    setImporting(false);
+  }
   async function runImport() {
     const entries = parseDecklist(importText);
     if (entries.length === 0) {
-      setImportSummary("Nothing to import — paste a decklist first.");
+      setImportNote("Nothing to import — paste a decklist first.");
       return;
     }
-    setImporting(true);
-    setImportSummary(null);
-    const known = poolByName(pool);
-    const results = await mapPool(entries, IMPORT_CONCURRENCY, ({ name, qty }) =>
-      resolveAndAdd(deckId, name, qty, known)
-    );
-    let added = 0;
-    const notFound: string[] = [];
-    results.forEach((r, i) => {
-      if (r === "added") added += entries[i].qty;
-      else if (r === "notfound") notFound.push(entries[i].name);
-    });
-    await onChanged();
-    const parts = [`Added ${added} card${added === 1 ? "" : "s"}`];
-    if (notFound.length) parts.push(`${notFound.length} not found: ${notFound.join(", ")}`);
-    setImportSummary(parts.join(", ") + ".");
+    setImportResult(null);
+    await importEntries(entries, null);
     setImportText("");
-    setImporting(false);
+  }
+  async function retryFailed() {
+    if (!importResult?.failed.length) return;
+    await importEntries(importResult.failed, importResult);
   }
 
   // Lands already in the pool, so their counts can be edited in place. Matches on
@@ -141,17 +142,13 @@ export default function ToolSheet({
     if (landTotal === 0) return;
     setLandBusy(true);
     setLandSummary(null);
-    const known = poolByName(pool);
-    let added = 0;
-    for (const name of PRESET_LANDS) {
-      const qty = landSel[name] ?? 0;
-      if (qty <= 0) continue;
-      const r = await resolveAndAdd(deckId, name, qty, known);
-      if (r === "added") added += qty;
-    }
+    const entries = PRESET_LANDS.filter((l) => (landSel[l] ?? 0) > 0).map((name) => ({ name, qty: landSel[name] }));
+    const r = await importByName(deckId, entries, poolByName(pool));
     await onChanged();
     setLandSel({});
-    setLandSummary(`Added ${added} card${added === 1 ? "" : "s"} to the pool.`);
+    const parts = [`Added ${r.added} card${r.added === 1 ? "" : "s"} to the pool`];
+    if (r.failed.length) parts.push(`couldn't add ${r.failed.map((f) => f.name).join(", ")} — Scryfall was busy, try again`);
+    setLandSummary(parts.join("; ") + ".");
     setLandBusy(false);
   }
 
@@ -187,7 +184,32 @@ export default function ToolSheet({
             className="cc-paper"
             style={{ ...paperInput, minHeight: 200, fontFamily: "var(--font-mono, monospace)", fontSize: 13.5, resize: "vertical" }}
           />
-          {importSummary && <div style={summaryBox}>{importSummary}</div>}
+          {importNote && <div style={summaryBox}>{importNote}</div>}
+          {importResult && (
+            <div style={{ ...summaryBox, display: "flex", flexDirection: "column", gap: 6 }}>
+              <div>
+                <b>Added {importResult.added} card{importResult.added === 1 ? "" : "s"}</b>
+                {importResult.notFound.length === 0 && importResult.failed.length === 0 && " — all done."}
+              </div>
+              {importResult.notFound.length > 0 && (
+                <div>
+                  <b>{importResult.notFound.length} not on Scryfall</b> (check the spelling):{" "}
+                  {importResult.notFound.join(", ")}
+                </div>
+              )}
+              {importResult.failed.length > 0 && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ flex: 1, minWidth: 200 }}>
+                    <b>{importResult.failed.length} lookup{importResult.failed.length === 1 ? "" : "s"} failed</b> — Scryfall
+                    was busy, nothing wrong with the names: {importResult.failed.map((f) => f.name).join(", ")}
+                  </span>
+                  <button onClick={retryFailed} disabled={importing} style={{ ...goldBtn, padding: "7px 14px", fontSize: 13.5, flex: "none" }}>
+                    {importing ? "Retrying…" : `Retry ${importResult.failed.length}`}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button onClick={onClose} style={ghostBtn}>Close</button>
             <button onClick={runImport} disabled={importing || !importText.trim()} style={goldBtn}>

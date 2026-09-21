@@ -66,61 +66,130 @@ export function toOutCard(c: ScryfallCard): OutCard {
   };
 }
 
-// Bulk name → card lookup via /cards/collection (75 identifiers per request).
-// Returns a lowercase-name → OutCard map; names that don't resolve are absent.
-export async function collectionByName(names: string[]): Promise<Map<string, OutCard>> {
-  const out = new Map<string, OutCard>();
-  for (let i = 0; i < names.length; i += 75) {
-    const chunk = names.slice(i, i + 75);
-    try {
-      const res = await fetch("https://api.scryfall.com/cards/collection", {
-        method: "POST",
-        headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
-        body: JSON.stringify({ identifiers: chunk.map((name) => ({ name })) }),
-      });
-      if (!res.ok) continue;
-      const data = await res.json();
-      for (const c of (data.data ?? []) as ScryfallCard[]) {
-        if (!c?.id) continue;
-        const card = toOutCard(c);
-        out.set(c.name.toLowerCase(), card);
-        // Scryfall answers a front-face request ("Dusk") with the full name
-        // ("Dusk // Dawn"). Callers look the card up by what they asked for,
-        // so a double-faced card is keyed by its front face as well.
-        const front = c.name.split(" // ")[0]!.trim().toLowerCase();
-        if (front && !out.has(front)) out.set(front, card);
-      }
-    } catch {
-      // skip the chunk — callers treat missing entries as unresolved
-    }
-    if (i + 75 < names.length) await new Promise((r) => setTimeout(r, 100));
-  }
-  return out;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Scryfall asks for ≤10 requests/second and answers bursts with 429. Between
+// batch calls we leave a gap; after a throttle we wait what Retry-After says
+// (or a second) before the single retry.
+const COLLECTION_GAP_MS = 100;
+const NAMED_GAP_MS = 120;
+function retryDelayMs(res: Response | null): number {
+  const after = Number(res?.headers.get("Retry-After"));
+  return Number.isFinite(after) && after > 0 ? Math.min(after * 1000, 5000) : 1000;
+}
+// A transient status worth one retry (as opposed to 404 = no such card).
+const transient = (res: Response) => res.status === 429 || res.status >= 500;
+
+// Lowercase lookup keys a card answers to: its full name and, for a
+// double-faced/split card, its front face — Scryfall answers a request for
+// "Dusk" with "Dusk // Dawn", and callers look up by what they asked for.
+function nameKeys(fullName: string): string[] {
+  const full = fullName.trim().toLowerCase();
+  const front = fullName.split(" // ")[0]!.trim().toLowerCase();
+  return front && front !== full ? [full, front] : [full];
+}
+export function cardNameKey(name: string): string {
+  return name.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-// Resolve a loose card name to a full card object. Returns null when the name
-// doesn't resolve (typo, double-faced quirk, not a real card) so the caller can
-// simply skip it.
-export async function resolveNamed(name: string): Promise<OutCard | null> {
+/**
+ * Bulk name → card lookup via POST /cards/collection, 75 identifiers per call.
+ *
+ * Three explicit buckets, because "the request failed" and "no such card" must
+ * not be reported the same way: a decklist import that hits a 429 mid-way would
+ * otherwise tell the player that Sol Ring doesn't exist.
+ *   found    — keyed by lowercase full name AND front-face name → card
+ *   notFound — names Scryfall itself reported unknown (typos, not real cards)
+ *   failed   — names whose request errored (429/5xx/network) even after a retry
+ */
+export interface CollectionLookup {
+  found: Map<string, OutCard>;
+  notFound: string[];
+  failed: string[];
+}
+
+export async function lookupCollection(names: string[]): Promise<CollectionLookup> {
+  const found = new Map<string, OutCard>();
+  const notFound: string[] = [];
+  const failed: string[] = [];
+  for (let i = 0; i < names.length; i += 75) {
+    if (i > 0) await sleep(COLLECTION_GAP_MS);
+    const chunk = names.slice(i, i + 75);
+    let data: { data?: ScryfallCard[]; not_found?: { name?: string }[] } | null = null;
+    for (let attempt = 0; attempt < 2 && !data; attempt++) {
+      let res: Response | null = null;
+      try {
+        res = await fetch("https://api.scryfall.com/cards/collection", {
+          method: "POST",
+          headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
+          body: JSON.stringify({ identifiers: chunk.map((name) => ({ name })) }),
+        });
+        if (res.ok) data = await res.json();
+        else if (!transient(res)) break; // 4xx other than 429: retrying won't help
+      } catch {
+        /* network blip — retry once */
+      }
+      if (!data && attempt === 0) await sleep(retryDelayMs(res));
+    }
+    if (!data) {
+      failed.push(...chunk);
+      continue;
+    }
+    for (const c of data.data ?? []) {
+      if (!c?.id) continue;
+      const card = toOutCard(c);
+      for (const k of nameKeys(c.name)) if (!found.has(k)) found.set(k, card);
+    }
+    // Scryfall lists the identifiers it couldn't match; anything else we asked
+    // for and didn't get back counts as not found too, never as failed.
+    const missing = new Set((data.not_found ?? []).map((n) => cardNameKey(n.name ?? "")));
+    for (const name of chunk) {
+      const k = cardNameKey(name);
+      if (missing.has(k) || (!found.has(k) && !found.has(cardNameKey(name.split(" // ")[0]!)))) {
+        notFound.push(name);
+      }
+    }
+  }
+  return { found, notFound, failed };
+}
+
+// The found map alone — for callers that treat every miss the same way.
+export async function collectionByName(names: string[]): Promise<Map<string, OutCard>> {
+  return (await lookupCollection(names)).found;
+}
+
+// Resolve a loose card name to a full card object via the fuzzy endpoint, with
+// the same three-way answer: the card, "notfound" (404 — a typo or not a real
+// card), or "failed" (throttled / down even after a retry).
+export type NamedResult =
+  | { status: "ok"; card: OutCard }
+  | { status: "notfound" | "failed"; card: null };
+
+export async function resolveNamedDetailed(name: string): Promise<NamedResult> {
   const url = `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`;
-  // One retry on a rate-limit / transient failure (429/5xx) before giving up, so
-  // a momentary throttle doesn't make a real card look unaddable.
   for (let attempt = 0; attempt < 2; attempt++) {
+    let res: Response | null = null;
     try {
-      const res = await fetch(url, { headers: SCRYFALL_HEADERS });
+      res = await fetch(url, { headers: SCRYFALL_HEADERS });
       if (res.ok) {
         const c = (await res.json()) as ScryfallCard;
-        return c?.id ? toOutCard(c) : null;
+        return c?.id ? { status: "ok", card: toOutCard(c) } : { status: "notfound", card: null };
       }
-      // 404 = genuinely no such card; don't retry. 429/5xx = transient.
-      if (res.status === 404) return null;
+      if (!transient(res)) return { status: "notfound", card: null };
     } catch {
-      /* network blip — fall through to retry */
+      /* network blip — retry once */
     }
-    if (attempt === 0) await new Promise((r) => setTimeout(r, 350));
+    if (attempt === 0) await sleep(retryDelayMs(res));
   }
-  return null;
+  return { status: "failed", card: null };
 }
+
+// Null on any miss — for callers that can simply skip an unresolved name.
+export async function resolveNamed(name: string): Promise<OutCard | null> {
+  return (await resolveNamedDetailed(name)).card;
+}
+
+export { NAMED_GAP_MS };
 
 // Market price (USD) for a single card by Scryfall id, memoized for the page's
 // lifetime so the swipe review doesn't refetch the same card. Returns the raw
