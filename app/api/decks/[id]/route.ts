@@ -30,7 +30,7 @@ export async function PATCH(
   const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const body = await req.json();
-  const data: { name?: string; format?: string; commander?: string | null; primer?: string | null; shared?: boolean; gamesPlayed?: number; gamesWon?: number } = {};
+  const data: { name?: string; format?: string; commander?: string | null; primer?: string | null; shared?: boolean; pinned?: boolean; gamesPlayed?: number; gamesWon?: number } = {};
   if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
   if (typeof body.format === "string" && body.format.trim()) data.format = body.format.trim();
   if ("commander" in body) {
@@ -53,6 +53,7 @@ export async function PATCH(
     data.gamesWon = record.gamesWon;
   }
   if (typeof body.shared === "boolean") data.shared = body.shared;
+  if (typeof body.pinned === "boolean") data.pinned = body.pinned;
   if (Object.keys(data).length === 0) {
     return NextResponse.json({ error: "no fields to update" }, { status: 400 });
   }

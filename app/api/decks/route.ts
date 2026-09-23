@@ -24,7 +24,7 @@ export async function GET(req: Request) {
   const wantPublic = new URL(req.url).searchParams.get("public") === "1";
   const decks = await prisma.deck.findMany({
     where: user && !wantPublic ? { userId: user.id } : { userId: null },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
     take: 100,
   });
   // Aggregate each deck's color identity (WUBRG order) and its real deck size.
