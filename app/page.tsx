@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ArrowRight, Copy, Pin, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
@@ -292,7 +293,7 @@ export default function HomePage() {
             </Reveal>
             <Reveal delay={210} style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
               <button className="id-btn" style={{ padding: "15px 26px", fontSize: 16 }} onClick={() => setShowModal(true)}>
-                Start brewing →
+                Start brewing <ArrowRight size={17} strokeWidth={2.25} />
               </button>
               <button className="id-ghost" style={{ padding: "14px 22px" }} onClick={seeSample}>
                 See a sample deck
@@ -382,7 +383,7 @@ export default function HomePage() {
                 Decks the pool is talking about.
               </h2>
             </div>
-            <button className="id-pill-gold" style={{ padding: "11px 20px", background: "#fdf26f", color: "#181228", borderColor: "transparent" }} onClick={() => setShowModal(true)}>New brew →</button>
+            <button className="id-pill-gold" style={{ padding: "11px 20px", background: "#fdf26f", color: "#181228", borderColor: "transparent" }} onClick={() => setShowModal(true)}>New brew <ArrowRight size={15} strokeWidth={2.25} /></button>
           </div>
           <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
         </div>
@@ -563,7 +564,7 @@ function CollectionBlock({ unique, total, sample, onOpen }: { unique: number; to
         <h2 className="id-display" style={{ margin: 0, fontSize: "clamp(24px, 4vw, 32px)", color: "var(--t1)" }}>Your collection</h2>
         <span className="id-mono" style={{ fontSize: 12.5, color: "var(--t3)" }}>{unique > 0 ? `${unique} unique · ${total} total` : "nothing yet"}</span>
         <button onClick={onOpen} className="id-ghost" style={{ marginLeft: "auto", padding: "9px 18px" }}>
-          {unique > 0 ? "Browse →" : "Import →"}
+          {unique > 0 ? "Browse" : "Import"} <ArrowRight size={15} strokeWidth={2.25} />
         </button>
       </div>
       {unique > 0 ? (
@@ -716,7 +717,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             zIndex: 2,
           }}
         >
-          📌
+          <Pin size={15} strokeWidth={2.25} fill={deck.pinned ? "currentColor" : "none"} />
         </button>}
         <button
           className="tile-action"
@@ -741,7 +742,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             zIndex: 2,
           }}
         >
-          ⧉
+          <Copy size={15} strokeWidth={2.25} />
         </button>
         <button
           className="tile-action"
@@ -766,7 +767,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             zIndex: 2,
           }}
         >
-          ✕
+          <Trash2 size={15} strokeWidth={2.25} />
         </button>
       </div>
     </Reveal>

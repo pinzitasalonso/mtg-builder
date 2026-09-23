@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Plus, Sparkles, X, ZoomIn } from "lucide-react";
 import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
 import { Block, InlineToken, boldNamesIn, cardNamesIn, cutCandidates, flattenInline, normalizeCardKey, parseBlocks } from "@/lib/chat-markdown";
 import { collectionByName } from "@/lib/scryfall";
@@ -273,9 +274,10 @@ export function useDeckChat({
 
 /* One-tap prompts for the empty state. The deck judge lives here now — it used
    to be a separate Tools modal, but it's just a conversation with the expert. */
-const STARTERS: { label: string; prompt: string }[] = [
+const STARTERS: { label: string; prompt: string; featured?: boolean }[] = [
   {
-    label: "✨ Judge my deck",
+    label: "Judge my deck",
+    featured: true,
     prompt:
       "Judge my current deck like a pro deckbuilder: a short verdict first, then what's working well, the weakest cards I should consider cutting, and the key cards I'm missing (suggest specific ones).",
   },
@@ -412,7 +414,7 @@ export default function DeckChat({
       {empty && (
         <>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
-            <span style={{ color: "var(--gold)", fontSize: 14, lineHeight: 1.5 }}>✦</span>
+            <Sparkles size={15} strokeWidth={2} color="var(--gold)" style={{ flex: "none", marginTop: 3 }} />
             <p style={{ margin: 0, fontSize: 13.5, color: "var(--w-2, var(--text-muted))", lineHeight: 1.5 }}>
               Describe what the deck needs — Spellpool pulls <b style={{ color: "var(--w-1, var(--text))" }}>real cards</b> in your color identity.
             </p>
@@ -425,6 +427,9 @@ export default function DeckChat({
                 onClick={() => doSend(s.prompt)}
                 disabled={streaming}
                 style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
                   padding: "7px 13px",
                   borderRadius: 999,
                   border: "1px solid var(--line)",
@@ -436,6 +441,7 @@ export default function DeckChat({
                   cursor: "pointer",
                 }}
               >
+                {s.featured && <Sparkles size={14} strokeWidth={2} />}
                 {s.label}
               </button>
             ))}
@@ -673,14 +679,14 @@ function AssistantMessage({
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 8 }}>
           {toAdd.length > 0 && (
             <button type="button" onClick={() => onAddAll(toAdd)} disabled={bulkBusy} style={bulkBtn(false)}>
-              {bulkProgress?.mode === "add" ? "Adding…" : `＋ Add all ${toAdd.length}`}
+              {bulkProgress?.mode === "add" ? "Adding…" : <><Plus size={14} strokeWidth={2.5} /> Add all {toAdd.length}</>}
             </button>
           )}
           {toRemove.length > 0 && !confirmCut && (
             <button type="button" onClick={() => setConfirmCut(true)} disabled={bulkBusy} style={bulkBtn(true)}>
               {bulkProgress?.mode === "remove"
                 ? `Removing ${bulkProgress.done}/${bulkProgress.total}…`
-                : `✕ Cut ${toRemove.length}…`}
+                : <><X size={14} strokeWidth={2.5} /> Cut {toRemove.length}…</>}
             </button>
           )}
           {toRemove.length > 0 && confirmCut && (
@@ -694,7 +700,7 @@ function AssistantMessage({
                 disabled={bulkBusy}
                 style={bulkBtn(true)}
               >
-                ✕ Cut {toRemove.length}
+                <X size={14} strokeWidth={2.5} /> Cut {toRemove.length}
               </button>
               <button type="button" onClick={() => setConfirmCut(false)} disabled={bulkBusy} style={bulkBtn(false)}>
                 Cancel
@@ -948,11 +954,10 @@ function CardLink({
           margin: 0,
           cursor: "pointer",
           color: "var(--accent)",
-          fontSize: "0.85em",
-          verticalAlign: "baseline",
+          verticalAlign: "-2px",
         }}
       >
-        🔍
+        <ZoomIn size={15} strokeWidth={2.25} />
       </button>
     </span>
   );

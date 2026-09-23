@@ -41,6 +41,10 @@ export const toolBtn: React.CSSProperties = {
 };
 
 export const ghostBtn: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
   background: "transparent",
   border: "1px solid var(--line)",
   borderRadius: 999,
@@ -53,6 +57,10 @@ export const ghostBtn: React.CSSProperties = {
 };
 
 export const goldBtn: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
   background: "var(--gold)",
   border: "none",
   borderRadius: 999,
@@ -65,6 +73,10 @@ export const goldBtn: React.CSSProperties = {
 };
 
 export const dangerBtn: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
   background: "var(--danger)",
   border: "none",
   borderRadius: 999,
