@@ -1451,20 +1451,13 @@ button {
   .home-meter { display: none; }
 }
 
-/* Deck-tile actions (pin, duplicate, delete): shown on hover or keyboard
-   focus of the tile, always on touch screens (no hover there), and a pinned
-   pin always stays visible. */
-.deck-tile .tile-action {
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.deck-tile:hover .tile-action,
-.deck-tile:focus-within .tile-action,
-.deck-tile .tile-action[data-on="true"] {
-  opacity: 1;
-}
-@media (hover: none) {
-  .deck-tile .tile-action {
-    opacity: 1;
+/* Deck tiles. The actions (pin, duplicate, delete) are always visible: hiding
+   them behind hover made them unreachable on iPad — a trackpad iPad reports
+   hover, and Safari swallows a first tap that changes how the page looks. The
+   lift is for a real mouse only, for the same reason. */
+@media (hover: hover) and (pointer: fine) {
+  .deck-tile-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 0 0 2px var(--gold), 0 10px 22px -14px rgba(0, 0, 0, 0.5) !important;
   }
 }
