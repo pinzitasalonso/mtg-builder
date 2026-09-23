@@ -96,7 +96,9 @@ export default function CommanderInput({
           } else if (e.key === "Enter" && active >= 0) {
             e.preventDefault();
             pick(suggestions[active]);
-          } else if (e.key === "Escape") {
+          } else if (e.key === "Escape" && open) {
+            // Only the list closes; a surrounding dialog stays open.
+            e.preventDefault();
             setOpen(false);
           }
         }}

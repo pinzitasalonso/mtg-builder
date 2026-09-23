@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  ArrowLeft, ArrowUpDown, BookOpen, Check, ChevronDown, ClipboardCopy, Copy, Crown, Dices, Eye, History,
-  ListChecks, Mountain, Plus, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, X,
+  ArrowLeft, ArrowUpDown, BookOpen, Check, ChevronDown, ClipboardCopy, Copy, Crown, Dices, Download, Eye, History,
+  ListChecks, Mountain, Plus, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
   type LucideIcon,
 } from "lucide-react";
 import Logo from "@/components/Logo";
@@ -254,6 +254,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
+  // One message line for the Edit deck modal: a failed save, share or delete.
+  const [settingsError, setSettingsError] = useState("");
 
   // tool sheet (export / import / lands) — its state lives in <ToolSheet>
   const [tool, setTool] = useState<Tool | null>(null);
@@ -590,6 +592,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     if (!deck) return;
     setEdit({ name: deck.name, format: deck.format, commander: deck.commander || "" });
     setConfirmDelete(false);
+    setSettingsError("");
     setSettingsOpen(true);
   }
 
@@ -607,13 +610,20 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   async function setShared(next: boolean) {
     if (!deck) return;
     setSharing(true);
-    const res = await fetch(`/api/decks/${deckId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ shared: next }),
-    });
-    if (res.ok) setDeck((d) => (d ? { ...d, shared: next } : d));
-    setSharing(false);
+    setSettingsError("");
+    try {
+      const res = await fetch(`/api/decks/${deckId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shared: next }),
+      });
+      if (!res.ok) throw new Error();
+      setDeck((d) => (d ? { ...d, shared: next } : d));
+    } catch {
+      setSettingsError("Couldn’t change sharing. Try again.");
+    } finally {
+      setSharing(false);
+    }
   }
 
   // Header "Share": ensure an owned deck is view-shareable, then copy its link.
@@ -646,19 +656,30 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     e.preventDefault();
     if (!edit.name.trim()) return;
     setSaving(true);
-    const res = await fetch(`/api/decks/${deckId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: edit.name.trim(), format: edit.format, commander: edit.commander.trim() }),
-    });
-    if (res.ok) {
+    setSettingsError("");
+    try {
+      const res = await fetch(`/api/decks/${deckId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        // The commander field hides outside Commander, so it must not keep
+        // the old value: an empty string clears it.
+        body: JSON.stringify({
+          name: edit.name.trim(),
+          format: edit.format,
+          commander: edit.format === "commander" ? edit.commander.trim() : "",
+        }),
+      });
+      if (!res.ok) throw new Error();
       const updated = await res.json();
       setDeck((d) => (d ? { ...d, name: updated.name, format: updated.format, commander: updated.commander } : d));
       setSettingsOpen(false);
       // Pick up the (possibly new) auto-included commander card.
       loadPool();
+    } catch {
+      setSettingsError("Couldn’t save your changes. Try again.");
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   }
 
   // Delete the whole deck (a two-step confirm guards the destructive click),
@@ -666,12 +687,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   async function deleteDeck() {
     if (!deck) return;
     setDeleting(true);
-    const res = await fetch(`/api/decks/${deckId}`, { method: "DELETE" });
-    if (res.ok) {
+    setSettingsError("");
+    try {
+      const res = await fetch(`/api/decks/${deckId}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
       router.push("/");
-    } else {
+    } catch {
       setDeleting(false);
-      setConfirmDelete(false);
+      setSettingsError("Couldn’t delete the deck. Try again.");
     }
   }
 
@@ -1467,10 +1490,20 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {/* settings modal */}
       {settingsOpen && (
-        <ModalShell onDismiss={() => setSettingsOpen(false)} maxWidth={420} zIndex={70}>
-          <h2 style={{ margin: "0 0 16px", fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: "var(--frame-ink)" }}>
-            Deck settings
-          </h2>
+        <ModalShell onDismiss={() => setSettingsOpen(false)} maxWidth={420} zIndex={70} labelledBy="edit-deck-title">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, margin: "0 0 16px" }}>
+            <h2 id="edit-deck-title" style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: "var(--frame-ink)" }}>
+              Edit deck
+            </h2>
+            <button type="button" onClick={() => setSettingsOpen(false)} aria-label="Close" style={{ width: 36, height: 36, borderRadius: 999, border: "none", background: "var(--bg3)", color: "var(--t2)", display: "grid", placeItems: "center", cursor: "pointer", flex: "none" }}>
+              <X size={18} strokeWidth={2.25} />
+            </button>
+          </div>
+          {settingsError && (
+            <div role="alert" style={{ marginBottom: 12 }}>
+              <ErrorNote>{settingsError}</ErrorNote>
+            </div>
+          )}
           <form onSubmit={saveSettings} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <Field label="Name">
               <input className="cc-paper" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} required autoFocus style={paperInput} />
@@ -1493,7 +1526,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               <button type="button" onClick={() => setSettingsOpen(false)} style={ghostBtn}>
                 Cancel
               </button>
-              <button type="submit" disabled={saving} style={goldBtn}>
+              <button type="submit" disabled={saving || !edit.name.trim()} style={{ ...goldBtn, opacity: saving || !edit.name.trim() ? 0.5 : 1, cursor: saving || !edit.name.trim() ? "default" : "pointer" }}>
                 {saving ? "Saving…" : "Save changes"}
               </button>
             </div>
@@ -1520,7 +1553,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </label>
               {deck?.shared && (
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                  <input readOnly value={typeof window !== "undefined" ? window.location.href : ""} style={{ ...paperInput, flex: 1, fontSize: 12.5 }} onFocus={(e) => e.currentTarget.select()} />
+                  <input readOnly aria-label="Share link" value={typeof window !== "undefined" ? window.location.href : ""} style={{ ...paperInput, flex: 1, fontSize: 12.5 }} onFocus={(e) => e.currentTarget.select()} />
                   <button type="button" onClick={copyLink} style={toolBtn}>
                     {copied === "link" ? "Copied!" : "Copy"}
                   </button>
@@ -1536,10 +1569,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               <button type="button" onClick={() => setTool("export")} style={toolBtn}>
-                ⤓ Export list
+                <Download size={15} strokeWidth={2.25} />
+                Export list
               </button>
               <button type="button" onClick={() => setTool("import")} style={toolBtn}>
-                ⤒ Import list
+                <Upload size={15} strokeWidth={2.25} />
+                Import list
               </button>
             </div>
           </div>
@@ -1565,7 +1600,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </div>
             ) : (
               <button type="button" onClick={() => setConfirmDelete(true)} style={{ ...toolBtn, color: "var(--danger)", width: "100%" }}>
-                <Trash2 size={15} strokeWidth={2.25} style={{ verticalAlign: "-2px", marginRight: 6 }} />Delete this deck
+                <Trash2 size={15} strokeWidth={2.25} />
+                Delete this deck
               </button>
             )}
           </div>
