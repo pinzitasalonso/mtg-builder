@@ -23,6 +23,14 @@ export async function POST(
   const list = Array.isArray(body?.cards) ? body.cards.slice(0, MAX_CARDS) : [];
   const str = (v: unknown) => (typeof v === "string" ? v : null);
 
+  // Which of these are already in the pool — a capped (singleton) card that
+  // is already there adds no copies, and the response says so.
+  const ids: string[] = [];
+  for (const c of list) if (typeof c?.scryfallId === "string" && c.scryfallId) ids.push(c.scryfallId);
+  const present = new Set(
+    (await prisma.poolCard.findMany({ where: { deckId, scryfallId: { in: [...new Set(ids)] } }, select: { scryfallId: true } })).map((r) => r.scryfallId)
+  );
+  let copies = 0;
   const ops = [];
   for (const c of list) {
     if (
@@ -35,6 +43,8 @@ export async function POST(
     const reqQty = Math.min(MAX_QTY, Number.isFinite(c.quantity) && c.quantity > 0 ? Math.floor(c.quantity) : 1);
     const capped = singletonCapped(deck.format, c.typeLine);
     const qty = capped ? 1 : reqQty;
+    copies += capped ? (present.has(c.scryfallId) ? 0 : 1) : qty;
+    present.add(c.scryfallId);
     const colorIdentity = typeof c.colorIdentity === "string" ? c.colorIdentity.toUpperCase().slice(0, 5) : null;
     const legalities =
       c.legalities && typeof c.legalities === "object" && !Array.isArray(c.legalities)
@@ -61,5 +71,7 @@ export async function POST(
     );
   }
   if (ops.length) await prisma.$transaction(ops);
-  return NextResponse.json({ added: ops.length });
+  // `added` is rows touched (kept for older clients); `copies` is what the
+  // pool actually gained.
+  return NextResponse.json({ added: ops.length, copies });
 }

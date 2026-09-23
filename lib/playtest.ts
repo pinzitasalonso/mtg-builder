@@ -110,15 +110,8 @@ export function mulligan(state: PlaytestState, shuffle: Shuffle = shuffled): Pla
 
 /** Pay one card of the mulligan debt: hand → bottom of the library. */
 export function bottomCard(state: PlaytestState, iid: number): PlaytestState {
-  if (state.toBottom <= 0) return state;
-  const card = state.hand.find((c) => c.iid === iid);
-  if (!card) return state;
-  return {
-    ...state,
-    hand: state.hand.filter((c) => c.iid !== iid),
-    library: [...state.library, card],
-    toBottom: state.toBottom - 1,
-  };
+  if (state.toBottom <= 0 || !state.hand.some((c) => c.iid === iid)) return state;
+  return moveCard(state, iid, "library", { position: "bottom" });
 }
 
 export function zoneOf(state: PlaytestState, iid: number): Zone | null {
@@ -140,7 +133,10 @@ export function moveCard(
   const target = [...next[to]];
   if (to === "library" && opts.position !== "bottom") target.unshift(card);
   else target.push(card);
-  return { ...next, [to]: target } as PlaytestState;
+  // Hand → bottom of library while a mulligan debt is owed pays the debt,
+  // whichever control did it.
+  const toBottom = from === "hand" && to === "library" && opts.position === "bottom" && state.toBottom > 0 ? state.toBottom - 1 : state.toBottom;
+  return { ...next, [to]: target, toBottom } as PlaytestState;
 }
 
 /** The natural play of a card: from hand, a permanent goes to the battlefield

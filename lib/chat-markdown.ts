@@ -119,9 +119,8 @@ export function cardNamesIn(md: string): string[] {
 // lowercased. Every name map/set (verified, not-found, pool membership) must be
 // keyed through this so a streaming quirk like a doubled space can't make the
 // same name hash differently in different code paths.
-export function normalizeCardKey(name: string): string {
-  return name.trim().replace(/\s+/g, " ").toLowerCase();
-}
+import { normalizeCardKey } from "./scryfall";
+export { normalizeCardKey };
 
 // Bold spans the model wrote WITHOUT brackets — candidate card names. The AI
 // often bolds a card name instead of bracketing it (e.g. "**Birds of
