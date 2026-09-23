@@ -88,7 +88,9 @@ function nameKeys(fullName: string): string[] {
   const front = fullName.split(" // ")[0]!.trim().toLowerCase();
   return front && front !== full ? [full, front] : [full];
 }
-export function cardNameKey(name: string): string {
+// Canonical lookup key for a card name: trimmed, internal whitespace
+// collapsed, lowercased. Every name map in the app is keyed through this.
+export function normalizeCardKey(name: string): string {
   return name.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
@@ -98,8 +100,11 @@ export function cardNameKey(name: string): string {
  * Three explicit buckets, because "the request failed" and "no such card" must
  * not be reported the same way: a decklist import that hits a 429 mid-way would
  * otherwise tell the player that Sol Ring doesn't exist.
- *   found    — keyed by lowercase full name AND front-face name → card
- *   notFound — names Scryfall itself reported unknown (typos, not real cards)
+ *   found    — keyed by the name asked for, the card's full name, and its
+ *              front-face name → card
+ *   notFound — names the batch could not match: Scryfall listed them as
+ *              not_found, or rejected the request outright (a non-transient
+ *              4xx). The fuzzy endpoint is the tie-breaker for those.
  *   failed   — names whose request errored (429/5xx/network) even after a retry
  */
 export interface CollectionLookup {
@@ -116,7 +121,8 @@ export async function lookupCollection(names: string[]): Promise<CollectionLooku
     if (i > 0) await sleep(COLLECTION_GAP_MS);
     const chunk = names.slice(i, i + 75);
     let data: { data?: ScryfallCard[]; not_found?: { name?: string }[] } | null = null;
-    for (let attempt = 0; attempt < 2 && !data; attempt++) {
+    let rejected = false;
+    for (let attempt = 0; attempt < 2 && !data && !rejected; attempt++) {
       let res: Response | null = null;
       try {
         res = await fetch("https://api.scryfall.com/cards/collection", {
@@ -125,27 +131,36 @@ export async function lookupCollection(names: string[]): Promise<CollectionLooku
           body: JSON.stringify({ identifiers: chunk.map((name) => ({ name })) }),
         });
         if (res.ok) data = await res.json();
-        else if (!transient(res)) break; // 4xx other than 429: retrying won't help
+        else if (!transient(res)) rejected = true; // 4xx other than 429: retrying won't help
       } catch {
         /* network blip — retry once */
       }
-      if (!data && attempt === 0) await sleep(retryDelayMs(res));
+      if (!data && !rejected && attempt === 0) await sleep(retryDelayMs(res));
+    }
+    if (rejected) {
+      // Not a throttle, so not retryable as-is — but not proof the names are
+      // wrong either. Hand them to the per-name path.
+      notFound.push(...chunk);
+      continue;
     }
     if (!data) {
       failed.push(...chunk);
       continue;
     }
-    for (const c of data.data ?? []) {
-      if (!c?.id) continue;
+    // Scryfall lists the identifiers it couldn't match, and returns the rest
+    // in the order asked. Keying a card by the name we ASKED for matters when
+    // Scryfall's canonical name differs ("Lim-Dul's Vault" → "Lim-Dûl's Vault").
+    const missing = new Set((data.not_found ?? []).map((n) => normalizeCardKey(n.name ?? "")));
+    const asked = chunk.filter((name) => !missing.has(normalizeCardKey(name)));
+    const cards = (data.data ?? []).filter((c) => c?.id);
+    cards.forEach((c, i) => {
       const card = toOutCard(c);
-      for (const k of nameKeys(c.name)) if (!found.has(k)) found.set(k, card);
-    }
-    // Scryfall lists the identifiers it couldn't match; anything else we asked
-    // for and didn't get back counts as not found too, never as failed.
-    const missing = new Set((data.not_found ?? []).map((n) => cardNameKey(n.name ?? "")));
+      const keys = asked.length === cards.length ? [normalizeCardKey(asked[i]!), ...nameKeys(c.name)] : nameKeys(c.name);
+      for (const k of keys) if (!found.has(k)) found.set(k, card);
+    });
     for (const name of chunk) {
-      const k = cardNameKey(name);
-      if (missing.has(k) || (!found.has(k) && !found.has(cardNameKey(name.split(" // ")[0]!)))) {
+      const k = normalizeCardKey(name);
+      if (missing.has(k) || (!found.has(k) && !found.has(normalizeCardKey(name.split(" // ")[0]!)))) {
         notFound.push(name);
       }
     }

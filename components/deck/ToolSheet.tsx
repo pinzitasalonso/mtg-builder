@@ -92,14 +92,19 @@ export default function ToolSheet({
   async function importEntries(entries: ImportEntry[], prior: ImportResult | null) {
     setImporting(true);
     setImportNote(null);
-    const r = await importByName(deckId, entries, poolByName(pool));
-    await onChanged();
-    setImportResult({
-      added: (prior?.added ?? 0) + r.added,
-      notFound: [...(prior?.notFound ?? []), ...r.notFound],
-      failed: r.failed,
-    });
-    setImporting(false);
+    try {
+      const r = await importByName(deckId, entries, poolByName(pool));
+      await onChanged();
+      setImportResult({
+        added: (prior?.added ?? 0) + r.added,
+        notFound: [...(prior?.notFound ?? []), ...r.notFound],
+        failed: r.failed,
+      });
+    } catch {
+      setImportNote("Something went wrong while importing — check the pool, then try again.");
+    } finally {
+      setImporting(false);
+    }
   }
   async function runImport() {
     const entries = parseDecklist(importText);

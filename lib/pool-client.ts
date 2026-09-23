@@ -1,7 +1,7 @@
 // Client-side helpers for adding cards to a deck's pool. Shared by decklist
 // import, bulk lands, AI-chat tap-to-add and name-mode add.
 
-import { NAMED_GAP_MS, OutCard, cardNameKey, lookupCollection, resolveNamed, resolveNamedDetailed } from "./scryfall";
+import { NAMED_GAP_MS, OutCard, lookupCollection, normalizeCardKey, resolveNamed, resolveNamedDetailed } from "./scryfall";
 import { enqueue } from "./offline-queue";
 
 export type Board = "pool" | "deck";
@@ -14,13 +14,13 @@ export interface PoolEntry extends OutCard {
   role: string | null;
 }
 
-// Build a lowercase-name → card map of the current pool. Matching by NAME (not
+// Build a normalizeCardKey(name) → card map of the current pool. Matching by NAME (not
 // scryfall id) matters: Scryfall's fuzzy lookup may resolve to a different
 // printing's id than the pooled copy, and we want to increment that row.
 export function poolByName(pool: OutCard[]): Map<string, OutCard> {
   const m = new Map<string, OutCard>();
   for (const c of pool) {
-    m.set(c.name.toLowerCase(), {
+    m.set(normalizeCardKey(c.name), {
       id: c.id,
       name: c.name,
       imageUri: c.imageUri,
@@ -133,9 +133,9 @@ export async function importByName(
     const name = e.name.trim();
     if (!name) continue;
     const qty = Math.max(1, Math.floor(e.qty || 1));
-    const prev = merged.get(cardNameKey(name));
+    const prev = merged.get(normalizeCardKey(name));
     if (prev) prev.qty += qty;
-    else merged.set(cardNameKey(name), { name, qty });
+    else merged.set(normalizeCardKey(name), { name, qty });
   }
   const want = [...merged.values()];
   const result: ImportResult = { added: 0, notFound: [], failed: [] };
@@ -144,21 +144,21 @@ export async function importByName(
   const resolved: { entry: ImportEntry; card: OutCard }[] = [];
   const toResolve: ImportEntry[] = [];
   for (const entry of want) {
-    const ex = known.get(cardNameKey(entry.name));
+    const ex = known.get(normalizeCardKey(entry.name));
     if (ex) resolved.push({ entry, card: ex });
     else toResolve.push(entry);
   }
 
   if (toResolve.length) {
     const lookup = await lookupCollection(toResolve.map((e) => e.name));
-    const failedKeys = new Set(lookup.failed.map(cardNameKey));
+    const failedKeys = new Set(lookup.failed.map(normalizeCardKey));
     const fuzzy: ImportEntry[] = [];
     for (const entry of toResolve) {
       const card =
-        lookup.found.get(cardNameKey(entry.name)) ??
-        lookup.found.get(cardNameKey(entry.name.split(" // ")[0]!));
+        lookup.found.get(normalizeCardKey(entry.name)) ??
+        lookup.found.get(normalizeCardKey(entry.name.split(" // ")[0]!));
       if (card?.imageUri) resolved.push({ entry, card });
-      else if (failedKeys.has(cardNameKey(entry.name))) result.failed.push(entry);
+      else if (failedKeys.has(normalizeCardKey(entry.name))) result.failed.push(entry);
       else fuzzy.push(entry);
     }
     // Exact-name misses get one fuzzy try each, spaced out — these are the few
@@ -176,6 +176,7 @@ export async function importByName(
   for (let i = 0; i < resolved.length; i += BULK_INSERT_MAX) {
     const batch = resolved.slice(i, i + BULK_INSERT_MAX);
     let ok = false;
+    let copies: number | null = null;
     try {
       const res = await fetch(`/api/decks/${deckId}/cards/bulk`, {
         method: "POST",
@@ -196,6 +197,10 @@ export async function importByName(
         }),
       });
       ok = res.ok;
+      if (ok) {
+        const body = await res.json().catch(() => null);
+        if (typeof body?.copies === "number") copies = body.copies;
+      }
     } catch {
       ok = false;
     }
@@ -203,10 +208,12 @@ export async function importByName(
       result.failed.push(...batch.map((b) => b.entry));
       continue;
     }
-    for (const { entry, card } of batch) {
-      result.added += entry.qty;
+    // The route says how many copies really went in: a singleton format caps
+    // "4 Sol Ring" at one, and a capped card already there adds none.
+    result.added += copies ?? batch.reduce((n, b) => n + b.entry.qty, 0);
+    for (const { card } of batch) {
       // So a later call in the same session merges into this row without a lookup.
-      known.set(cardNameKey(card.name), card);
+      known.set(normalizeCardKey(card.name), card);
     }
   }
   return result;
@@ -235,7 +242,7 @@ export async function resolveAndAdd(
   opts?: { skipIfExists?: boolean }
 ): Promise<"added" | "exists" | "notfound" | "error"> {
   try {
-    const existing = known.get(name.toLowerCase());
+    const existing = known.get(normalizeCardKey(name));
     if (existing) {
       if (opts?.skipIfExists) return "exists";
       return (await postCard(deckId, existing, qty)) ? "added" : "error";
@@ -244,9 +251,9 @@ export async function resolveAndAdd(
     if (!card) return "notfound";
     if (!card.imageUri) return "error";
     // Fuzzy input may resolve to a card already in the deck under its full name.
-    if (opts?.skipIfExists && known.has(card.name.toLowerCase())) return "exists";
+    if (opts?.skipIfExists && known.has(normalizeCardKey(card.name))) return "exists";
     if (!(await postCard(deckId, card, qty))) return "error";
-    known.set(card.name.toLowerCase(), card);
+    known.set(normalizeCardKey(card.name), card);
     return "added";
   } catch {
     return "error";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { CardArt } from "@/components/mtg";
 import { PoolEntry } from "@/lib/pool-client";
@@ -111,26 +111,14 @@ export default function PlaytestModal({
   };
 
   // Deck-wide land odds — the old sample-hand table, kept behind a button.
-  // Counts the library deck: everything but a seated commander.
-  const { deckSize, landCount } = useMemo(() => {
-    const seats = new Set(
-      commanderGame ? (commander ?? "").split("+").map((s) => s.trim().toLowerCase()).filter(Boolean) : []
-    );
-    let deckSize = 0;
-    let landCount = 0;
-    for (const c of cards) {
-      for (let i = 0; i < Math.max(1, c.quantity); i++) {
-        const key = c.name.trim().toLowerCase();
-        if (seats.has(key)) {
-          seats.delete(key);
-          continue;
-        }
-        deckSize++;
-        if (isLandCard(c.typeLine)) landCount++;
-      }
-    }
-    return { deckSize, landCount };
-  }, [cards, commander, commanderGame]);
+  // Counted from the game itself: every card that isn't a commander,
+  // wherever it is, so the seating logic lives in one place (startGame).
+  const deckCards = [...state.library, ...state.hand, ...state.battlefield, ...state.graveyard, ...state.exile].filter((c) => !c.commander);
+  const deckSize = deckCards.length;
+  const landCount = deckCards.filter((c) => isLandCard(c.typeLine)).length;
+  // A commander that left the command zone is somewhere in play; none at all
+  // means the stored name wasn't in this list.
+  const commanderOut = [...state.battlefield, ...state.hand, ...state.graveyard, ...state.exile, ...state.library].some((c) => c.commander);
 
   const lands = state.battlefield.filter((c) => isLandCard(c.typeLine));
   const perms = state.battlefield.filter((c) => !isLandCard(c.typeLine));
@@ -263,7 +251,9 @@ export default function PlaytestModal({
               {state.command.length ? (
                 state.command.map((c) => <PtCard key={c.iid} card={c} zone="command" {...cardProps} />)
               ) : (
-                <div className="pt-pile pt-pile-empty" title="The commander is on the battlefield">—</div>
+                <div className="pt-pile pt-pile-empty" title={commanderOut ? "The commander has left the command zone" : "The commander isn't in this list"}>
+                  {commanderOut ? "—" : "?"}
+                </div>
               )}
             </div>
           )}
@@ -526,14 +516,14 @@ function Panel({ title, onClose, children }: { title: string; onClose: () => voi
 
 /* Hypergeometric land odds for the deck, as the old sample-hand view showed them. */
 function OddsTable({ deckSize: N, landCount }: { deckSize: number; landCount: number }) {
+  if (N < 7) return <div className="pt-empty">Not enough cards for odds — you need at least 7.</div>;
   const pct = (p: number) => `${Math.round(p * 100)}%`;
   const rows = [2, 3, 4].map((k) => ({
     k,
     open: hypergeometricAtLeast(N, landCount, Math.min(7, N), k),
     t3: hypergeometricAtLeast(N, landCount, Math.min(10, N), k),
   }));
-  const noLand = N >= 7 ? hypergeometric(N, landCount, 7, 0) : 0;
-  if (N < 7) return <div className="pt-empty">Not enough cards for odds — you need at least 7.</div>;
+  const noLand = hypergeometric(N, landCount, 7, 0);
   return (
     <div style={{ fontSize: 14, color: "#fff" }}>
       <p className="pt-panel-note" style={{ marginTop: 0 }}>

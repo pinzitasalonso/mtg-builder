@@ -101,6 +101,16 @@ describe("mulligan", () => {
     expect(s3.mulligans).toBe(2);
   });
 
+  it("is paid by a hand → bottom-of-library move too, however it was done", () => {
+    const s1 = mulligan(startGame(deck(), { shuffle: keep }), keep);
+    const s2 = moveCard(s1, s1.hand[0]!.iid, "library", { position: "bottom" });
+    expect(s2.toBottom).toBe(0);
+    expect(s2.hand).toHaveLength(6);
+    // A top-of-library move is not a payment.
+    const s3 = moveCard(s1, s1.hand[0]!.iid, "library", { position: "top" });
+    expect(s3.toBottom).toBe(1);
+  });
+
   it("stops at six mulligans", () => {
     let s = startGame(deck(), { shuffle: keep });
     for (let i = 0; i < 6; i++) s = mulligan(s, keep);
