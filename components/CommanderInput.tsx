@@ -23,17 +23,16 @@ export default function CommanderInput({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  // Suppresses the fetch triggered by programmatically setting the value when a
-  // suggestion is picked (so the menu doesn't immediately reopen).
-  const skipNext = useRef(false);
+  // Only typing searches. A value set from outside (the saved commander when a
+  // modal opens) or by picking a suggestion must not pop the list open over
+  // the rest of the form.
+  const typed = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (skipNext.current) {
-      skipNext.current = false;
-      return;
-    }
+    if (!typed.current) return;
+    typed.current = false;
     const q = value.trim();
     if (q.length < 2) {
       setSuggestions([]);
@@ -71,7 +70,6 @@ export default function CommanderInput({
   }, []);
 
   function pick(name: string) {
-    skipNext.current = true;
     onChange(name);
     setOpen(false);
     setSuggestions([]);
@@ -83,7 +81,10 @@ export default function CommanderInput({
       <input
         className={className}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          typed.current = true;
+          onChange(e.target.value);
+        }}
         onFocus={() => suggestions.length > 0 && setOpen(true)}
         onKeyDown={(e) => {
           if (!open || suggestions.length === 0) return;
