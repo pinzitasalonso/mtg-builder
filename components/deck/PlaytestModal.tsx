@@ -73,6 +73,8 @@ export default function PlaytestModal({
   const startingLife = commanderGame ? 40 : 20;
   const newGame = () => startGame(cards, { commander: commanderGame ? commander : null, startingLife });
   const [state, setState] = useState<PlaytestState>(newGame);
+  // Every earlier state, newest last — so a misclick is one Undo away.
+  const [history, setHistory] = useState<PlaytestState[]>([]);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [pile, setPile] = useState<Pile | null>(null);
   const [oddsOpen, setOddsOpen] = useState(false);
@@ -86,29 +88,55 @@ export default function PlaytestModal({
       document.body.style.overflow = prev;
     };
   }, []);
-  // Esc closes the topmost thing: a menu or panel first, then the table.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (menu || pile || oddsOpen || zoom) {
-        setMenu(null);
-        setPile(null);
-        setOddsOpen(false);
-        setZoom(null);
-      } else onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [menu, pile, oddsOpen, zoom, onClose]);
-
   // Every move goes through here so the menu it came from closes with it — and
   // so does the hover zoom: the card under the pointer may have just left the
-  // zone, and an unmounted card never fires pointerleave.
+  // zone, and an unmounted card never fires pointerleave. The state it replaces
+  // goes on the undo stack (capped; a long game shouldn't grow without bound).
   const act = (step: Step) => {
     setMenu(null);
     setZoom(null);
-    setState(step);
+    const next = step(state);
+    if (next === state) return;
+    setHistory((h) => [...h.slice(-99), state]);
+    setState(next);
   };
+  const undo = () => {
+    if (history.length === 0) return;
+    setMenu(null);
+    setZoom(null);
+    setState(history[history.length - 1]!);
+    setHistory((h) => h.slice(0, -1));
+  };
+
+  // Keys: Esc closes the topmost thing (a menu or panel, then the table);
+  // Cmd/Ctrl+Z undoes; D draws, N is next turn, U untaps all.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (menu || pile || oddsOpen || zoom) {
+          setMenu(null);
+          setPile(null);
+          setOddsOpen(false);
+          setZoom(null);
+        } else onClose();
+        return;
+      }
+      const typing = e.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+      if (typing || e.altKey) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undo();
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || menu || pile || oddsOpen) return;
+      const k = e.key.toLowerCase();
+      if (k === "d") act((s) => draw(s, 1));
+      else if (k === "n") act(nextTurn);
+      else if (k === "u") act(untapAll);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   // Deck-wide land odds — the old sample-hand table, kept behind a button.
   // Counted from the game itself: every card that isn't a commander,
@@ -195,16 +223,19 @@ export default function PlaytestModal({
         <button type="button" className="pt-btn pt-btn-gold" onClick={() => act(newGame)}>
           New game
         </button>
+        <button type="button" className="pt-btn" onClick={undo} disabled={history.length === 0} title="Undo (⌘Z / Ctrl+Z)">
+          ↶ Undo
+        </button>
         <button type="button" className="pt-btn" onClick={() => act((s) => mulligan(s))} disabled={state.mulligans >= 6}>
           Mulligan{state.mulligans ? ` (${state.mulligans})` : ""}
         </button>
-        <button type="button" className="pt-btn" onClick={() => act((s) => draw(s, 1))} disabled={state.library.length === 0}>
+        <button type="button" className="pt-btn" onClick={() => act((s) => draw(s, 1))} disabled={state.library.length === 0} title="Draw a card (D)">
           Draw
         </button>
-        <button type="button" className="pt-btn" onClick={() => act(nextTurn)}>
+        <button type="button" className="pt-btn" onClick={() => act(nextTurn)} title="Untap and draw (N)">
           Next turn ⟳
         </button>
-        <button type="button" className="pt-btn" onClick={() => act(untapAll)} disabled={!state.battlefield.some((c) => c.tapped)}>
+        <button type="button" className="pt-btn" onClick={() => act(untapAll)} disabled={!state.battlefield.some((c) => c.tapped)} title="Untap all (U)">
           Untap all
         </button>
         <button type="button" className="pt-btn" onClick={() => act((s) => shuffleLibrary(s))} disabled={state.library.length < 2}>
