@@ -669,6 +669,15 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     loadPool();
   }
 
+  // Everything in the pool onto the deck board, in one request. Confirmed
+  // first: undoing it is one card at a time.
+  async function addAllToDeck() {
+    const n = poolCards.reduce((s, c) => s + c.quantity, 0);
+    if (n === 0 || !confirm(`Move all ${n} pool card${n === 1 ? "" : "s"} into the deck?`)) return;
+    await fetch(`/api/decks/${deckId}/cards/promote`, { method: "POST" });
+    loadPool();
+  }
+
   const inPool = (cardId: string) => pool.some((c) => c.id === cardId);
 
   // ── Boards: "deck" = the actual decklist, "pool" = candidates.
@@ -1283,7 +1292,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           </div>
 
           {poolCards.length > 0 && (
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -2 }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: -2 }}>
+              <button onClick={addAllToDeck} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }} title="Move every pool card into the deck">
+                ＋ Add all to deck
+              </button>
               <button onClick={() => startReview()} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }}>
                 ✓ Review pool
               </button>
