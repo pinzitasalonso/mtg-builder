@@ -24,6 +24,7 @@
 // button to run a new one.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Link2, ScanSearch } from "lucide-react";
 import type { DeckScoreReport } from "@/lib/deck-score-report";
 import type { AnalysisDocument, DeckScan } from "@/lib/deck-analysis";
 import {
@@ -337,7 +338,7 @@ export function InsightPlay({ insight }: { insight: DeckInsightData }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
         {comboCount > 0 && (
           <Pill on={showCombos} onClick={() => setShowCombos((v) => !v)}>
-            🔗 {comboCount} combo{comboCount === 1 ? "" : "s"}
+            <Link2 size={14} strokeWidth={2.25} /> {comboCount} combo{comboCount === 1 ? "" : "s"}
           </Pill>
         )}
         {games.length > 0 && (
@@ -580,7 +581,7 @@ export function InsightScan({
       {!showNotes ? (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <Pill on={running} onClick={() => (hasPrimer ? void run() : setShowNotes(true))}>
-            🔍 {running ? "Scanning…" : insight.scan ? "Scan again" : "Scan deck"}
+            <ScanSearch size={14} strokeWidth={2.25} /> {running ? "Scanning…" : insight.scan ? "Scan again" : "Scan deck"}
           </Pill>
           {hasPrimer && !running && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>guided by your primer</span>}
           {meter && <span style={{ fontSize: 11.5, color: exhausted ? "var(--gold)" : "var(--w-3)" }}>{meter}</span>}

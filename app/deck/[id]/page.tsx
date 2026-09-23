@@ -4,6 +4,11 @@ import { use, useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import {
+  ArrowLeft, ArrowUpDown, BookOpen, Check, ChevronDown, ClipboardCopy, Copy, Crown, Dices, Eye, History,
+  ListChecks, Mountain, Plus, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, X,
+  type LucideIcon,
+} from "lucide-react";
 import Logo from "@/components/Logo";
 import CommanderInput from "@/components/CommanderInput";
 import SwipeModal from "@/components/SwipeModal";
@@ -225,6 +230,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   // header tools dropdown + play-guide popover
   const [toolsOpen, setToolsOpen] = useState(false);
+  useEffect(() => {
+    if (!toolsOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setToolsOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toolsOpen]);
   // Fixed viewport coords for the tools menu, measured from the button so it
   // opens right under it and never runs off-screen on mobile.
   const [toolsPos, setToolsPos] = useState<{ top: number; left: number } | null>(null);
@@ -846,8 +857,35 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   setToolsOpen(true);
                 }}
               >
-                Tools ▾
+                Tools <ChevronDown size={15} strokeWidth={2.25} />
               </button>
+            </div>
+            {/* Playtest was the hero's headline action. It is a thing you do
+                WITH a finished deck, not a thing you do to build one, so it
+                sits up here with Share and Tools — and the hero goes to the two
+                actions that actually build the deck. */}
+            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setPlaytestOpen(true)} disabled={deckCards.length === 0}>
+              <Dices size={16} strokeWidth={2} /> Playtest
+            </button>
+            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={shareDeck} disabled={sharing}>
+              {copied === "link" ? "Copied!" : sharing ? "Sharing…" : "Share"}
+            </button>
+            {canEdit ? (
+              <button className="id-btn" style={{ padding: "10px 18px" }} onClick={openSettings}>
+                Edit deck
+              </button>
+            ) : (
+              <button className="id-btn" style={{ padding: "10px 18px" }} onClick={duplicateThisDeck} disabled={forking}>
+                {forking ? "Duplicating…" : <><Copy size={15} strokeWidth={2.25} /> Duplicate</>}
+              </button>
+            )}
+          </div>
+        </header>
+        {/* The Tools menu lives outside the header: the header's backdrop-filter
+            makes it the containing block for fixed children, which shrank the
+            click-away layer to the header's own height — so a click on the
+            page didn't close the menu, and the stray layer blocked the header
+            buttons. */}
               {toolsOpen && (
                 <>
                   <div onClick={() => setToolsOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
@@ -864,19 +902,19 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       // Holds the menu open so the copy is confirmed. As a
                       // hero button this said "Copied!"; closing on click
                       // would have made copying silent.
-                      { label: copied === "list" ? "✓ Copied!" : "📋 Copy decklist", on: copyDecklist, disabled: deckCards.length === 0, keepOpen: true },
-                      { label: "🛒 Buy list", on: () => setOrderOpen(true), disabled: deckCards.length === 0 },
-                      { label: "🕘 Versions", on: () => setVersionsOpen(true) },
+                      { label: copied === "list" ? "Copied!" : "Copy decklist", icon: copied === "list" ? Check : ClipboardCopy, on: copyDecklist, disabled: deckCards.length === 0, keepOpen: true },
+                      { label: "Buy list", icon: ShoppingCart, on: () => setOrderOpen(true), disabled: deckCards.length === 0 },
+                      { label: "Versions", icon: History, on: () => setVersionsOpen(true) },
                       ...(canEdit ? [
-                        { label: "🌲 Add lands & staples", on: () => setTool("lands") },
-                        { label: "⬆ Export / import", on: () => setTool("export") },
+                        { label: "Add lands & staples", icon: Mountain, on: () => setTool("lands") },
+                        { label: "Export / import", icon: ArrowUpDown, on: () => setTool("export") },
                         { group: "At the table" },
-                        { label: "🎟 Game code", on: () => setGameCodeOpen(true) },
+                        { label: "Game code", icon: Ticket, on: () => setGameCodeOpen(true) },
                         { group: "Write-ups" },
-                        { label: "📖 Primer", on: () => { setPrimerOpen(true); setPane("stats"); } },
-                        { label: "🔍 Scan deck", on: () => { setScanOpen(true); setPane("stats"); }, disabled: deckCards.length < 40 },
+                        { label: "Primer", icon: BookOpen, on: () => { setPrimerOpen(true); setPane("stats"); } },
+                        { label: "Scan deck", icon: ScanSearch, on: () => { setScanOpen(true); setPane("stats"); }, disabled: deckCards.length < 40 },
                       ] : []),
-                    ] as { group?: string; label?: string; on?: () => void; disabled?: boolean; keepOpen?: boolean }[]).map((it) =>
+                    ] as { group?: string; label?: string; icon?: LucideIcon; on?: () => void; disabled?: boolean; keepOpen?: boolean }[]).map((it) =>
                       it.group ? (
                         <div key={it.group} className="id-label" style={{ color: "var(--w-3)", fontSize: 10, padding: "9px 11px 4px" }}>
                           {it.group}
@@ -886,8 +924,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                           key={it.label}
                           onClick={() => { if (!it.disabled) { it.on!(); if (!it.keepOpen) setToolsOpen(false); } }}
                           disabled={it.disabled}
-                          style={{ textAlign: "left", padding: "9px 11px", borderRadius: 9, border: "none", background: "transparent", color: "var(--w-1)", fontFamily: "var(--font-ui)", fontSize: 13.5, fontWeight: 600, cursor: it.disabled ? "default" : "pointer", opacity: it.disabled ? 0.45 : 1 }}
+                          className="tools-item"
+                          style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "left", padding: "9px 11px", borderRadius: 9, border: "none", background: "transparent", color: "var(--w-1)", fontFamily: "var(--font-ui)", fontSize: 13.5, fontWeight: 600, cursor: it.disabled ? "default" : "pointer", opacity: it.disabled ? 0.45 : 1 }}
                         >
+                          {it.icon && <it.icon size={16} strokeWidth={2} style={{ flex: "none", opacity: 0.85 }} />}
                           {it.label}
                         </button>
                       )
@@ -895,33 +935,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   </div>
                 </>
               )}
-            </div>
-            {/* Playtest was the hero's headline action. It is a thing you do
-                WITH a finished deck, not a thing you do to build one, so it
-                sits up here with Share and Tools — and the hero goes to the two
-                actions that actually build the deck. */}
-            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setPlaytestOpen(true)} disabled={deckCards.length === 0}>
-              🎲 Playtest
-            </button>
-            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={shareDeck} disabled={sharing}>
-              {copied === "link" ? "Copied!" : sharing ? "Sharing…" : "Share"}
-            </button>
-            {canEdit ? (
-              <button className="id-btn" style={{ padding: "10px 18px" }} onClick={openSettings}>
-                Edit deck
-              </button>
-            ) : (
-              <button className="id-btn" style={{ padding: "10px 18px" }} onClick={duplicateThisDeck} disabled={forking}>
-                {forking ? "Duplicating…" : "⧉ Duplicate"}
-              </button>
-            )}
-          </div>
-        </header>
 
         <div style={{ maxWidth: 1180, margin: "0 auto", padding: "12px clamp(16px,4vw,52px) 80px" }}>
           {/* breadcrumb */}
-          <Link href="/" style={{ display: "inline-block", color: "var(--w-3)", fontSize: 13, textDecoration: "none", marginBottom: 6 }}>
-            ← All decks
+          <Link href="/" style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "var(--w-3)", fontSize: 13, textDecoration: "none", marginBottom: 6, padding: "4px 0", minHeight: 24 }}>
+            <ArrowLeft size={14} strokeWidth={2.25} /> All decks
           </Link>
 
           {pendingSync > 0 && (
@@ -975,14 +993,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               {canEdit && (
                 <div className="deck-actions">
                   <button className="deck-action deck-action-add" onClick={goAddCards} title="Add cards to the pool">
-                    <span className="deck-action-icon" aria-hidden>+</span>
+                    <span className="deck-action-icon" aria-hidden><Plus size={20} strokeWidth={2.25} /></span>
                     <span className="deck-action-text">
                       <b>Add cards</b>
                       <i>Search, or paste a list.</i>
                     </span>
                   </button>
                   <button className="deck-action deck-action-ai" onClick={() => setChatOpen(true)}>
-                    <span className="deck-action-icon" aria-hidden>✦</span>
+                    <span className="deck-action-icon" aria-hidden><Sparkles size={19} strokeWidth={2} /></span>
                     <span className="deck-action-text">
                       <b>Ask the AI about this deck</b>
                       <i>Lines, cuts and combos.</i>
@@ -1029,7 +1047,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           {/* A read-only banner for viewers of a shared deck. */}
           {!canEdit && (
             <div className="id-panel" style={{ padding: "11px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 9, fontSize: 13.5, color: "var(--w-2)" }}>
-              <span aria-hidden style={{ fontSize: 15 }}>👁</span>
+              <Eye size={16} strokeWidth={2} style={{ flex: "none" }} />
               You’re viewing a shared deck — read-only. Hit <b style={{ color: "var(--w-1)" }}>Duplicate</b> to make your own editable copy.
             </div>
           )}
@@ -1294,10 +1312,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           {poolCards.length > 0 && (
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: -2 }}>
               <button onClick={addAllToDeck} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }} title="Move every pool card into the deck">
-                ＋ Add all to deck
+                <Plus size={14} strokeWidth={2.25} /> Add all to deck
               </button>
               <button onClick={() => startReview()} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }}>
-                ✓ Review pool
+                <ListChecks size={14} strokeWidth={2.25} /> Review pool
               </button>
             </div>
           )}
@@ -1349,14 +1367,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </div>
               {canEdit && (
                 <button onClick={() => startDeckReview()} disabled={deckCards.length === 0} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }}>
-                  ✓ Review
+                  <ListChecks size={14} strokeWidth={2.25} /> Review
                 </button>
               )}
             </div>
           </div>
           {deckWarningCount > 0 && (
-            <div style={{ fontSize: 12.5, color: "var(--gold)", marginBottom: 12 }}>
-              ⚠ {deckWarningCount} card{deckWarningCount === 1 ? "" : "s"} with legality warnings — hover the ⚠ on a card.
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--gold)", marginBottom: 12 }}>
+              <TriangleAlert size={14} strokeWidth={2.25} style={{ flex: "none" }} /> {deckWarningCount} card{deckWarningCount === 1 ? "" : "s"} with legality warnings — the marked cards say why.
             </div>
           )}
 
@@ -1418,7 +1436,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {chatOpen && canEdit && (
         <ModalShell onDismiss={() => setChatOpen(false)} maxWidth={780} zIndex={68}>
           <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 14 }}>
-            <span className="id-display" style={{ fontSize: 22, color: "var(--w-1)" }}>✦ Ask the AI</span>
+            <span className="id-display" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 22, color: "var(--w-1)" }}><Sparkles size={20} strokeWidth={2} /> Ask the AI</span>
             <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>build · judge · refine</span>
             <button
               onClick={() => setChatOpen(false)}
@@ -1547,7 +1565,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </div>
             ) : (
               <button type="button" onClick={() => setConfirmDelete(true)} style={{ ...toolBtn, color: "var(--danger)", width: "100%" }}>
-                🗑 Delete this deck
+                <Trash2 size={15} strokeWidth={2.25} style={{ verticalAlign: "-2px", marginRight: 6 }} />Delete this deck
               </button>
             )}
           </div>
@@ -1885,27 +1903,22 @@ function DeckCardTile({
       (non-commander decks, basics in commander); shows a − / + stepper. */
   onQty?: (next: number) => void;
 }) {
-  const [hover, setHover] = useState(false);
   return (
     <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className="card-tile"
       onClick={onOpen}
       title={card.name}
-      style={{
-        cursor: onOpen ? "pointer" : "default",
-        transform: hover ? "translateY(-3px)" : "none",
-        transition: "transform .16s ease",
-      }}
+      style={{ cursor: onOpen ? "pointer" : "default", transition: "transform .16s ease" }}
     >
     <div
+      className="card-tile-face"
       style={{
         position: "relative",
         borderRadius: "4.8%/3.5%",
         overflow: "hidden",
         aspectRatio: "5 / 7",
         background: "rgba(0,0,0,.25)",
-        boxShadow: hover ? "0 14px 30px -10px rgba(0,0,0,.6)" : "0 4px 12px -4px rgba(0,0,0,.45)",
+        boxShadow: "0 4px 12px -4px rgba(0,0,0,.45)",
         transition: "box-shadow .16s ease",
       }}
     >
@@ -1921,8 +1934,8 @@ function DeckCardTile({
         style={{ position: "absolute", inset: 0 }}
       />
       {owned && (
-        <span title="In your collection" style={{ position: "absolute", top: 7, left: 7, background: "rgba(13,138,95,.92)", color: "#fff", fontSize: 10.5, fontWeight: 700, padding: "2px 7px", borderRadius: 999, boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}>
-          ✓
+        <span title="In your collection" aria-label="In your collection" style={{ position: "absolute", top: 7, left: 7, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "rgba(13,138,95,.92)", color: "#fff", borderRadius: 999, boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}>
+          <Check size={14} strokeWidth={3} />
         </span>
       )}
       {onQty ? (
@@ -1952,8 +1965,8 @@ function DeckCardTile({
         )
       )}
       {warning && (
-        <span title={warning} style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", fontSize: 12, width: 20, height: 20, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          ⚠
+        <span title={warning} aria-label={warning} style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <TriangleAlert size={14} strokeWidth={2.25} />
         </span>
       )}
       {removable && (
@@ -1961,9 +1974,10 @@ function DeckCardTile({
           onClick={(e) => { e.stopPropagation(); onRemove(); }}
           title="Remove from deck"
           aria-label="Remove from deck"
-          style={{ ...poolIconBtn, position: "absolute", top: 7, right: 7, opacity: hover ? 1 : 0, transition: "opacity .15s", color: "#ff9b8a" }}
+          className="card-tile-remove"
+          style={{ ...poolIconBtn, position: "absolute", top: 7, right: 7, color: "#ff9b8a" }}
         >
-          ✕
+          <X size={16} strokeWidth={2.5} />
         </button>
       )}
     </div>
@@ -2005,8 +2019,8 @@ function IdCardLine({
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {card.quantity > 1 && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--w-3)", flex: "none" }}>{card.quantity}×</span>}
           <span style={{ fontSize: 14, fontWeight: 700, color: "var(--w-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
-          {owned && <span title="In your collection" style={{ color: "#4ecb8f", fontSize: 12, fontWeight: 700, flex: "none" }}>✓</span>}
-          {warning && <span title={warning} style={{ color: "#ff9c86", fontSize: 12, flex: "none" }}>⚠</span>}
+          {owned && <Check size={14} strokeWidth={3} color="#4ecb8f" style={{ flex: "none" }} aria-label="In your collection"><title>In your collection</title></Check>}
+          {warning && <TriangleAlert size={14} strokeWidth={2.25} color="#ff9c86" style={{ flex: "none" }} aria-label={warning}><title>{warning}</title></TriangleAlert>}
         </div>
         <div style={{ fontSize: 11.5, color: "var(--w-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
       </div>
@@ -2027,75 +2041,3 @@ function DeckSectionHead({ cat, n }: { cat: string; n: number }) {
     </div>
   );
 }
-
-function DeckRailRow({
-  card,
-  warning,
-  owned,
-  onOpen,
-  onMove,
-  onRemove,
-}: {
-  card: PoolCard;
-  warning?: string;
-  owned?: boolean;
-  onOpen: () => void;
-  onMove: () => void;
-  onRemove: () => void;
-}) {
-  const [hover, setHover] = useState(false);
-  return (
-    <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      onClick={onOpen}
-      style={{
-        display: "grid",
-        gridTemplateColumns: "30px 1fr auto",
-        alignItems: "center",
-        gap: 10,
-        padding: "7px 11px 7px 8px",
-        borderRadius: 10,
-        cursor: "pointer",
-        background: "#ffffff",
-        boxShadow: hover ? "0 6px 16px -6px rgba(0,0,0,.4)" : "0 1px 2px rgba(0,0,0,.18)",
-        transition: "box-shadow .14s ease",
-      }}
-    >
-      <div style={{ position: "relative", width: 30, height: 30, borderRadius: 6, overflow: "hidden", flexShrink: 0 }}>
-        <CardArt name={card.name} src={card.imageUri || undefined} radius={0} style={{ position: "absolute", inset: 0 }} />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {card.quantity > 1 && <span style={{ fontSize: 12, fontWeight: 700, color: "#5c5c64" }}>{card.quantity}×</span>}
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#15151a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
-          {owned && <span title="In your collection" style={{ color: "#4ecb8f", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>✓</span>}
-          {warning && <span title={warning} style={{ color: "#ff9c86", fontSize: 12 }}>⚠</span>}
-        </div>
-        <div style={{ fontSize: 11.5, color: "#8a8a92", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
-      </div>
-      {hover ? (
-        <div style={{ display: "flex", gap: 4 }}>
-          <button onClick={(e) => { e.stopPropagation(); onMove(); }} title="Move to pool" aria-label="Move to pool" style={railIconBtn}>↓</button>
-          <button onClick={(e) => { e.stopPropagation(); onRemove(); }} title="Remove" aria-label="Remove" style={railIconBtn}>✕</button>
-        </div>
-      ) : (
-        <ManaCost cost={card.manaCost} size={15} />
-      )}
-    </div>
-  );
-}
-
-const railIconBtn: React.CSSProperties = {
-  width: 24,
-  height: 24,
-  borderRadius: 6,
-  border: "none",
-  cursor: "pointer",
-  background: "#f1f1ec",
-  color: "#5c5c64",
-  fontSize: 12,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check } from "lucide-react";
 import { parseDecklist } from "@/lib/decklist";
 import { ImportEntry, ImportResult, PoolEntry, importByName, poolByName, setQuantity, deleteCard } from "@/lib/pool-client";
 import { ModalShell, ghostBtn, goldBtn, paperInput } from "./ui";
@@ -171,7 +172,7 @@ export default function ToolSheet({
           <textarea readOnly value={exportText} onFocus={(e) => e.currentTarget.select()} className="cc-paper" style={{ ...paperInput, minHeight: 220, fontFamily: "var(--font-mono, monospace)", fontSize: 13.5, resize: "vertical" }} />
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button onClick={onClose} style={ghostBtn}>Close</button>
-            <button onClick={copyExport} disabled={pool.length === 0} style={goldBtn}>{copied ? "Copied ✓" : "Copy to clipboard"}</button>
+            <button onClick={copyExport} disabled={pool.length === 0} style={goldBtn}>{copied ? <><Check size={15} strokeWidth={2.5} /> Copied</> : "Copy to clipboard"}</button>
           </div>
         </div>
       )}

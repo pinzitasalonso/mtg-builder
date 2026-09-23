@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ArrowUpRight, Check, ShoppingCart } from "lucide-react";
 import { PoolEntry } from "@/lib/pool-client";
 import { ModalShell, ghostBtn, goldBtn } from "./ui";
 
@@ -79,8 +80,8 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
   return (
     <ModalShell onDismiss={onClose} maxWidth={520}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)" }}>
-          Order on CardTrader 🛒
+        <h2 style={{ margin: 0, display: "flex", alignItems: "center", gap: 9, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)" }}>
+          <ShoppingCart size={22} strokeWidth={2} /> Order on CardTrader
         </h2>
         <button onClick={onClose} style={{ ...ghostBtn, padding: "6px 12px" }}>Close</button>
       </div>
@@ -99,7 +100,7 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
             or use the manual route:
           </p>
           <button onClick={copyAndOpen} style={goldBtn}>
-            {copied ? "✓ List copied — paste it there" : "Copy list & open Shop Optimizer"}
+            {copied ? <><Check size={15} strokeWidth={2.5} /> List copied — paste it there</> : "Copy list & open Shop Optimizer"}
           </button>
         </div>
       )}
@@ -110,7 +111,7 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
             {error}
           </div>
           <button onClick={copyAndOpen} style={ghostBtn}>
-            {copied ? "✓ List copied — paste it there" : "Copy list & open Shop Optimizer instead"}
+            {copied ? <><Check size={15} strokeWidth={2.5} /> List copied — paste it there</> : "Copy list & open Shop Optimizer instead"}
           </button>
         </div>
       )}
@@ -164,8 +165,8 @@ export default function OrderModal({ cards, onClose }: { cards: PoolEntry[]; onC
 
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button onClick={onClose} style={ghostBtn}>Close</button>
-            <a href={result.cartUrl} target="_blank" rel="noopener noreferrer" style={{ ...goldBtn, textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
-              Open cart ↗
+            <a href={result.cartUrl} target="_blank" rel="noopener noreferrer" style={{ ...goldBtn, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              Open cart <ArrowUpRight size={16} strokeWidth={2.25} />
             </a>
           </div>
         </div>

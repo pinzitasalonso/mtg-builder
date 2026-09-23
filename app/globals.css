@@ -943,7 +943,7 @@ button {
    and its tap-to-dismiss backdrop only exist where hover isn't available. */
 .cardlink-preview { display: none; }
 .cardlink-preview-backdrop { display: none; }
-@media (hover: none) {
+@media (any-pointer: coarse) {
   .cardlink-preview { display: inline; }
   .cardlink-preview-backdrop { display: block; }
 }
@@ -1053,6 +1053,9 @@ button {
   color: rgba(255, 255, 255, 0.7);
 }
 .pt-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: #fff;
@@ -1277,7 +1280,7 @@ button {
 .pt-zoom-backdrop {
   display: none;
 }
-@media (hover: none) {
+@media (any-pointer: coarse) {
   .pt-card-menu {
     opacity: 1;
   }
@@ -1293,7 +1296,10 @@ button {
   bottom: 4px;
   left: 4px;
   z-index: 2;
-  padding: 1px 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 5px;
   border-radius: 999px;
   background: var(--gold);
   color: var(--accent-ink);
@@ -1459,5 +1465,94 @@ button {
   .deck-tile-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 0 0 2px var(--gold), 0 10px 22px -14px rgba(0, 0, 0, 0.5) !important;
+  }
+}
+
+/* ── Icons and controls ────────────────────────────────────────────────
+   Icons are Lucide (lucide-react): one line style, currentColor, so they
+   take the button's colour. An icon inside a labelled control is decorative
+   (Lucide sets aria-hidden); an icon-only control carries aria-label. */
+
+/* Keyboard focus is always visible, on every control. */
+:where(button, a, [role="button"], input, select, textarea):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* A small press response on the app's buttons. */
+.id-btn:active:not(:disabled),
+.id-ghost:active:not(:disabled),
+.id-pill-gold:active:not(:disabled),
+.pt-btn:active:not(:disabled),
+.tile-action:active,
+.deck-action:active,
+.card-tile-remove:active {
+  transform: scale(0.97);
+}
+
+/* Tools menu rows: a hover wash for the mouse. */
+@media (hover: hover) and (pointer: fine) {
+  .tools-item:not(:disabled):hover {
+    background: var(--w-fill) !important;
+  }
+}
+
+/* Deck grid cards. The lift is for a real mouse only: on iPad Safari a tap
+   that changes how the page looks is swallowed, so nothing may change on
+   "hover" there. The remove button follows the same rule — hidden until
+   hover with a mouse, always shown on any device with a touch screen (an
+   iPad with a trackpad still has one). */
+.card-tile-remove {
+  width: 30px !important;
+  height: 30px !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  .card-tile:hover {
+    transform: translateY(-3px);
+  }
+  .card-tile:hover .card-tile-face {
+    box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.6) !important;
+  }
+  .card-tile .card-tile-remove {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .card-tile:hover .card-tile-remove,
+  .card-tile:focus-within .card-tile-remove {
+    opacity: 1;
+  }
+}
+@media (any-pointer: coarse) {
+  .card-tile .card-tile-remove {
+    opacity: 1 !important;
+  }
+}
+
+/* Swipe review's round buttons: the hover grow is for a real mouse only. */
+@media (hover: hover) and (pointer: fine) {
+  .sw-btn:hover {
+    transform: scale(1.08);
+    background: var(--sw-hover) !important;
+  }
+}
+.sw-btn:active {
+  transform: scale(0.95);
+}
+
+/* Collection tiles: −/+/remove appear on hover with a mouse and are always
+   shown on any device with a touch screen (same iPad rule as the deck grid). */
+@media (hover: hover) and (pointer: fine) {
+  .coll-tile-controls {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  :hover > .coll-tile-controls,
+  :focus-within > .coll-tile-controls {
+    opacity: 1;
+  }
+}
+@media (any-pointer: coarse) {
+  .coll-tile-controls {
+    opacity: 1 !important;
   }
 }

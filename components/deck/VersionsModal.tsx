@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { History, Trash2 } from "lucide-react";
 import { PoolEntry } from "@/lib/pool-client";
 import { DeckDiff, VersionCard, VersionSummary, diffDecklists, isEmptyDiff } from "@/lib/deck-diff";
 import { ModalShell, ghostBtn, goldBtn, paperInput } from "./ui";
@@ -91,8 +92,8 @@ export default function VersionsModal({
   return (
     <ModalShell onDismiss={onClose} maxWidth={560}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)" }}>
-          Versions 🕘
+        <h2 style={{ margin: 0, display: "flex", alignItems: "center", gap: 9, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "var(--frame-ink)" }}>
+          <History size={22} strokeWidth={2} /> Versions
         </h2>
         <button onClick={onClose} style={{ ...ghostBtn, padding: "6px 12px" }}>Close</button>
       </div>
@@ -147,8 +148,8 @@ export default function VersionsModal({
                   {busyId === v.id ? "…" : active ? "Comparing" : "Compare"}
                 </button>
                 {canEdit && (
-                  <button onClick={() => remove(v)} disabled={busyId === v.id} title="Delete version" aria-label="Delete version" style={{ ...ghostBtn, padding: "6px 10px", fontSize: 13, color: "var(--danger)" }}>
-                    ✕
+                  <button onClick={() => remove(v)} disabled={busyId === v.id} title="Delete version" aria-label="Delete version" style={{ ...ghostBtn, display: "inline-flex", alignItems: "center", padding: "6px 10px", fontSize: 13, color: "var(--danger)" }}>
+                    <Trash2 size={15} strokeWidth={2.25} />
                   </button>
                 )}
               </div>

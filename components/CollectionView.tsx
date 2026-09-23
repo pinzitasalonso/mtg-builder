@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Minus, Plus, Trash2, X } from "lucide-react";
 import { getIdentityTheme } from "@/lib/identity-theme";
 import {
   Collection,
@@ -234,7 +235,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
             Import
           </button>
           <button onClick={onClose} aria-label="Close collection" className="mn-ghost" style={{ padding: "9px 16px", fontSize: 14 }}>
-            ✕ Close
+            <X size={15} strokeWidth={2.5} /> Close
           </button>
         </div>
       </div>
@@ -473,10 +474,10 @@ function CollectionTile({
       <span style={{ position: "absolute", top: 7, left: 7, background: "rgba(13,138,95,.92)", color: "#fff", fontSize: 12, fontWeight: 800, padding: "1px 8px", borderRadius: 999, boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}>
         ×{busy ? "…" : quantity}
       </span>
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 6, padding: 6, background: "linear-gradient(transparent, rgba(0,0,0,.6))", opacity: hover ? 1 : 0, transition: "opacity .15s" }}>
-        <button onClick={onDec} disabled={busy} aria-label={`Remove one ${name}`} style={tileBtn}>−</button>
-        <button onClick={onInc} disabled={busy} aria-label={`Add one ${name}`} style={tileBtn}>+</button>
-        <button onClick={onDelete} disabled={busy} aria-label={`Remove all ${name}`} style={{ ...tileBtn, color: "#ff9b8a" }}>✕</button>
+      <div className="coll-tile-controls" style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 6, padding: 6, background: "linear-gradient(transparent, rgba(0,0,0,.6))" }}>
+        <button onClick={onDec} disabled={busy} aria-label={`Remove one ${name}`} style={tileBtn}><Minus size={15} strokeWidth={2.5} /></button>
+        <button onClick={onInc} disabled={busy} aria-label={`Add one ${name}`} style={tileBtn}><Plus size={15} strokeWidth={2.5} /></button>
+        <button onClick={onDelete} disabled={busy} aria-label={`Remove all ${name}`} style={{ ...tileBtn, color: "#ff9b8a" }}><Trash2 size={15} strokeWidth={2.25} /></button>
       </div>
     </div>
   );

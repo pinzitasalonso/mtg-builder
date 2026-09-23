@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { BarChart3, Crown, Dices, Ellipsis, RotateCw, Undo2, X, ZoomIn } from "lucide-react";
 import { CardArt } from "@/components/mtg";
 import { PoolEntry } from "@/lib/pool-client";
 import { hypergeometric, hypergeometricAtLeast } from "@/lib/probability";
@@ -201,7 +202,7 @@ export default function PlaytestModal({
     <div className="pt-root" role="dialog" aria-label="Playtest">
       <header className="pt-top">
         <div className="pt-title">
-          <span className="id-display" style={{ fontSize: 22, color: "#fff" }}>🎲 Playtest</span>
+          <span className="id-display" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 22, color: "#fff" }}><Dices size={21} strokeWidth={2} /> Playtest</span>
           <span className="pt-sub">
             from {sourceLabel} · {deckSize} cards · {landCount} lands
           </span>
@@ -211,10 +212,10 @@ export default function PlaytestModal({
           <LifeCounter label="Opp" value={state.oppLife} onDelta={(d) => act((s) => adjustLife(s, "opp", d))} />
           <LifeCounter label="You" value={state.life} onDelta={(d) => act((s) => adjustLife(s, "you", d))} />
           <button type="button" className="pt-btn" onClick={() => setOddsOpen(true)}>
-            Odds
+            <BarChart3 size={14} strokeWidth={2.25} /> Odds
           </button>
           <button type="button" className="pt-btn" onClick={onClose} aria-label="Close playtest">
-            ✕ Close
+            <X size={14} strokeWidth={2.5} /> Close
           </button>
         </div>
       </header>
@@ -224,7 +225,7 @@ export default function PlaytestModal({
           New game
         </button>
         <button type="button" className="pt-btn" onClick={undo} disabled={history.length === 0} title="Undo (⌘Z / Ctrl+Z)">
-          ↶ Undo
+          <Undo2 size={14} strokeWidth={2.25} /> Undo
         </button>
         <button type="button" className="pt-btn" onClick={() => act((s) => mulligan(s))} disabled={state.mulligans >= 6}>
           Mulligan{state.mulligans ? ` (${state.mulligans})` : ""}
@@ -233,7 +234,7 @@ export default function PlaytestModal({
           Draw
         </button>
         <button type="button" className="pt-btn" onClick={() => act(nextTurn)} title="Untap and draw (N)">
-          Next turn ⟳
+          Next turn <RotateCw size={14} strokeWidth={2.25} />
         </button>
         <button type="button" className="pt-btn" onClick={() => act(untapAll)} disabled={!state.battlefield.some((c) => c.tapped)} title="Untap all (U)">
           Untap all
@@ -393,8 +394,8 @@ function PtCard({
         <CardArt name={card.name} src={card.imageUri || undefined} prefer="src" version="normal" loading="lazy" radius={0} style={{ position: "absolute", inset: 0 }} />
       </div>
       {card.commander && (
-        <span className="pt-cmdr" title="Commander">
-          ★
+        <span className="pt-cmdr" title="Commander" aria-label="Commander">
+          <Crown size={12} strokeWidth={2.5} />
         </span>
       )}
       <button
@@ -406,7 +407,7 @@ function PtCard({
           onMenu(e.currentTarget.getBoundingClientRect(), card, zone);
         }}
       >
-        ⋯
+        <Ellipsis size={16} strokeWidth={2.5} />
       </button>
       <button
         type="button"
@@ -417,7 +418,7 @@ function PtCard({
           onZoom(card, zone, e.currentTarget.getBoundingClientRect());
         }}
       >
-        🔍
+        <ZoomIn size={15} strokeWidth={2.25} />
       </button>
     </div>
   );

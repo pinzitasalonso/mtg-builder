@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, CircleCheck, Info, SkipForward, Sparkles, X, type LucideIcon } from "lucide-react";
 import { ClassicCard } from "@/components/mtg";
 import { fetchUsdPrice } from "@/lib/scryfall";
 
@@ -32,7 +33,7 @@ const VARIANTS = {
     hint: "← skip · → add to pool",
     passLabel: "skip this card",
     addLabel: "add to pool",
-    doneIcon: "✦",
+    doneIcon: Sparkles as LucideIcon,
     doneTitle: (acted: number) => `Added ${acted} card${acted === 1 ? "" : "s"} to the pool`,
     doneSub: (_passed: number, _skipped: number) => "That is the end of this batch.",
     hasPass: false,
@@ -40,10 +41,10 @@ const VARIANTS = {
   },
   review: {
     eyebrow: "Review Pool",
-    hint: "← remove from pool · ↷ skip · → add to deck",
+    hint: "← remove from pool · ↓ skip · → add to deck",
     passLabel: "remove from pool",
     addLabel: "add to deck",
-    doneIcon: "✓",
+    doneIcon: CircleCheck as LucideIcon,
     doneTitle: (acted: number) => `Moved ${acted} card${acted === 1 ? "" : "s"} to the deck`,
     doneSub: (passed: number, skipped: number) =>
       [
@@ -60,7 +61,7 @@ const VARIANTS = {
     hint: "← remove from deck · → keep",
     passLabel: "remove from deck",
     addLabel: "keep in deck",
-    doneIcon: "✓",
+    doneIcon: CircleCheck as LucideIcon,
     doneTitle: (acted: number) => `Kept ${acted} card${acted === 1 ? "" : "s"}`,
     doneSub: (passed: number, _skipped: number) =>
       passed > 0 ? `Removed ${passed} card${passed === 1 ? "" : "s"} from the deck.` : "You reviewed the whole deck.",
@@ -270,7 +271,7 @@ export default function SwipeModal<T extends SwipeCard>({
           style={{ width: 40, height: 40, borderRadius: 999, cursor: "pointer", color: "var(--t2)", fontSize: 15, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
           aria-label="Close"
         >
-          ✕
+          <X size={18} strokeWidth={2.25} />
         </button>
       </div>
 
@@ -310,7 +311,7 @@ export default function SwipeModal<T extends SwipeCard>({
         )}
         {done ? (
           <div style={{ textAlign: "center", animation: "sp-pop .35s ease" }}>
-            <div style={{ fontSize: 40, color: "var(--accent)", marginBottom: 6 }}>{copy.doneIcon}</div>
+            <div style={{ color: "var(--accent)", marginBottom: 8, display: "flex", justifyContent: "center" }}><copy.doneIcon size={40} strokeWidth={1.75} /></div>
             <div style={{ fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 600, color: "var(--text)" }}>
               {copy.doneTitle(acted)}
             </div>
@@ -428,20 +429,18 @@ function CardFace({ card }: { card: SwipeCard }) {
 
 function SwBtn({ kind, onClick, size, label }: { kind: "skip" | "info" | "add" | "later"; onClick?: () => void; size?: number; label?: string }) {
   const cfg = {
-    skip: { ic: "✕", color: "#c2402a", size: 58 },
-    info: { ic: "i", color: "#9a9aa2", size: 46 },
+    skip: { ic: X, color: "#c2402a", size: 58 },
+    info: { ic: Info, color: "#9a9aa2", size: 46 },
     // Grey and small, like info: skipping is not a verdict on the card, and a
     // third coloured circle beside Remove and Add would read as one.
-    later: { ic: "\u21b7", color: "#9a9aa2", size: 46 },
-    add: { ic: "\u2726", color: "#0d8a5f", size: 58 },
+    later: { ic: SkipForward, color: "#9a9aa2", size: 46 },
+    add: { ic: Check, color: "#0d8a5f", size: 58 },
   }[kind];
   const dim = size ?? cfg.size;
-  const [h, setH] = useState(false);
   return (
     <button
+      className="sw-btn"
       onClick={onClick}
-      onMouseEnter={() => setH(true)}
-      onMouseLeave={() => setH(false)}
       aria-label={label ?? (kind === "later" ? "skip for now" : kind)}
       title={label ?? (kind === "later" ? "Skip \u2014 leave it in the pool" : undefined)}
       style={{
@@ -450,20 +449,18 @@ function SwBtn({ kind, onClick, size, label }: { kind: "skip" | "info" | "add" |
         borderRadius: "50%",
         cursor: "pointer",
         border: "none",
-        background: h ? `${cfg.color}14` : "var(--bg2)",
+        background: "var(--bg2)",
+        ["--sw-hover" as string]: `${cfg.color}14`,
         color: cfg.color,
-        fontSize: dim * 0.36,
-        fontFamily: kind === "info" ? "var(--font-display)" : "inherit",
-        
+
         boxShadow: `inset 0 0 0 2px ${cfg.color}55, 0 4px 12px rgba(21,21,26,.12)`,
-        transform: h ? "scale(1.08)" : "scale(1)",
-        transition: "transform .15s, background .15s",
+        transition: "transform .15s ease-out, background .15s ease",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      {cfg.ic}
+      <cfg.ic size={Math.round(dim * 0.42)} strokeWidth={2.5} />
     </button>
   );
 }

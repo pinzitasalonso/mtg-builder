@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { Check, Ticket } from "lucide-react";
 import { ModalShell, ghostBtn, goldBtn } from "./ui";
 
 /* Mint a "seat me at your table" game code for this deck. A friend types it
@@ -52,8 +53,8 @@ export default function GameCodeModal({
   return (
     <ModalShell onDismiss={onClose} maxWidth={460}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, color: "var(--w-1)" }}>
-          Game code 🎟
+        <h2 style={{ margin: 0, display: "flex", alignItems: "center", gap: 9, fontFamily: "var(--font-display)", fontSize: 24, color: "var(--w-1)" }}>
+          <Ticket size={22} strokeWidth={2} /> Game code
         </h2>
         <button onClick={onClose} style={{ ...ghostBtn, padding: "6px 12px" }}>Close</button>
       </div>
@@ -79,7 +80,7 @@ export default function GameCodeModal({
                 setCopied(true);
               }}
             >
-              {copied ? "Copied ✓" : "Copy code"}
+              {copied ? <><Check size={15} strokeWidth={2.5} /> Copied</> : "Copy code"}
             </button>
           )}
         </div>

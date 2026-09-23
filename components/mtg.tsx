@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type CSSProperties } from "react";
+import { ArrowDownToLine, ArrowUpToLine, TriangleAlert, X } from "lucide-react";
 
 /* ---------- mana / color palette ---------- */
 /* Flat colored mana discs with a white glyph cut-out (white uses a dark glyph),
@@ -791,7 +792,7 @@ export function ClassicCard({
             boxShadow: "0 2px 6px rgba(21,21,26,.18)",
           }}
         >
-          ⚠
+          <TriangleAlert size={13} strokeWidth={2.5} />
         </div>
       )}
 
@@ -851,7 +852,7 @@ export function ClassicCard({
             whiteSpace: "nowrap",
           }}
         >
-          {moveLabel?.startsWith("Move to deck") ? "⇧" : "⇩"}
+          {moveLabel?.startsWith("Move to deck") ? <ArrowUpToLine size={14} strokeWidth={2.25} /> : <ArrowDownToLine size={14} strokeWidth={2.25} />}
         </button>
       )}
 
@@ -882,118 +883,7 @@ export function ClassicCard({
           }}
           aria-label="Remove"
         >
-          ✕
-        </button>
-      )}
-    </div>
-  );
-}
-
-/* Compact list row — parchment ledger line. */
-export function ClassicRow({
-  card,
-  onRemove,
-  onClick,
-  quantity,
-  warning,
-  onMove,
-  moveLabel,
-}: {
-  card: FrameCard;
-  onRemove?: () => void;
-  onClick?: () => void;
-  quantity?: number;
-  warning?: string | null;
-  onMove?: () => void;
-  moveLabel?: string;
-}) {
-  const [hover, setHover] = useState(false);
-  return (
-    <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      onClick={onClick}
-      style={{
-        display: "grid",
-        gridTemplateColumns: onMove ? "30px 1fr auto auto auto 16px" : "30px 1fr auto auto 16px",
-        alignItems: "center",
-        gap: 11,
-        padding: "6px 10px 6px 7px",
-        borderRadius: 5,
-        cursor: onClick ? "pointer" : "default",
-        background: hover ? "rgba(21,21,26,.04)" : "transparent",
-        boxShadow: hover ? "inset 0 0 0 1px var(--line)" : "none",
-        transition: "background .12s",
-      }}
-    >
-      <div className="cc-art" style={{ width: 30, height: 30, borderRadius: 4 }}>
-        <CardArt name={card.name} src={card.imageUri || undefined} colors={colorsOf(card.manaCost)} radius={0} style={{ position: "absolute", inset: 0 }} />
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontFamily: "var(--font-ui)", fontWeight: 700, fontSize: 16, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.15 }}>
-          {warning && (
-            <span title={warning} style={{ color: "var(--danger)", marginRight: 6, cursor: "help" }}>⚠</span>
-          )}
-          {card.name}
-        </div>
-        <div style={{ fontSize: 12.5, fontStyle: "normal", color: "var(--text-dim)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {card.typeLine}
-        </div>
-      </div>
-      {quantity && quantity > 1 ? (
-        <span style={{ fontFamily: "var(--font-display)", fontWeight: 700, fontSize: 13, color: "var(--gold)" }}>×{quantity}</span>
-      ) : (
-        <span />
-      )}
-      <ManaCost cost={card.manaCost} size={15} />
-      {onMove && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onMove();
-          }}
-          title={moveLabel}
-          aria-label={moveLabel}
-          style={{
-            height: 22,
-            padding: "0 8px",
-            borderRadius: 6,
-            border: "none",
-            cursor: "pointer",
-            background: "var(--bg3)",
-            color: "var(--gold)",
-            fontSize: 12,
-            fontWeight: 700,
-            opacity: hover ? 1 : 0,
-            transition: "opacity .12s",
-            boxShadow: "inset 0 0 0 1px var(--line)",
-          }}
-        >
-          {moveLabel?.startsWith("Move to deck") ? "⇧" : "⇩"}
-        </button>
-      )}
-      {onRemove && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          style={{
-            width: 16,
-            height: 16,
-            borderRadius: 4,
-            border: "none",
-            cursor: "pointer",
-            padding: 0,
-            background: "transparent",
-            color: "var(--text-dim)",
-            opacity: hover ? 1 : 0,
-            transition: "opacity .12s",
-            fontSize: 11,
-          }}
-          aria-label="Remove"
-        >
-          ✕
+          <X size={14} strokeWidth={2.5} />
         </button>
       )}
     </div>
