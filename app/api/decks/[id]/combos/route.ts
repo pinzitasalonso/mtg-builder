@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
+import { accessibleDeckByPublicId, currentUser, viewableDeckByPublicId } from "@/lib/auth";
 import { findCombos } from "@/lib/combos";
 
 export const runtime = "nodejs";
@@ -18,7 +18,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
+  const deck = await viewableDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
 
   const rows = await prisma.poolCard.findMany({

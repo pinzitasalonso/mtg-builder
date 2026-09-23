@@ -1441,3 +1441,30 @@ button {
     flex-basis: 100%;
   }
 }
+
+/* Home header on a phone: the email goes first, then the plan meter, so
+   Sign out and New deck always fit on one line. */
+@media (max-width: 640px) {
+  .home-email { display: none; }
+}
+@media (max-width: 480px) {
+  .home-meter { display: none; }
+}
+
+/* Deck-tile actions (pin, duplicate, delete): shown on hover or keyboard
+   focus of the tile, always on touch screens (no hover there), and a pinned
+   pin always stays visible. */
+.deck-tile .tile-action {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.deck-tile:hover .tile-action,
+.deck-tile:focus-within .tile-action,
+.deck-tile .tile-action[data-on="true"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .deck-tile .tile-action {
+    opacity: 1;
+  }
+}

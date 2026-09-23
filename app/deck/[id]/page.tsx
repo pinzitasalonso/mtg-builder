@@ -995,7 +995,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
             {/* commander showcase + progress badge */}
             <div style={{ display: "flex", justifyContent: "center" }}>
-              <div style={{ position: "relative", width: "min(280px, 78vw)" }}>
+              <div style={{ position: "relative", width: "min(280px, 54vw)" }}>
                 <div style={{ aspectRatio: "5 / 7", borderRadius: 16, overflow: "hidden", boxShadow: "0 30px 60px -24px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.1)" }}>
                   {(deck?.commander || deck?.name) && (
                     <CardArt
@@ -1837,8 +1837,8 @@ const poolIconBtn: React.CSSProperties = {
 };
 
 const tileQtyBtn: React.CSSProperties = {
-  width: 20,
-  height: 20,
+  width: 26,
+  height: 26,
   borderRadius: "50%",
   border: "none",
   cursor: "pointer",
@@ -1858,7 +1858,9 @@ const tileQtyBtn: React.CSSProperties = {
    rather than squinted at. */
 const deckTileGrid: React.CSSProperties = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(168px, 1fr))",
+  // Three per row at least, so a phone shows a deck rather than a column of
+  // single cards; 168px wide once there's room for it.
+  gridTemplateColumns: "repeat(auto-fill, minmax(min(168px, calc(33.33% - 10px)), 1fr))",
   gap: 14,
 };
 

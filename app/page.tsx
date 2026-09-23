@@ -161,6 +161,7 @@ export default function HomePage() {
     const spent = typeof me.deckLimit === "number" && decks.length >= me.deckLimit;
     return (
       <span
+        className="home-meter"
         title="Free plan. Spellpool Pro in the iOS app lifts both limits."
         style={{
           fontSize: 11.5,
@@ -252,7 +253,7 @@ export default function HomePage() {
                   // two figures in Account and beside the assistant's input.
                   planMeter
                 )}
-                <span title={me.email} style={{ fontSize: 13, color: "var(--t3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <span className="home-email" title={me.email} style={{ fontSize: 13, color: "var(--t3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {me.email}
                 </span>
                 <button onClick={signOut} className="id-ghost" style={{ padding: "9px 16px" }}>Sign out</button>
@@ -362,7 +363,17 @@ export default function HomePage() {
       )}
 
       {/* PUBLIC BREWS — color-identity showcase */}
-      <div id="brews" style={{ background: "#150e52", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px) clamp(72px,8vw,112px)", flex: 1 }}>
+      <div
+        id="brews"
+        style={{
+          // Always navy, so the text uses the light set whatever the page theme —
+          // in light mode the inherited dark tokens were unreadable here.
+          ["--t1" as string]: "#ffffff",
+          ["--t2" as string]: "rgba(255,255,255,.72)",
+          ["--t3" as string]: "rgba(255,255,255,.6)",
+          ["--border" as string]: "rgba(255,255,255,.28)",
+          ["--surface" as string]: "rgba(255,255,255,.06)",
+          background: "#150e52", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px) clamp(72px,8vw,112px)", flex: 1 }}>
         <div style={{ maxWidth: 1180, margin: "0 auto" }}>
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 40, flexWrap: "wrap" }}>
             <div>
@@ -371,7 +382,7 @@ export default function HomePage() {
                 Decks the pool is talking about.
               </h2>
             </div>
-            <button className="id-pill-gold" style={{ padding: "11px 20px" }} onClick={() => setShowModal(true)}>New brew →</button>
+            <button className="id-pill-gold" style={{ padding: "11px 20px", background: "#fdf26f", color: "#181228", borderColor: "transparent" }} onClick={() => setShowModal(true)}>New brew →</button>
           </div>
           <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
         </div>
@@ -619,11 +630,9 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
   const pct = Math.min(1, count / Math.max(1, target));
   return (
     <Reveal delay={60 + Math.min(index, 8) * 50}>
-      <div style={{ position: "relative" }}>
+      <div className="deck-tile" style={{ position: "relative" }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
         <button
           onClick={onOpen}
-          onMouseEnter={() => setHover(true)}
-          onMouseLeave={() => setHover(false)}
           style={{
             textAlign: "left",
             cursor: "pointer",
@@ -660,7 +669,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
                 padding: "3px 8px",
                 borderRadius: 6,
                 textTransform: "capitalize",
-                opacity: hover ? 0 : 1,
+                opacity: hover || deck.pinned ? 0 : 1,
                 transition: "opacity .15s",
               }}
             >
@@ -688,25 +697,25 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
         {/* Pin: always visible once pinned, so the top of the list reads as
             chosen; hover-only otherwise, like the other tile actions. */}
         {onPin && <button
+          className="tile-action"
           onClick={(e) => { e.stopPropagation(); onPin(); }}
           title={deck.pinned ? "Unpin deck" : "Pin deck to the top"}
           aria-label={deck.pinned ? "Unpin deck" : "Pin deck to the top"}
           aria-pressed={Boolean(deck.pinned)}
+          data-on={deck.pinned ? "true" : undefined}
           style={{
             position: "absolute",
             top: 10,
-            right: 74,
-            width: 24,
-            height: 24,
+            right: 86,
+            width: 30,
+            height: 30,
             borderRadius: 8,
             border: "none",
             cursor: "pointer",
             background: deck.pinned ? "var(--gold)" : "rgba(0,0,0,.5)",
             color: deck.pinned ? "var(--accent-ink)" : "#fff",
             fontSize: 12,
-            opacity: hover || deck.pinned ? 1 : 0,
-            transition: "opacity .15s",
-            display: "flex",
+                        display: "flex",
             alignItems: "center",
             justifyContent: "center",
             zIndex: 2,
@@ -715,24 +724,23 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
           📌
         </button>}
         <button
+          className="tile-action"
           onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
           title="Duplicate deck"
           aria-label="Duplicate deck"
           style={{
             position: "absolute",
             top: 10,
-            right: 42,
-            width: 24,
-            height: 24,
+            right: 48,
+            width: 30,
+            height: 30,
             borderRadius: 8,
             border: "none",
             cursor: "pointer",
             background: "rgba(0,0,0,.5)",
             color: "#fff",
             fontSize: 12,
-            opacity: hover ? 1 : 0,
-            transition: "opacity .15s",
-            display: "flex",
+                        display: "flex",
             alignItems: "center",
             justifyContent: "center",
             zIndex: 2,
@@ -741,6 +749,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
           ⧉
         </button>
         <button
+          className="tile-action"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
           title="Delete deck"
           aria-label="Delete deck"
@@ -748,17 +757,15 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             position: "absolute",
             top: 10,
             right: 10,
-            width: 24,
-            height: 24,
+            width: 30,
+            height: 30,
             borderRadius: 8,
             border: "none",
             cursor: "pointer",
             background: "rgba(0,0,0,.5)",
             color: "#fff",
             fontSize: 11,
-            opacity: hover ? 1 : 0,
-            transition: "opacity .15s",
-            display: "flex",
+                        display: "flex",
             alignItems: "center",
             justifyContent: "center",
             zIndex: 2,
