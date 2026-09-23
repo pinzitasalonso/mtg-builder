@@ -1,4 +1,8 @@
+"use client";
+
 // Shared styles & small primitives for the deck screen and its modals.
+
+import { useEffect, useRef } from "react";
 
 export const paperInput: React.CSSProperties = {
   flex: 1,
@@ -38,6 +42,10 @@ export const toolBtn: React.CSSProperties = {
   fontSize: 14,
   fontWeight: 600,
   textAlign: "center",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
 };
 
 export const ghostBtn: React.CSSProperties = {
@@ -105,24 +113,61 @@ export function ErrorNote({ children }: { children: React.ReactNode }) {
   );
 }
 
-// Flat white modal scaffold shared by the deck dialogs.
+// Open shells, oldest first. Only the top one answers Esc, so a sheet opened
+// from a modal closes on its own.
+const openShells: symbol[] = [];
+
+// Flat white modal scaffold shared by the deck dialogs. It is a real dialog:
+// Esc closes it, the page behind stops scrolling, and focus goes back to
+// whatever opened it.
 export function ModalShell({
   onDismiss,
   maxWidth,
   zIndex = 72,
+  labelledBy,
   children,
 }: {
   onDismiss: () => void;
   maxWidth: number;
   zIndex?: number;
+  labelledBy?: string;
   children: React.ReactNode;
 }) {
+  const dismiss = useRef(onDismiss);
+  useEffect(() => {
+    dismiss.current = onDismiss;
+  });
+
+  useEffect(() => {
+    const id = Symbol("modal");
+    openShells.push(id);
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      // A child that used Esc itself (a suggestion list) marks it handled.
+      if (e.key !== "Escape" || e.defaultPrevented || openShells[openShells.length - 1] !== id) return;
+      e.preventDefault();
+      dismiss.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      openShells.splice(openShells.indexOf(id), 1);
+      if (openShells.length === 0) document.body.style.overflow = overflow;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
+    };
+  }, []);
+
   return (
     <div
       style={{ position: "fixed", inset: 0, background: "rgba(8,6,11,.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex, animation: "sp-fade .15s ease" }}
       onClick={(e) => e.target === e.currentTarget && onDismiss()}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={labelledBy}
         style={{
           background: "var(--bg)",
           borderRadius: 20,
@@ -134,7 +179,7 @@ export function ModalShell({
           animation: "sp-pop .18s ease",
         }}
       >
-        <div style={{ padding: "24px 26px 26px", overflowY: "auto", width: "100%" }}>{children}</div>
+        <div style={{ padding: "24px 26px 26px", overflowY: "auto", overscrollBehavior: "contain", width: "100%" }}>{children}</div>
       </div>
     </div>
   );
