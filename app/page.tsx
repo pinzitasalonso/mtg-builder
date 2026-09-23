@@ -622,7 +622,6 @@ function DeckTable({
 }
 
 function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void; onDuplicate: () => void; onPin?: () => void }) {
-  const [hover, setHover] = useState(false);
   const colors = deck.colors?.length ? deck.colors : ["C"];
   const field = getIdentityField(colors.join(""));
   const count = deck._count?.cards || 0;
@@ -630,8 +629,9 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
   const pct = Math.min(1, count / Math.max(1, target));
   return (
     <Reveal delay={60 + Math.min(index, 8) * 50}>
-      <div className="deck-tile" style={{ position: "relative" }} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <div className="deck-tile" style={{ position: "relative" }}>
         <button
+          className="deck-tile-card"
           onClick={onOpen}
           style={{
             textAlign: "left",
@@ -644,10 +644,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             position: "relative",
             color: "#fff",
             background: `linear-gradient(165deg, ${field.bg}, ${field.deep})`,
-            boxShadow: hover
-              ? "0 0 0 2px var(--gold), 0 10px 22px -14px rgba(0,0,0,.5)"
-              : "0 3px 8px -2px rgba(0,0,0,.28)",
-            transform: hover ? "translateY(-4px)" : "none",
+            boxShadow: "0 3px 8px -2px rgba(0,0,0,.28)",
             transition: "transform .2s, box-shadow .2s",
           }}
         >
@@ -660,7 +657,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             <span
               style={{
                 position: "absolute",
-                top: 13,
+                bottom: 10,
                 right: 14,
                 fontFamily: "var(--font-mono)",
                 fontSize: 11,
@@ -669,8 +666,6 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
                 padding: "3px 8px",
                 borderRadius: 6,
                 textTransform: "capitalize",
-                opacity: hover || deck.pinned ? 0 : 1,
-                transition: "opacity .15s",
               }}
             >
               {deck.format}
@@ -694,8 +689,8 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             </div>
           </div>
         </button>
-        {/* Pin: always visible once pinned, so the top of the list reads as
-            chosen; hover-only otherwise, like the other tile actions. */}
+        {/* Pin: gold once pinned, so the top of the list reads as
+            chosen. All three actions are always visible (see .deck-tile-card). */}
         {onPin && <button
           className="tile-action"
           onClick={(e) => { e.stopPropagation(); onPin(); }}
