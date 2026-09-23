@@ -4,15 +4,18 @@ import { useState, type CSSProperties } from "react";
 import { ArrowDownToLine, ArrowUpToLine, TriangleAlert, X } from "lucide-react";
 
 /* ---------- mana / color palette ---------- */
-/* Flat colored mana discs with a white glyph cut-out (white uses a dark glyph),
-   matching the Color Identity design's saturated disc set. */
-export const MANA: Record<string, { bg: string; fg: string; ring: string }> = {
-  W: { bg: "#efe6c2", fg: "#7a6a32", ring: "rgba(0,0,0,.10)" },
-  U: { bg: "#3a82d8", fg: "#ffffff", ring: "rgba(0,0,0,.10)" },
-  B: { bg: "#6f5f7e", fg: "#ffffff", ring: "rgba(0,0,0,.10)" },
-  R: { bg: "#e0573f", fg: "#ffffff", ring: "rgba(0,0,0,.10)" },
-  G: { bg: "#4e9e6a", fg: "#ffffff", ring: "rgba(0,0,0,.10)" },
-  C: { bg: "#b6bcc6", fg: "#ffffff", ring: "rgba(0,0,0,.10)" },
+/* Mana discs: a soft top-lit gradient from `hi` to `bg`, with the glyph in
+   `fg`. The hues follow the deck identity grounds (lib/identity-theme.ts), a
+   step brighter so a disc still reads on its own color's page. `bg` is also
+   the flat fill for bars and charts. White and colorless are light discs with
+   a dark glyph, as on the printed cards. */
+export const MANA: Record<string, { bg: string; hi: string; fg: string; ring: string }> = {
+  W: { bg: "#ecd9a0", hi: "#fbf3d9", fg: "#8a6410", ring: "rgba(90,64,8,.22)" },
+  U: { bg: "#4a4ff0", hi: "#7d8bff", fg: "#ffffff", ring: "rgba(20,16,90,.35)" },
+  B: { bg: "#3a3441", hi: "#5f5769", fg: "#efe9f5", ring: "rgba(0,0,0,.4)" },
+  R: { bg: "#dc4a31", hi: "#f57b5a", fg: "#ffffff", ring: "rgba(90,20,8,.35)" },
+  G: { bg: "#2f8350", hi: "#4fb274", fg: "#ffffff", ring: "rgba(8,50,24,.35)" },
+  C: { bg: "#bdb8c4", hi: "#e6e3ea", fg: "#2d2934", ring: "rgba(20,16,28,.22)" },
 };
 export const COLOR_NAME: Record<string, string> = {
   W: "White",
@@ -50,96 +53,143 @@ export function colorsOf(manaCost: string | null | undefined): string[] {
 }
 
 /* ---------- pips ---------- */
-/* Stylized-minimal MTG mana glyphs — cut in the page background color so they
-   read as cut-outs on the colored discs. */
+/* The five mana glyphs plus colorless and Phyrexian, drawn on one 24-unit grid
+   so they share weight and optical size. Each is a single filled path; holes
+   (the skull's eyes, the flame's core) are even-odd cut-outs, so a glyph shows
+   whatever sits behind it rather than a painted-on disc color. */
+const GLYPH_PATHS: Record<string, string> = {
+  // Sun: a disc with eight tapered rays, long and short in turn.
+  W: (() => {
+    let d = "M12 8.3a3.7 3.7 0 1 1 0 7.4a3.7 3.7 0 1 1 0-7.4Z";
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4 - Math.PI / 2;
+      const tip = i % 2 ? 8 : 9.6;
+      const r0 = 5.1, w = i % 2 ? 0.95 : 1.25;
+      const p = (r: number, off: number) => {
+        const x = 12 + r * Math.cos(a) - off * Math.sin(a);
+        const y = 12 + r * Math.sin(a) + off * Math.cos(a);
+        return `${x.toFixed(2)} ${y.toFixed(2)}`;
+      };
+      d += `M${p(r0, -w)}L${p(tip, 0)}L${p(r0, w)}Z`;
+    }
+    return d;
+  })(),
+  // Water drop, with a small highlight cut from its left flank.
+  U: "M12 2.8C12 2.8 18.4 9.9 18.4 14.3A6.4 6.4 0 0 1 5.6 14.3C5.6 9.9 12 2.8 12 2.8Z M8.6 14.2c0 1.5.8 2.8 2 3.4c-.5-.9-.7-2-.6-3.2c.1-1.3.6-2.6 1.3-3.8c-1.6 1-2.7 2.2-2.7 3.6Z",
+  // Skull: cranium and jaw, eyes and nose cut out.
+  B: "M12 3.3C7.8 3.3 4.8 6.3 4.8 10.3c0 2.4 1.1 4.2 2.8 5.3v2.6c0 .9.7 1.6 1.6 1.6h5.6c.9 0 1.6-.7 1.6-1.6v-2.6c1.7-1.1 2.8-2.9 2.8-5.3C19.2 6.3 16.2 3.3 12 3.3Z M7.3 11a2 2 0 1 0 4 0a2 2 0 1 0-4 0Z M12.7 11a2 2 0 1 0 4 0a2 2 0 1 0-4 0Z M12 13.6l1.1 2.1h-2.2Z",
+  // Fireball: a leaping flame with its hot core cut out.
+  R: "M12.4 2.6C13.1 5.9 16.9 7.7 17.9 11.6C18.9 15.7 16 20.2 12 20.2C8 20.2 5.2 17.1 5.6 13.3C5.9 10.6 7.7 9.1 8.6 7.3C9.1 8.8 9.5 9.9 10.5 10.8C10.2 7.7 11.2 5 12.4 2.6Z M12 18.4C10.4 18.4 9.2 17.2 9.3 15.6C9.4 14 10.8 13.1 11.3 11.7C12.3 13 14.8 14.2 14.7 16.1C14.6 17.4 13.4 18.4 12 18.4Z",
+  // Tree: a rounded canopy on a flared trunk.
+  G: "M12 3.1c2.3 0 4.1 1.6 4.4 3.7c1.7.6 2.9 2.2 2.9 4.1c0 2.4-1.9 4.3-4.3 4.3H13.2v2.9l1.9 1.6H8.9l1.9-1.6v-2.9H9c-2.4 0-4.3-1.9-4.3-4.3c0-1.9 1.2-3.5 2.9-4.1C7.9 4.7 9.7 3.1 12 3.1Z",
+  // Colorless: a hollow diamond.
+  C: "M12 3.2L19.2 12L12 20.8L4.8 12Z M12 7.4L8.2 12L12 16.6L15.8 12Z",
+  // Phyrexian: a ring struck through by a bar.
+  P: "M12 5.6a6.4 6.4 0 1 1 0 12.8a6.4 6.4 0 1 1 0-12.8Z M12 7.6a4.4 4.4 0 1 0 0 8.8a4.4 4.4 0 1 0 0-8.8Z M11 2.8h2v18.4h-2Z",
+};
+
 export function ManaGlyph({ type, color, size }: { type: string; color: string; size: number }) {
-  let body: React.ReactNode;
-  switch (type) {
-    case "W": // sun
-      body = (
-        <g fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
-          <circle cx="12" cy="12" r="3.6" fill={color} stroke="none" />
-          {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
-            const r = (a * Math.PI) / 180;
-            return (
-              <line
-                key={a}
-                x1={12 + 6.2 * Math.cos(r)}
-                y1={12 + 6.2 * Math.sin(r)}
-                x2={12 + 8.6 * Math.cos(r)}
-                y2={12 + 8.6 * Math.sin(r)}
-              />
-            );
-          })}
-        </g>
-      );
-      break;
-    case "U": // water drop
-      body = <path fill={color} d="M12 3.2c2.6 4 5.6 7.2 5.6 10.4a5.6 5.6 0 1 1-11.2 0C6.4 10.4 9.4 7.2 12 3.2z" />;
-      break;
-    case "B": // skull
-      body = (
-        <g fill={color}>
-          <path d="M12 3.6a6.6 6.6 0 0 0-6.6 6.6c0 2.5 1.2 4.3 2.7 5.4v3h7.8v-3c1.5-1.1 2.7-2.9 2.7-5.4A6.6 6.6 0 0 0 12 3.6z" />
-          <circle cx="9.4" cy="10.6" r="1.7" fill={MANA.B.bg} />
-          <circle cx="14.6" cy="10.6" r="1.7" fill={MANA.B.bg} />
-          <path d="M12 12.6l1.2 2.2h-2.4z" fill={MANA.B.bg} />
-        </g>
-      );
-      break;
-    case "R": // flame
-      body = (
-        <path
-          fill={color}
-          d="M12.6 3.4c.3 2.9-2.1 4.5-3.4 6.3-1.2 1.7-1.6 3.6-.9 5.5a5.9 5.9 0 0 0 3 3.3c-.7-1.2-.8-2.5-.2-3.7.5-1 1.4-1.7 1.8-2.8.8 1 1.9 2 2.4 3.3.4 1.1.3 2.3-.3 3.2a5.9 5.9 0 0 0 3.2-5.2c0-2.4-1.6-4-3-5.5-1.2-1.3-2.4-2.6-2.6-4.4z"
-        />
-      );
-      break;
-    case "G": // tree
-      body = (
-        <g fill={color}>
-          <path d="M12 3.6l4.6 6.4h-2.4l3.4 5H6.4l3.4-5H7.4L12 3.6z" />
-          <rect x="10.9" y="14.6" width="2.2" height="4" rx="1" />
-        </g>
-      );
-      break;
-    default: // colorless — diamond
-      body = <path fill={color} d="M12 4.5L18.5 12 12 19.5 5.5 12z" />;
-  }
+  const d = GLYPH_PATHS[type] ?? GLYPH_PATHS.C;
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: "block" }} aria-hidden="true">
-      {body}
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: "block", flex: "none" }} aria-hidden="true">
+      <path d={d} fill={color} fillRule={type === "G" || type === "P" ? "nonzero" : "evenodd"} />
     </svg>
   );
 }
 
 const GLYPHS = new Set(["W", "U", "B", "R", "G", "C"]);
+const disc = (k: string) => `linear-gradient(160deg, ${MANA[k].hi}, ${MANA[k].bg} 72%)`;
 
+/** How a mana symbol reads aloud: "{2/W}" → "two generic or white". */
+export function symbolName(sym: string): string {
+  const one = (p: string) =>
+    COLOR_NAME[p]?.toLowerCase() ?? (p === "P" ? "Phyrexian" : /^\d+$/.test(p) ? `${p} generic` : p === "S" ? "snow" : p);
+  const parts = sym.split("/");
+  if (parts.includes("P")) return `Phyrexian ${parts.filter((p) => p !== "P").map(one).join(" or ")}`;
+  return parts.map(one).join(" or ");
+}
+
+/** One mana symbol: a color disc with its glyph, a gray disc with a number,
+ *  a split disc for hybrid, or a color disc with the Phyrexian mark. */
 export function Pip({ sym, size = 18 }: { sym: string; size?: number }) {
-  const key = sym.length === 1 && MANA[sym] ? sym : "C";
+  const parts = sym.split("/");
+  const phyrexian = parts.includes("P");
+  const colors = parts.filter((p) => p !== "P");
+  const base: CSSProperties = {
+    position: "relative",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: size,
+    height: size,
+    borderRadius: "50%",
+    flex: "none",
+    overflow: "hidden",
+    lineHeight: 1,
+  };
+  const label = symbolName(sym);
+
+  // Hybrid ({W/U}, {2/W}): split on the diagonal, a half-size mark in each half.
+  if (colors.length === 2) {
+    const [a, b] = colors.map((c) => (MANA[c] ? c : "C"));
+    const mark = (p: string, k: string, pos: CSSProperties) => (
+      <span style={{ position: "absolute", ...pos, display: "flex" }}>
+        {GLYPHS.has(p) ? (
+          <ManaGlyph type={p} color={MANA[k].fg} size={size * 0.46} />
+        ) : (
+          <span style={{ fontSize: size * 0.42, fontWeight: 800, color: MANA[k].fg, fontFamily: "var(--font-ui)", display: "block", lineHeight: 1 }}>{p}</span>
+        )}
+      </span>
+    );
+    return (
+      <span
+        role="img"
+        aria-label={label}
+        title={label}
+        style={{
+          ...base,
+          background: `linear-gradient(135deg, ${MANA[a].hi}, ${MANA[a].bg} 49.5%, ${MANA[b].bg} 50.5%, ${MANA[b].hi})`,
+          boxShadow: `inset 0 0 0 1px ${MANA[b].ring}, 0 1px 2px rgba(0,0,0,.25)`,
+        }}
+      >
+        {mark(colors[0], a, { top: size * 0.1, left: size * 0.12 })}
+        {mark(colors[1], b, { bottom: size * 0.1, right: size * 0.12 })}
+      </span>
+    );
+  }
+
+  const c = colors[0] ?? "C";
+  const key = MANA[c] ? c : "C";
   const m = MANA[key];
-  const isMulti = sym.length > 1;
-  const isGlyph = !isMulti && GLYPHS.has(sym);
+  const glyph = phyrexian ? "P" : GLYPHS.has(c) ? c : null;
+  // Generic costs and anything without a glyph (X, 10, S) set as numerals.
+  const text = c.length > 2 ? c.slice(0, 2) : c;
   return (
     <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        flex: "none",
-        background: m.bg,
-        color: m.fg,
-        fontSize: size * (isMulti ? 0.42 : 0.62),
-        fontWeight: 700,
-        lineHeight: 1,
-        fontFamily: "var(--font-ui)",
-        boxShadow: `inset 0 0 0 1px ${m.ring}, 0 1px 1.5px rgba(0,0,0,.2)`,
-      }}
+      role="img"
+      aria-label={label}
+      title={label}
+      style={{ ...base, background: disc(key), boxShadow: `inset 0 0 0 1px ${m.ring}, inset 0 1px 0 rgba(255,255,255,.28), 0 1px 2px rgba(0,0,0,.25)` }}
     >
-      {isGlyph ? <ManaGlyph type={sym} color={m.fg} size={size * 0.86} /> : isMulti ? sym.replace("/", "") : sym}
+      {glyph ? (
+        <ManaGlyph type={glyph} color={m.fg} size={size * 0.84} />
+      ) : (
+        <span
+          aria-hidden="true"
+          style={{
+            fontFamily: "var(--font-ui)",
+            fontWeight: 800,
+            fontSize: size * (text.length > 1 ? 0.5 : 0.62),
+            letterSpacing: "-0.03em",
+            fontVariantNumeric: "tabular-nums",
+            color: m.fg,
+            // Numerals have no descenders, so the line box centers them high.
+            transform: "translateY(0.06em)",
+          }}
+        >
+          {text}
+        </span>
+      )}
     </span>
   );
 }
@@ -148,9 +198,11 @@ export function ManaCost({ cost, size = 18 }: { cost: string | null | undefined;
   const syms = parseSymbols(cost);
   if (syms.length === 0) return null;
   return (
-    <span style={{ display: "inline-flex", gap: 2, alignItems: "center" }}>
+    <span role="img" aria-label={`Mana cost: ${syms.map(symbolName).join(", ")}`} style={{ display: "inline-flex", gap: Math.max(2, size * 0.14), alignItems: "center", flex: "none" }}>
       {syms.map((s, i) => (
-        <Pip key={i} sym={s} size={size} />
+        <span key={i} aria-hidden="true" style={{ display: "flex" }}>
+          <Pip sym={s} size={size} />
+        </span>
       ))}
     </span>
   );
@@ -159,9 +211,15 @@ export function ManaCost({ cost, size = 18 }: { cost: string | null | undefined;
 export function ColorPips({ colors, size = 16 }: { colors: string[]; size?: number }) {
   const list = colors.length ? colors : ["C"];
   return (
-    <span style={{ display: "inline-flex", gap: 3 }}>
+    <span
+      role="img"
+      aria-label={list.map((c) => COLOR_NAME[c] ?? c).join(", ")}
+      style={{ display: "inline-flex", gap: Math.max(3, size * 0.18), flex: "none" }}
+    >
       {list.map((c, i) => (
-        <Pip key={i} sym={c} size={size} />
+        <span key={i} aria-hidden="true" style={{ display: "flex" }}>
+          <Pip sym={c} size={size} />
+        </span>
       ))}
     </span>
   );
