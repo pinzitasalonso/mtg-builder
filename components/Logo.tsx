@@ -1,27 +1,15 @@
 "use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
-import { MANA, ManaGlyph } from "@/components/mtg";
+import { Pip } from "@/components/mtg";
 
 const ORDER = ["W", "U", "B", "R", "G"];
 
-/** A flat colored mana disc with the glyph cut in the page background color. */
+/** A mana disc for the logo — the same symbol the app uses everywhere. */
 export function ManaDisc({ type, size }: { type: string; size: number }) {
-  const m = MANA[type] || MANA.C;
   return (
-    <span
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: m.bg,
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flex: "none",
-      }}
-    >
-      <ManaGlyph type={type} color={m.fg} size={size * 0.86} />
+    <span aria-hidden="true" style={{ display: "flex" }}>
+      <Pip sym={type} size={size} />
     </span>
   );
 }
