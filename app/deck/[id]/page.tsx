@@ -14,6 +14,7 @@ import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
 import DeckPrimer from "@/components/deck/DeckPrimer";
 import DeckStatsPane from "@/components/deck/DeckStatsPane";
 import OrderModal from "@/components/deck/OrderModal";
+import VersionsModal from "@/components/deck/VersionsModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, dangerBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamed } from "@/lib/scryfall";
 import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard, deleteCard, setQuantity } from "@/lib/pool-client";
@@ -296,6 +297,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // playtest table
   const [playtestOpen, setPlaytestOpen] = useState(false);
   const [gameCodeOpen, setGameCodeOpen] = useState(false);
+  // saved versions of the deck — runs in <VersionsModal> while open
+  const [versionsOpen, setVersionsOpen] = useState(false);
 
   // "Order on CardTrader" — runs in <OrderModal> while open
   const [orderOpen, setOrderOpen] = useState(false);
@@ -854,6 +857,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       // would have made copying silent.
                       { label: copied === "list" ? "✓ Copied!" : "📋 Copy decklist", on: copyDecklist, disabled: deckCards.length === 0, keepOpen: true },
                       { label: "🛒 Buy list", on: () => setOrderOpen(true), disabled: deckCards.length === 0 },
+                      { label: "🕘 Versions", on: () => setVersionsOpen(true) },
                       ...(canEdit ? [
                         { label: "🌲 Add lands & staples", on: () => setTool("lands") },
                         { label: "⬆ Export / import", on: () => setTool("export") },
@@ -1613,6 +1617,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {/* CardTrader order */}
       {orderOpen && <OrderModal cards={deckCards} onClose={() => setOrderOpen(false)} />}
+
+      {/* saved versions — snapshot now, compare an earlier one with the current list */}
+      {versionsOpen && <VersionsModal deckId={deckId} pool={pool} canEdit={canEdit} onClose={() => setVersionsOpen(false)} />}
 
       {/* card preview modal */}
       {preview && (

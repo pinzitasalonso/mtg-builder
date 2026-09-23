@@ -179,6 +179,7 @@ model Deck {
   userId    Int?
   user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards     PoolCard[]
+  versions  DeckVersion[]
   playCodes PlayCode[]
   games     GameLog[]
 }
@@ -258,4 +259,21 @@ model PoolCard {
   addedAt       DateTime @default(now())
 
   @@unique([deckId, scryfallId])
+}
+
+// A saved snapshot of a deck's cards, so an earlier build can be compared
+// with the current one. The card list is JSON — the shape is the snapshot's,
+// and nothing queries inside it; the counts are columns so a listing is cheap.
+model DeckVersion {
+  id        Int      @id @default(autoincrement())
+  deckId    Int
+  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  label     String?
+  // [{ name, quantity, board, scryfallId }]
+  cards     String
+  deckCount Int      @default(0)
+  poolCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([deckId])
 }
