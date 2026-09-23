@@ -29,6 +29,7 @@ interface Deck {
   format: string;
   commander: string | null;
   createdAt: string;
+  pinned?: boolean;
   colors?: string[];
   _count: { cards: number };
 }
@@ -177,6 +178,16 @@ export default function HomePage() {
     );
   })();
 
+  // Pinned decks sort first; the list re-fetches so the order follows.
+  async function pinDeck(id: string, pinned: boolean) {
+    await fetch(`/api/decks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned }),
+    });
+    loadAll();
+  }
+
   async function duplicateDeck(id: string) {
     const res = await fetch(`/api/decks/${id}/duplicate`, { method: "POST" });
     // Duplicating is the other way past the deck cap, and it answered a 403 by
@@ -317,7 +328,7 @@ export default function HomePage() {
               <CStat n={formatCount} label="Formats" accent />
             </div>
           </div>
-          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onNew={() => setShowModal(true)} showNew={loaded} />
+          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onPin={pinDeck} onNew={() => setShowModal(true)} showNew={loaded} />
           <CollectionBlock unique={collection.unique} total={collection.total} sample={collection.sample} onOpen={() => setShowCollection(true)} />
           <div style={{ height: 64 }} />
         </div>
@@ -576,6 +587,7 @@ function DeckTable({
   onOpen,
   onDelete,
   onDuplicate,
+  onPin,
   onNew,
   showNew,
 }: {
@@ -583,20 +595,22 @@ function DeckTable({
   onOpen: (d: Deck) => void;
   onDelete: (id: string) => void;
   onDuplicate: (id: string) => void;
+  /** Absent on the public gallery: pinning is a personal order, not everyone's. */
+  onPin?: (id: string, pinned: boolean) => void;
   onNew: () => void;
   showNew: boolean;
 }) {
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(258px, 1fr))", gap: 22 }}>
       {decks.map((d, i) => (
-        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.publicId)} onDuplicate={() => onDuplicate(d.publicId)} />
+        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.publicId)} onDuplicate={() => onDuplicate(d.publicId)} onPin={onPin ? () => onPin(d.publicId, !d.pinned) : undefined} />
       ))}
       {showNew && <NewDeckTile onNew={onNew} />}
     </div>
   );
 }
 
-function DeckTile({ deck, index, onOpen, onDelete, onDuplicate }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void; onDuplicate: () => void }) {
+function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void; onDuplicate: () => void; onPin?: () => void }) {
   const [hover, setHover] = useState(false);
   const colors = deck.colors?.length ? deck.colors : ["C"];
   const field = getIdentityField(colors.join(""));
@@ -671,6 +685,35 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate }: { deck: Deck; 
             </div>
           </div>
         </button>
+        {/* Pin: always visible once pinned, so the top of the list reads as
+            chosen; hover-only otherwise, like the other tile actions. */}
+        {onPin && <button
+          onClick={(e) => { e.stopPropagation(); onPin(); }}
+          title={deck.pinned ? "Unpin deck" : "Pin deck to the top"}
+          aria-label={deck.pinned ? "Unpin deck" : "Pin deck to the top"}
+          aria-pressed={Boolean(deck.pinned)}
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 74,
+            width: 24,
+            height: 24,
+            borderRadius: 8,
+            border: "none",
+            cursor: "pointer",
+            background: deck.pinned ? "var(--gold)" : "rgba(0,0,0,.5)",
+            color: deck.pinned ? "var(--accent-ink)" : "#fff",
+            fontSize: 12,
+            opacity: hover || deck.pinned ? 1 : 0,
+            transition: "opacity .15s",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2,
+          }}
+        >
+          📌
+        </button>}
         <button
           onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
           title="Duplicate deck"
