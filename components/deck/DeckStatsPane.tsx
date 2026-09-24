@@ -2,16 +2,16 @@
 
 // The deck page's Stats pane — everything ABOUT the deck rather than in it.
 //
-// Read top to bottom it goes: what the deck IS (the profile), how it PLAYS
-// (the primer, the combos, the record), what it's MADE of (curve,
-// composition, colour identity), then 8x8. That is the iOS Stats tab's order,
-// and the reasoning there applies here: the profile is the verdict, the things
-// you READ come next, and the densest block goes last because it is the one
-// you come looking for rather than glance at.
-//
-// The shape blocks sit three-up on a wide page instead of stacked. iOS stacks
-// them because it is a phone; stacking them here would make the pane twice as
-// tall for no gain.
+// Three parts, top to bottom:
+//   AT A GLANCE — the numbers that judge the deck, as a row of tiles (size,
+//     bracket, average cost, lands), and the Score with its working.
+//   BUILD — what it's made of, in two pairs that belong together: the curve
+//     beside the composition (what it costs, what it is), then the colours and
+//     mana sources beside the roles (8×8) (what it needs, what it does).
+//     Side by side on a wide page, stacked on a phone.
+//   HOW IT PLAYS — the things you READ: the primer, the AI analysis, the
+//     combos. Last, because they're long, and the numbers are what you open
+//     this tab to glance at.
 
 import {
   InsightAnalysis,
@@ -61,7 +61,10 @@ export default function DeckStatsPane({
   scanOpen,
   onHoverCurveBar,
   onClickCurveBar,
+  target,
 }: {
+  /** The deck's size target: 100 for Commander, 60 otherwise. */
+  target: number;
   deckId: string;
   deckCards: PoolEntry[];
   /** Every card on the page, both boards — 8x8 and the bracket filter it themselves. */
@@ -96,27 +99,20 @@ export default function DeckStatsPane({
     );
   }
 
+  const lands = stats.types.find((t) => t.name === "Lands")?.n ?? 0;
+  // Two blocks that read together: side by side where there's room.
+  const pair: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", columnGap: 40 };
+
   return (
     <div>
-      <StatSection title="Profile">
-        <InsightProfile insight={insight} avgManaValue={avgManaValue} />
-        <InsightScan deckId={deckId} insight={insight} canEdit={canEdit} open={scanOpen} primer={primer} />
+      <StatSection title="At a glance">
+        <InsightProfile insight={insight} avgManaValue={avgManaValue} cardCount={stats.count} target={target} lands={lands} />
+        <div style={{ marginTop: 12 }}>
+          <InsightScan deckId={deckId} insight={insight} canEdit={canEdit} open={scanOpen} primer={primer} />
+        </div>
       </StatSection>
 
-      {showPlay && (
-        <StatSection title="How it plays">
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {showPrimer && (
-              <DeckPrimer deckId={deckId} primer={primer} canEdit={canEdit} onSaved={onPrimerSaved} />
-            )}
-            {insight.scan?.analysis && <InsightAnalysis analysis={insight.scan.analysis} />}
-            <InsightPlay insight={insight} />
-          </div>
-        </StatSection>
-      )}
-
-      {/* The shape, three-up where there is room for it. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", columnGap: 34 }}>
+      <div style={pair}>
         <StatSection title="Mana curve">
           <ManaCurve
             curve={stats.curve}
@@ -126,7 +122,7 @@ export default function DeckStatsPane({
           />
         </StatSection>
 
-        <StatSection title={`Composition · ${deckCards.length} cards`}>
+        <StatSection title={`Composition · ${stats.count} cards`}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 12 }}>
             {stats.types.flatMap((t) =>
               Array.from({ length: t.n }).map((_, i) => (
@@ -143,15 +139,29 @@ export default function DeckStatsPane({
             ))}
           </div>
         </StatSection>
+      </div>
 
-        <StatSection title="Color identity">
-          <ColorIdentity deckCards={deckCards} identity={identity} avgManaValue={avgManaValue} />
+      <div style={pair}>
+        <StatSection title="Colors & mana">
+          <ColorIdentity deckCards={deckCards} identity={identity} />
+        </StatSection>
+
+        <StatSection title="Roles · 8×8">
+          <InsightEightByEight insight={insight} />
         </StatSection>
       </div>
 
-      <StatSection title="8×8">
-        <InsightEightByEight insight={insight} />
-      </StatSection>
+      {showPlay && (
+        <StatSection title="How it plays">
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {showPrimer && (
+              <DeckPrimer deckId={deckId} primer={primer} canEdit={canEdit} onSaved={onPrimerSaved} />
+            )}
+            {insight.scan?.analysis && <InsightAnalysis analysis={insight.scan.analysis} />}
+            <InsightPlay insight={insight} />
+          </div>
+        </StatSection>
+      )}
     </div>
   );
 }
@@ -161,15 +171,7 @@ export default function DeckStatsPane({
  * colour, read from what each land actually adds. Cards are not either/or: a
  * spell//land MDFC counts on both sides.
  */
-function ColorIdentity({
-  deckCards,
-  identity,
-  avgManaValue,
-}: {
-  deckCards: PoolEntry[];
-  identity: string[];
-  avgManaValue: number;
-}) {
+function ColorIdentity({ deckCards, identity }: { deckCards: PoolEntry[]; identity: string[] }) {
   const spell: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
   const land: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
   const colored = identity.filter((c) => "WUBRG".includes(c));
@@ -228,9 +230,9 @@ function ColorIdentity({
           </div>
         </div>
       )}
-      <p style={{ fontSize: 12.5, color: "var(--w-2)", margin: 0, lineHeight: 1.45 }}>
-        Avg. mana value <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{avgManaValue.toFixed(1)}</b> · land
-        sources reflect what each land can produce; fetches and any-colour lands count toward your identity.
+      {/* The average cost moved to the At a glance tiles. */}
+      <p style={{ fontSize: 12, color: "var(--w-3)", margin: 0, lineHeight: 1.45 }}>
+        Land sources are what each land can produce; fetches and any-colour lands count toward your identity.
       </p>
     </>
   );

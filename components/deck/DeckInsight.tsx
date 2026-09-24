@@ -188,16 +188,33 @@ function ProfileRow({ label, value, detail }: { label: string; value: string; de
   );
 }
 
+/** One figure of the at-a-glance row: a small label, the number, a note. */
+function StatTile({ label, value, detail, warn }: { label: string; value: string; detail?: string | null; warn?: boolean }) {
+  return (
+    <div style={{ padding: "12px 14px", borderRadius: 14, background: "var(--w-fill)", boxShadow: "inset 0 0 0 1px var(--w-line)", minWidth: 0 }}>
+      <div className="id-label" style={{ fontSize: 10.5, color: "var(--w-3)", marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: warn ? "#ffb4a3" : "var(--w-1)", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+      {detail && <div style={{ fontSize: 11.5, color: "var(--w-3)", marginTop: 4, lineHeight: 1.35 }}>{detail}</div>}
+    </div>
+  );
+}
+
 /**
- * The verdict: bracket, average cost, Score. One glance, the numbers that
- * judge the deck — and, under the Score, the working.
+ * The verdict, at a glance: size, average cost, bracket, lands — a row of
+ * tiles — and, under them, the Score with its working.
  */
 export function InsightProfile({
   insight,
   avgManaValue,
+  cardCount,
+  target,
+  lands,
 }: {
   insight: DeckInsightData;
   avgManaValue: number;
+  cardCount: number;
+  target: number;
+  lands: number;
 }) {
   const { bracket, changers, combos, scan } = insight;
   const score = scan?.score ?? null;
@@ -221,15 +238,25 @@ export function InsightProfile({
       ? `plays like at least Bracket ${score.bracketFloor} by its Score`
       : null;
 
+  const missing = target - cardCount;
   return (
-    <div style={{ maxWidth: 560 }}>
-      <ProfileRow
-        label="Bracket"
-        value={`${BRACKET_NUMBER[bracket]} · ${BRACKET_LABEL[bracket]}`}
-        detail={[bracketDetail, floorNote].filter(Boolean).join(" · ") || null}
-      />
-      {Number.isFinite(avgManaValue) && <ProfileRow label="Average cost" value={avgManaValue.toFixed(2)} />}
-      {score && <InsightScore score={score} scannedAt={scan?.scannedAt ?? null} />}
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: score ? 14 : 0 }}>
+        <StatTile
+          label="Cards"
+          value={`${cardCount}/${target}`}
+          detail={missing > 0 ? `${missing} to go` : missing < 0 ? `${-missing} over` : "complete"}
+          warn={missing < 0}
+        />
+        <StatTile label="Bracket" value={`${BRACKET_NUMBER[bracket]} · ${BRACKET_LABEL[bracket]}`} detail={[bracketDetail, floorNote].filter(Boolean).join(" · ") || null} />
+        {Number.isFinite(avgManaValue) && <StatTile label="Average cost" value={avgManaValue.toFixed(2)} detail="mana value, lands excluded" />}
+        <StatTile label="Lands" value={String(lands)} detail={`${Math.round((lands / Math.max(1, cardCount)) * 100)}% of the deck`} />
+      </div>
+      {score && (
+        <div style={{ maxWidth: 620 }}>
+          <InsightScore score={score} scannedAt={scan?.scannedAt ?? null} />
+        </div>
+      )}
     </div>
   );
 }
@@ -435,9 +462,8 @@ export function InsightEightByEight({ insight }: { insight: DeckInsightData }) {
   const [openBucket, setOpenBucket] = useState<string | null>(null);
   return (
     <div>
-      <p style={{ fontSize: 12, color: "var(--w-3)", lineHeight: 1.5, margin: "0 0 14px", maxWidth: 620 }}>
-        Eight categories of eight, plus thirty-five lands. A starting shape rather than a rule — one
-        category at six and another at nine is fine.
+      <p style={{ fontSize: 12, color: "var(--w-3)", lineHeight: 1.5, margin: "0 0 10px", maxWidth: 620 }}>
+        The 8×8 shape: eight categories of eight, plus thirty-five lands. A starting point, not a rule.
       </p>
       <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {insight.buckets.map((b) => {
