@@ -67,7 +67,7 @@ export default function HomePage() {
   const [showModal, setShowModal] = useState(false);
   const [showCollection, setShowCollection] = useState(false);
   // Collection summary for the home block: count + a few names for thumbnails.
-  const [collection, setCollection] = useState<{ unique: number; total: number; sample: string[] }>({ unique: 0, total: 0, sample: [] });
+  const [collection, setCollection] = useState<{ unique: number; total: number; pending: number; sample: string[] }>({ unique: 0, total: 0, pending: 0, sample: [] });
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
   const [creating, setCreating] = useState(false);
 
@@ -79,7 +79,7 @@ export default function HomePage() {
       const j = Math.floor(Math.random() * (i + 1));
       [names[i], names[j]] = [names[j], names[i]];
     }
-    setCollection({ unique: c.unique, total: c.total, sample: names.slice(0, 7) });
+    setCollection({ unique: c.unique, total: c.total, pending: c.pending, sample: names.slice(0, 7) });
   }
 
   async function loadAll() {
@@ -96,7 +96,7 @@ export default function HomePage() {
     setPublicDecks(pub);
     setLoaded(true);
     if (user) loadCollection();
-    else setCollection({ unique: 0, total: 0, sample: [] });
+    else setCollection({ unique: 0, total: 0, pending: 0, sample: [] });
   }
 
   useEffect(() => {
@@ -342,7 +342,7 @@ export default function HomePage() {
             </div>
           </div>
           <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onPin={pinDeck} onNew={() => setShowModal(true)} showNew={loaded} />
-          <CollectionBlock unique={collection.unique} total={collection.total} sample={collection.sample} onOpen={() => setShowCollection(true)} />
+          <CollectionBlock unique={collection.unique} total={collection.total} pending={collection.pending} sample={collection.sample} onOpen={() => setShowCollection(true)} />
           <div style={{ height: 64 }} />
         </div>
       )}
@@ -568,12 +568,12 @@ function CStat({ n, label, accent }: { n: number; label: string; accent?: boolea
 }
 
 /* ---------- "Your collection" home block ---------- */
-function CollectionBlock({ unique, total, sample, onOpen }: { unique: number; total: number; sample: string[]; onOpen: () => void }) {
+function CollectionBlock({ unique, total, pending, sample, onOpen }: { unique: number; total: number; pending: number; sample: string[]; onOpen: () => void }) {
   return (
     <div style={{ marginTop: 56 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 14, paddingBottom: 20, borderBottom: "1px solid var(--line)" }}>
         <h2 className="id-display" style={{ margin: 0, fontSize: "clamp(24px, 4vw, 32px)", color: "var(--t1)" }}>Your collection</h2>
-        <span className="id-mono" style={{ fontSize: 12.5, color: "var(--t3)" }}>{unique > 0 ? `${unique} unique · ${total} total` : "nothing yet"}</span>
+        <span className="id-mono" style={{ fontSize: 12.5, color: "var(--t3)" }}>{unique > 0 ? `${unique} unique · ${total} total${pending > 0 ? ` · matching ${pending}…` : ""}` : "nothing yet"}</span>
         <button onClick={onOpen} className="id-ghost" style={{ marginLeft: "auto", padding: "9px 18px" }}>
           {unique > 0 ? "Browse" : "Import"} <ArrowRight size={15} strokeWidth={2.25} />
         </button>
