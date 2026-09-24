@@ -25,6 +25,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link2, ScanSearch } from "lucide-react";
+import { GetProButton } from "@/components/GetPro";
 import type { DeckScoreReport } from "@/lib/deck-score-report";
 import type { AnalysisDocument, DeckScan } from "@/lib/deck-analysis";
 import {
@@ -546,6 +547,8 @@ export function InsightScan({
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null | undefined>(undefined);
+  // Bumped by a Pro purchase so the meter re-reads to "unlimited".
+  const [meterKey, setMeterKey] = useState(0);
 
   // From the Tools menu: a deck with a primer runs at once, one without
   // gets the notes box.
@@ -567,7 +570,7 @@ export function InsightScan({
     return () => {
       live = false;
     };
-  }, [insight.scan?.scannedAt]);
+  }, [insight.scan?.scannedAt, meterKey]);
 
   useEffect(() => {
     if (pendingOpen > 0 && !running) void run();
@@ -603,6 +606,11 @@ export function InsightScan({
   const meter =
     remaining === undefined ? null : remaining === null ? "Unlimited scans on Pro" : `${remaining} free scan${remaining === 1 ? "" : "s"} left today`;
   const exhausted = remaining === 0;
+  // Out of scans is where iOS raises its paywall; here, Get Pro by the meter.
+  const upgraded = () => {
+    setError(null);
+    setMeterKey((k) => k + 1);
+  };
 
   return (
     <div style={{ marginTop: 12 }}>
@@ -613,6 +621,11 @@ export function InsightScan({
           </Pill>
           {hasPrimer && !running && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>guided by your primer</span>}
           {meter && <span style={{ fontSize: 11.5, color: exhausted ? "var(--gold)" : "var(--w-3)" }}>{meter}</span>}
+          {exhausted && (
+            <span style={{ fontSize: 12 }}>
+              <GetProButton onUpgraded={upgraded} />
+            </span>
+          )}
           {running && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>about half a minute — you can keep working</span>}
           {error && <span style={{ fontSize: 12, color: "var(--gold)" }}>{error}</span>}
         </div>
@@ -646,6 +659,11 @@ export function InsightScan({
               Cancel
             </button>
             {meter && <span style={{ fontSize: 11.5, color: exhausted ? "var(--gold)" : "var(--w-3)" }}>{meter}</span>}
+            {exhausted && (
+              <span style={{ fontSize: 12 }}>
+                <GetProButton onUpgraded={upgraded} />
+              </span>
+            )}
           </div>
           {running && (
             <div style={{ fontSize: 12, color: "var(--w-3)", marginTop: 8 }}>Reading the list, goldfishing a few hundred hands, writing it up — about half a minute.</div>

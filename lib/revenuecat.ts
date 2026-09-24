@@ -1,13 +1,15 @@
 // RevenueCat → server subscription sync.
 //
-// The iOS app sells "Pro" through RevenueCat (App Store IAP). RevenueCat is the
+// "Pro" is sold through RevenueCat in two places: the iOS app (App Store IAP)
+// and spellpool.com (Web Billing, through purchases-js). RevenueCat is the
 // source of truth for whether a subscription is active; our job is only to
 // mirror that onto `User.tier` ("pro" | "free"), which is what every plan gate
-// already reads (lib/limits.ts) — so a purchase on iOS lifts the caps on the
-// web app too, for the same account.
+// already reads (lib/limits.ts) — so a purchase on either lifts the caps on
+// both, for the same account.
 //
-// The link between the two is identity: the app calls Purchases.logIn("<User.id>"),
-// so RevenueCat's `app_user_id` IS our numeric User.id. We never trust the client
+// The link is identity: both clients hand RevenueCat "<User.id>" (the app via
+// Purchases.logIn, the web via /api/subscription/config), so RevenueCat's
+// `app_user_id` IS our numeric User.id. We never trust the client
 // for entitlement state — tier is only ever set from RevenueCat server-to-server
 // (the webhook below, or the REST re-check).
 
@@ -65,4 +67,23 @@ export async function isProOnRevenueCat(
 export function userIdFromAppUserId(appUserId: string): number | null {
   const id = Number(appUserId);
   return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/* The web paywall (RevenueCat's purchases-js, on spellpool.com) is configured
+   with a PUBLIC key that the server hands to the browser. So this is the one
+   place a key leaves the server, and it only lets through the kinds that are
+   meant to:
+     - `rcb_…`    a Web Billing key — the one production runs on.
+     - `rcb_sb_…` a Web Billing sandbox key (Stripe test cards).
+     - `test_…`   the Test Store key (purchases are simulated).
+   The last two hand out Pro without real money, so they're refused in
+   production: a sandbox key left in Railway would make Pro free for anyone
+   who found a Stripe test card. Anything else — above all an `sk_` secret key
+   pasted into the wrong variable — is refused everywhere, and the paywall
+   simply stays hidden. */
+export function webPaywallKey(raw: string | null | undefined, production: boolean): string | null {
+  const key = raw?.trim();
+  if (!key || !/^(rcb|test)_[A-Za-z0-9_.-]+$/.test(key)) return null;
+  const sandbox = key.startsWith("rcb_sb_") || key.startsWith("test_");
+  return production && sandbox ? null : key;
 }

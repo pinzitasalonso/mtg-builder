@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { ArrowUp, Plus, RotateCcw, Sparkles, X } from "lucide-react";
 import { parseBlocks, type Block, type InlineToken } from "@/lib/chat-markdown";
+import { GetProButton } from "@/components/GetPro";
 import { deckRef, rewriteDeckLinks } from "@/lib/assistant";
 import { resolveAndAdd } from "@/lib/pool-client";
 import { track } from "@/lib/track";
@@ -62,6 +63,8 @@ export default function HomeAssistant({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
+  // The error is the free plan's daily AI budget: offer Pro beside it.
+  const [aiLimited, setAiLimited] = useState(false);
   const [menu, setMenu] = useState<{ name: string; rect: DOMRect } | null>(null);
   const [toast, setToast] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -88,6 +91,7 @@ export default function HomeAssistant({
     setMessages([...history, { role: "assistant", content: "" }]);
     setInput("");
     setError("");
+    setAiLimited(false);
     setStreaming(true);
     pinned.current = true;
     try {
@@ -98,6 +102,7 @@ export default function HomeAssistant({
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
+        if (data.code === "ai_limit") setAiLimited(true);
         throw new Error(data.error || "The assistant is unavailable right now.");
       }
       const reader = res.body.getReader();
@@ -239,7 +244,22 @@ export default function HomeAssistant({
       {/* composer, docked at the bottom */}
       <div style={{ borderTop: "1px solid var(--line)", padding: "12px clamp(16px, 4vw, 32px) max(12px, env(safe-area-inset-bottom))" }}>
         <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
-        {error && <div role="alert" style={{ fontSize: 13.5, color: "var(--danger)" }}>{error}</div>}
+        {error && (
+          <div role="alert" style={{ fontSize: 13.5, color: "var(--danger)" }}>
+            {error}
+            {aiLimited && (
+              <>
+                {" "}
+                <GetProButton
+                  onUpgraded={() => {
+                    setError("");
+                    setAiLimited(false);
+                  }}
+                />
+              </>
+            )}
+          </div>
+        )}
         {toast && <div role="status" style={{ fontSize: 13.5, color: "var(--t2, var(--text-muted))" }}>{toast}</div>}
 
         <form

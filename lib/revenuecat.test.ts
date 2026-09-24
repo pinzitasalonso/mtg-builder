@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isProOnRevenueCat, userIdFromAppUserId } from "./revenuecat";
+import { isProOnRevenueCat, userIdFromAppUserId, webPaywallKey } from "./revenuecat";
 
 function mockFetch(status: number, json: unknown) {
   vi.stubGlobal(
@@ -65,5 +65,24 @@ describe("isProOnRevenueCat", () => {
     expect(await isProOnRevenueCat("42", "sk_test")).toBeNull();
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("network down"); }));
     expect(await isProOnRevenueCat("42", "sk_test")).toBeNull();
+  });
+});
+
+describe("webPaywallKey", () => {
+  it("serves a live Web Billing key everywhere", () => {
+    expect(webPaywallKey("rcb_AbC123", true)).toBe("rcb_AbC123");
+    expect(webPaywallKey("  rcb_AbC123\n", false)).toBe("rcb_AbC123");
+  });
+  it("serves sandbox and Test Store keys only outside production", () => {
+    expect(webPaywallKey("rcb_sb_AbC123", false)).toBe("rcb_sb_AbC123");
+    expect(webPaywallKey("test_AbC123", false)).toBe("test_AbC123");
+    expect(webPaywallKey("rcb_sb_AbC123", true)).toBeNull();
+    expect(webPaywallKey("test_AbC123", true)).toBeNull();
+  });
+  it("never serves a secret key, another platform's key, or junk", () => {
+    for (const bad of ["sk_live_AbC123", "sk_AbC123", "appl_AbC123", "goog_AbC123", "strp_AbC123", "rcb_", "rcb_a b", "", undefined, null]) {
+      expect(webPaywallKey(bad, false)).toBeNull();
+      expect(webPaywallKey(bad, true)).toBeNull();
+    }
   });
 });

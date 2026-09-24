@@ -1475,6 +1475,8 @@ button {
     justify-content: center;
   }
   .home-header .id-btn { padding: 10px 14px !important; }
+  /* Get Pro is a gold icon button there, like Collection and Sign out. */
+  .home-header .id-btn.home-icon-btn { padding: 0 !important; }
 }
 
 /* Deck tiles. The actions (pin, duplicate, delete) are always visible: hiding
@@ -1633,4 +1635,12 @@ button {
   .coll-card-art {
     width: min(64vw, 240px) !important;
   }
+}
+
+/* RevenueCat's web paywall (purchases-js) mounts a full-screen root on <body>
+   and fills it with this var, falling back to the system Canvas — white or
+   grey behind the paywall's own indigo on a wide screen. The brand ink, the
+   ground under every paywall surface in the iOS app, instead. */
+#rcb-ui-pw-root {
+  --rc-purchases-ui-bg-color: #181228;
 }

@@ -1,7 +1,7 @@
 // Plan limits — the pure half (no Prisma import, so tests stay hermetic;
 // the DB-touching helpers live in lib/limits-db.ts). Tiers live on
-// User.tier: "free" is the default; "pro" (the future paid tier) lifts
-// every cap.
+// User.tier: "free" is the default; "pro" (Spellpool Pro) lifts every
+// cap.
 
 export const FREE_DECK_LIMIT = 5;
 export const FREE_AI_PER_DAY = 4;
@@ -9,12 +9,15 @@ export const FREE_AI_PER_DAY = 4;
 // chat turn, so they have their own meter: one a day free, unlimited on Pro.
 export const FREE_SCANS_PER_DAY = 1;
 
+// Both clients show these as sent. They don't say where Pro is sold: it's in
+// the iOS app and on spellpool.com, and each client puts its own Get Pro
+// beside the message.
 export const DECK_LIMIT_MSG =
-  `The free plan holds ${FREE_DECK_LIMIT} decks — delete one to make room. Spellpool Pro (in the iOS app) lifts the limit.`;
+  `The free plan holds ${FREE_DECK_LIMIT} decks — delete one to make room. Spellpool Pro lifts the limit.`;
 export const AI_LIMIT_MSG =
-  `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro (in the iOS app) lifts the limit.`;
+  `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro lifts the limit.`;
 export const SCAN_LIMIT_MSG =
-  `You've used today's free deck scan — it resets at midnight UTC. Spellpool Pro (in the iOS app) makes scans unlimited.`;
+  `You've used today's free deck scan — it resets at midnight UTC. Spellpool Pro makes scans unlimited.`;
 
 export interface TierFields {
   tier?: string | null;
