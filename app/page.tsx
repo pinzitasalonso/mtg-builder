@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
 import HomeAssistant from "@/components/HomeAssistant";
+import LandingVisual from "@/components/LandingVisual";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
@@ -60,10 +61,10 @@ const FEATURE_ICON: Record<LandingFeature["icon"], LucideIcon> = {
   phone: Smartphone,
 };
 
-const FEATURES = [
-  { n: "01", t: "Pour in a theme", d: "Tell Spellpool a commander, a combo, or just a vibe. It reads the whole Oracle text database — not just card names." },
-  { n: "02", t: "Swipe the pool", d: "Get a living pool of suggestions ranked for your build. Keep what fits, toss what doesn't. The pool reshapes as you go." },
-  { n: "03", t: "Brew to 100", d: "Watch your curve, color identity, and type balance update live. Export to your deck builder the moment it's legal." },
+const FEATURES: { n: string; t: string; d: string; v: "prompt" | "swipe" | "curve" }[] = [
+  { v: "prompt", n: "01", t: "Pour in a theme", d: "Tell Spellpool a commander, a combo, or just a vibe. It reads the whole Oracle text database — not just card names." },
+  { v: "swipe", n: "02", t: "Swipe the pool", d: "Get a living pool of suggestions ranked for your build. Keep what fits, toss what doesn't. The pool reshapes as you go." },
+  { v: "curve", n: "03", t: "Brew to 100", d: "Watch your curve, color identity, and type balance update live. Export to your deck builder the moment it's legal." },
 ];
 
 export default function HomePage() {
@@ -398,7 +399,8 @@ export default function HomePage() {
               {FEATURES.map((f, i) => (
                 <Reveal key={f.n} delay={120 + i * 90}>
                   <div style={{ padding: "28px 28px 28px 0", borderTop: "1px solid var(--line)", marginRight: i < FEATURES.length - 1 ? 28 : 0, height: "100%" }}>
-                    <div className="id-mono" style={{ fontSize: 13, color: "var(--gold)", marginBottom: 18 }}>{f.n}</div>
+                    <LandingVisual icon={f.v} />
+                    <div className="id-mono" style={{ fontSize: 13, color: "var(--gold)", marginBottom: 10 }}>{f.n}</div>
                     <div className="id-display" style={{ fontSize: 26, marginBottom: 10, color: "var(--t1)" }}>{f.t}</div>
                     <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)", margin: 0 }}>{f.d}</p>
                   </div>
@@ -422,10 +424,13 @@ export default function HomePage() {
               {LANDING_FEATURES.map((f) => {
                 const Icon = FEATURE_ICON[f.icon];
                 return (
-                  <article key={f.title} style={{ padding: "22px 22px 24px", borderRadius: 18, background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)" }}>
-                    <Icon size={22} strokeWidth={2} color="var(--gold)" aria-hidden="true" />
-                    <h3 style={{ margin: "14px 0 8px", fontSize: 17, fontWeight: 700, color: "var(--t1)" }}>{f.title}</h3>
-                    <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)" }}>{f.body}</p>
+                  <article key={f.title} style={{ padding: "16px 16px 22px", borderRadius: 18, background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)" }}>
+                    <LandingVisual icon={f.icon} />
+                    <h3 style={{ margin: "0 6px 8px", display: "flex", alignItems: "center", gap: 8, fontSize: 17, fontWeight: 700, color: "var(--t1)" }}>
+                      <Icon size={18} strokeWidth={2.25} color="var(--gold)" aria-hidden="true" style={{ flex: "none" }} />
+                      {f.title}
+                    </h3>
+                    <p style={{ margin: "0 6px", fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)" }}>{f.body}</p>
                   </article>
                 );
               })}
