@@ -287,29 +287,31 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
       }}
     >
       {/* header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "16px 22px", borderBottom: "1px solid var(--line)" }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".02em", color: "var(--text)" }}>
+      {/* On a phone the count wraps under the title rather than squeezing
+          into a column beside the buttons, and Close drops its label. */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px clamp(16px, 4vw, 22px)", borderBottom: "1px solid var(--line)" }}>
+        <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", columnGap: 12, rowGap: 2, minWidth: 0 }}>
+          <h1 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "clamp(19px, 6vw, 24px)", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".02em", color: "var(--text)" }}>
             Collection
           </h1>
-          <span className="mn-label" style={{ color: "var(--text-muted)" }}>
+          <span className="mn-label" style={{ color: "var(--text-muted)", whiteSpace: "nowrap" }}>
             {collection.unique > 0 ? `${collection.unique} unique · ${collection.total} total` : "empty"}
             {indexing ? " · indexing…" : ""}
           </span>
         </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => setImportOpen((v) => !v)} className="mn-btn" style={{ padding: "9px 18px", fontSize: 14 }}>
+        <div style={{ display: "flex", gap: 8, flex: "none" }}>
+          <button onClick={() => setImportOpen((v) => !v)} className="mn-btn coll-head-btn" style={{ padding: "9px 18px", fontSize: 14 }}>
             Import
           </button>
-          <button onClick={onClose} aria-label="Close collection" className="mn-ghost" style={{ padding: "9px 16px", fontSize: 14 }}>
-            <X size={15} strokeWidth={2.5} /> Close
+          <button onClick={onClose} aria-label="Close collection" className="mn-ghost coll-close" style={{ padding: "9px 16px", fontSize: 14 }}>
+            <X size={15} strokeWidth={2.5} /> <span className="coll-close-label">Close</span>
           </button>
         </div>
       </div>
 
       {/* import panel */}
       {importOpen && (
-        <div style={{ padding: "14px 22px", borderBottom: "1px solid var(--line)", background: "var(--bg3)" }}>
+        <div style={{ padding: "14px clamp(16px, 4vw, 22px)", borderBottom: "1px solid var(--line)", background: "var(--bg3)" }}>
           <textarea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
@@ -348,7 +350,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
 
       {/* enrichment status: names Scryfall doesn't know, or a paused lookup */}
       {(stalled || (collection.unrecognised?.length ?? 0) > 0) && (
-        <div role="status" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 22px", borderBottom: "1px solid var(--line)", fontSize: 13, color: "var(--text-muted)" }}>
+        <div role="status" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px clamp(16px, 4vw, 22px)", borderBottom: "1px solid var(--line)", fontSize: 13, color: "var(--text-muted)" }}>
           {stalled ? (
             <span>Card details are taking a while ({collection.pending} left). They’ll finish next time you open your collection.</span>
           ) : (
@@ -365,7 +367,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
       )}
 
       {/* filter bar */}
-      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 22px", borderBottom: "1px solid var(--line)", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px clamp(16px, 4vw, 22px)", borderBottom: "1px solid var(--line)", flexWrap: "wrap" }}>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -374,7 +376,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
           autoCorrect="off"
           autoComplete="off"
           spellCheck={false}
-          style={{ width: 200, maxWidth: "60vw", padding: "9px 14px", border: "1px solid var(--line)", borderRadius: 999, background: "var(--bg3)", color: "var(--text)", outline: "none", fontSize: 16 }}
+          style={{ flex: "1 1 180px", minWidth: 0, maxWidth: 320, padding: "9px 14px", border: "1px solid var(--line)", borderRadius: 999, background: "var(--bg3)", color: "var(--text)", outline: "none", fontSize: 16 }}
         />
         <div style={{ display: "flex", gap: 6 }} title={indexing ? "Indexing — color filters available shortly" : undefined}>
           {COLORS.map((c) => {

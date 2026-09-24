@@ -1587,3 +1587,19 @@ button {
     justify-content: center;
   }
 }
+
+/* Collection header on a phone: Close is its icon (it keeps its aria-label). */
+@media (max-width: 480px) {
+  .coll-close-label {
+    display: none;
+  }
+  .coll-close {
+    width: 40px;
+    height: 40px;
+    padding: 0 !important;
+    justify-content: center;
+  }
+  .coll-head-btn {
+    padding: 9px 14px !important;
+  }
+}
