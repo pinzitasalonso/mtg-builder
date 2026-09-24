@@ -938,7 +938,8 @@ button {
      it the first screen is all words. */
   .id-fan {
     height: 300px !important;
-    margin-top: -8px;
+    /* Breathing room below the Start brewing / sample-deck buttons. */
+    margin-top: 36px;
   }
   .id-fan > div {
     transform: scale(0.72);
