@@ -44,4 +44,13 @@ describe("parseDecklist", () => {
     // No leading count — the whole line is the name.
     expect(parseDecklist("Door to Nothingness")).toEqual([{ name: "Door to Nothingness", qty: 1 }]);
   });
+  it("strips bracketed set codes and tags, foil markers and MTGO's SB: prefix", () => {
+    expect(parseDecklist("1 Sol Ring [CMR]\n1x Arcane Signet (CMR) 297 *F*\n1 Swords to Plowshares *F*\n1 Cultivate [Ramp]\nSB: 2 Duress")).toEqual([
+      { name: "Sol Ring", qty: 1 },
+      { name: "Arcane Signet", qty: 1 },
+      { name: "Swords to Plowshares", qty: 1 },
+      { name: "Cultivate", qty: 1 },
+      { name: "Duress", qty: 2 },
+    ]);
+  });
 });

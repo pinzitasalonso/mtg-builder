@@ -16,17 +16,39 @@ export interface Collection {
   total: number;
   // Cards still awaiting server-side enrichment; poll GET until this is 0.
   pending: number;
+  // Names Scryfall has no card for (sent once nothing is pending).
+  unrecognised?: string[];
 }
 
 export const EMPTY_COLLECTION: Collection = { cards: [], unique: 0, total: 0, pending: 0 };
 
 export async function fetchCollection(): Promise<Collection> {
+  return (await tryFetchCollection()) ?? EMPTY_COLLECTION;
+}
+
+// Null when the request failed, so a caller showing a collection can keep it
+// rather than blank the screen over one dropped request.
+export async function tryFetchCollection(): Promise<Collection | null> {
   try {
     const res = await fetch("/api/collection");
-    if (!res.ok) return EMPTY_COLLECTION;
+    if (!res.ok) return null;
     return (await res.json()) as Collection;
   } catch {
-    return EMPTY_COLLECTION;
+    return null;
+  }
+}
+
+// Queue the unrecognised names for another lookup.
+export async function rematchCollection(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/collection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rematch: true }),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -36,6 +58,7 @@ export interface ImportResult {
   unique?: number;
   total?: number;
   imported?: number;
+  truncated?: number;
 }
 
 export async function importCollection(text: string, mode: "add" | "replace"): Promise<ImportResult> {
@@ -46,10 +69,10 @@ export async function importCollection(text: string, mode: "add" | "replace"): P
       body: JSON.stringify({ text, mode }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) return { ok: false, error: data.error ?? "Import failed." };
+    if (!res.ok) return { ok: false, error: data.error ?? `Import failed (${res.status}). Your list is still in the box — try again.` };
     return { ok: true, ...data };
   } catch {
-    return { ok: false, error: "Network error." };
+    return { ok: false, error: "Couldn’t reach Spellpool. Your list is still in the box — try again." };
   }
 }
 

@@ -8,8 +8,9 @@ import {
   CollectionCard,
   EMPTY_COLLECTION,
   clearCollection,
-  fetchCollection,
   importCollection,
+  rematchCollection,
+  tryFetchCollection,
   setCollectionCard,
 } from "@/lib/collection-client";
 import { parseCollectionText } from "@/lib/collection-csv";
@@ -18,6 +19,9 @@ import { categoryOf, manaValue, TYPE_ORDER } from "@/components/mtg";
 // Tiles render in pages; scrolling near the bottom reveals the next page, so a
 // filtered set shows every match without dumping thousands of nodes at once.
 const PAGE = 120;
+// Polls in a row without progress before enrichment waits for a later visit
+// (about half a minute of backing off).
+const MAX_STALLS = 6;
 
 const theme = getIdentityTheme(null);
 
@@ -69,9 +73,24 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
-  // Load the collection; cards already carry server-resolved metadata.
+  // Enrichment polling backs off when a poll makes no progress (Scryfall slow
+  // or down), and stops after a while rather than hammering the server; the
+  // cards finish on a later visit.
+  const stall = useRef(0);
+  const lastPending = useRef(Infinity);
+  const [stalled, setStalled] = useState(false);
+
+  // Load the collection; cards already carry server-resolved metadata. A failed
+  // request keeps what's on screen instead of blanking it.
   async function load() {
-    const c = await fetchCollection();
+    const c = await tryFetchCollection();
+    if (!c) {
+      stall.current++;
+      setCollection((prev) => ({ ...prev }));
+      return null;
+    }
+    stall.current = c.pending > 0 && c.pending >= lastPending.current ? stall.current + 1 : 0;
+    lastPending.current = c.pending;
     setCollection(c);
     return c;
   }
@@ -88,12 +107,35 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
   // Each GET resolves another batch of cards server-side; poll until none remain
   // so the filters end up backed by the whole collection (persisted thereafter).
   useEffect(() => {
-    if (collection.pending <= 0) return;
+    if (collection.pending <= 0) {
+      setStalled(false);
+      return;
+    }
+    if (stall.current >= MAX_STALLS) {
+      setStalled(true);
+      return;
+    }
     const t = setTimeout(() => {
       load();
-    }, 500);
+    }, Math.min(500 * 2 ** stall.current, 15000));
     return () => clearTimeout(t);
-  }, [collection.pending, collection.unique]);
+    // The collection object changes on every load, success or not.
+  }, [collection]);
+
+  async function retryUnrecognised() {
+    if (busy) return;
+    setBusy(true);
+    const ok = await rematchCollection();
+    setBusy(false);
+    if (!ok) {
+      setNote("Couldn’t reach Spellpool — try again in a moment.");
+      return;
+    }
+    stall.current = 0;
+    lastPending.current = Infinity;
+    setStalled(false);
+    load();
+  }
 
   // Edit one card's quantity (0 removes). Update locally to avoid re-enriching.
   async function editQty(name: string, next: number) {
@@ -161,7 +203,13 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     });
     setImportText("");
     setImportOpen(false);
-    setNote(`${mode === "replace" ? "Replaced" : "Merged"} — ${r.unique} unique, ${r.total} total.`);
+    setNote(
+      `${mode === "replace" ? "Replaced" : "Merged"} — ${r.unique} unique, ${r.total} total.` +
+        (r.truncated ? ` ${r.truncated} more weren’t saved: the limit is 20,000 different cards.` : "")
+    );
+    stall.current = 0;
+    lastPending.current = Infinity;
+    setStalled(false);
     setBusy(false);
     onChanged?.();
     // Reconcile with the server (canonical counts + kicks off enrichment/polling).
@@ -295,6 +343,24 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
             </button>
             {note && <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{note}</span>}
           </div>
+        </div>
+      )}
+
+      {/* enrichment status: names Scryfall doesn't know, or a paused lookup */}
+      {(stalled || (collection.unrecognised?.length ?? 0) > 0) && (
+        <div role="status" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "10px 22px", borderBottom: "1px solid var(--line)", fontSize: 13, color: "var(--text-muted)" }}>
+          {stalled ? (
+            <span>Card details are taking a while ({collection.pending} left). They’ll finish next time you open your collection.</span>
+          ) : (
+            <span>
+              {collection.unrecognised!.length === 1 ? "1 card wasn’t" : `${collection.unrecognised!.length} cards weren’t`} recognised:{" "}
+              <b style={{ color: "var(--text)" }}>{collection.unrecognised!.slice(0, 5).join(", ")}</b>
+              {collection.unrecognised!.length > 5 ? ` and ${collection.unrecognised!.length - 5} more` : ""}. Check the spelling, or try again.
+            </span>
+          )}
+          <button onClick={stalled ? () => { stall.current = 0; setStalled(false); load(); } : retryUnrecognised} disabled={busy} className="mn-ghost" style={{ padding: "6px 12px", fontSize: 12.5 }}>
+            Try again
+          </button>
         </div>
       )}
 
