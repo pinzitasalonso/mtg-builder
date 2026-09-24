@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { History, Trash2 } from "lucide-react";
+import { History, RotateCcw, Trash2 } from "lucide-react";
 import { PoolEntry } from "@/lib/pool-client";
 import { DeckDiff, VersionCard, VersionSummary, diffDecklists, isEmptyDiff } from "@/lib/deck-diff";
 import { ModalShell, ghostBtn, goldBtn, paperInput } from "./ui";
@@ -14,11 +14,14 @@ export default function VersionsModal({
   pool,
   canEdit,
   onClose,
+  onRestored,
 }: {
   deckId: string;
   pool: PoolEntry[];
   canEdit: boolean;
   onClose: () => void;
+  /** A version was restored: the deck page reloads its cards. */
+  onRestored?: () => void;
 }) {
   const [versions, setVersions] = useState<VersionSummary[] | null>(null);
   const [label, setLabel] = useState("");
@@ -26,6 +29,7 @@ export default function VersionsModal({
   const [error, setError] = useState("");
   const [compare, setCompare] = useState<{ version: VersionSummary; diff: DeckDiff } | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [note, setNote] = useState("");
 
   const now: VersionCard[] = pool.map((c) => ({ name: c.name, quantity: c.quantity, board: c.board, scryfallId: c.id }));
   const deckNow = now.filter((c) => c.board === "deck").reduce((n, c) => n + c.quantity, 0);
@@ -71,6 +75,33 @@ export default function VersionsModal({
       }
       const body = (await res.json()) as { cards: VersionCard[] };
       setCompare({ version, diff: diffDecklists(body.cards, now, "deck") });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  // Put the deck back the way this version had it. The server saves the
+  // current deck as a version first, so the restore shows up in the list and
+  // can be undone the same way.
+  async function restore(version: VersionSummary) {
+    if (!confirm(`Restore "${titleOf(version)}"? The deck as it is now is saved as a version first.`)) return;
+    setBusyId(version.id);
+    setError("");
+    setNote("");
+    try {
+      const res = await fetch(`/api/decks/${deckId}/versions/${version.id}`, { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error || "Couldn't restore that version.");
+        return;
+      }
+      setCompare(null);
+      setNote(
+        `Restored. The previous deck was saved as “${body.backup ?? "a version"}”.` +
+          (body.missing?.length ? ` Not found on Scryfall, so left out: ${body.missing.join(", ")}.` : "")
+      );
+      onRestored?.();
+      await load();
     } finally {
       setBusyId(null);
     }
@@ -124,6 +155,7 @@ export default function VersionsModal({
         </form>
       )}
       {error && <div style={{ color: "var(--danger)", fontSize: 13.5, marginBottom: 10 }}>{error}</div>}
+      {note && <div role="status" style={{ color: "#0d8a5f", fontSize: 13.5, marginBottom: 10 }}>{note}</div>}
 
       {versions === null ? (
         <p style={{ fontSize: 13.5, color: "var(--t3)" }}>Loading…</p>
@@ -160,8 +192,15 @@ export default function VersionsModal({
 
       {compare && (
         <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-          <div className="label-sc" style={{ fontSize: 11.5, color: "var(--t2)", letterSpacing: ".1em", marginBottom: 8 }}>
-            {titleOf(compare.version)} → now · the deck
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+            <div className="label-sc" style={{ fontSize: 11.5, color: "var(--t2)", letterSpacing: ".1em" }}>
+              {titleOf(compare.version)} → now · the deck
+            </div>
+            {canEdit && !isEmptyDiff(compare.diff) && (
+              <button onClick={() => restore(compare.version)} disabled={busyId !== null} style={{ ...goldBtn, padding: "6px 14px", fontSize: 13 }}>
+                <RotateCcw size={14} strokeWidth={2.25} /> {busyId === compare.version.id ? "Restoring…" : "Restore this version"}
+              </button>
+            )}
           </div>
           {isEmptyDiff(compare.diff) ? (
             <p style={{ margin: 0, fontSize: 13.5, color: "var(--t3)" }}>No changes — the deck is the same as this version.</p>
