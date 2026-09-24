@@ -1457,6 +1457,26 @@ button {
   .home-meter { display: none; }
 }
 
+/* Icons that only a phone's header shows (Sign out, the + on New deck). */
+.home-show { display: none; }
+/* Home header on a phone: one row. The wordmark goes (the disc still reads as
+   the logo), Collection and Sign out become 38px icon buttons with their
+   aria-labels, and New deck keeps its words. */
+@media (max-width: 560px) {
+  .home-header { padding-left: 16px !important; padding-right: 16px !important; gap: 8px; }
+  .home-header .logo-word,
+  .home-header .home-hide { display: none; }
+  .home-header .home-show { display: inline-block; }
+  .home-header-actions { gap: 8px !important; }
+  .home-header .home-icon-btn {
+    width: 38px;
+    height: 38px;
+    padding: 0 !important;
+    justify-content: center;
+  }
+  .home-header .id-btn { padding: 10px 14px !important; }
+}
+
 /* Deck tiles. The actions (pin, duplicate, delete) are always visible: hiding
    them behind hover made them unreachable on iPad — a trackpad iPad reports
    hover, and Safari swallows a first tap that changes how the page looks. The
