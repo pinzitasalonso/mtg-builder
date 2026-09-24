@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { parseCollectionText } from "@/lib/collection-csv";
-import { collectionByName, scryfallIdFromImage, usdPricesByIds } from "@/lib/scryfall";
+import { lookupCollection, NAMED_GAP_MS, normalizeCardKey, resolveNamedDetailed, scryfallIdFromImage, usdPricesByIds, type OutCard } from "@/lib/scryfall";
+import { isUnrecognised, planEnrichment, type CardMeta } from "@/lib/collection-enrich";
 
 export const runtime = "nodejs";
 
@@ -10,6 +11,64 @@ const MAX_ENTRIES = 20000;
 // How many not-yet-resolved cards to enrich per GET. Bounded so a fresh import
 // converges over a few quick polls rather than blocking one slow request.
 const ENRICH_PER_CALL = 525; // 7 Scryfall requests of 75 names
+// Names the exact lookup missed get a fuzzy try each ("Lim-Dul's Vault",
+// "Jotun Grunt", a typo). One request apiece, so a handful per GET; the rest
+// wait for the next poll.
+const FUZZY_PER_CALL = 12;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Resolve a batch of un-matched rows and apply the result. Failed lookups are
+// left for the next call — see lib/collection-enrich.ts for why that matters.
+async function enrichBatch(userId: number) {
+  const stale = await prisma.collectionCard.findMany({
+    where: { userId, enriched: false },
+    select: { id: true, name: true, nameKey: true, quantity: true },
+    take: ENRICH_PER_CALL,
+  });
+  if (stale.length === 0) return;
+
+  const { found, notFound } = await lookupCollection(stale.map((r) => r.name));
+  const byName = new Map<string, OutCard>(found);
+  const unknownNames = new Set<string>();
+  const fuzzy = [...new Set(notFound.map(normalizeCardKey))].slice(0, FUZZY_PER_CALL);
+  for (const [i, key] of fuzzy.entries()) {
+    if (i > 0) await sleep(NAMED_GAP_MS);
+    const r = await resolveNamedDetailed(key);
+    if (r.status === "ok") byName.set(key, r.card);
+    else if (r.status === "notfound") unknownNames.add(key);
+    // "failed": neither — tried again next time.
+  }
+
+  const matched = new Map<number, CardMeta>();
+  const unknown = new Set<number>();
+  for (const r of stale) {
+    const k = normalizeCardKey(r.name);
+    const card = byName.get(k);
+    if (card) matched.set(r.id, card);
+    else if (unknownNames.has(k)) unknown.add(r.id);
+  }
+  const renames = [...matched.entries()]
+    .map(([id, c]) => ({ id, key: c.name.toLowerCase() }))
+    .filter(({ id, key }) => stale.find((r) => r.id === id)!.nameKey !== key);
+  const existing = renames.length
+    ? await prisma.collectionCard.findMany({
+        where: { userId, nameKey: { in: [...new Set(renames.map((r) => r.key))] }, id: { notIn: stale.map((r) => r.id) } },
+        select: { id: true, nameKey: true, quantity: true },
+      })
+    : [];
+
+  const ops = planEnrichment(stale, matched, unknown, existing);
+  if (ops.length === 0) return;
+  await prisma.$transaction(
+    ops.map((op) =>
+      op.kind === "delete"
+        ? prisma.collectionCard.delete({ where: { id: op.id } })
+        : op.kind === "quantity"
+          ? prisma.collectionCard.update({ where: { id: op.id }, data: { quantity: op.quantity } })
+          : prisma.collectionCard.update({ where: { id: op.id }, data: op.data })
+    )
+  );
+}
 
 // The signed-in user's owned-card collection. Guests have none — GET returns an
 // empty collection so deck pages can fetch it unconditionally. Each call resolves
@@ -20,29 +79,9 @@ export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ cards: [], unique: 0, total: 0, pending: 0 });
 
-  const stale = await prisma.collectionCard.findMany({
-    where: { userId: user.id, enriched: false },
-    select: { id: true, name: true },
-    take: ENRICH_PER_CALL,
-  });
-  if (stale.length > 0) {
-    const map = await collectionByName(stale.map((r) => r.name));
-    await prisma.$transaction(
-      stale.map((r) => {
-        const m = map.get(r.name.toLowerCase());
-        return prisma.collectionCard.update({
-          where: { id: r.id },
-          data: {
-            enriched: true,
-            colorIdentity: m?.colorIdentity ?? null,
-            typeLine: m?.typeLine ?? null,
-            manaCost: m?.manaCost ?? null,
-            imageUri: m?.imageUri ?? null,
-          },
-        });
-      })
-    );
-  }
+  // Enrichment is best-effort: a Scryfall failure must never keep the player
+  // from seeing the collection they already have.
+  await enrichBatch(user.id).catch((e) => console.error("[collection] enrich failed", e instanceof Error ? e.message : e));
 
   const rows = await prisma.collectionCard.findMany({
     where: { userId: user.id },
@@ -64,7 +103,9 @@ export async function GET() {
 
   const pending = await prisma.collectionCard.count({ where: { userId: user.id, enriched: false } });
   const total = rows.reduce((s, r) => s + r.quantity, 0);
-  return NextResponse.json({ cards, unique: rows.length, total, pending });
+  // Names Scryfall had no card for, so the player can fix or retry them.
+  const unrecognised = pending > 0 ? [] : rows.filter(isUnrecognised).map((r) => r.name);
+  return NextResponse.json({ cards, unique: rows.length, total, pending, unrecognised });
 }
 
 // Import a pasted list or a CSV export (Moxfield, ManaBox, Deckbox, TCGplayer…
@@ -76,10 +117,23 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Sign in to save a collection." }, { status: 401 });
 
   const body = await req.json().catch(() => null);
+
+  // "Try again" on unrecognised names: queue them for another lookup. Also
+  // recovers rows an old failed lookup left blank.
+  if (body?.rematch === true) {
+    const res = await prisma.collectionCard.updateMany({
+      where: { userId: user.id, enriched: true, typeLine: null, imageUri: null },
+      data: { enriched: false },
+    });
+    return NextResponse.json({ requeued: res.count });
+  }
+
   const text = typeof body?.text === "string" ? body.text : "";
   const mode = body?.mode === "replace" ? "replace" : "add";
 
-  const entries = parseCollectionText(text).slice(0, MAX_ENTRIES);
+  const parsed = parseCollectionText(text);
+  const entries = parsed.slice(0, MAX_ENTRIES);
+  const truncated = parsed.length - entries.length;
   if (entries.length === 0) {
     return NextResponse.json({ error: "Nothing to import — paste a list or choose a CSV first." }, { status: 400 });
   }
@@ -120,6 +174,9 @@ export async function POST(req: Request) {
     unique: rows.length,
     total: rows.reduce((s, r) => s + r.quantity, 0),
     imported: entries.length,
+    // Different cards past the cap, which weren't saved — said out loud rather
+    // than dropped silently.
+    truncated,
     mode,
   });
 }

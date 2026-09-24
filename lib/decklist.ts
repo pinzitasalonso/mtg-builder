@@ -15,9 +15,15 @@ export function parseDecklist(text: string): DecklistEntry[] {
     if (!line) continue;
     // Comment / section markers ("// Pool", "# Sideboard", "SIDEBOARD:") — skip.
     if (line.startsWith("//") || line.startsWith("#") || /^[A-Za-z ]+:$/.test(line)) continue;
-    const m = line.match(/^\s*(\d+)\s*[xX]?\s+(.*)$/);
+    // MTGO's "SB: 2 Duress" sideboard prefix.
+    const body = line.replace(/^SB:\s*/i, "");
+    const m = body.match(/^\s*(\d+)\s*[xX]?\s+(.*)$/);
     const qty = m ? Math.max(1, parseInt(m[1], 10)) : 1;
-    const name = (m ? m[2] : line).replace(/\s*\([^)]*\).*$/, "").trim();
+    const name = (m ? m[2] : body)
+      .replace(/\s*\([^)]*\).*$/, "") // "(CMR) 472" set + collector number
+      .replace(/\s*\[[^\]]*\]/g, "") // "[CMR]" set codes, "[Ramp]" tags (Deckstats, Archidekt)
+      .replace(/\s*\*[A-Za-z]+\*/g, "") // "*F*" / "*E*" foil markers (Moxfield)
+      .trim();
     if (!name) continue;
     const k = name.toLowerCase();
     if (byName.has(k)) {
