@@ -4,16 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { ArrowUp, Plus, RotateCcw, Sparkles, X } from "lucide-react";
-import { ModalShell } from "@/components/deck/ui";
 import { parseBlocks, type Block, type InlineToken } from "@/lib/chat-markdown";
 import { deckRef, rewriteDeckLinks } from "@/lib/assistant";
 import { resolveAndAdd } from "@/lib/pool-client";
 import { track } from "@/lib/track";
 
-/* The home assistant: one conversation across every deck and the collection
-   (POST /api/assistant reads them all server-side). Deck names in a reply open
-   the deck; a card name opens a menu to add it to any deck's pool. The
-   conversation survives closing the panel, and a reload (sessionStorage). */
+/* The home assistant, full screen: one conversation across every deck and the
+   collection (POST /api/assistant reads them all server-side, and can create
+   decks, edit them and save versions). Deck names in a reply open the deck; a
+   card name opens a menu to add it to any deck's pool. The conversation
+   survives closing the panel, and a reload (sessionStorage). */
 
 interface Msg {
   role: "user" | "assistant";
@@ -27,16 +27,30 @@ export interface AssistantDeckRef {
 const STORE = "sp-home-assistant";
 const STARTERS = [
   "Which of my decks is strongest, and which needs the most work?",
-  "What deck could I build from cards I already own?",
+  "Compare my decks by speed and cost.",
+  "Build me a new deck from cards I already own.",
   "Which cards am I running in several decks?",
   "What should I buy next that helps more than one deck?",
 ];
+
+// The server's in-stream signal that a tool changed a deck (see
+// /api/assistant). Stripped before anything is shown.
+const DECKS_CHANGED = "\u2063decks-changed\u2063";
 
 function namedImageUrl(name: string): string {
   return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=normal`;
 }
 
-export default function HomeAssistant({ decks, onClose }: { decks: AssistantDeckRef[]; onClose: () => void }) {
+export default function HomeAssistant({
+  decks,
+  onClose,
+  onDecksChanged,
+}: {
+  decks: AssistantDeckRef[];
+  onClose: () => void;
+  /** A reply created or changed a deck: refresh the list behind the panel. */
+  onDecksChanged?: () => void;
+}) {
   const [messages, setMessages] = useState<Msg[]>(() => {
     try {
       const saved = sessionStorage.getItem(STORE);
@@ -93,6 +107,10 @@ export default function HomeAssistant({ decks, onClose }: { decks: AssistantDeck
         const { done, value } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
+        if (acc.includes(DECKS_CHANGED)) {
+          acc = acc.split(DECKS_CHANGED).join("");
+          onDecksChanged?.();
+        }
         const shown = acc;
         setMessages((prev) => [...prev.slice(0, -1), { role: "assistant", content: shown }]);
       }
@@ -126,14 +144,39 @@ export default function HomeAssistant({ decks, onClose }: { decks: AssistantDeck
     setError("");
   }
 
+  // Full screen: Esc closes (unless the card menu is open, which it closes
+  // first), and the page behind stops scrolling.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (menu) setMenu(null);
+      else onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menu, onClose]);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
   const empty = messages.length === 0;
   return (
-    <ModalShell onDismiss={onClose} maxWidth={780} zIndex={75} labelledBy="home-assistant-title">
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, minHeight: "min(70vh, 640px)" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-          <Sparkles size={20} strokeWidth={2} color="var(--gold)" style={{ flex: "none", marginTop: 4 }} />
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="home-assistant-title"
+      style={{ position: "fixed", inset: 0, zIndex: 75, background: "var(--bg)", display: "flex", flexDirection: "column", animation: "sp-fade .15s ease" }}
+    >
+      {/* header: full width, with the column below centred under it */}
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "12px clamp(16px, 4vw, 32px)" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", alignItems: "center", gap: 10 }}>
+          <Sparkles size={20} strokeWidth={2} color="var(--gold)" style={{ flex: "none" }} />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 id="home-assistant-title" style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: "var(--frame-ink, var(--text))" }}>
+            <h2 id="home-assistant-title" style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "clamp(17px, 4.6vw, 22px)", fontWeight: 700, color: "var(--frame-ink, var(--text))", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               Ask about all your decks
             </h2>
             <div style={{ fontSize: 13, color: "var(--t3, var(--text-muted))", marginTop: 2 }}>
@@ -149,9 +192,26 @@ export default function HomeAssistant({ decks, onClose }: { decks: AssistantDeck
             <X size={18} strokeWidth={2.25} />
           </button>
         </div>
+      </div>
 
+      {/* transcript: the page's own scroll area */}
+      <div
+        ref={scrollRef}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+          setMenu(null);
+        }}
+        style={{ flex: 1, overflowY: "auto", padding: "20px clamp(16px, 4vw, 32px)" }}
+        aria-live="polite"
+      >
+        <div style={{ maxWidth: 860, margin: "0 auto", minHeight: "100%", display: "flex", flexDirection: "column", gap: 18 }}>
         {empty ? (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, justifyContent: "flex-end" }}>
+            <p style={{ margin: "0 0 8px", fontSize: 14.5, color: "var(--t2, var(--text-muted))", lineHeight: 1.5 }}>
+              It reads every deck with its cards’ costs, prices and Deck Score, and your collection. It can look cards up,
+              build a new deck, change one (saving a version first), or save a version.
+            </p>
             {STARTERS.map((s) => (
               <button key={s} type="button" onClick={() => send(s)} className="id-ghost" style={{ justifyContent: "flex-start", textAlign: "left", whiteSpace: "normal", padding: "11px 16px", borderRadius: 14, fontSize: 14 }}>
                 {s}
@@ -159,16 +219,7 @@ export default function HomeAssistant({ decks, onClose }: { decks: AssistantDeck
             ))}
           </div>
         ) : (
-          <div
-            ref={scrollRef}
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              pinned.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-              setMenu(null);
-            }}
-            style={{ flex: 1, maxHeight: "min(58vh, 560px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, padding: "2px" }}
-            aria-live="polite"
-          >
+          <>
             {messages.map((m, i) =>
               m.role === "user" ? (
                 <div key={i} style={{ alignSelf: "flex-end", maxWidth: "85%", background: "var(--bg3)", color: "var(--t1, var(--text))", padding: "9px 14px", borderRadius: "16px 16px 4px 16px", fontSize: 14.5, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
@@ -180,9 +231,14 @@ export default function HomeAssistant({ decks, onClose }: { decks: AssistantDeck
                 <div key={i} style={{ fontSize: 14, color: "var(--t3, var(--text-muted))" }}>Reading your decks…</div>
               )
             )}
-          </div>
+          </>
         )}
+        </div>
+      </div>
 
+      {/* composer, docked at the bottom */}
+      <div style={{ borderTop: "1px solid var(--line)", padding: "12px clamp(16px, 4vw, 32px) max(12px, env(safe-area-inset-bottom))" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
         {error && <div role="alert" style={{ fontSize: 13.5, color: "var(--danger)" }}>{error}</div>}
         {toast && <div role="status" style={{ fontSize: 13.5, color: "var(--t2, var(--text-muted))" }}>{toast}</div>}
 
@@ -211,12 +267,12 @@ export default function HomeAssistant({ decks, onClose }: { decks: AssistantDeck
             <ArrowUp size={19} strokeWidth={2.5} />
           </button>
         </form>
+        </div>
       </div>
 
-      {/* Portalled: the dialog's pop-in transform would otherwise become the
-          fixed menu's containing block and throw its position off. */}
+      {/* Portalled, so no ancestor's transform can offset the fixed menu. */}
       {menu && createPortal(<AddMenu name={menu.name} rect={menu.rect} decks={decks} onPick={(d) => addTo(d, menu.name)} onClose={() => setMenu(null)} />, document.body)}
-    </ModalShell>
+    </div>
   );
 }
 

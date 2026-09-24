@@ -423,7 +423,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {showAssistant && <HomeAssistant decks={decks.map((d) => ({ publicId: d.publicId, name: d.name }))} onClose={() => setShowAssistant(false)} />}
+      {showAssistant && <HomeAssistant decks={decks.map((d) => ({ publicId: d.publicId, name: d.name }))} onClose={() => setShowAssistant(false)} onDecksChanged={loadAll} />}
       {showCollection && <CollectionView onClose={() => setShowCollection(false)} onChanged={loadCollection} />}
 
       {showModal && (

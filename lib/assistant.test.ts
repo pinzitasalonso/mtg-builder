@@ -12,6 +12,7 @@ describe("buildDecksBlock", () => {
     expect(block.indexOf("### Kaito")).toBeLessThan(block.indexOf("### Zur"));
     expect(block).toContain("[Kaito](/deck/abc123)");
     expect(block).toContain("Commander: Kaito, Bane of Nightmares · 31/100 cards in the deck");
+    expect(block).toContain("Deck Score: not scanned yet");
     expect(block).toContain("Deck: Sol Ring; 30 Island");
     expect(block).toContain("Deck: (empty)");
   });
@@ -19,6 +20,26 @@ describe("buildDecksBlock", () => {
   it("caps a long pool", () => {
     const pool = Array.from({ length: 70 }, (_, i) => ({ name: `Card ${i}`, quantity: 1 }));
     expect(buildDecksBlock([deck({ pool })])).toContain("…and 10 more");
+  });
+});
+
+describe("card detail", () => {
+  it("adds mana value, type, role and price to each deck card, and totals the deck", () => {
+    const block = buildDecksBlock([
+      deck({
+        deck: [
+          { name: "Sol Ring", quantity: 1, manaValue: 1, type: "Artifact", role: "ramp", usd: "1.90" },
+          { name: "Island", quantity: 30, manaValue: 0, type: "Basic Land", usd: "0.10" },
+        ],
+        score: "6.5 (speed 7) · bracket 3",
+        versions: 2,
+      }),
+    ]);
+    expect(block).toContain("Sol Ring (mv 1, Artifact, ramp, $1.90)");
+    expect(block).toContain("30 Island (mv 0, Basic Land, $0.10)");
+    expect(block).toContain("about $4.90 (31 cards priced)");
+    expect(block).toContain("2 saved versions");
+    expect(block).toContain("Deck Score: 6.5 (speed 7) · bracket 3");
   });
 });
 
