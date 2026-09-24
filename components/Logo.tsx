@@ -37,6 +37,7 @@ export default function Logo({
       <ManaDisc type={ORDER[idx]} size={size + 2} />
       {wordmark && (
         <span
+          className="logo-word"
           style={{
             fontFamily: "var(--font-display)",
             fontSize: size,
