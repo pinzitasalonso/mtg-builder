@@ -3,7 +3,7 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — Spellpool",
+  title: "Privacy Policy",
   description: "What Spellpool stores, why, and how to remove it.",
 };
 
