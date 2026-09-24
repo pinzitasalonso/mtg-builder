@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Minus, Plus, Trash2, X } from "lucide-react";
+import { FileUp, Minus, Plus, Trash2, X } from "lucide-react";
 import { getIdentityTheme } from "@/lib/identity-theme";
 import {
   Collection,
@@ -12,7 +12,7 @@ import {
   importCollection,
   setCollectionCard,
 } from "@/lib/collection-client";
-import { parseDecklist } from "@/lib/decklist";
+import { parseCollectionText } from "@/lib/collection-csv";
 import { categoryOf, manaValue, TYPE_ORDER } from "@/components/mtg";
 
 // Tiles render in pages; scrolling near the bottom reveals the next page, so a
@@ -113,6 +113,25 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     setRowBusy(null);
   }
 
+  const fileRef = useRef<HTMLInputElement>(null);
+  async function loadFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // choosing the same file again still fires
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const found = parseCollectionText(text);
+      setImportText(text);
+      setNote(
+        found.length
+          ? `${file.name}: ${found.length} cards, ${found.reduce((s, c) => s + c.qty, 0)} copies. Pick a mode and import.`
+          : `Couldn’t find any cards in ${file.name}. It needs a header row with a Name column.`
+      );
+    } catch {
+      setNote(`Couldn’t read ${file.name}.`);
+    }
+  }
+
   async function runImport() {
     if (!importText.trim() || busy) return;
     setBusy(true);
@@ -127,7 +146,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     }
     // Optimistically reflect the import right away so the grid never flashes the
     // old list or an empty state while the server round-trip + enrichment finish.
-    const parsed = parseDecklist(text);
+    const parsed = parseCollectionText(text);
     setCollection((prev) => {
       const map = new Map<string, CollectionCard>();
       if (mode === "add") for (const c of prev.cards) map.set(c.name.toLowerCase(), { ...c });
@@ -251,7 +270,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
             autoCorrect="off"
             autoComplete="off"
             spellCheck={false}
-            placeholder={"Paste a list — 1 Sol Ring, 4 Llanowar Elves, or a Moxfield/Deckbox export"}
+            placeholder={"Paste a list — 1 Sol Ring, 4 Llanowar Elves — or upload a CSV from Moxfield, ManaBox, Deckbox, TCGplayer…"}
             style={{ width: "100%", minHeight: 110, resize: "vertical", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontFamily: "var(--font-mono, monospace)", fontSize: 16, lineHeight: 1.5, background: "var(--surface)", color: "var(--text)", outline: "none" }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
@@ -262,6 +281,12 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
                 </button>
               ))}
             </div>
+            {/* A CSV lands in the box first, so the mode can be picked and
+                what was read can be seen before anything is saved. */}
+            <input ref={fileRef} type="file" accept=".csv,text/csv,.txt,text/plain" onChange={loadFile} style={{ display: "none" }} />
+            <button onClick={() => fileRef.current?.click()} disabled={busy} className="mn-ghost" style={{ padding: "8px 14px", fontSize: 13 }}>
+              <FileUp size={15} strokeWidth={2.25} /> Upload CSV
+            </button>
             <button onClick={runImport} disabled={busy || !importText.trim()} className="mn-btn" style={{ padding: "8px 18px", fontSize: 13.5 }}>
               {busy ? "Saving…" : "Import"}
             </button>
