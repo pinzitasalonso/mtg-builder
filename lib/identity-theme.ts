@@ -81,6 +81,12 @@ const FELT = { center: "#412fda", mid: "#3726be", edge: "#2d1da1" };
 // The near-black every identity ground sinks into at the bottom.
 const TABLE_DARK = "#100a18";
 
+/** An identity color lifted toward white: a fill that reads as that deck's
+ *  color on its own darker ground (the home tile's progress bar). */
+export function liftHex(hex: string, t = 0.55): string {
+  return mixHex(hex, "#ffffff", t);
+}
+
 function mixHex(a: string, b: string, t: number): string {
   const [ar, ag, ab] = hexToRgb(a);
   const [br, bg, bb] = hexToRgb(b);

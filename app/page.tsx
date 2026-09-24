@@ -10,7 +10,7 @@ import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
 import { track } from "@/lib/track";
-import { getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
+import { getIdentityField, liftHex, LIGHT_VARS } from "@/lib/identity-theme";
 
 /* The home view wears the commander-blue identity field — the same immersive
    look the deck pages use, matching the Color Identity design. */
@@ -681,7 +681,10 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             </div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
               <div style={{ flex: 1, height: 6, borderRadius: 4, background: "rgba(255,255,255,.16)", overflow: "hidden" }}>
-                <div style={{ width: `${pct * 100}%`, height: "100%", background: "var(--gold)", borderRadius: 4 }} />
+                {/* The deck's own color, lifted so it reads on the tile's
+                    gradient. Not var(--gold): the deck section redefines that
+                    as the page's blue. */}
+                <div style={{ width: `${pct * 100}%`, height: "100%", background: liftHex(field.bg), borderRadius: 4 }} />
               </div>
               <span className="id-mono" style={{ fontSize: 12.5, color: "#fff", fontWeight: 600 }}>
                 {count}
