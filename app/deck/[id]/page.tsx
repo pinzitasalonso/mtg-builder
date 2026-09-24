@@ -1116,6 +1116,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           {pane === "stats" && (
             <DeckStatsPane
               deckId={deckId}
+              target={target}
               deckCards={deckCards}
               // Both boards. 8x8 and the bracket read the deck board out of
               // this themselves, and a Game Changer you are only CONSIDERING
