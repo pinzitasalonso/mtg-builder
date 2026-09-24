@@ -588,10 +588,12 @@ function Reveal({ delay = 0, style, children }: { delay?: number; style?: React.
 /* Fanned hand of real cards — staggered deal-in + idle float; hover lifts a card. */
 function CardFan() {
   const [hov, setHov] = useState<number | null>(null);
+  // Classics in their original 1993 frames — the black-bordered Beta
+  // printings — pinned by image: by name alone Scryfall serves the newest.
   const fan = [
-    { name: "Sol Ring", colors: ["C"] },
-    { name: "Counterspell", colors: ["U"] },
-    { name: "Braids, Conjurer Adept", colors: ["U"] },
+    { name: "Shivan Dragon", colors: ["R"], src: "https://cards.scryfall.io/normal/front/5/e/5e64822a-6817-4e1e-8155-3e95f8e3763f.jpg" },
+    { name: "Black Lotus", colors: ["C"], src: "https://cards.scryfall.io/normal/front/b/3/b3a69a1c-c80f-4413-a6fd-ae54cabbce28.jpg" },
+    { name: "Serra Angel", colors: ["W"], src: "https://cards.scryfall.io/normal/front/5/6/5669f9c8-2e94-47e2-a551-7efff317fb34.jpg" },
   ];
   return (
     <div className="id-fan" style={{ position: "relative", height: 420, display: "flex", justifyContent: "center", alignItems: "center" }} aria-hidden="true">
@@ -633,7 +635,7 @@ function CardFan() {
                     animation: `id-float 6.5s ease-in-out ${1200 + i * 260}ms infinite`,
                   }}
                 >
-                  <CardArt name={c.name} colors={c.colors} version="normal" radius={14} style={{ width: "100%", height: "100%" }} />
+                  <CardArt name={c.name} src={c.src} prefer="src" colors={c.colors} version="normal" radius={14} style={{ width: "100%", height: "100%" }} />
                 </div>
               </div>
             </div>
