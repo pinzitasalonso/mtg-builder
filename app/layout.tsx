@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { SITE_DESCRIPTION, SITE_URL } from "@/lib/landing";
 import { IBM_Plex_Mono, Inter } from "next/font/google";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import "./globals.css";
@@ -26,22 +27,41 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://www.spellpool.com"),
-  title: "Spellpool — MTG Deck Builder",
-  description:
-    "Spellpool — build and brew Magic: The Gathering decks, powered by Claude + Scryfall.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Spellpool — AI Magic: The Gathering deck builder for Commander",
+    // Pages that set a title read "Kaito, Bane of Nightmares · Spellpool".
+    template: "%s · Spellpool",
+  },
+  description: SITE_DESCRIPTION,
   applicationName: "Spellpool",
+  keywords: [
+    "MTG deck builder",
+    "Commander deck builder",
+    "EDH deck builder",
+    "AI deck builder",
+    "Magic: The Gathering",
+    "Commander brackets",
+    "deck score",
+    "MTG combos",
+    "MTG collection tracker",
+    "playtest MTG deck",
+  ],
+  // No canonical here: set in the root layout it would be inherited by every
+  // page, marking them all as copies of the home page.
+  robots: { index: true, follow: true },
   openGraph: {
-    title: "Spellpool",
-    description: "Build and brew your Magic: The Gathering decks.",
+    title: "Spellpool — AI Magic: The Gathering deck builder",
+    description: SITE_DESCRIPTION,
     url: "/",
     siteName: "Spellpool",
     type: "website",
+    locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Spellpool",
-    description: "Build and brew your Magic: The Gathering decks.",
+    title: "Spellpool — AI Magic: The Gathering deck builder",
+    description: SITE_DESCRIPTION,
   },
 };
 

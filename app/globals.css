@@ -1634,3 +1634,8 @@ button {
     width: min(64vw, 240px) !important;
   }
 }
+
+/* Landing FAQ: the chevron turns when an answer is open. */
+.home-faq summary::-webkit-details-marker { display: none; }
+.home-faq[open] .home-faq-chevron { transform: rotate(180deg); }
+.home-faq-chevron { transition: transform .15s ease; }
