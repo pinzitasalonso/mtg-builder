@@ -12,7 +12,7 @@ import {
   importCollection,
   setCollectionCard,
 } from "@/lib/collection-client";
-import { parseDecklist } from "@/lib/decklist";
+import { parseCollectionText } from "@/lib/collection-csv";
 import { categoryOf, manaValue, TYPE_ORDER } from "@/components/mtg";
 
 // Tiles render in pages; scrolling near the bottom reveals the next page, so a
@@ -65,6 +65,17 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
 
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  // A CSV export (Moxfield, Archidekt, ManaBox, Deckbox, TCGplayer) or a plain
+  // text list, read into the box so the same Import button sends it; the
+  // server reads a CSV by its Name and Count columns.
+  async function loadFile(file: File | undefined) {
+    if (!file) return;
+    const text = await file.text();
+    setImportText(text);
+    setNote(`${file.name} loaded — check the mode, then Import.`);
+  }
   const [importMode, setImportMode] = useState<"add" | "replace">("add");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -127,7 +138,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     }
     // Optimistically reflect the import right away so the grid never flashes the
     // old list or an empty state while the server round-trip + enrichment finish.
-    const parsed = parseDecklist(text);
+    const parsed = parseCollectionText(text);
     setCollection((prev) => {
       const map = new Map<string, CollectionCard>();
       if (mode === "add") for (const c of prev.cards) map.set(c.name.toLowerCase(), { ...c });
@@ -251,7 +262,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
             autoCorrect="off"
             autoComplete="off"
             spellCheck={false}
-            placeholder={"Paste a list — 1 Sol Ring, 4 Llanowar Elves, or a Moxfield/Deckbox export"}
+            placeholder={"Paste a list — 1 Sol Ring, 4 Llanowar Elves — or choose a CSV export from Moxfield, Archidekt, ManaBox, Deckbox or TCGplayer"}
             style={{ width: "100%", minHeight: 110, resize: "vertical", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontFamily: "var(--font-mono, monospace)", fontSize: 16, lineHeight: 1.5, background: "var(--surface)", color: "var(--text)", outline: "none" }}
           />
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10, flexWrap: "wrap" }}>
@@ -264,6 +275,19 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
             </div>
             <button onClick={runImport} disabled={busy || !importText.trim()} className="mn-btn" style={{ padding: "8px 18px", fontSize: 13.5 }}>
               {busy ? "Saving…" : "Import"}
+            </button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".csv,.tsv,.txt,text/csv,text/plain,text/tab-separated-values"
+              hidden
+              onChange={(e) => {
+                void loadFile(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+            <button onClick={() => fileInput.current?.click()} disabled={busy} className="mn-ghost" style={{ padding: "8px 14px", fontSize: 13 }}>
+              Choose a file…
             </button>
             <button onClick={runClear} disabled={busy || collection.unique === 0} className="mn-ghost" style={{ padding: "8px 14px", fontSize: 13 }}>
               Clear all

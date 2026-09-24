@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
-import { parseDecklist } from "@/lib/decklist";
+import { parseCollectionText } from "@/lib/collection-csv";
 import { collectionByName, scryfallIdFromImage, usdPricesByIds } from "@/lib/scryfall";
 
 export const runtime = "nodejs";
@@ -67,7 +67,9 @@ export async function GET() {
   return NextResponse.json({ cards, unique: rows.length, total, pending });
 }
 
-// Import a pasted collection. `mode: "replace"` swaps the whole collection;
+// Import a collection: a pasted "{qty} {name}" list, or a CSV export from
+// Moxfield, Archidekt, ManaBox, Deckbox or TCGplayer (read by its Name and
+// Count columns). `mode: "replace"` swaps the whole collection;
 // "add" merges quantities into what's already there. Cards are stored by name
 // only (no Scryfall resolution) so even huge collections import instantly.
 export async function POST(req: Request) {
@@ -78,9 +80,9 @@ export async function POST(req: Request) {
   const text = typeof body?.text === "string" ? body.text : "";
   const mode = body?.mode === "replace" ? "replace" : "add";
 
-  const entries = parseDecklist(text).slice(0, MAX_ENTRIES);
+  const entries = parseCollectionText(text).slice(0, MAX_ENTRIES);
   if (entries.length === 0) {
-    return NextResponse.json({ error: "Nothing to import — paste a list first." }, { status: 400 });
+    return NextResponse.json({ error: "Nothing to import — paste a list or choose a file first." }, { status: 400 });
   }
 
   if (mode === "replace") {
