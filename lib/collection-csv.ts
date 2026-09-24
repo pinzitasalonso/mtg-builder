@@ -1,4 +1,5 @@
 import { parseDecklist, type DecklistEntry } from "./decklist";
+import { printingRef } from "./printing";
 
 // Collection exports from the usual apps (Moxfield, ManaBox, Deckbox,
 // TCGplayer, Archidekt, Dragon Shield, Delver Lens) are CSV with a header row.
@@ -8,6 +9,12 @@ import { parseDecklist, type DecklistEntry } from "./decklist";
 // carries printing notes like "(Borderless)").
 const NAME_HEADERS = ["simple name", "card name", "cardname", "card_name", "name", "card"];
 const QTY_HEADERS = ["quantity", "count", "qty", "amount", "copies", "quantityx"];
+// The exact printing: ManaBox and others carry the Scryfall id; most carry a
+// set code and collector number. (A "Set" column holding a set NAME, as
+// TCGplayer's does, is ignored by printingRef — it can't be looked up.)
+const ID_HEADERS = ["scryfall id", "scryfall_id", "scryfallid", "scryfall uuid"];
+const SET_HEADERS = ["set code", "set_code", "setcode", "edition", "set"];
+const NUMBER_HEADERS = ["collector number", "collector_number", "collectornumber", "card number", "number", "cn"];
 
 /** Split CSV text into rows of cells. Handles quoted cells with delimiters,
  *  doubled quotes and line breaks inside them (RFC 4180). */
@@ -61,6 +68,12 @@ export function parseCollectionCsv(text: string): DecklistEntry[] | null {
   const nameCol = NAME_HEADERS.map((h) => header.indexOf(h)).find((i) => i >= 0);
   if (nameCol === undefined) return null;
   const qtyCol = QTY_HEADERS.map((h) => header.indexOf(h)).find((i) => i >= 0);
+  const col = (hs: string[]) => hs.map((h) => header.indexOf(h)).find((i) => i >= 0);
+  const idCol = col(ID_HEADERS);
+  const setCol = col(SET_HEADERS);
+  const numCol = col(NUMBER_HEADERS);
+  // The copies behind the printing each entry keeps (the one owned most of).
+  const printingQty = new Map<number, number>();
 
   const entries: DecklistEntry[] = [];
   const byName = new Map<string, number>();
@@ -73,10 +86,20 @@ export function parseCollectionCsv(text: string): DecklistEntry[] | null {
     // unreadable count means one.
     const qty = Number.isFinite(n) ? n : 1;
     if (qty <= 0) continue;
-    // Each printing is its own row; the collection counts by name.
+    const at = (c: number | undefined) => (c === undefined ? null : r[c]);
+    const printing = printingRef(at(idCol), at(setCol), at(numCol));
+    // Each printing is its own row; the collection counts by name, and shows
+    // the printing owned most of (the first, on a tie).
     const k = name.toLowerCase();
-    if (byName.has(k)) entries[byName.get(k)!].qty += qty;
-    else { byName.set(k, entries.length); entries.push({ name, qty }); }
+    if (byName.has(k)) {
+      const i = byName.get(k)!;
+      entries[i].qty += qty;
+      if (printing && qty > (printingQty.get(i) ?? 0)) { entries[i].printing = printing; printingQty.set(i, qty); }
+    } else {
+      byName.set(k, entries.length);
+      if (printing) printingQty.set(entries.length, qty);
+      entries.push(printing ? { name, qty, printing } : { name, qty });
+    }
   }
   return entries;
 }

@@ -90,6 +90,14 @@ export function planEnrichment(
   return ops;
 }
 
+/** The name a collection row goes by. A reversible printing (the same card on
+ *  both sides) is "Hallowed Fountain // Hallowed Fountain" to Scryfall; decks
+ *  know it as "Hallowed Fountain", and ownership is a name comparison. */
+export function canonicalName(name: string): string {
+  const faces = name.split(" // ");
+  return faces.length > 1 && faces.every((f) => f === faces[0]) ? faces[0] : name;
+}
+
 /** Rows whose name Scryfall doesn't know: done, but with nothing resolved. */
 export function isUnrecognised(r: { typeLine: string | null; imageUri: string | null }): boolean {
   return !r.typeLine && !r.imageUri;

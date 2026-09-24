@@ -17,8 +17,10 @@ describe("parseDecklist", () => {
     expect(parseDecklist("4x Counterspell")).toEqual([{ name: "Counterspell", qty: 4 }]);
   });
 
-  it("strips set / collector-number suffixes", () => {
-    expect(parseDecklist("1 Sol Ring (C21) 263")).toEqual([{ name: "Sol Ring", qty: 1 }]);
+  it("strips set / collector-number suffixes, keeping them as the printing", () => {
+    expect(parseDecklist("1 Sol Ring (C21) 263")).toEqual([{ name: "Sol Ring", qty: 1, printing: { set: "c21", number: "263" } }]);
+    // A set code with no number isn't a printing that can be looked up.
+    expect(parseDecklist("1 Sol Ring (C21)")).toEqual([{ name: "Sol Ring", qty: 1 }]);
   });
 
   it("merges repeated names case-insensitively, preserving first-seen order", () => {
@@ -47,7 +49,7 @@ describe("parseDecklist", () => {
   it("strips bracketed set codes and tags, foil markers and MTGO's SB: prefix", () => {
     expect(parseDecklist("1 Sol Ring [CMR]\n1x Arcane Signet (CMR) 297 *F*\n1 Swords to Plowshares *F*\n1 Cultivate [Ramp]\nSB: 2 Duress")).toEqual([
       { name: "Sol Ring", qty: 1 },
-      { name: "Arcane Signet", qty: 1 },
+      { name: "Arcane Signet", qty: 1, printing: { set: "cmr", number: "297" } },
       { name: "Swords to Plowshares", qty: 1 },
       { name: "Cultivate", qty: 1 },
       { name: "Duress", qty: 2 },
