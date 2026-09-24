@@ -10,11 +10,11 @@ export const FREE_AI_PER_DAY = 4;
 export const FREE_SCANS_PER_DAY = 1;
 
 export const DECK_LIMIT_MSG =
-  `The free plan holds ${FREE_DECK_LIMIT} decks — delete one to make room. Spellpool Pro (in the iOS app) lifts the limit.`;
+  `The free plan holds ${FREE_DECK_LIMIT} decks — delete one to make room. Spellpool Pro, coming soon, lifts the limit.`;
 export const AI_LIMIT_MSG =
-  `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro (in the iOS app) lifts the limit.`;
+  `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro, coming soon, lifts the limit.`;
 export const SCAN_LIMIT_MSG =
-  `You've used today's free deck scan — it resets at midnight UTC. Spellpool Pro (in the iOS app) makes scans unlimited.`;
+  `You've used today's free deck scan — it resets at midnight UTC. Spellpool Pro, coming soon, makes scans unlimited.`;
 
 export interface TierFields {
   tier?: string | null;
