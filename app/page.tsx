@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, Copy, Library, LogOut, Pin, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, Copy, Library, LogOut, Pin, Plus, Sparkles, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
+import HomeAssistant from "@/components/HomeAssistant";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
@@ -66,6 +67,9 @@ export default function HomePage() {
   const [loaded, setLoaded] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showCollection, setShowCollection] = useState(false);
+  // The all-decks assistant. Its conversation lives in sessionStorage, so closing
+  // the panel (or reloading) keeps it.
+  const [showAssistant, setShowAssistant] = useState(false);
   // Collection summary for the home block: count + a few names for thumbnails.
   const [collection, setCollection] = useState<{ unique: number; total: number; pending: number; sample: string[] }>({ unique: 0, total: 0, pending: 0, sample: [] });
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
@@ -341,6 +345,25 @@ export default function HomePage() {
               <CStat n={formatCount} label="Formats" accent />
             </div>
           </div>
+          {/* The assistant that sees every deck at once. Styled as the box you'd
+              type into, because that's what tapping it opens. */}
+          {decks.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAssistant(true)}
+              className="home-ask"
+              style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", margin: "0 0 26px", padding: "14px 18px", borderRadius: 18, border: "1px solid var(--line)", background: "var(--bg2)", color: "var(--t2)", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-ui)", boxShadow: "0 4px 14px -8px rgba(0,0,0,.25)" }}
+            >
+              <Sparkles size={20} strokeWidth={2} color="var(--gold)" style={{ flex: "none" }} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 700, fontSize: 15.5, color: "var(--t1)" }}>Ask about all your decks</span>
+                <span style={{ display: "block", fontSize: 13.5, color: "var(--t3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  Which deck is strongest? What can I build from my collection?
+                </span>
+              </span>
+              <ArrowRight size={17} strokeWidth={2.25} style={{ flex: "none" }} />
+            </button>
+          )}
           <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onPin={pinDeck} onNew={() => setShowModal(true)} showNew={loaded} />
           <CollectionBlock unique={collection.unique} total={collection.total} pending={collection.pending} sample={collection.sample} onOpen={() => setShowCollection(true)} />
           <div style={{ height: 64 }} />
@@ -400,6 +423,7 @@ export default function HomePage() {
         </div>
       </div>
 
+      {showAssistant && <HomeAssistant decks={decks.map((d) => ({ publicId: d.publicId, name: d.name }))} onClose={() => setShowAssistant(false)} />}
       {showCollection && <CollectionView onClose={() => setShowCollection(false)} onChanged={loadCollection} />}
 
       {showModal && (
