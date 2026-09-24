@@ -179,7 +179,7 @@ export default function HomePage() {
     return (
       <span
         className="home-meter"
-        title="Free plan. Spellpool Pro in the iOS app lifts both limits."
+        title="Free plan. Spellpool Pro, coming soon, lifts both limits."
         style={{
           fontSize: 11.5,
           fontWeight: 600,

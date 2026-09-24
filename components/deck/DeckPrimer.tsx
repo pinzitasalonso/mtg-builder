@@ -101,7 +101,7 @@ export default function DeckPrimer({
         <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: "var(--w-3)" }}>
           No primer yet.{" "}
           {canEdit
-            ? "Write how this deck is piloted — the plan, what to keep, the combos and the lines. The iOS app can draft one from your decklist."
+            ? "Write how this deck is piloted — the plan, what to keep, the combos and the lines."
             : "The owner hasn’t written one."}
         </p>
       )}

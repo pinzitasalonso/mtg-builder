@@ -13,6 +13,8 @@ export const SITE_DESCRIPTION =
 export interface LandingFeature {
   /** A lucide icon name, mapped to the component on the page. */
   icon: "sparkles" | "gauge" | "link" | "library" | "dices" | "history" | "cart" | "phone";
+  // (No mention of the iPhone app, or of the AI model by name, until the app
+  // ships — the web on a phone is the mobile story for now.)
   title: string;
   body: string;
 }
@@ -61,8 +63,8 @@ export const LANDING_FEATURES: LandingFeature[] = [
   },
   {
     icon: "phone",
-    title: "Web and iPhone",
-    body: "The same decks and collection on spellpool.com and in the iPhone app, kept in sync.",
+    title: "On your phone, too",
+    body: "Spellpool works in your phone's browser. Add it to your home screen and your decks, collection and assistant come with you.",
   },
 ];
 
@@ -91,7 +93,7 @@ export const LANDING_FAQ: FaqItem[] = [
       // One template literal on purpose: the production minifier folded two
       // concatenated templates here into "with 41 deck scan a day", dropping
       // the words between the constants.
-      `Yes. The free plan holds ${FREE_DECK_LIMIT} decks, with ${FREE_AI_PER_DAY} AI questions and ${FREE_SCANS_PER_DAY} deck scan a day. Spellpool Pro, in the iPhone app, lifts every limit.`,
+      `Yes. The free plan holds ${FREE_DECK_LIMIT} decks, with ${FREE_AI_PER_DAY} AI questions and ${FREE_SCANS_PER_DAY} deck scan a day. Spellpool Pro, with no limits, is coming soon.`,
   },
   {
     q: "How does the Deck Score work?",
@@ -109,8 +111,7 @@ export const LANDING_FAQ: FaqItem[] = [
   {
     q: "Where does the card data come from?",
     a:
-      "Card text, images and prices come from Scryfall, and combos from Commander Spellbook. The AI is Claude, by " +
-      "Anthropic.",
+      "Card text, images and prices come from Scryfall, and combos from Commander Spellbook.",
   },
 ];
 
@@ -124,7 +125,7 @@ export function landingJsonLd(): object[] {
       url: SITE_URL,
       description: SITE_DESCRIPTION,
       applicationCategory: "GameApplication",
-      operatingSystem: "Web, iOS",
+      operatingSystem: "Web",
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
       featureList: LANDING_FEATURES.map((f) => f.title),
     },
