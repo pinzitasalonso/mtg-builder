@@ -41,9 +41,10 @@ const MAX_MESSAGE_CHARS = 8000;
 // unusual with web search capped at 3 uses.
 const MAX_RESUMES = 3;
 
-// Reasoning effort. Opus 5 defaults to `high`; effort governs thinking, and
-// thinking is both the slowest and the priciest part of a turn (it bills as
-// OUTPUT at $25/M).
+// Reasoning effort. Opus 5.5 defaults to `medium` (Opus 5 defaulted to `high`),
+// but this stays explicit so a default change can't move it. Effort governs
+// thinking, and thinking is both the slowest and the priciest part of a turn
+// (it bills as OUTPUT, $20/M on Opus 5.5).
 //
 // This was parked at the default on purpose, waiting for real numbers rather
 // than a hunch — the complaints that led to Opus 5 in the first place were
@@ -357,8 +358,8 @@ export async function POST(req: Request) {
       // updated the app.
       }, 10000);
       try {
-        // Opus 5 rejects sampling params (`temperature` → 400) and runs
-        // adaptive thinking by default; thinking spends output tokens, so the
+        // Opus 5.5 rejects sampling params (`temperature` → 400) and always
+        // runs adaptive thinking (it can't be disabled — effort is the dial); thinking spends output tokens, so the
         // budget carries headroom beyond the visible reply. Full-decklist
         // builds (60–100 lines AFTER a heavy think) were starving at 6000 —
         // the visible reply came back truncated or empty. The stream filter
@@ -387,8 +388,8 @@ export async function POST(req: Request) {
         let finalStop: Anthropic.Message["stop_reason"] = null;
         for (let attempt = 0; ; attempt++) {
           const ai = anthropic.messages.stream({
-            model: "claude-opus-5",
-            // Opus 5 allows 128K output. 16000 was chosen when a full decklist
+            model: "claude-opus-5-5",
+            // Opus 5.5 allows 128K output. 16000 was chosen when a full decklist
             // build was starving at 6000, and it is still the ceiling a long
             // answer runs into — thinking bills against this budget too, so a
             // heavy think before a 100-line list eats it between them. This is
