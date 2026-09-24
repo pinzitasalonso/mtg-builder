@@ -58,6 +58,8 @@ export interface DeckInsightData {
   /** null while the Game Changer list is still loading. */
   changers: number | null;
   combos: ComboResult | null;
+  /** The combo lookup is still in flight (combos is null until it answers). */
+  combosLoading: boolean;
   history: History | null;
   /** The last scan, or null when the deck has never been scanned. */
   scan: DeckScan | null;
@@ -77,6 +79,7 @@ export interface DeckInsightData {
 export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsightData {
   const [gameChangers, setGameChangers] = useState<Set<string> | null>(null);
   const [combos, setCombos] = useState<ComboResult | null>(null);
+  const [combosLoading, setCombosLoading] = useState(true);
   const [history, setHistory] = useState<History | null>(null);
   const [scan, setScan] = useState<DeckScan | null>(null);
 
@@ -98,10 +101,12 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
 
   useEffect(() => {
     let live = true;
+    setCombosLoading(true);
     fetch(`/api/decks/${deckId}/combos`)
       .then((r) => (r.ok ? r.json() : null))
       .then((b) => live && setCombos(b))
-      .catch(() => live && setCombos(null));
+      .catch(() => live && setCombos(null))
+      .finally(() => live && setCombosLoading(false));
     return () => {
       live = false;
     };
@@ -145,6 +150,7 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
     bracket,
     changers,
     combos,
+    combosLoading,
     history,
     scan,
     setScan,
@@ -201,7 +207,7 @@ function StatTile({ label, value, detail, warn }: { label: string; value: string
 }
 
 /**
- * The verdict, at a glance: size, average cost, bracket, lands — a row of
+ * The verdict, at a glance: size, bracket, average cost, combos — a row of
  * tiles — and, under them, the Score with its working.
  */
 export function InsightProfile({
@@ -209,13 +215,11 @@ export function InsightProfile({
   avgManaValue,
   cardCount,
   target,
-  lands,
 }: {
   insight: DeckInsightData;
   avgManaValue: number;
   cardCount: number;
   target: number;
-  lands: number;
 }) {
   const { bracket, changers, combos, scan } = insight;
   const score = scan?.score ?? null;
@@ -240,6 +244,29 @@ export function InsightProfile({
     ? [`plays like it, by its Score`, `rules alone: ${BRACKET_NUMBER[bracket]}${bracketDetail ? ` (${bracketDetail})` : ""}`].join(" · ")
     : bracketDetail;
 
+  // Combos the deck can assemble (Commander Spellbook). Null while loading, or
+  // when Spellbook didn't answer — "0" would claim a count we don't have.
+  const comboList = combos?.combos ?? null;
+  const comboValue = comboList === null ? (insight.combosLoading ? "…" : "—") : String(comboList.length);
+  const wins = comboList?.filter((c) => c.produces.some((p) => /win the game/i.test(p))).length ?? 0;
+  const comboDetail =
+    comboList === null
+      ? insight.combosLoading
+        ? "checking Spellbook…"
+        : "couldn’t check right now"
+      : comboList.length === 0
+        ? "none in the list"
+        : [
+            wins ? `${wins} win${wins === 1 ? "s" : ""} the game` : null,
+            combos?.hasTwoCardCombo ? "two-card combo" : null,
+            // Otherwise, what they make: "infinite tokens · infinite damage".
+            ...(wins
+              ? []
+              : [...new Set(comboList.map((c) => c.produces[0]?.toLowerCase()).filter(Boolean))].slice(0, 2)),
+          ]
+            .filter(Boolean)
+            .join(" · ") || null;
+
   const missing = target - cardCount;
   return (
     <div>
@@ -252,7 +279,7 @@ export function InsightProfile({
         />
         <StatTile label="Bracket" value={`${BRACKET_NUMBER[shown.bracket]} · ${BRACKET_LABEL[shown.bracket]}`} detail={bracketNote} />
         {Number.isFinite(avgManaValue) && <StatTile label="Average cost" value={avgManaValue.toFixed(2)} detail="mana value, lands excluded" />}
-        <StatTile label="Lands" value={String(lands)} detail={`${Math.round((lands / Math.max(1, cardCount)) * 100)}% of the deck`} />
+        <StatTile label="Combos" value={comboValue} detail={comboDetail} />
       </div>
       {score && (
         <div style={{ maxWidth: 620 }}>

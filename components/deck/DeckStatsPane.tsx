@@ -4,7 +4,8 @@
 //
 // Three parts, top to bottom:
 //   AT A GLANCE — the numbers that judge the deck, as a row of tiles (size,
-//     bracket, average cost, lands), and the Score with its working.
+//     bracket, average cost, combos), and the Score with its working. Lands
+//     have their count in the composition just below.
 //   BUILD — what it's made of, in two pairs that belong together: the curve
 //     beside the composition (what it costs, what it is), then the colours and
 //     mana sources beside the roles (8×8) (what it needs, what it does).
@@ -99,14 +100,13 @@ export default function DeckStatsPane({
     );
   }
 
-  const lands = stats.types.find((t) => t.name === "Lands")?.n ?? 0;
   // Two blocks that read together: side by side where there's room.
   const pair: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", columnGap: 40 };
 
   return (
     <div>
       <StatSection title="At a glance">
-        <InsightProfile insight={insight} avgManaValue={avgManaValue} cardCount={stats.count} target={target} lands={lands} />
+        <InsightProfile insight={insight} avgManaValue={avgManaValue} cardCount={stats.count} target={target} />
         <div style={{ marginTop: 12 }}>
           <InsightScan deckId={deckId} insight={insight} canEdit={canEdit} open={scanOpen} primer={primer} />
         </div>
