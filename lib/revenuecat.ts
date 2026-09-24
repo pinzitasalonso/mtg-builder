@@ -1,7 +1,7 @@
 // RevenueCat → server subscription sync.
 //
 // "Pro" is sold through RevenueCat in two places: the iOS app (App Store IAP)
-// and spellpool.com (Web Billing, through purchases-js). RevenueCat is the
+// and spellpool.com (Paddle, through RevenueCat's purchases-js). RevenueCat is the
 // source of truth for whether a subscription is active; our job is only to
 // mirror that onto `User.tier` ("pro" | "free"), which is what every plan gate
 // already reads (lib/limits.ts) — so a purchase on either lifts the caps on
@@ -24,9 +24,16 @@ const PRO_ENTITLEMENT = "pro";
 
 interface RCSubscriberResponse {
   subscriber?: {
-    entitlements?: Record<string, { expires_date?: string | null }>;
+    entitlements?: Record<string, { expires_date?: string | null; product_identifier?: string }>;
+    subscriptions?: Record<string, { store?: string; is_sandbox?: boolean }>;
   };
 }
+
+// Stores whose test mode anyone can reach from the website: a test purchase
+// there costs nothing but a test card. The App Store's is TestFlight, which
+// is invited testers only, so its sandbox purchases keep counting as they
+// always have.
+const WEB_STORES = new Set(["paddle", "rc_billing", "stripe", "test_store"]);
 
 /* Ask RevenueCat whether this app_user_id currently has the `pro` entitlement.
    Canonical check (RevenueCat's recommended pattern): re-read the subscriber
@@ -36,10 +43,16 @@ interface RCSubscriberResponse {
    Tri-state: true/false is a DEFINITIVE answer from RevenueCat; null means we
    couldn't get one (bad/permission-less API key, network failure, RC outage).
    Callers must not change anyone's tier on null — a misconfigured key once
-   made every re-check actively stamp paying subscribers back to "free". */
+   made every re-check actively stamp paying subscribers back to "free".
+
+   In production, Pro backed only by a TEST purchase from a web store is not
+   Pro. Paddle's test and live keys look alike (both `pdl_…`), so the key
+   check below can't keep a test key off the live site; this can, whichever
+   key is set. */
 export async function isProOnRevenueCat(
   appUserId: string,
-  secretKey: string
+  secretKey: string,
+  production: boolean = process.env.NODE_ENV === "production"
 ): Promise<boolean | null> {
   try {
     const res = await fetch(`${RC_API}/subscribers/${encodeURIComponent(appUserId)}`, {
@@ -52,6 +65,10 @@ export async function isProOnRevenueCat(
     const data = (await res.json()) as RCSubscriberResponse;
     const ent = data.subscriber?.entitlements?.[PRO_ENTITLEMENT];
     if (!ent) return false;
+    if (production) {
+      const sub = data.subscriber?.subscriptions?.[ent.product_identifier ?? ""];
+      if (sub?.is_sandbox && WEB_STORES.has(sub.store ?? "")) return false;
+    }
     // Active when there's no expiry (non-expiring) or the expiry is in the future.
     if (!ent.expires_date) return true;
     return new Date(ent.expires_date).getTime() > Date.now();
@@ -73,17 +90,20 @@ export function userIdFromAppUserId(appUserId: string): number | null {
    with a PUBLIC key that the server hands to the browser. So this is the one
    place a key leaves the server, and it only lets through the kinds that are
    meant to:
-     - `rcb_…`    a Web Billing key — the one production runs on.
+     - `pdl_…`    a Paddle key — the one production runs on. Paddle is the
+                  merchant of record, so it collects and pays the sales tax.
+     - `rcb_…`    a RevenueCat Web Billing (Stripe) key, the alternative.
      - `rcb_sb_…` a Web Billing sandbox key (Stripe test cards).
      - `test_…`   the Test Store key (purchases are simulated).
    The last two hand out Pro without real money, so they're refused in
    production: a sandbox key left in Railway would make Pro free for anyone
-   who found a Stripe test card. Anything else — above all an `sk_` secret key
-   pasted into the wrong variable — is refused everywhere, and the paywall
-   simply stays hidden. */
+   who found a test card. A Paddle test key can't be told apart by its prefix,
+   so isProOnRevenueCat refuses its purchases in production instead. Anything
+   else — above all an `sk_` secret key pasted into the wrong variable — is
+   refused everywhere, and the paywall simply stays hidden. */
 export function webPaywallKey(raw: string | null | undefined, production: boolean): string | null {
   const key = raw?.trim();
-  if (!key || !/^(rcb|test)_[A-Za-z0-9_.-]+$/.test(key)) return null;
+  if (!key || !/^(pdl|rcb|test)_[A-Za-z0-9_.-]+$/.test(key)) return null;
   const sandbox = key.startsWith("rcb_sb_") || key.startsWith("test_");
   return production && sandbox ? null : key;
 }

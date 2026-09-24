@@ -1,5 +1,6 @@
 // The web half of Spellpool Pro: RevenueCat's own paywall, rendered on
-// spellpool.com by purchases-js and paid through Web Billing.
+// spellpool.com by purchases-js and paid through Paddle, which RevenueCat
+// drives (Paddle is the merchant of record, so it handles sales tax and VAT).
 //
 // It's the same paywall the iOS app shows (RevenueCatUI's PaywallView) — the
 // design, the copy and the prices all live in the RevenueCat dashboard on the
@@ -19,7 +20,7 @@ import type { CustomerInfo, Purchases } from "@revenuecat/purchases-js";
 export const PRO_ENTITLEMENT = "pro";
 
 export interface PaywallConfig {
-  /** Public Web Billing key; null when the web paywall isn't offered. */
+  /** Public web key (Paddle, `pdl_`); null when the web paywall isn't offered. */
   apiKey: string | null;
   /** RevenueCat identity: the numeric User.id as a string. Null signed out. */
   appUserId: string | null;

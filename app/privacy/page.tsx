@@ -60,10 +60,11 @@ export default function PrivacyPage() {
       <p style={P}>
         Pro subscriptions are bought in the iOS app through Apple&apos;s App Store, or on spellpool.com. Either
         way your card number never reaches us. In the app, Apple handles all payment details. On the web,
-        the paywall and checkout are RevenueCat&apos;s, and Stripe processes the payment: they receive your
-        Spellpool account id and email address (for the receipt and for managing the subscription), and
-        Stripe receives your payment details and runs its own fraud checks. The web paywall also tells
-        RevenueCat when it&apos;s shown and what&apos;s bought — only once you open it.
+        Paddle (Paddle.com Market Ltd) is our reseller and the merchant of record: it receives your email
+        address, country and payment details to take the payment and handle tax, under its own privacy
+        policy. The paywall is RevenueCat&apos;s, and RevenueCat and Paddle receive your Spellpool account id
+        so the purchase lands on your account. The web paywall also tells RevenueCat when it&apos;s shown and
+        what&apos;s bought — only once you open it.
       </p>
       <p style={P}>
         We use RevenueCat to know whether a subscription is active: we read your Spellpool account id and

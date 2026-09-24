@@ -86,6 +86,8 @@ function billedBy(store: string | undefined): string | null {
     case "app_store":
     case "mac_app_store":
       return "Billed through the App Store.";
+    case "paddle":
+      return "Billed by Paddle, our reseller on spellpool.com.";
     case "rc_billing":
     case "stripe":
       return "Billed on spellpool.com.";

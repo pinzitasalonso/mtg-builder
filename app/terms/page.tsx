@@ -48,11 +48,15 @@ export default function TermsPage() {
         in your Apple ID subscription settings. Refunds are handled by Apple under their standard terms.
       </p>
       <p style={P}>
-        <strong>On spellpool.com</strong>, it&apos;s sold through RevenueCat&apos;s Web Billing, with the payment
-        processed by Stripe. You&apos;re charged at confirmation of purchase at the price shown, then at the
-        start of each period until you cancel. Manage or cancel any time from{" "}
+        <strong>On spellpool.com</strong>, our order process is conducted by our online reseller Paddle.com.
+        Paddle.com is the Merchant of Record for all our web orders: it takes the payment, handles sales tax
+        and VAT, and provides customer service for billing and returns, under its{" "}
+        <a href="https://www.paddle.com/legal/checkout-buyer-terms" style={{ color: "var(--gold)" }}>Buyer Terms</a>.
+        You&apos;re charged at confirmation of purchase at the price shown, then at the start of each period
+        until you cancel. Manage or cancel any time from{" "}
         <Link href="/pro" style={{ color: "var(--gold)" }}>spellpool.com/pro</Link> or the link in your
-        receipt email. For a refund, email us (below).
+        Paddle receipt email. For a refund, contact Paddle at{" "}
+        <a href="https://paddle.net" style={{ color: "var(--gold)" }}>paddle.net</a>, or email us (below).
       </p>
       <p style={P}>
         Either way, a free trial, when offered, becomes a paid subscription at its end unless you cancel
