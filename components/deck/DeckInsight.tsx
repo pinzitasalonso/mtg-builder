@@ -30,6 +30,7 @@ import type { AnalysisDocument, DeckScan } from "@/lib/deck-analysis";
 import {
   BRACKET_LABEL,
   BRACKET_NUMBER,
+  shownBracket,
   countGameChangers,
   cubeBuckets,
   suggestedBracket,
@@ -231,12 +232,13 @@ export function InsightProfile({
           .filter(Boolean)
           .join(" · ") || null;
 
-  // The Score's floors only ever bump a deck UP, and only as a note: the
-  // bracket is Wizards' rule set, and this is a reading of the same list.
-  const floorNote =
-    score && score.bracketFloor > BRACKET_NUMBER[bracket]
-      ? `plays like at least Bracket ${score.bracketFloor} by its Score`
-      : null;
+  // When the deck plays above its rules bracket, the Score's floor is the
+  // bracket shown, and the rules one becomes the note — a deck that plays like
+  // a 3 is a 3 at the table, whatever its Game Changer count.
+  const shown = shownBracket(bracket, score?.bracketFloor);
+  const bracketNote = shown.byScore
+    ? [`plays like it, by its Score`, `rules alone: ${BRACKET_NUMBER[bracket]}${bracketDetail ? ` (${bracketDetail})` : ""}`].join(" · ")
+    : bracketDetail;
 
   const missing = target - cardCount;
   return (
@@ -248,7 +250,7 @@ export function InsightProfile({
           detail={missing > 0 ? `${missing} to go` : missing < 0 ? `${-missing} over` : "complete"}
           warn={missing < 0}
         />
-        <StatTile label="Bracket" value={`${BRACKET_NUMBER[bracket]} · ${BRACKET_LABEL[bracket]}`} detail={[bracketDetail, floorNote].filter(Boolean).join(" · ") || null} />
+        <StatTile label="Bracket" value={`${BRACKET_NUMBER[shown.bracket]} · ${BRACKET_LABEL[shown.bracket]}`} detail={bracketNote} />
         {Number.isFinite(avgManaValue) && <StatTile label="Average cost" value={avgManaValue.toFixed(2)} detail="mana value, lands excluded" />}
         <StatTile label="Lands" value={String(lands)} detail={`${Math.round((lands / Math.max(1, cardCount)) * 100)}% of the deck`} />
       </div>

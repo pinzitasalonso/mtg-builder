@@ -48,6 +48,19 @@ export const BRACKET_NUMBER: Record<Bracket, number> = {
 };
 
 /**
+ * The bracket to show: the rules bracket (Game Changers, two-card combos), or
+ * the Score's floor when the deck plays above it. The floor only ever bumps a
+ * deck UP, so a deck that plays like a 3 reads as a 3 even with a rules-2
+ * list. `byScore` says which one won, so the reason can be shown.
+ */
+export function shownBracket(rules: Bracket, scoreFloor: number | null | undefined): { bracket: Bracket; byScore: boolean } {
+  const floor = scoreFloor ?? 0;
+  if (floor <= BRACKET_NUMBER[rules]) return { bracket: rules, byScore: false };
+  const bumped = (Object.keys(BRACKET_NUMBER) as Bracket[]).find((b) => BRACKET_NUMBER[b] === Math.min(5, floor));
+  return bumped ? { bracket: bumped, byScore: true } : { bracket: rules, byScore: false };
+}
+
+/**
  * The bracket a list adds up to.
  *
  * Ported from `CommanderBracket.suggested`. Exhibition and cEDH are absent on

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BRACKET_NUMBER,
+  shownBracket,
   countGameChangers,
   cubeBuckets,
   nameKey,
@@ -159,5 +160,16 @@ describe("commander art name", () => {
     expect(artName("")).toBeUndefined();
     expect(artName("   ")).toBeUndefined();
     expect(artName(" + ")).toBeUndefined();
+  });
+});
+
+describe("shownBracket", () => {
+  it("uses the Score's floor when the deck plays above its rules bracket", () => {
+    expect(shownBracket("core", 3)).toEqual({ bracket: "upgraded", byScore: true });
+  });
+  it("keeps the rules bracket when it's as high or higher, or there's no scan", () => {
+    expect(shownBracket("optimized", 3)).toEqual({ bracket: "optimized", byScore: false });
+    expect(shownBracket("upgraded", 3)).toEqual({ bracket: "upgraded", byScore: false });
+    expect(shownBracket("core", null)).toEqual({ bracket: "core", byScore: false });
   });
 });
