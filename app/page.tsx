@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, Copy, Pin, Trash2 } from "lucide-react";
+import { ArrowRight, Copy, Library, LogOut, Pin, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
@@ -226,8 +226,10 @@ export default function HomePage() {
           background: "var(--bg)",
         }}
       >
-        {/* transparent top nav */}
+        {/* transparent top nav. On a phone the wordmark and button labels drop
+            out (see .home-header in globals.css) so it stays one row. */}
         <header
+          className="home-header"
           style={{
             position: "sticky",
             top: 0,
@@ -240,7 +242,7 @@ export default function HomePage() {
           }}
         >
           <Logo size={19} />
-          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+          <div className="home-header-actions" style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             {me ? (
               <>
                 {me.tier === "pro" ? (
@@ -257,14 +259,23 @@ export default function HomePage() {
                 <span className="home-email" title={me.email} style={{ fontSize: 13, color: "var(--t3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {me.email}
                 </span>
-                <button onClick={signOut} className="id-ghost" style={{ padding: "9px 16px" }}>Sign out</button>
+                {/* The collection sits below every deck; this is the way to it
+                    without scrolling past them all. */}
+                <button onClick={() => setShowCollection(true)} className="id-ghost home-icon-btn" style={{ padding: "9px 16px" }} aria-label="Collection">
+                  <Library size={16} strokeWidth={2.25} /> <span className="home-hide">Collection</span>
+                </button>
+                <button onClick={signOut} className="id-ghost home-icon-btn" style={{ padding: "9px 16px" }} aria-label="Sign out">
+                  <LogOut size={16} strokeWidth={2.25} className="home-show" /> <span className="home-hide">Sign out</span>
+                </button>
               </>
             ) : (
               me === null && (
                 <Link href="/login" className="id-ghost" style={{ padding: "9px 16px" }}>Sign in</Link>
               )
             )}
-            <button onClick={() => setShowModal(true)} className="id-btn" style={{ padding: "10px 18px" }}>New deck</button>
+            <button onClick={() => setShowModal(true)} className="id-btn" style={{ padding: "10px 18px", whiteSpace: "nowrap" }}>
+              <Plus size={16} strokeWidth={2.5} className="home-show" /> New deck
+            </button>
           </div>
         </header>
 

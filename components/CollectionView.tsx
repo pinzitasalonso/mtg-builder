@@ -81,6 +81,10 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
   // Enrichment polling backs off when a poll makes no progress (Scryfall slow
   // or down), and stops after a while rather than hammering the server; the
   // cards finish on a later visit.
+  // Nothing has come back yet. The first GET also resolves a batch of cards,
+  // which can take seconds; until it answers the header says so rather than
+  // calling the collection empty.
+  const [loaded, setLoaded] = useState(false);
   const stall = useRef(0);
   const lastPending = useRef(Infinity);
   const [stalled, setStalled] = useState(false);
@@ -96,6 +100,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     }
     stall.current = c.pending > 0 && c.pending >= lastPending.current ? stall.current + 1 : 0;
     lastPending.current = c.pending;
+    setLoaded(true);
     setCollection(c);
     return c;
   }
@@ -305,26 +310,26 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
         animation: "sp-fade .15s ease",
       }}
     >
-      {/* header */}
-      {/* On a phone the count wraps under the title rather than squeezing
-          into a column beside the buttons, and Close drops its label. */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "14px clamp(16px, 4vw, 22px)", borderBottom: "1px solid var(--line)" }}>
-        <div style={{ display: "flex", alignItems: "baseline", flexWrap: "wrap", columnGap: 12, rowGap: 2, minWidth: 0 }}>
-          <h1 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "clamp(19px, 6vw, 24px)", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".02em", color: "var(--text)" }}>
+      {/* header: the title and buttons share a row; the count has a full-width
+          row of its own under them, free to wrap (it grows an "indexing…"
+          while cards resolve, which used to run under the buttons). */}
+      <div style={{ padding: "14px clamp(16px, 4vw, 22px) 12px", borderBottom: "1px solid var(--line)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <h1 style={{ margin: 0, minWidth: 0, fontFamily: "var(--font-display)", fontSize: "clamp(19px, 6vw, 24px)", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".02em", color: "var(--text)" }}>
             Collection
           </h1>
-          <span className="mn-label" style={{ color: "var(--text-muted)", whiteSpace: "nowrap" }}>
-            {collection.unique > 0 ? `${collection.unique} unique · ${collection.total} total` : "empty"}
-            {indexing ? " · indexing…" : ""}
-          </span>
+          <div style={{ display: "flex", gap: 8, flex: "none" }}>
+            <button onClick={() => setImportOpen((v) => !v)} className="mn-btn coll-head-btn" style={{ padding: "9px 18px", fontSize: 14 }}>
+              Import
+            </button>
+            <button onClick={onClose} aria-label="Close collection" className="mn-ghost coll-close" style={{ padding: "9px 16px", fontSize: 14 }}>
+              <X size={15} strokeWidth={2.5} /> <span className="coll-close-label">Close</span>
+            </button>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 8, flex: "none" }}>
-          <button onClick={() => setImportOpen((v) => !v)} className="mn-btn coll-head-btn" style={{ padding: "9px 18px", fontSize: 14 }}>
-            Import
-          </button>
-          <button onClick={onClose} aria-label="Close collection" className="mn-ghost coll-close" style={{ padding: "9px 16px", fontSize: 14 }}>
-            <X size={15} strokeWidth={2.5} /> <span className="coll-close-label">Close</span>
-          </button>
+        <div className="mn-label" style={{ marginTop: 4, color: "var(--text-muted)" }}>
+          {collection.unique > 0 ? `${collection.unique} unique · ${collection.total} total` : loaded ? "empty" : "loading…"}
+          {indexing ? ` · indexing ${collection.pending} left…` : ""}
         </div>
       </div>
 
@@ -455,9 +460,11 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
             setVisible((v) => (v < filtered.length ? Math.min(filtered.length, v + PAGE) : v));
           }
         }}
-        style={{ flex: 1, overflowY: "auto", padding: "18px 22px 40px" }}
+        style={{ flex: 1, overflowY: "auto", padding: "18px clamp(16px, 4vw, 22px) 40px" }}
       >
-        {collection.unique === 0 ? (
+        {!loaded && collection.unique === 0 ? (
+          <div style={{ textAlign: "center", color: "var(--text-muted)", padding: "60px 20px", fontSize: 15 }}>Loading your collection…</div>
+        ) : collection.unique === 0 ? (
           <div style={{ textAlign: "center", color: "var(--text-muted)", padding: "60px 20px", fontSize: 15 }}>
             Your collection is empty.{" "}
             <button onClick={() => setImportOpen(true)} style={{ background: "none", border: "none", color: "var(--accent)", fontWeight: 600, cursor: "pointer", textDecoration: "underline", fontSize: 15 }}>
