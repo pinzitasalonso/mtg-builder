@@ -20,6 +20,9 @@ export interface Collection {
   pending: number;
   // Names Scryfall has no card for (sent once nothing is pending).
   unrecognised?: string[];
+  // The server's matching job: running, or paused after Scryfall stopped
+  // answering (it restarts on its own after a cool-down).
+  indexing?: { running: boolean; paused: boolean };
 }
 
 export const EMPTY_COLLECTION: Collection = { cards: [], unique: 0, total: 0, pending: 0 };
