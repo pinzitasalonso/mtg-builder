@@ -934,8 +934,15 @@ button {
   .id-hero-grid {
     grid-template-columns: 1fr;
   }
+  /* The card fan stays on a phone, scaled down under the hero text: without
+     it the first screen is all words. */
   .id-fan {
-    display: none !important;
+    height: 300px !important;
+    margin-top: -8px;
+  }
+  .id-fan > div {
+    transform: scale(0.72);
+    transform-origin: top center;
   }
 }
 
