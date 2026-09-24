@@ -140,7 +140,7 @@ export async function POST(
 
     const anthropic = new Anthropic();
     const response = await anthropic.messages.create({
-      model: "claude-opus-5",
+      model: "claude-opus-5-5",
       // A document of a few hundred words plus the thinking that precedes it.
       max_tokens: 8000,
       output_config: { effort: "medium", format: { type: "json_schema", schema: ANALYSIS_SCHEMA } },

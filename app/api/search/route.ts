@@ -39,8 +39,12 @@ async function synthesize(
   almostCombos: AlmostCombo[]
 ): Promise<{ summary: string; cards: string[] }> {
   const msg = await anthropic.messages.create({
-    model: "claude-sonnet-4-6",
+    model: "claude-sonnet-5",
     max_tokens: 2000,
+    // Sonnet 5 thinks by default (4.6 didn't). This is a quick ranking pass
+    // with a small budget: thinking would add latency and could eat the 2000
+    // tokens before the JSON is written, so it stays off as it was on 4.6.
+    thinking: { type: "disabled" },
     system:
       "You are a world-class Magic: The Gathering deckbuilding expert acting as a ranker over community data. " +
       "The user describes the cards they want — possibly multi-faceted (color + type + mechanic + theme + " +
