@@ -5,6 +5,10 @@ import { currentUser } from "@/lib/auth";
 import { AI_LIMIT_MSG } from "@/lib/limits";
 import { consumeAi } from "@/lib/limits-db";
 import { buildDecksBlock, type AssistantDeck } from "@/lib/assistant";
+import { ASSISTANT_TOOLS, runAssistantTool } from "@/lib/assistant-tools";
+import { manaValue } from "@/lib/deck-score-classify";
+import { scryfallIdFromImage, usdPricesByIds } from "@/lib/scryfall";
+import type { DeckScan } from "@/lib/deck-analysis";
 
 export const runtime = "nodejs";
 
@@ -24,23 +28,37 @@ interface ChatMessage {
 
 const MAX_MESSAGE_CHARS = 8000;
 const MAX_TOTAL_CHARS = 20000;
-const MAX_RESUMES = 3;
+// Model passes per question: pause_turn resumes plus rounds of tool calls.
+// Building a deck is a lookup or two and a create; eight is room to spare
+// while still bounding a runaway loop.
+const MAX_PASSES = 8;
 // Owned cards listed for the model. A big collection is still a small prompt
 // next to this cap (2,500 names is ~15k tokens), and it's a cached block.
 const MAX_OWNED = 6000;
 
 const INSTRUCTIONS =
   "You are Spellpool's assistant: a world-class Magic: The Gathering deckbuilding expert who can see ALL of " +
-  "the player's decks and their whole card collection at once. Below are every deck (its list, its pool of " +
-  "candidate cards, format and commander) and every card they own. Answer questions that span them: which " +
-  "deck is strongest or weakest and why, which deck a card belongs in, what the decks share, where a card " +
-  "is doing more work, what to build next from what they own, what to buy that helps several decks, how " +
-  "to split contested staples between decks, and so on. Be a knowledgeable friend with opinions, not a " +
-  "search engine.\n\n" +
-  "USE WHAT YOU CAN SEE: ground every claim in the lists below. When you say a deck runs a card, it must " +
-  "be in that deck's list. When you say the player owns a card, it must be in the collection. If a " +
-  "question is about a single deck, answer it, and mention that the deck's own assistant (on the deck " +
-  "page) can also add cards for them.\n\n" +
+  "the player's decks and their whole card collection at once, and who can act on their decks. Below are " +
+  "every deck — each card with its mana value, type, role and price; the deck's total cost; its Deck Score " +
+  "and bracket when it has been scanned; its saved versions — and every card they own, with prices. Answer " +
+  "questions that span them: which deck is strongest or weakest and why, how they compare in speed and " +
+  "cost, which deck a card belongs in, what they share, what to build next from what they own, what to buy " +
+  "that helps several decks, how to split contested staples, and so on. Be a knowledgeable friend with " +
+  "opinions, not a search engine.\n\n" +
+  "USE WHAT YOU CAN SEE: ground every claim in the data below. When you say a deck runs a card, it must be " +
+  "in that deck's list; when you say they own one, it must be in the collection. Prices are USD market " +
+  "prices from Scryfall; say 'about' — they move. The Deck Score (0–10, from DeckCheck's rubric: speed, " +
+  "consistency, interaction, resilience) and the bracket (1–5, Commander's power brackets) are the app's " +
+  "own measure of power: use them when comparing strength, and say when a deck hasn't been scanned.\n\n" +
+  "TOOLS: card_details looks cards up on Scryfall (exact text, legality, Game Changer status, EDHREC " +
+  "popularity, prices). Use it when a judgement turns on a card's exact text, legality or price and you are " +
+  "not certain, or for a card you don't know. create_deck builds a new deck (a fresh build, a copy, or a " +
+  "new version of an existing deck as its own deck). edit_deck changes an existing deck: it saves a version " +
+  "first automatically, so the player can go back. save_version snapshots a deck. ACT ONLY WHEN ASKED: " +
+  "suggest changes freely, but create or edit a deck only when the player asked you to or clearly agreed. " +
+  "When you build a deck, make it complete and legal for its format (Commander: exactly 100 cards including " +
+  "the commander, singleton, within the commander's color identity), prefer cards they own, and say after " +
+  "what it cost to fill the rest. After acting, say what you did in a line and link the deck.\n\n" +
   "DECK LINKS — CRITICAL: every time you name one of the player's decks, write it as the Markdown link " +
   "given in its heading, exactly: [Deck Name](/deck/<id>). The app turns it into a button that opens the " +
   "deck. Never invent a deck or an id.\n\n" +
@@ -48,12 +66,29 @@ const INSTRUCTIONS =
   "double square brackets, e.g. [[Sol Ring]]. The app turns each into a button that adds the card to a " +
   "deck of the player's choosing. Commander names count as cards here too. Never write a real card's name " +
   "without the brackets.\n\n" +
-  "LOOK IT UP: you have a web_search tool. Use it when the answer turns on something that changes — a new " +
-  "set, a ban, the current metagame, prices — or on a card you don't recognise. Start writing your take " +
-  "first and search after; never narrate searches or paste URLs.\n\n" +
+  "LOOK IT UP: you also have web_search. Use it when the answer turns on something that changes — a new " +
+  "set, a ban, the current metagame. Start writing your take first and search after; never narrate " +
+  "searches or paste URLs.\n\n" +
   "FORMAT: clean GitHub-flavored Markdown: short ## headings, **bold** for emphasis, bullet lists. Keep it " +
   "tight and skimmable. When a question names no deck and could mean several, answer across all of them " +
   "rather than asking which one.";
+
+// Sent in the stream when a tool changed a deck, so the client refreshes its
+// deck list. Invisible: the client strips it before rendering.
+const DECKS_CHANGED = "\u2063decks-changed\u2063";
+
+// The Deck Score line for a scanned deck, from its stored scan.
+function scoreLine(analysis: string | null): string | null {
+  if (!analysis) return null;
+  try {
+    const scan = JSON.parse(analysis) as DeckScan;
+    const s = scan.score;
+    const axes = s.axes.map((a) => `${a.label.toLowerCase()} ${a.score}`).join(", ");
+    return `${s.label} (${axes}) · bracket ${s.bracketFloor} or higher · wins around turn ${s.fundamentalTurn} · scanned ${scan.scannedAt.slice(0, 10)}`;
+  } catch {
+    return null;
+  }
+}
 
 function stopNote(stop: Anthropic.Message["stop_reason"]): string | null {
   switch (stop) {
@@ -62,7 +97,8 @@ function stopNote(stop: Anthropic.Message["stop_reason"]): string | null {
     case "refusal":
       return "_(I stopped there and can't continue that one. Try rephrasing it?)_";
     case "pause_turn":
-      return "_(I ran out of research time on that one — ask again and I'll keep going.)_";
+    case "tool_use":
+      return "_(I ran out of steps on that one — ask me to continue and I'll pick up where I left off.)_";
     default:
       return null;
   }
@@ -106,26 +142,54 @@ export async function POST(req: Request) {
         name: true,
         format: true,
         commander: true,
-        cards: { select: { name: true, quantity: true, board: true }, orderBy: { name: "asc" } },
+        analysis: true,
+        _count: { select: { versions: true } },
+        cards: {
+          select: { name: true, quantity: true, board: true, manaCost: true, typeLine: true, role: true, scryfallId: true },
+          orderBy: { name: "asc" },
+        },
       },
     }),
     prisma.collectionCard.findMany({
       where: { userId: user.id },
-      select: { name: true, quantity: true },
+      select: { name: true, quantity: true, imageUri: true },
       orderBy: { name: "asc" },
       take: MAX_OWNED,
     }),
   ]);
+
+  // Prices: deck cards by their printing, owned cards by the owned printing.
+  // Both memoized in-process (the collection's are warmed by its indexer).
+  const ownedIds = owned.map((c) => scryfallIdFromImage(c.imageUri));
+  const prices = await usdPricesByIds([
+    ...new Set([
+      ...deckRows.flatMap((d) => d.cards.filter((c) => c.board === "deck").map((c) => c.scryfallId)),
+      ...ownedIds.filter((id): id is string => id !== null),
+    ]),
+  ]).catch(() => new Map<string, string>());
+
   const decks: AssistantDeck[] = deckRows
     .filter((d): d is typeof d & { publicId: string } => Boolean(d.publicId))
-    .map((d) => ({
-      publicId: d.publicId,
-      name: d.name,
-      format: d.format,
-      commander: d.commander,
-      deck: d.cards.filter((c) => c.board === "deck").map((c) => ({ name: c.name, quantity: c.quantity })),
-      pool: d.cards.filter((c) => c.board !== "deck").map((c) => ({ name: c.name, quantity: c.quantity })),
-    }));
+    .map((d) => {
+      const card = (c: (typeof d.cards)[number], priced: boolean) => ({
+        name: c.name,
+        quantity: c.quantity,
+        manaValue: c.typeLine?.includes("Land") ? 0 : manaValue(c.manaCost),
+        type: c.typeLine?.split(" — ")[0] ?? null,
+        role: c.role,
+        usd: priced ? prices.get(c.scryfallId) ?? null : null,
+      });
+      return {
+        publicId: d.publicId,
+        name: d.name,
+        format: d.format,
+        commander: d.commander,
+        deck: d.cards.filter((c) => c.board === "deck").map((c) => card(c, true)),
+        pool: d.cards.filter((c) => c.board !== "deck").map((c) => ({ name: c.name, quantity: c.quantity })),
+        score: scoreLine(d.analysis),
+        versions: d._count.versions,
+      };
+    });
 
   // Stable first, for the prefix cache: instructions, then the collection
   // (changes on import), then the decks (change as they're edited).
@@ -135,7 +199,15 @@ export async function POST(req: Request) {
       type: "text",
       text:
         "\n\nTHE PLAYER'S COLLECTION — every card they own" +
-        (owned.length ? ` (${owned.length} different cards):\n` + owned.map((c) => (c.quantity > 1 ? `${c.quantity} ${c.name}` : c.name)).join("; ") : ": nothing imported yet."),
+        (owned.length
+          ? ` (${owned.length} different cards, with prices where known):\n` +
+            owned
+              .map((c, i) => {
+                const usd = ownedIds[i] ? prices.get(ownedIds[i]!) : null;
+                return `${c.quantity > 1 ? `${c.quantity} ` : ""}${c.name}${usd ? ` $${usd}` : ""}`;
+              })
+              .join("; ")
+          : ": nothing imported yet."),
       cache_control: { type: "ephemeral" },
     },
     { type: "text", text: "\n\n" + buildDecksBlock(decks), cache_control: { type: "ephemeral" } },
@@ -159,13 +231,13 @@ export async function POST(req: Request) {
       try {
         const convo: Anthropic.MessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
         let finalStop: Anthropic.Message["stop_reason"] = null;
-        for (let attempt = 0; ; attempt++) {
+        for (let pass = 0; pass < MAX_PASSES; pass++) {
           const ai = anthropic.messages.stream({
             model: "claude-opus-5-5",
             max_tokens: 32000,
             output_config: { effort: "medium" },
             system,
-            tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }],
+            tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }, ...ASSISTANT_TOOLS],
             messages: convo,
           });
           for await (const event of ai) {
@@ -179,13 +251,31 @@ export async function POST(req: Request) {
           const final = await ai.finalMessage();
           const u = final.usage;
           console.log(
-            `[assistant] decks=${decks.length} owned=${owned.length} fresh=${u.input_tokens} ` +
+            `[assistant] pass=${pass} decks=${decks.length} owned=${owned.length} fresh=${u.input_tokens} ` +
               `cache_write=${u.cache_creation_input_tokens ?? 0} cache_read=${u.cache_read_input_tokens ?? 0} ` +
               `out=${u.output_tokens} stop=${final.stop_reason}`
           );
           finalStop = final.stop_reason;
-          if (final.stop_reason !== "pause_turn" || attempt >= MAX_RESUMES) break;
+          if (final.stop_reason === "pause_turn") {
+            convo.push({ role: "assistant", content: final.content });
+            continue;
+          }
+          if (final.stop_reason !== "tool_use") break;
+
+          // Run the tools the model asked for, show the player what they did,
+          // and hand the results back for the next pass.
+          const uses = final.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+          const results: Anthropic.ToolResultBlockParam[] = [];
+          for (const use of uses) {
+            const out = await runAssistantTool(user, use.name, use.input);
+            if (out.note) controller.enqueue(encoder.encode(`\n\n**${out.note}**\n\n`));
+            if (out.changed) controller.enqueue(encoder.encode(DECKS_CHANGED));
+            results.push({ type: "tool_result", tool_use_id: use.id, content: out.result, is_error: out.isError || undefined });
+          }
           convo.push({ role: "assistant", content: final.content });
+          convo.push({ role: "user", content: results });
+          // finalStop stays "tool_use": if the passes run out here, the model
+          // never got to answer the results, and the note says so.
         }
         const note = stopNote(finalStop);
         if (note) controller.enqueue(encoder.encode(`\n\n${note}`));
