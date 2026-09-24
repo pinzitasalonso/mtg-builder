@@ -8,6 +8,8 @@ export interface CollectionCard {
   typeLine?: string | null;
   manaCost?: string | null;
   imageUri?: string | null;
+  // USD for the owned printing (read off imageUri server-side), when priced.
+  usdPrice?: string | null;
 }
 
 export interface Collection {
@@ -76,13 +78,14 @@ export async function importCollection(text: string, mode: "add" | "replace"): P
   }
 }
 
-// Set the exact owned quantity of a single card (0 removes it).
-export async function setCollectionCard(name: string, quantity: number): Promise<boolean> {
+// Set the exact owned quantity of a single card (0 removes it). An imageUri
+// pins the printing owned — the version is read back off that image.
+export async function setCollectionCard(name: string, quantity: number, imageUri?: string): Promise<boolean> {
   try {
     const res = await fetch("/api/collection", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, quantity }),
+      body: JSON.stringify(imageUri ? { name, quantity, imageUri } : { name, quantity }),
     });
     return res.ok;
   } catch {
@@ -102,4 +105,28 @@ export async function clearCollection(): Promise<boolean> {
 // Lowercased-name set for O(1) "do I own this?" checks against card names.
 export function ownedNameSet(cards: CollectionCard[]): Set<string> {
   return new Set(cards.map((c) => c.name.toLowerCase()));
+}
+
+// Every paper printing of a card, newest first (see /api/collection/printings).
+export interface CardPrinting {
+  id: string;
+  name: string;
+  set: string;
+  setName: string;
+  number: string;
+  released: string | null;
+  imageUri: string;
+  finishes: string[];
+  usd: string | null;
+  usdFoil: string | null;
+}
+
+export async function fetchPrintings(name: string): Promise<CardPrinting[] | null> {
+  try {
+    const res = await fetch(`/api/collection/printings?name=${encodeURIComponent(name)}`);
+    if (!res.ok) return null;
+    return ((await res.json()).printings ?? []) as CardPrinting[];
+  } catch {
+    return null;
+  }
 }

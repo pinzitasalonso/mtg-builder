@@ -14,6 +14,8 @@ import {
   setCollectionCard,
 } from "@/lib/collection-client";
 import { parseCollectionText } from "@/lib/collection-csv";
+import CollectionCardModal from "@/components/CollectionCardModal";
+import type { CardPrinting } from "@/lib/collection-client";
 import { categoryOf, manaValue, TYPE_ORDER } from "@/components/mtg";
 
 // Tiles render in pages; scrolling near the bottom reveals the next page, so a
@@ -63,6 +65,9 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
 
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
+  // The card open in the details panel, by lowercased name.
+  const [detail, setDetail] = useState<string | null>(null);
+  const detailCard = detail ? collection.cards.find((c) => c.name.toLowerCase() === detail) ?? null : null;
   // Infinite-scroll window: how many of the filtered cards are rendered.
   const [visible, setVisible] = useState(PAGE);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -172,6 +177,20 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     } catch {
       setNote(`Couldn’t read ${file.name}.`);
     }
+  }
+
+  // Pin the printing the player owns: its image is the version, and the price
+  // follows it.
+  async function pickPrinting(card: CollectionCard, p: CardPrinting): Promise<boolean> {
+    const ok = await setCollectionCard(card.name, card.quantity, p.imageUri);
+    if (!ok) return false;
+    const key = card.name.toLowerCase();
+    setCollection((c) => ({
+      ...c,
+      cards: c.cards.map((x) => (x.name.toLowerCase() === key ? { ...x, imageUri: p.imageUri, usdPrice: p.usd ?? p.usdFoil ?? null } : x)),
+    }));
+    onChanged?.();
+    return true;
   }
 
   async function runImport() {
@@ -462,6 +481,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
                   imageUri={c.imageUri ?? null}
                   busy={rowBusy === c.name.toLowerCase()}
                   onPreview={setPreview}
+                  onOpen={() => { setPreview(null); setDetail(c.name.toLowerCase()); }}
                   onInc={() => editQty(c.name, c.quantity + 1)}
                   onDec={() => editQty(c.name, c.quantity - 1)}
                   onDelete={() => editQty(c.name, 0)}
@@ -481,6 +501,15 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
       </div>
 
       {preview && <CardPreview preview={preview} />}
+      {detailCard && (
+        <CollectionCardModal
+          card={detailCard}
+          busy={rowBusy === detailCard.name.toLowerCase()}
+          onQty={(n) => editQty(detailCard.name, n)}
+          onPick={(p) => pickPrinting(detailCard, p)}
+          onClose={() => setDetail(null)}
+        />
+      )}
     </div>
   );
 }
@@ -491,6 +520,7 @@ function CollectionTile({
   imageUri,
   busy,
   onPreview,
+  onOpen,
   onInc,
   onDec,
   onDelete,
@@ -500,6 +530,7 @@ function CollectionTile({
   imageUri: string | null;
   busy: boolean;
   onPreview: (p: Preview | null) => void;
+  onOpen: () => void;
   onInc: () => void;
   onDec: () => void;
   onDelete: () => void;
@@ -564,6 +595,13 @@ function CollectionTile({
           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
         />
       )}
+      {/* The whole card opens its details; the count controls sit above it. */}
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`${name}: details and version`}
+        style={{ position: "absolute", inset: 0, padding: 0, border: "none", background: "transparent", cursor: "pointer" }}
+      />
       <span style={{ position: "absolute", top: 7, left: 7, background: "rgba(13,138,95,.92)", color: "#fff", fontSize: 12, fontWeight: 800, padding: "1px 8px", borderRadius: 999, boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}>
         ×{busy ? "…" : quantity}
       </span>

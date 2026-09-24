@@ -26,7 +26,7 @@ describe("parseCollectionCsv", () => {
 
   it("reads ManaBox's Quantity column wherever it sits", () => {
     const csv = "Name,Set code,Set name,Collector number,Foil,Rarity,Quantity\nLightning Bolt,2x2,Double Masters 2022,117,normal,uncommon,4";
-    expect(parseCollectionCsv(csv)).toEqual([{ name: "Lightning Bolt", qty: 4 }]);
+    expect(parseCollectionCsv(csv)).toEqual([{ name: "Lightning Bolt", qty: 4, printing: { set: "2x2", number: "117" } }]);
   });
 
   it("prefers TCGplayer's Simple Name over its annotated Name", () => {
@@ -47,6 +47,26 @@ describe("parseCollectionCsv", () => {
   it("returns null for text that isn't a CSV export", () => {
     expect(parseCollectionCsv("1 Sol Ring\n4 Lightning Bolt")).toBeNull();
     expect(parseCollectionCsv("1 Borra, Cursed Blacksmith")).toBeNull();
+  });
+});
+
+describe("printings from an export", () => {
+  it("pins ManaBox's Scryfall id, and keeps the printing owned most of", () => {
+    const csv = [
+      "Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,ManaBox ID,Scryfall ID",
+      "Sol Ring,CMR,Commander Legends,472,normal,uncommon,1,1,aaaaaaaa-0000-4000-8000-000000000001",
+      "Sol Ring,C21,Commander 2021,263,normal,uncommon,3,2,aaaaaaaa-0000-4000-8000-000000000002",
+      '"Sheoldred, the Apocalypse",DMU,Dominaria United,107,normal,mythic,1,3,d67be074-cdd4-41d9-ac89-0a0456c4e4b2',
+    ].join("\n");
+    expect(parseCollectionCsv(csv)).toEqual([
+      { name: "Sol Ring", qty: 4, printing: { id: "aaaaaaaa-0000-4000-8000-000000000002" } },
+      { name: "Sheoldred, the Apocalypse", qty: 1, printing: { id: "d67be074-cdd4-41d9-ac89-0a0456c4e4b2" } },
+    ]);
+  });
+
+  it("ignores a Set column that holds a set name", () => {
+    const csv = "Quantity,Name,Simple Name,Set,Card Number\n1,Sol Ring,Sol Ring,Commander Masters,395";
+    expect(parseCollectionCsv(csv)).toEqual([{ name: "Sol Ring", qty: 1 }]);
   });
 });
 

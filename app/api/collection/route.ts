@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { parseCollectionText } from "@/lib/collection-csv";
-import { lookupCollection, NAMED_GAP_MS, normalizeCardKey, resolveNamedDetailed, scryfallIdFromImage, usdPricesByIds, type OutCard } from "@/lib/scryfall";
-import { isUnrecognised, planEnrichment, type CardMeta } from "@/lib/collection-enrich";
+import { encodePrinting } from "@/lib/printing";
+import { lookupCollection, lookupPrintings, NAMED_GAP_MS, normalizeCardKey, resolveNamedDetailed, scryfallIdFromImage, usdPricesByIds, type OutCard } from "@/lib/scryfall";
+import { canonicalName, isUnrecognised, planEnrichment, type CardMeta } from "@/lib/collection-enrich";
 
 export const runtime = "nodejs";
 
@@ -22,12 +23,20 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function enrichBatch(userId: number) {
   const stale = await prisma.collectionCard.findMany({
     where: { userId, enriched: false },
-    select: { id: true, name: true, nameKey: true, quantity: true },
+    select: { id: true, name: true, nameKey: true, quantity: true, printing: true },
     take: ENRICH_PER_CALL,
   });
   if (stale.length === 0) return;
 
-  const { found, notFound } = await lookupCollection(stale.map((r) => r.name));
+  // Rows an import pinned to a printing resolve by that printing first, so the
+  // card shows (and is priced as) the version the player owns. A printing
+  // Scryfall doesn't have falls back to the name; a failed request waits.
+  const refs = stale.filter((r) => r.printing).map((r) => r.printing!);
+  const byRef = refs.length ? await lookupPrintings(refs) : { found: new Map<string, OutCard>(), notFound: [], failed: [] };
+  const refFailed = new Set(byRef.failed);
+  const byNameRows = stale.filter((r) => !r.printing || (!byRef.found.has(r.printing) && !refFailed.has(r.printing)));
+
+  const { found, notFound } = byNameRows.length ? await lookupCollection(byNameRows.map((r) => r.name)) : { found: new Map<string, OutCard>(), notFound: [] };
   const byName = new Map<string, OutCard>(found);
   const unknownNames = new Set<string>();
   const fuzzy = [...new Set(notFound.map(normalizeCardKey))].slice(0, FUZZY_PER_CALL);
@@ -42,9 +51,12 @@ async function enrichBatch(userId: number) {
   const matched = new Map<number, CardMeta>();
   const unknown = new Set<number>();
   for (const r of stale) {
+    const pinned = r.printing ? byRef.found.get(r.printing) : undefined;
+    if (pinned) { matched.set(r.id, { ...pinned, name: canonicalName(pinned.name) }); continue; }
+    if (r.printing && refFailed.has(r.printing)) continue;
     const k = normalizeCardKey(r.name);
     const card = byName.get(k);
-    if (card) matched.set(r.id, card);
+    if (card) matched.set(r.id, { ...card, name: canonicalName(card.name) });
     else if (unknownNames.has(k)) unknown.add(r.id);
   }
   const renames = [...matched.entries()]
@@ -65,7 +77,7 @@ async function enrichBatch(userId: number) {
         ? prisma.collectionCard.delete({ where: { id: op.id } })
         : op.kind === "quantity"
           ? prisma.collectionCard.update({ where: { id: op.id }, data: { quantity: op.quantity } })
-          : prisma.collectionCard.update({ where: { id: op.id }, data: op.data })
+          : prisma.collectionCard.update({ where: { id: op.id }, data: { ...op.data, printing: null } })
     )
   );
 }
@@ -142,7 +154,7 @@ export async function POST(req: Request) {
     await prisma.$transaction([
       prisma.collectionCard.deleteMany({ where: { userId: user.id } }),
       prisma.collectionCard.createMany({
-        data: entries.map((e) => ({ userId: user.id, name: e.name, nameKey: e.name.toLowerCase(), quantity: e.qty })),
+        data: entries.map((e) => ({ userId: user.id, name: e.name, nameKey: e.name.toLowerCase(), quantity: e.qty, printing: encodePrinting(e.printing) })),
       }),
     ]);
   } else {
@@ -152,17 +164,20 @@ export async function POST(req: Request) {
       select: { id: true, nameKey: true, quantity: true },
     });
     const byKey = new Map(existing.map((r) => [r.nameKey, r]));
-    const creates: { userId: number; name: string; nameKey: string; quantity: number }[] = [];
-    const updates: { id: number; quantity: number }[] = [];
+    const creates: { userId: number; name: string; nameKey: string; quantity: number; printing: string | null }[] = [];
+    const updates: { id: number; data: { quantity: number; printing?: string; enriched?: boolean } }[] = [];
     for (const e of entries) {
       const key = e.name.toLowerCase();
       const ex = byKey.get(key);
-      if (ex) updates.push({ id: ex.id, quantity: ex.quantity + e.qty });
-      else creates.push({ userId: user.id, name: e.name, nameKey: key, quantity: e.qty });
+      const printing = encodePrinting(e.printing);
+      // A printing named in the file is what the player owns: it replaces the
+      // one shown, and the row resolves again to pick it up.
+      if (ex) updates.push({ id: ex.id, data: printing ? { quantity: ex.quantity + e.qty, printing, enriched: false } : { quantity: ex.quantity + e.qty } });
+      else creates.push({ userId: user.id, name: e.name, nameKey: key, quantity: e.qty, printing });
     }
     await prisma.$transaction([
       prisma.collectionCard.createMany({ data: creates }),
-      ...updates.map((u) => prisma.collectionCard.update({ where: { id: u.id }, data: { quantity: u.quantity } })),
+      ...updates.map((u) => prisma.collectionCard.update({ where: { id: u.id }, data: u.data })),
     ]);
   }
 
@@ -195,7 +210,10 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "name and quantity required" }, { status: 400 });
   }
   const nameKey = name.toLowerCase();
-  const imageUri = typeof body?.imageUri === "string" && body.imageUri ? body.imageUri : null;
+  // Only a Scryfall card image: it's shown as-is, and the printing (and its
+  // price) is read back off it.
+  const imageUri =
+    typeof body?.imageUri === "string" && /^https:\/\/([a-z0-9-]+\.)*scryfall\.(io|com)\//i.test(body.imageUri) ? body.imageUri : null;
 
   if (quantity <= 0) {
     await prisma.collectionCard.deleteMany({ where: { userId: user.id, nameKey } });
@@ -203,7 +221,7 @@ export async function PATCH(req: Request) {
     const qty = Math.min(quantity, 9999);
     // Pinning an image counts as enriched, so the nightly name-enrich won't
     // overwrite the player's chosen printing.
-    const pinned = imageUri ? { imageUri, enriched: true } : {};
+    const pinned = imageUri ? { imageUri, enriched: true, printing: null } : {};
     await prisma.collectionCard.upsert({
       where: { userId_nameKey: { userId: user.id, nameKey } },
       create: { userId: user.id, name, nameKey, quantity: qty, ...pinned },

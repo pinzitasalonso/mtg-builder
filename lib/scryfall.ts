@@ -2,6 +2,8 @@
 // handlers and client components alike (browsers silently drop the User-Agent
 // header, which is fine).
 
+import { decodePrinting } from "./printing";
+
 export interface ScryfallCard {
   id: string;
   name: string;
@@ -164,6 +166,54 @@ export async function lookupCollection(names: string[]): Promise<CollectionLooku
         notFound.push(name);
       }
     }
+  }
+  return { found, notFound, failed };
+}
+
+/**
+ * Exact printings via POST /cards/collection: by Scryfall id, or by set code
+ * and collector number. Same three buckets as lookupCollection, keyed by the
+ * encoded ref (lib/printing.ts). A printing Scryfall doesn't have is notFound,
+ * and the caller falls back to the card's name.
+ */
+export async function lookupPrintings(refs: string[]): Promise<CollectionLookup> {
+  const found = new Map<string, OutCard>();
+  const notFound: string[] = [];
+  const failed: string[] = [];
+  const unique = [...new Set(refs)];
+  for (let i = 0; i < unique.length; i += 75) {
+    if (i > 0) await sleep(COLLECTION_GAP_MS);
+    const chunk = unique.slice(i, i + 75);
+    const identifiers = chunk.map((r) => {
+      const p = decodePrinting(r);
+      return p?.id ? { id: p.id } : { set: p?.set, collector_number: p?.number };
+    });
+    let data: { data?: ScryfallCard[] } | null = null;
+    let rejected = false;
+    for (let attempt = 0; attempt < 2 && !data && !rejected; attempt++) {
+      let res: Response | null = null;
+      try {
+        res = await fetch("https://api.scryfall.com/cards/collection", {
+          method: "POST",
+          headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
+          body: JSON.stringify({ identifiers }),
+        });
+        if (res.ok) data = await res.json();
+        else if (!transient(res)) rejected = true;
+      } catch {
+        /* network blip — retry once */
+      }
+      if (!data && !rejected && attempt === 0) await sleep(retryDelayMs(res));
+    }
+    if (rejected) { notFound.push(...chunk); continue; }
+    if (!data) { failed.push(...chunk); continue; }
+    for (const c of data.data ?? []) {
+      if (!c?.id) continue;
+      const card = toOutCard(c);
+      found.set(`id:${c.id.toLowerCase()}`, card);
+      if (c.set && c.collector_number) found.set(`set:${c.set.toLowerCase()}:${c.collector_number.toLowerCase()}`, card);
+    }
+    for (const r of chunk) if (!found.has(r)) notFound.push(r);
   }
   return { found, notFound, failed };
 }

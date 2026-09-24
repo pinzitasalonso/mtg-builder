@@ -77,6 +77,10 @@ model CollectionCard {
   // True once resolved against Scryfall (even if the name didn't resolve), so
   // the same names aren't re-queried on every load.
   enriched Boolean @default(false)
+  // The exact printing an import named ("id:<scryfall id>" or
+  // "set:<code>:<number>", lib/printing.ts), waiting to be resolved. Cleared
+  // once it is; the owned printing then lives in imageUri.
+  printing String?
 
   @@unique([userId, nameKey])
 }

@@ -1,6 +1,11 @@
+import { printingRef, type PrintingRef } from "./printing";
+
 export interface DecklistEntry {
   name: string;
   qty: number;
+  // The exact printing, when the line names one ("(CMR) 472"). A collection
+  // import pins it; a deck import ignores it.
+  printing?: PrintingRef;
 }
 
 // Parse a pasted decklist in the common "{qty}[x] {name} [(SET) 123]" per-line
@@ -19,7 +24,10 @@ export function parseDecklist(text: string): DecklistEntry[] {
     const body = line.replace(/^SB:\s*/i, "");
     const m = body.match(/^\s*(\d+)\s*[xX]?\s+(.*)$/);
     const qty = m ? Math.max(1, parseInt(m[1], 10)) : 1;
-    const name = (m ? m[2] : body)
+    const rest = m ? m[2] : body;
+    const set = rest.match(/\(([A-Za-z0-9]{2,6})\)\s*([0-9A-Za-z★†-]+)?/);
+    const printing = set ? printingRef(null, set[1], set[2]) : undefined;
+    const name = rest
       .replace(/\s*\([^)]*\).*$/, "") // "(CMR) 472" set + collector number
       .replace(/\s*\[[^\]]*\]/g, "") // "[CMR]" set codes, "[Ramp]" tags (Deckstats, Archidekt)
       .replace(/\s*\*[A-Za-z]+\*/g, "") // "*F*" / "*E*" foil markers (Moxfield)
@@ -30,7 +38,7 @@ export function parseDecklist(text: string): DecklistEntry[] {
       entries[byName.get(k)!].qty += qty;
     } else {
       byName.set(k, entries.length);
-      entries.push({ name, qty });
+      entries.push(printing ? { name, qty, printing } : { name, qty });
     }
   }
   return entries;

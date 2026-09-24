@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isUnrecognised, planEnrichment, type CardMeta } from "./collection-enrich";
+import { canonicalName, isUnrecognised, planEnrichment, type CardMeta } from "./collection-enrich";
 
 const card = (name: string): CardMeta => ({ name, colorIdentity: "U", typeLine: "Creature", manaCost: "{U}", imageUri: "https://img/" + name });
 const row = (id: number, name: string, quantity = 1) => ({ id, name, nameKey: name.toLowerCase(), quantity });
@@ -49,5 +49,13 @@ describe("isUnrecognised", () => {
   it("is a row with neither a type line nor an image", () => {
     expect(isUnrecognised({ typeLine: null, imageUri: null })).toBe(true);
     expect(isUnrecognised({ typeLine: null, imageUri: "x" })).toBe(false);
+  });
+});
+
+describe("canonicalName", () => {
+  it("collapses a reversible card's repeated name, and leaves real double faces alone", () => {
+    expect(canonicalName("Hallowed Fountain // Hallowed Fountain")).toBe("Hallowed Fountain");
+    expect(canonicalName("Delver of Secrets // Insectile Aberration")).toBe("Delver of Secrets // Insectile Aberration");
+    expect(canonicalName("Sol Ring")).toBe("Sol Ring");
   });
 });
