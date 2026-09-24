@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
-import { AI_LIMIT_MSG } from "@/lib/limits";
+import { aiLimitMsg } from "@/lib/limits";
+import { proOnSale } from "@/lib/revenuecat";
 import { consumeAi } from "@/lib/limits-db";
 import { buildDecksBlock, type AssistantDeck } from "@/lib/assistant";
 import { ASSISTANT_TOOLS, runAssistantTool } from "@/lib/assistant-tools";
@@ -131,7 +132,7 @@ export async function POST(req: Request) {
   }
   // Metered after validation, so a malformed request doesn't cost a question.
   if (!(await consumeAi(user))) {
-    return NextResponse.json({ error: AI_LIMIT_MSG, code: "ai_limit" }, { status: 429 });
+    return NextResponse.json({ error: aiLimitMsg(proOnSale()), code: "ai_limit" }, { status: 429 });
   }
 
   const [deckRows, owned] = await Promise.all([

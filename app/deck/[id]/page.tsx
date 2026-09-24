@@ -1711,7 +1711,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {orderOpen && <OrderModal cards={deckCards} onClose={() => setOrderOpen(false)} />}
 
       {/* saved versions — snapshot now, compare an earlier one with the current list */}
-      {versionsOpen && <VersionsModal deckId={deckId} pool={pool} canEdit={canEdit} onClose={() => setVersionsOpen(false)} />}
+      {versionsOpen && <VersionsModal deckId={deckId} pool={pool} canEdit={canEdit} onClose={() => setVersionsOpen(false)} onRestored={loadPool} />}
 
       {/* card preview modal */}
       {preview && (

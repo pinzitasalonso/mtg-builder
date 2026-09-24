@@ -87,3 +87,10 @@ export function webPaywallKey(raw: string | null | undefined, production: boolea
   const sandbox = key.startsWith("rcb_sb_") || key.startsWith("test_");
   return production && sandbox ? null : key;
 }
+
+/* Whether Pro can be bought on the web right now: this deployment has a key
+   it's willing to serve. Until it does, the free plan's messages call Pro
+   "coming soon" (lib/limits.ts). */
+export function proOnSale(): boolean {
+  return webPaywallKey(process.env.REVENUECAT_WEB_KEY, process.env.NODE_ENV === "production") !== null;
+}

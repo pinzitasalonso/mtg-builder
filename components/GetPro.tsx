@@ -12,8 +12,22 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Sparkles } from "lucide-react";
 import { loadPaywallConfig, presentProPaywall, syncSubscription } from "@/lib/pro-paywall";
 
-export function useProPaywall(onUpgraded?: () => void) {
+/* Whether this deployment sells Pro on the web (the paywall's key is set).
+   False until the config answers, so nothing flashes in and out. */
+export function usePaywallAvailable(): [boolean, (v: boolean) => void] {
   const [available, setAvailable] = useState(false);
+  useEffect(() => {
+    let live = true;
+    loadPaywallConfig().then((c) => live && setAvailable(Boolean(c.apiKey)));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return [available, setAvailable];
+}
+
+export function useProPaywall(onUpgraded?: () => void) {
+  const [available, setAvailable] = usePaywallAvailable();
   // "opening" covers loading the SDK and the offering; "syncing" is the few
   // seconds after a purchase while the server confirms it with RevenueCat.
   const [phase, setPhase] = useState<"idle" | "opening" | "syncing">("idle");
@@ -23,14 +37,6 @@ export function useProPaywall(onUpgraded?: () => void) {
   useEffect(() => {
     upgraded.current = onUpgraded;
   });
-
-  useEffect(() => {
-    let live = true;
-    loadPaywallConfig().then((c) => live && setAvailable(Boolean(c.apiKey)));
-    return () => {
-      live = false;
-    };
-  }, []);
 
   // A note says its piece and goes.
   useEffect(() => {

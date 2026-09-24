@@ -2,7 +2,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import prisma from "@/lib/prisma";
 import { newPublicId } from "@/lib/deck-id";
 import { singletonCapped } from "@/lib/commander";
-import { DECK_LIMIT_MSG, type TierFields } from "@/lib/limits";
+import { deckLimitMsg, type TierFields } from "@/lib/limits";
+import { proOnSale } from "@/lib/revenuecat";
 import { canCreateDeck } from "@/lib/limits-db";
 import { snapshotDeck } from "@/lib/deck-versions";
 import { lookupCollection, NAMED_GAP_MS, normalizeCardKey, resolveNamedDetailed, SCRYFALL_HEADERS, type OutCard } from "@/lib/scryfall";
@@ -299,7 +300,10 @@ async function ownDeck(userId: number, publicId: string) {
 async function createDeck(user: { id: number } & TierFields, input: Record<string, unknown>): Promise<ToolOutcome> {
   const name = str(input.name, 80);
   if (!name) return { result: "A deck needs a name.", isError: true };
-  if (!(await canCreateDeck(user))) return { result: DECK_LIMIT_MSG, isError: true, note: `Couldn’t create “${name}”: ${DECK_LIMIT_MSG}` };
+  if (!(await canCreateDeck(user))) {
+    const msg = deckLimitMsg(proOnSale());
+    return { result: msg, isError: true, note: `Couldn’t create “${name}”: ${msg}` };
+  }
   const format = str(input.format, 30).toLowerCase() || "commander";
   const commander = str(input.commander, 120) || null;
   const cards = cardInputs(input.cards);

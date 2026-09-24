@@ -3,7 +3,7 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 
 export const metadata: Metadata = {
-  title: "Terms of Use — Spellpool",
+  title: "Terms of Use",
   description: "The terms for using Spellpool and the Spellpool Pro subscription.",
 };
 

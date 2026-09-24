@@ -45,12 +45,12 @@ export default function ProView() {
 
   if (!cfg || !cfg.appUserId) return <AuthShell>{null}</AuthShell>;
 
-  if (pro) return <ProAccount info={info} webPaywall={Boolean(cfg.apiKey)} syncing={paywall.syncing} />;
+  if (pro) return <ProAccount info={info} syncing={paywall.syncing} />;
 
   return (
     <AuthShell>
       <h1 style={h1}>Spellpool Pro</h1>
-      <p style={lede}>Lifts every limit on the free plan, here and in the iOS app.</p>
+      <p style={lede}>Lifts every limit on the free plan.</p>
       <Perks />
       {paywall.note && <div style={{ ...errorBox, marginBottom: 12 }}>{paywall.note}</div>}
       {paywall.available ? (
@@ -58,7 +58,7 @@ export default function ProView() {
           {paywall.syncing ? "Unlocking Pro…" : paywall.busy ? "Opening…" : "See the plans"}
         </button>
       ) : (
-        <p style={{ ...lede, margin: 0 }}>Get it in the Spellpool iOS app: Account → Upgrade to Pro. It applies here as soon as you have it.</p>
+        <p style={{ ...lede, margin: 0 }}>Spellpool Pro is coming soon.</p>
       )}
       <p style={footNote}>
         <Link href="/" style={{ color: "var(--gold)", fontWeight: 600 }}>Back to your decks</Link>
@@ -102,7 +102,7 @@ function day(d: Date): string {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 }
 
-function ProAccount({ info, webPaywall, syncing }: { info: CustomerInfo | null; webPaywall: boolean; syncing: boolean }) {
+function ProAccount({ info, syncing }: { info: CustomerInfo | null; syncing: boolean }) {
   const ent = info?.entitlements.active[PRO_ENTITLEMENT];
   const billing = billedBy(ent?.store);
   const when = ent?.expirationDate
@@ -114,7 +114,7 @@ function ProAccount({ info, webPaywall, syncing }: { info: CustomerInfo | null; 
   return (
     <AuthShell>
       <h1 style={h1}>You&apos;re on Spellpool Pro</h1>
-      <p style={lede}>{syncing ? "Unlocking Pro on your account…" : "Every limit is lifted, here and in the iOS app."}</p>
+      <p style={lede}>{syncing ? "Unlocking Pro on your account…" : "Every limit on the free plan is lifted."}</p>
       <Perks />
       {ent?.billingIssueDetectedAt && (
         <div style={{ ...errorBox, marginBottom: 12 }}>The last payment didn&apos;t go through — update it below to keep Pro.</div>
@@ -130,11 +130,7 @@ function ProAccount({ info, webPaywall, syncing }: { info: CustomerInfo | null; 
         </a>
       ) : (
         ent?.store !== "promotional" && (
-          <p style={{ ...lede, margin: 0 }}>
-            {webPaywall
-              ? "Manage or cancel it where you bought it."
-              : "Manage or cancel it in the iOS app: Account → Manage Subscription."}
-          </p>
+          <p style={{ ...lede, margin: 0 }}>Manage or cancel it where you bought it.</p>
         )
       )}
       <p style={footNote}>

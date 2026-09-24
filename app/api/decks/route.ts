@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { newPublicId } from "@/lib/deck-id";
-import { DECK_LIMIT_MSG } from "@/lib/limits";
+import { deckLimitMsg } from "@/lib/limits";
+import { proOnSale } from "@/lib/revenuecat";
 import { canCreateDeck } from "@/lib/limits-db";
 import { recordEvent } from "@/lib/analytics";
 
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
   const user = await currentUser();
   // Signed-in decks count toward the plan; anonymous public decks don't.
   if (user && !(await canCreateDeck(user))) {
-    return NextResponse.json({ error: DECK_LIMIT_MSG, code: "deck_limit" }, { status: 403 });
+    return NextResponse.json({ error: deckLimitMsg(proOnSale()), code: "deck_limit" }, { status: 403 });
   }
   const body = await req.json();
   const name = typeof body.name === "string" ? body.name.trim() : "";

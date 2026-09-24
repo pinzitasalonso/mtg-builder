@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowRight, Copy, Library, LogOut, Pin, Plus, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, ChevronDown, Copy, Dices, Gauge, History, Library, Link2, LogOut, Pin, Plus, ShoppingCart, Smartphone, Sparkles, Trash2, type LucideIcon } from "lucide-react";
+import { LANDING_FAQ, LANDING_FEATURES, landingJsonLd, type LandingFeature } from "@/lib/landing";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
 import HomeAssistant from "@/components/HomeAssistant";
 import CommanderInput from "@/components/CommanderInput";
-import { GetProButton } from "@/components/GetPro";
+import { GetProButton, usePaywallAvailable } from "@/components/GetPro";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
 import { track } from "@/lib/track";
@@ -49,6 +50,17 @@ type Me = {
   deckLimit?: number | null;
 } | null;
 
+const FEATURE_ICON: Record<LandingFeature["icon"], LucideIcon> = {
+  sparkles: Sparkles,
+  gauge: Gauge,
+  link: Link2,
+  library: Library,
+  dices: Dices,
+  history: History,
+  cart: ShoppingCart,
+  phone: Smartphone,
+};
+
 const FEATURES = [
   { n: "01", t: "Pour in a theme", d: "Tell Spellpool a commander, a combo, or just a vibe. It reads the whole Oracle text database — not just card names." },
   { n: "02", t: "Swipe the pool", d: "Get a living pool of suggestions ranked for your build. Keep what fits, toss what doesn't. The pool reshapes as you go." },
@@ -75,6 +87,8 @@ export default function HomePage() {
   const [collection, setCollection] = useState<{ unique: number; total: number; pending: number; sample: string[] }>({ unique: 0, total: 0, pending: 0, sample: [] });
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
   const [creating, setCreating] = useState(false);
+  // Whether Pro is on sale on the web yet — until it is, it's "coming soon".
+  const [proOnSale] = usePaywallAvailable();
 
   async function loadCollection() {
     const c = await fetchCollection();
@@ -168,7 +182,7 @@ export default function HomePage() {
     return (
       <span
         className="home-meter"
-        title="Free plan. Spellpool Pro lifts both limits."
+        title={proOnSale ? "Free plan. Spellpool Pro lifts both limits." : "Free plan. Spellpool Pro, coming soon, lifts both limits."}
         style={{
           fontSize: 11.5,
           fontWeight: 600,
@@ -310,7 +324,7 @@ export default function HomePage() {
           <div>
             <Reveal delay={40}>
               <div className="id-label" style={{ color: "var(--gold)", marginBottom: 18, display: "inline-flex", alignItems: "center", gap: 9 }}>
-                <span style={{ width: 22, height: 2, background: "var(--gold)" }} /> Powered by Claude + Scryfall
+                <span style={{ width: 22, height: 2, background: "var(--gold)" }} /> AI deck builder for Magic: The Gathering
               </div>
             </Reveal>
             <Reveal delay={90}>
@@ -321,7 +335,7 @@ export default function HomePage() {
             </Reveal>
             <Reveal delay={150}>
               <p style={{ fontSize: "clamp(16px,1.5vw,19px)", lineHeight: 1.5, color: "var(--t2)", maxWidth: 440, margin: "0 0 30px" }}>
-                Describe what you want to play. Spellpool reads every card&apos;s rules text and hands you a pool to swipe — building to a legal 100 with the curve and color identity worked out for you.
+                Describe what you want to play. Spellpool reads every card&apos;s rules text and hands you a pool to swipe — building to a legal Commander 100 with the curve and color identity worked out for you. Then score it, find its combos, and playtest it.
               </p>
             </Reveal>
             <Reveal delay={210} style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
@@ -422,6 +436,51 @@ export default function HomePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* EVERYTHING IN THE POOL + FAQ — what the app does now, for a first
+          visit (and for search engines: this is the page's real content). */}
+      {!me && (
+        <section aria-labelledby="features-title" style={{ padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px)" }}>
+          <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+            <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Everything in the pool</div>
+            <h2 id="features-title" className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: "0 0 40px", maxWidth: 760, color: "var(--t1)" }}>
+              Build it, score it, play it, own it.
+            </h2>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16 }}>
+              {LANDING_FEATURES.map((f) => {
+                const Icon = FEATURE_ICON[f.icon];
+                return (
+                  <article key={f.title} style={{ padding: "22px 22px 24px", borderRadius: 18, background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)" }}>
+                    <Icon size={22} strokeWidth={2} color="var(--gold)" aria-hidden="true" />
+                    <h3 style={{ margin: "14px 0 8px", fontSize: 17, fontWeight: 700, color: "var(--t1)" }}>{f.title}</h3>
+                    <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)" }}>{f.body}</p>
+                  </article>
+                );
+              })}
+            </div>
+
+            <h2 id="faq-title" className="id-display" style={{ fontSize: "clamp(28px,3.6vw,40px)", margin: "clamp(56px,7vw,88px) 0 18px", color: "var(--t1)" }}>
+              Questions
+            </h2>
+            <div style={{ maxWidth: 820, display: "flex", flexDirection: "column" }}>
+              {LANDING_FAQ.map((f) => (
+                <details key={f.q} className="home-faq" style={{ borderTop: "1px solid var(--line)", padding: "16px 0" }}>
+                  <summary style={{ cursor: "pointer", listStyle: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 17, fontWeight: 700, color: "var(--t1)" }}>
+                    <h3 style={{ margin: 0, font: "inherit" }}>{f.q}</h3>
+                    <ChevronDown size={18} strokeWidth={2.25} className="home-faq-chevron" aria-hidden="true" style={{ flex: "none", color: "var(--t3)" }} />
+                  </summary>
+                  <p style={{ margin: "10px 0 0", fontSize: 15, lineHeight: 1.6, color: "var(--t2)" }}>{f.a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Structured data: the app and its FAQ, matching what's on the page. */}
+      {!me && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(landingJsonLd()).replace(/</g, "\\u003c") }} />
       )}
 
       {/* PUBLIC BREWS — color-identity showcase */}

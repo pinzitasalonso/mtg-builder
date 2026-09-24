@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser, viewableDeckByPublicId } from "@/lib/auth";
+import { restoreVersion } from "@/lib/deck-versions";
 
 const versionIdOf = (raw: string) => {
   const n = Number(raw);
@@ -34,4 +35,17 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const { count } = await prisma.deckVersion.deleteMany({ where: { id: vid, deckId: deck.id } });
   if (count === 0) return NextResponse.json({ error: "not found" }, { status: 404 });
   return new NextResponse(null, { status: 204 });
+}
+
+// Restore: put the deck back the way this version had it. The current deck is
+// saved as a version first (see restoreVersion), so this can be undone too.
+export async function POST(_req: Request, { params }: { params: Promise<{ id: string; versionId: string }> }) {
+  const { id, versionId } = await params;
+  const user = await currentUser();
+  const deck = await accessibleDeckByPublicId(id, user?.id ?? null);
+  const vid = versionIdOf(versionId);
+  if (!deck || vid === null) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const r = await restoreVersion(deck.id, vid);
+  if (!r.ok) return NextResponse.json({ error: r.error }, { status: r.status });
+  return NextResponse.json(r);
 }

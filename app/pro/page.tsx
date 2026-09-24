@@ -3,7 +3,7 @@ import ProView from "./ProView";
 
 export const metadata: Metadata = {
   title: "Spellpool Pro",
-  description: "Unlimited decks, AI asks and deck scans — on spellpool.com and in the iOS app.",
+  description: "Unlimited decks, AI asks and deck scans on Spellpool.",
 };
 
 // spellpool.com/pro: the paywall as a page, for links from anywhere (and for

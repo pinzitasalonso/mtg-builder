@@ -18,7 +18,8 @@ import {
   parseAnalysis,
   type DeckScan,
 } from "@/lib/deck-analysis";
-import { SCAN_LIMIT_MSG } from "@/lib/limits";
+import { scanLimitMsg } from "@/lib/limits";
+import { proOnSale } from "@/lib/revenuecat";
 import { consumeScan, refundScan } from "@/lib/limits-db";
 import { extractJson, messageText } from "@/lib/ai";
 
@@ -92,7 +93,7 @@ export async function POST(
   }
 
   if (!(await consumeScan(user))) {
-    return NextResponse.json({ error: SCAN_LIMIT_MSG, code: "scan_limit" }, { status: 429 });
+    return NextResponse.json({ error: scanLimitMsg(proOnSale()), code: "scan_limit" }, { status: 429 });
   }
 
   try {
