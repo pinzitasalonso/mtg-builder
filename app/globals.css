@@ -1556,3 +1556,34 @@ button {
     opacity: 1 !important;
   }
 }
+
+/* Deck page header on a phone: one row, not three. The wordmark goes (the
+   mana disc still reads as the logo and links home), Playtest and Share
+   become icon buttons with their aria-labels, and the Tools chevron drops. */
+@media (max-width: 560px) {
+  .deck-header {
+    flex-wrap: nowrap !important;
+    padding-top: 10px !important;
+    padding-bottom: 10px !important;
+    gap: 8px !important;
+  }
+  .deck-header .logo-word,
+  .deck-header .hdr-hide {
+    display: none;
+  }
+  .deck-header-actions {
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+  }
+  .deck-header-actions > button,
+  .deck-header-actions > div > button {
+    padding: 9px 12px !important;
+    white-space: nowrap;
+  }
+  .deck-header .hdr-icon-btn {
+    width: 38px;
+    height: 38px;
+    padding: 0 !important;
+    justify-content: center;
+  }
+}

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  ArrowLeft, ArrowUpDown, BookOpen, Check, ChevronDown, ClipboardCopy, Copy, Crown, Dices, Download, Eye, History,
+  ArrowLeft, ArrowUpDown, BookOpen, Check, ChevronDown, ClipboardCopy, Copy, Crown, Dices, Download, Eye, Share2, History,
   ListChecks, Mountain, Plus, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
   type LucideIcon,
 } from "lucide-react";
@@ -843,6 +843,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       <div className="deck-theme" style={{ ...theme.vars, background: theme.bg, color: theme.text, minHeight: "100vh" }}>
         {/* top nav — logo + tools / share / buy list / edit deck */}
         <header
+          className="deck-header"
           style={{
             display: "flex",
             alignItems: "center",
@@ -859,10 +860,13 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             gap: 12,
           }}
         >
-          <Link href="/" aria-label="Spellpool home" style={{ textDecoration: "none" }}>
+          <Link href="/" aria-label="Spellpool home" style={{ textDecoration: "none", flex: "none" }}>
             <Logo size={18} />
           </Link>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", minWidth: 0 }}>
+          {/* On a phone this row must stay one line: the wordmark, the button
+              labels for Playtest and Share, and the Tools chevron drop out
+              (see .deck-header in globals.css), and each keeps an aria-label. */}
+          <div className="deck-header-actions" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", minWidth: 0 }}>
             {/* Shown to a non-owner too. Copy decklist and Buy list were a hero
                 button and a top-bar button, both ungated; folding them in here
                 behind `canEdit` would have quietly taken them away from anyone
@@ -880,18 +884,19 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   setToolsOpen(true);
                 }}
               >
-                Tools <ChevronDown size={15} strokeWidth={2.25} />
+                Tools <ChevronDown className="hdr-hide" size={15} strokeWidth={2.25} />
               </button>
             </div>
             {/* Playtest was the hero's headline action. It is a thing you do
                 WITH a finished deck, not a thing you do to build one, so it
                 sits up here with Share and Tools — and the hero goes to the two
                 actions that actually build the deck. */}
-            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={() => setPlaytestOpen(true)} disabled={deckCards.length === 0}>
-              <Dices size={16} strokeWidth={2} /> Playtest
+            <button className="id-ghost hdr-icon-btn" style={{ padding: "9px 15px" }} onClick={() => setPlaytestOpen(true)} disabled={deckCards.length === 0} aria-label="Playtest">
+              <Dices size={16} strokeWidth={2} /> <span className="hdr-hide">Playtest</span>
             </button>
-            <button className="id-ghost" style={{ padding: "9px 15px" }} onClick={shareDeck} disabled={sharing}>
-              {copied === "link" ? "Copied!" : sharing ? "Sharing…" : "Share"}
+            <button className="id-ghost hdr-icon-btn" style={{ padding: "9px 15px" }} onClick={shareDeck} disabled={sharing} aria-label={copied === "link" ? "Link copied" : "Share"}>
+              {copied === "link" ? <Check size={16} strokeWidth={2.25} /> : <Share2 size={16} strokeWidth={2} />}{" "}
+              <span className="hdr-hide">{copied === "link" ? "Copied!" : sharing ? "Sharing…" : "Share"}</span>
             </button>
             {canEdit ? (
               <button className="id-btn" style={{ padding: "10px 18px" }} onClick={openSettings}>
@@ -1912,9 +1917,10 @@ const tileQtyBtn: React.CSSProperties = {
    rather than squinted at. */
 const deckTileGrid: React.CSSProperties = {
   display: "grid",
-  // Three per row at least, so a phone shows a deck rather than a column of
-  // single cards; 168px wide once there's room for it.
-  gridTemplateColumns: "repeat(auto-fill, minmax(min(168px, calc(33.33% - 10px)), 1fr))",
+  // Two per row at least, so a phone shows a deck rather than a column of
+  // single cards, at a size you can read; 168px wide once there's room for it.
+  // (7px is half the gap.)
+  gridTemplateColumns: "repeat(auto-fill, minmax(min(168px, calc(50% - 7px)), 1fr))",
   gap: 14,
 };
 
