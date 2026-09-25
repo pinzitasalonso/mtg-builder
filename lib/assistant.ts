@@ -98,3 +98,7 @@ export function deckRef(token: string): { id: string; label: string } | null {
   const m = token.match(/^@deck:([A-Za-z0-9_-]+)\|(.+)$/);
   return m ? { id: m[1], label: m[2] } : null;
 }
+
+/** Sent in an assistant's stream when a tool changed a deck, so the client
+ *  refreshes. Invisible (U+2063), and stripped before anything is shown. */
+export const DECKS_CHANGED = "\u2063decks-changed\u2063";
