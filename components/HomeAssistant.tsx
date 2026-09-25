@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createPortal } from "react-dom";
 import { ArrowUp, Plus, RotateCcw, Sparkles, X } from "lucide-react";
 import { parseBlocks, type Block, type InlineToken } from "@/lib/chat-markdown";
-import { deckRef, rewriteDeckLinks } from "@/lib/assistant";
+import { DECKS_CHANGED, deckRef, rewriteDeckLinks } from "@/lib/assistant";
 import { resolveAndAdd } from "@/lib/pool-client";
 import { track } from "@/lib/track";
 
@@ -35,7 +35,7 @@ const STARTERS = [
 
 // The server's in-stream signal that a tool changed a deck (see
 // /api/assistant). Stripped before anything is shown.
-const DECKS_CHANGED = "\u2063decks-changed\u2063";
+// (DECKS_CHANGED, the server's in-stream signal, comes from lib/assistant.)
 
 function namedImageUrl(name: string): string {
   return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=normal`;
