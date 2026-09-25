@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell, { errorBox, footNote, goldBtn, h1, input, lede, linkBtn, noticeBox } from "@/components/AuthShell";
+import { safeNextPath } from "@/lib/next-path";
 import { track } from "@/lib/track";
 
 // The app's own table, not a deck page's ground. `getIdentityTheme(null)`
@@ -14,6 +15,9 @@ type Mode = "login" | "signup";
 export default function LoginForm({ googleEnabled }: { googleEnabled: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
+  // Where to land after signing in — /pro, when Get Pro sent a signed-out
+  // player here. Same-origin paths only.
+  const next = safeNextPath(params.get("next"));
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -50,7 +54,7 @@ export default function LoginForm({ googleEnabled }: { googleEnabled: boolean })
           }
           return;
         }
-        router.push("/");
+        router.push(next);
         router.refresh();
         return;
       }
@@ -87,11 +91,11 @@ export default function LoginForm({ googleEnabled }: { googleEnabled: boolean })
     setBusy(true);
     // A full navigation, not fetch: the OAuth flow has to happen in the
     // browser's address bar, and the callback signs us in with a cookie.
-    window.location.href = "/api/auth/oauth/google/start";
+    window.location.href = `/api/auth/oauth/google/start?next=${encodeURIComponent(next)}`;
   }
 
-  function switchMode(next: Mode) {
-    setMode(next);
+  function switchMode(to: Mode) {
+    setMode(to);
     setError(null);
     setShowResend(false);
   }

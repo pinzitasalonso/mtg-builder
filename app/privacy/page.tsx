@@ -19,7 +19,7 @@ export default function PrivacyPage() {
       <h1 className="id-display" style={{ fontSize: "clamp(34px,6vw,52px)", margin: "26px 0 4px", color: "var(--t1)" }}>
         Privacy Policy
       </h1>
-      <p style={{ ...P, color: "var(--t3)" }}>Last updated July 17, 2026 · Applies to spellpool.com and the Spellpool iOS app.</p>
+      <p style={{ ...P, color: "var(--t3)" }}>Last updated September 24, 2026 · Applies to spellpool.com and the Spellpool iOS app.</p>
 
       <h2 style={H2}>The short version</h2>
       <p style={P}>
@@ -58,15 +58,24 @@ export default function PrivacyPage() {
 
       <h2 style={H2}>Purchases</h2>
       <p style={P}>
-        Pro subscriptions are bought through Apple&apos;s App Store; Apple handles all payment details — your
-        card number never reaches us. We use RevenueCat to know whether a subscription is active: it
-        receives your Spellpool account id and purchase state, nothing more.
+        Pro subscriptions are bought in the iOS app through Apple&apos;s App Store, or on spellpool.com. Either
+        way your card number never reaches us. In the app, Apple handles all payment details. On the web,
+        Paddle (Paddle.com Market Ltd) is our reseller and the merchant of record: it receives your email
+        address, country and payment details to take the payment and handle tax, under its own privacy
+        policy. The paywall is RevenueCat&apos;s, and RevenueCat and Paddle receive your Spellpool account id
+        so the purchase lands on your account. The web paywall also tells RevenueCat when it&apos;s shown and
+        what&apos;s bought — only once you open it.
+      </p>
+      <p style={P}>
+        We use RevenueCat to know whether a subscription is active: we read your Spellpool account id and
+        purchase state from it, nothing more.
       </p>
 
       <h2 style={H2}>What we don&apos;t do</h2>
       <p style={P}>
         No advertising, no selling or sharing of personal data, no third-party analytics or tracking
-        SDKs, no location data, no contacts access.
+        SDKs (the web paywall&apos;s reporting to RevenueCat, above, is the one exception, and only once you
+        open it), no location data, no contacts access.
       </p>
 
       <h2 style={H2}>Deleting your data</h2>

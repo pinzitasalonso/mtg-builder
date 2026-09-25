@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser, viewableDeckByPublicId } from "@/lib/auth";
 import { newPublicId } from "@/lib/deck-id";
-import { DECK_LIMIT_MSG } from "@/lib/limits";
+import { deckLimitMsg } from "@/lib/limits";
+import { proOnSale } from "@/lib/revenuecat";
 import { canCreateDeck } from "@/lib/limits-db";
 import { recordEvent } from "@/lib/analytics";
 
@@ -15,7 +16,7 @@ export async function POST(
 ) {
   const user = await currentUser();
   if (user && !(await canCreateDeck(user))) {
-    return NextResponse.json({ error: DECK_LIMIT_MSG, code: "deck_limit" }, { status: 403 });
+    return NextResponse.json({ error: deckLimitMsg(proOnSale()), code: "deck_limit" }, { status: 403 });
   }
   // You can copy any deck you can see — your own, an ownerless public deck, or
   // one someone shared with you — into a fresh deck you own.

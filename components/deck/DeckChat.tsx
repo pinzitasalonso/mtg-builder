@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Plus, Sparkles, X, ZoomIn } from "lucide-react";
 import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
 import { Block, InlineToken, boldNamesIn, cardNamesIn, cutCandidates, flattenInline, normalizeCardKey, parseBlocks } from "@/lib/chat-markdown";
+import { GetProButton } from "@/components/GetPro";
 import { collectionByName } from "@/lib/scryfall";
 import { track } from "@/lib/track";
 import Link from "next/link";
@@ -35,6 +36,9 @@ export interface DeckChatController {
   setInput: React.Dispatch<React.SetStateAction<string>>;
   streaming: boolean;
   error: string;
+  /** The error is the free plan's daily AI budget — the moment to offer Pro. */
+  aiLimited: boolean;
+  dismissError: () => void;
   busy: Set<string>;
   bulkBusy: boolean;
   bulkProgress: { mode: "add" | "remove"; done: number; total: number } | null;
@@ -75,6 +79,7 @@ export function useDeckChat({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState("");
+  const [aiLimited, setAiLimited] = useState(false);
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
   // Live progress for the bulk add/remove bar so it never looks frozen.
@@ -209,6 +214,7 @@ export function useDeckChat({
     setInput("");
     setStreaming(true);
     setError("");
+    setAiLimited(false);
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -227,6 +233,7 @@ export function useDeckChat({
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
+        if (data.code === "ai_limit") setAiLimited(true);
         throw new Error(data.error || "The assistant is unavailable right now.");
       }
       const reader = res.body.getReader();
@@ -266,6 +273,11 @@ export function useDeckChat({
     setInput,
     streaming,
     error,
+    aiLimited,
+    dismissError: () => {
+      setError("");
+      setAiLimited(false);
+    },
     busy,
     bulkBusy,
     bulkProgress,
@@ -318,6 +330,8 @@ export default function DeckChat({
     setInput,
     streaming,
     error,
+    aiLimited,
+    dismissError,
     busy,
     bulkBusy,
     bulkProgress,
@@ -417,7 +431,15 @@ export default function DeckChat({
       )}
 
       {error && (
-        <div style={{ fontSize: 13.5, color: "var(--danger)", padding: "0 2px" }}>{error}</div>
+        <div style={{ fontSize: 13.5, color: "var(--danger)", padding: "0 2px" }}>
+          {error}
+          {aiLimited && (
+            <>
+              {" "}
+              <GetProButton onUpgraded={dismissError} />
+            </>
+          )}
+        </div>
       )}
 
       {/* intro line + one-tap starters (only before the first message) */}
