@@ -8,6 +8,8 @@ import { Block, InlineToken, boldNamesIn, cardNamesIn, cutCandidates, flattenInl
 import { GetProButton } from "@/components/GetPro";
 import { collectionByName } from "@/lib/scryfall";
 import { track } from "@/lib/track";
+import Link from "next/link";
+import { DECKS_CHANGED, deckRef, rewriteDeckLinks } from "@/lib/assistant";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -224,6 +226,9 @@ export function useDeckChat({
             cards: pool.map((c) => ({ name: c.name, manaCost: c.manaCost, typeLine: c.typeLine, quantity: c.quantity })),
           },
           collection: ownedNames,
+          // Lets the server give the assistant this deck's tools (save a
+          // version, edit, copy) when the player owns it.
+          deckId,
         }),
       });
       if (!res.ok || !res.body) {
@@ -238,6 +243,11 @@ export function useDeckChat({
         const { done, value } = await reader.read();
         if (done) break;
         acc += decoder.decode(value, { stream: true });
+        // A tool changed the deck: reload it, and keep the signal out of the text.
+        if (acc.includes(DECKS_CHANGED)) {
+          acc = acc.split(DECKS_CHANGED).join("");
+          onPoolChanged();
+        }
         setMessages((prev) => {
           const copy = prev.slice();
           copy[copy.length - 1] = { role: "assistant", content: acc };
@@ -788,7 +798,8 @@ function ChatMarkdown({
 }) {
   // Re-parsing the whole reply on every streamed chunk (for every bubble) adds
   // up; the parse only depends on the text.
-  const blocks = useMemo(() => parseBlocks(text), [text]);
+  // Deck links from the tools ([Name](/deck/<id>)) become link tokens first.
+  const blocks = useMemo(() => parseBlocks(rewriteDeckLinks(text)), [text]);
   const linkFor = (name: string, key: string) => {
     const nameKey = normalizeCardKey(name);
     const entry = poolByLower.get(nameKey);
@@ -822,6 +833,14 @@ function ChatMarkdown({
           <strong key={key} style={{ fontWeight: 700 }}>
             {renderInline(t.tokens, key)}
           </strong>
+        );
+      }
+      const deck = deckRef(t.value);
+      if (deck) {
+        return (
+          <Link key={key} href={`/deck/${deck.id}`} style={{ color: "var(--accent)", fontWeight: 700, textDecoration: "underline", textUnderlineOffset: 2 }}>
+            {deck.label}
+          </Link>
         );
       }
       // A name Scryfall couldn't resolve (an AI slip) — show it plainly, not as

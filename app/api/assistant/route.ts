@@ -5,7 +5,7 @@ import { currentUser } from "@/lib/auth";
 import { aiLimitMsg } from "@/lib/limits";
 import { proOnSale } from "@/lib/revenuecat";
 import { consumeAi } from "@/lib/limits-db";
-import { buildDecksBlock, type AssistantDeck } from "@/lib/assistant";
+import { buildDecksBlock, DECKS_CHANGED, type AssistantDeck } from "@/lib/assistant";
 import { ASSISTANT_TOOLS, runAssistantTool } from "@/lib/assistant-tools";
 import { manaValue } from "@/lib/deck-score-classify";
 import { scryfallIdFromImage, usdPricesByIds } from "@/lib/scryfall";
@@ -79,7 +79,7 @@ const INSTRUCTIONS =
 
 // Sent in the stream when a tool changed a deck, so the client refreshes its
 // deck list. Invisible: the client strips it before rendering.
-const DECKS_CHANGED = "\u2063decks-changed\u2063";
+// (DECKS_CHANGED, the in-stream "a deck changed" signal, lives in lib/assistant.)
 
 // The Deck Score line for a scanned deck, from its stored scan.
 function scoreLine(analysis: string | null): string | null {

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { currentUser } from "@/lib/auth";
+import prisma from "@/lib/prisma";
+import { ASSISTANT_TOOLS, runAssistantTool } from "@/lib/assistant-tools";
+import { DECKS_CHANGED } from "@/lib/assistant";
 import { ANON_LIMIT_MSG, anonAiAllowed, clientIp } from "@/lib/ratelimit";
 import { aiLimitMsg } from "@/lib/limits";
 import { proOnSale } from "@/lib/revenuecat";
@@ -41,6 +44,19 @@ const MAX_MESSAGE_CHARS = 8000;
 // loop's cost and latency rather than any expected behaviour — one is already
 // unusual with web search capped at 3 uses.
 const MAX_RESUMES = 3;
+// All passes per question: resumes plus rounds of deck-tool calls.
+const MAX_PASSES = 8;
+
+// What the deck's assistant is told about its tools, when it has them.
+function deckToolsBlock(publicId: string, name: string): string {
+  return (
+    `\n\nDECK TOOLS: you can act on this deck ("${name}", id ${publicId}). save_version snapshots it under a ` +
+    "label. edit_deck adds, removes or moves cards between the deck and its pool, and saves a version first so " +
+    "the player can restore it. create_deck makes a new deck: use it for a copy or a new version as its own deck, " +
+    "with the full list. card_details looks cards up on Scryfall. Act only when the player asks you to, or clearly " +
+    "agrees. After acting, say what you did in one line. Links to decks look like [Name](/deck/<id>)."
+  );
+}
 
 // Reasoning effort. Opus 5.5 defaults to `medium` (Opus 5 defaulted to `high`),
 // but this stays explicit so a default change can't move it. Effort governs
@@ -97,6 +113,8 @@ function stopNote(stop: Anthropic.Message["stop_reason"]): string | null {
     // wanting another round of searching and we stopped buying them.
     case "pause_turn":
       return "_(I ran out of research time on that one — ask again and I'll keep going.)_";
+    case "tool_use":
+      return "_(I ran out of steps on that one — ask me to continue and I'll pick up where I left off.)_";
     default:
       return null;
   }
@@ -154,6 +172,15 @@ export async function POST(req: Request) {
   // already degrades to. See isCollectionBuild for why the tell is a *missing*
   // currentDeck rather than an empty one.
   const buildingFromCollection = isCollectionBuild(body?.currentDeck, collection);
+
+  // The deck's own assistant gets the same actions as the home one (look cards
+  // up, save a version, edit the deck, create a copy) when the web client says
+  // which deck this is AND the signed-in player owns it. Anyone else, and the
+  // iOS app (which sends no deckId), gets the conversation as before.
+  const ownedDeck =
+    user && typeof body?.deckId === "string"
+      ? await prisma.deck.findFirst({ where: { publicId: body.deckId, userId: user.id }, select: { publicId: true, name: true } })
+      : null;
 
   const anthropic = new Anthropic();
 
@@ -321,6 +348,7 @@ export async function POST(req: Request) {
       // Per-deck, because it is filtered to the commander's colour identity —
       // so it belongs here in the volatile tail and not in a cached block.
       buildNewCardsBlock(recent.cards, recent.sets) +
+      (ownedDeck ? deckToolsBlock(ownedDeck.publicId!, ownedDeck.name) : "") +
       (sources.length ? `\n\n(You may mention these sources informed you: ${sources.join(", ")}.)` : ""),
   });
 
@@ -377,9 +405,10 @@ export async function POST(req: Request) {
         // skips research: its answer is supposed to come out of the card list
         // already in the request, so a search would only put back the dead air
         // before the first byte that the skip exists to remove.
-        const tools = buildingFromCollection
-          ? []
-          : [{ type: "web_search_20260209" as const, name: "web_search" as const, max_uses: 3 }];
+        const tools: Anthropic.ToolUnion[] = [
+          ...(buildingFromCollection ? [] : [{ type: "web_search_20260209" as const, name: "web_search" as const, max_uses: 3 }]),
+          ...(ownedDeck ? ASSISTANT_TOOLS : []),
+        ];
         const convo: Anthropic.MessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
         // A server-tool turn can stop with `stop_reason: "pause_turn"` when the
         // server-side loop hits its iteration limit. Nothing errors — the
@@ -387,7 +416,7 @@ export async function POST(req: Request) {
         // turn back (no extra user message: the API sees the trailing tool
         // block and picks up where it left off).
         let finalStop: Anthropic.Message["stop_reason"] = null;
-        for (let attempt = 0; ; attempt++) {
+        for (let attempt = 0; attempt < MAX_PASSES; attempt++) {
           const ai = anthropic.messages.stream({
             model: "claude-opus-5-5",
             // Opus 5.5 allows 128K output. 16000 was chosen when a full decklist
@@ -417,8 +446,23 @@ export async function POST(req: Request) {
           const final = await ai.finalMessage();
           logUsage(final.usage, final.stop_reason);
           finalStop = final.stop_reason;
-          if (final.stop_reason !== "pause_turn" || attempt >= MAX_RESUMES) break;
+          if (final.stop_reason === "pause_turn") {
+            if (attempt >= MAX_RESUMES) break;
+            convo.push({ role: "assistant", content: final.content });
+            continue;
+          }
+          if (final.stop_reason !== "tool_use" || !ownedDeck || !user) break;
+          // Run the deck tools the model asked for, show the player what they
+          // did, and hand the results back for the next pass.
+          const results: Anthropic.ToolResultBlockParam[] = [];
+          for (const use of final.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use")) {
+            const out = await runAssistantTool(user, use.name, use.input);
+            if (out.note) controller.enqueue(encoder.encode(`\n\n**${out.note}**\n\n`));
+            if (out.changed) controller.enqueue(encoder.encode(DECKS_CHANGED));
+            results.push({ type: "tool_result", tool_use_id: use.id, content: out.result, is_error: out.isError || undefined });
+          }
           convo.push({ role: "assistant", content: final.content });
+          convo.push({ role: "user", content: results });
         }
         // Say why, when the answer stopped for a reason other than being
         // finished. A truncated reply that explains itself is a small problem;
@@ -429,8 +473,16 @@ export async function POST(req: Request) {
         controller.close();
       } catch (e) {
         clearInterval(heartbeat);
-        const detail = e instanceof Error ? e.message : String(e);
-        controller.enqueue(encoder.encode(`\n\n_Sorry — the assistant hit an error: ${detail}_`));
+        // The detail goes to the logs; the player gets a sentence to act on.
+        console.error("[chat] failed", e instanceof Error ? e.message : e);
+        const busy = e instanceof Anthropic.APIError && (e.status === 429 || e.status === 529 || (e.status ?? 0) >= 500);
+        controller.enqueue(
+          encoder.encode(
+            busy
+              ? "\n\n_The assistant is busy right now. Give it a moment and ask again._"
+              : "\n\n_Sorry — the assistant hit an error. Try asking again._"
+          )
+        );
         controller.close();
       }
     },
