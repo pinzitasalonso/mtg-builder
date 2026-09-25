@@ -59,7 +59,10 @@ const INSTRUCTIONS =
   "suggest changes freely, but create or edit a deck only when the player asked you to or clearly agreed. " +
   "When you build a deck, make it complete and legal for its format (Commander: exactly 100 cards including " +
   "the commander, singleton, within the commander's color identity), prefer cards they own, and say after " +
-  "what it cost to fill the rest. After acting, say what you did in a line and link the deck.\n\n" +
+  "what it cost to fill the rest. The COMMANDER must be a legendary creature, or a card whose text says it " +
+  "can be your commander — check with card_details if you're not certain it's legendary; a plain creature " +
+  "is never a commander. If create_deck refuses your commander, pick a legal one and try again. " +
+  "After acting, say what you did in a line and link the deck.\n\n" +
   "DECK LINKS — CRITICAL: every time you name one of the player's decks, write it as the Markdown link " +
   "given in its heading, exactly: [Deck Name](/deck/<id>). The app turns it into a button that opens the " +
   "deck. Never invent a deck or an id.\n\n" +

@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
 import HomeAssistant from "@/components/HomeAssistant";
+import LandingVisual from "@/components/LandingVisual";
 import CommanderInput from "@/components/CommanderInput";
 import { GetProButton, usePaywallAvailable } from "@/components/GetPro";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
@@ -61,10 +62,10 @@ const FEATURE_ICON: Record<LandingFeature["icon"], LucideIcon> = {
   phone: Smartphone,
 };
 
-const FEATURES = [
-  { n: "01", t: "Pour in a theme", d: "Tell Spellpool a commander, a combo, or just a vibe. It reads the whole Oracle text database — not just card names." },
-  { n: "02", t: "Swipe the pool", d: "Get a living pool of suggestions ranked for your build. Keep what fits, toss what doesn't. The pool reshapes as you go." },
-  { n: "03", t: "Brew to 100", d: "Watch your curve, color identity, and type balance update live. Export to your deck builder the moment it's legal." },
+const FEATURES: { n: string; t: string; d: string; v: "prompt" | "swipe" | "curve" }[] = [
+  { v: "prompt", n: "01", t: "Pour in a theme", d: "Tell Spellpool a commander, a combo, or just a vibe. It reads the whole Oracle text database — not just card names." },
+  { v: "swipe", n: "02", t: "Swipe the pool", d: "Get a living pool of suggestions ranked for your build. Keep what fits, toss what doesn't. The pool reshapes as you go." },
+  { v: "curve", n: "03", t: "Brew to 100", d: "Watch your curve, color identity, and type balance update live. Export to your deck builder the moment it's legal." },
 ];
 
 export default function HomePage() {
@@ -427,7 +428,8 @@ export default function HomePage() {
               {FEATURES.map((f, i) => (
                 <Reveal key={f.n} delay={120 + i * 90}>
                   <div style={{ padding: "28px 28px 28px 0", borderTop: "1px solid var(--line)", marginRight: i < FEATURES.length - 1 ? 28 : 0, height: "100%" }}>
-                    <div className="id-mono" style={{ fontSize: 13, color: "var(--gold)", marginBottom: 18 }}>{f.n}</div>
+                    <LandingVisual icon={f.v} />
+                    <div className="id-mono" style={{ fontSize: 13, color: "var(--gold)", marginBottom: 10 }}>{f.n}</div>
                     <div className="id-display" style={{ fontSize: 26, marginBottom: 10, color: "var(--t1)" }}>{f.t}</div>
                     <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)", margin: 0 }}>{f.d}</p>
                   </div>
@@ -451,10 +453,13 @@ export default function HomePage() {
               {LANDING_FEATURES.map((f) => {
                 const Icon = FEATURE_ICON[f.icon];
                 return (
-                  <article key={f.title} style={{ padding: "22px 22px 24px", borderRadius: 18, background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)" }}>
-                    <Icon size={22} strokeWidth={2} color="var(--gold)" aria-hidden="true" />
-                    <h3 style={{ margin: "14px 0 8px", fontSize: 17, fontWeight: 700, color: "var(--t1)" }}>{f.title}</h3>
-                    <p style={{ margin: 0, fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)" }}>{f.body}</p>
+                  <article key={f.title} style={{ padding: "16px 16px 22px", borderRadius: 18, background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)" }}>
+                    <LandingVisual icon={f.icon} />
+                    <h3 style={{ margin: "0 6px 8px", display: "flex", alignItems: "center", gap: 8, fontSize: 17, fontWeight: 700, color: "var(--t1)" }}>
+                      <Icon size={18} strokeWidth={2.25} color="var(--gold)" aria-hidden="true" style={{ flex: "none" }} />
+                      {f.title}
+                    </h3>
+                    <p style={{ margin: "0 6px", fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)" }}>{f.body}</p>
                   </article>
                 );
               })}
@@ -618,10 +623,12 @@ function Reveal({ delay = 0, style, children }: { delay?: number; style?: React.
 /* Fanned hand of real cards — staggered deal-in + idle float; hover lifts a card. */
 function CardFan() {
   const [hov, setHov] = useState<number | null>(null);
+  // Classics in their original 1993 frames — the black-bordered Beta
+  // printings — pinned by image: by name alone Scryfall serves the newest.
   const fan = [
-    { name: "Sol Ring", colors: ["C"] },
-    { name: "Counterspell", colors: ["U"] },
-    { name: "Braids, Conjurer Adept", colors: ["U"] },
+    { name: "Shivan Dragon", colors: ["R"], src: "https://cards.scryfall.io/normal/front/5/e/5e64822a-6817-4e1e-8155-3e95f8e3763f.jpg" },
+    { name: "Black Lotus", colors: ["C"], src: "https://cards.scryfall.io/normal/front/b/3/b3a69a1c-c80f-4413-a6fd-ae54cabbce28.jpg" },
+    { name: "Serra Angel", colors: ["W"], src: "https://cards.scryfall.io/normal/front/5/6/5669f9c8-2e94-47e2-a551-7efff317fb34.jpg" },
   ];
   return (
     <div className="id-fan" style={{ position: "relative", height: 420, display: "flex", justifyContent: "center", alignItems: "center" }} aria-hidden="true">
@@ -663,7 +670,7 @@ function CardFan() {
                     animation: `id-float 6.5s ease-in-out ${1200 + i * 260}ms infinite`,
                   }}
                 >
-                  <CardArt name={c.name} colors={c.colors} version="normal" radius={14} style={{ width: "100%", height: "100%" }} />
+                  <CardArt name={c.name} src={c.src} prefer="src" colors={c.colors} version="normal" radius={14} style={{ width: "100%", height: "100%" }} />
                 </div>
               </div>
             </div>

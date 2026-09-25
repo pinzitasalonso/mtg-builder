@@ -2,6 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import prisma from "@/lib/prisma";
 import { newPublicId } from "@/lib/deck-id";
 import { singletonCapped } from "@/lib/commander";
+import { canBeCommander, fitsIdentity, isBackground } from "@/lib/format";
 import { deckLimitMsg, type TierFields } from "@/lib/limits";
 import { proOnSale } from "@/lib/revenuecat";
 import { canCreateDeck } from "@/lib/limits-db";
@@ -51,7 +52,9 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
     description:
       "Create a new deck for the player, with cards. Use when they ask you to build, copy, or branch a deck " +
       "(a 'new version' as its own deck). Put the decklist on board 'deck' and extra candidates on 'pool'. " +
-      "Include the commander in the cards. Returns the new deck's link.",
+      "For Commander, the commander must be a legendary creature (or a card whose text says it can be your commander), " +
+      "and every card must be inside its colour identity: the tool refuses an invalid commander and leaves out " +
+      "off-colour cards. Include the commander in the cards. Returns the new deck's link.",
     input_schema: {
       type: "object",
       properties: {
@@ -292,7 +295,7 @@ function cardInputs(v: unknown): CardInput[] {
 
 async function ownDeck(userId: number, publicId: string) {
   if (!publicId) return null;
-  return prisma.deck.findFirst({ where: { publicId, userId }, select: { id: true, publicId: true, name: true, format: true } });
+  return prisma.deck.findFirst({ where: { publicId, userId }, select: { id: true, publicId: true, name: true, format: true, commander: true } });
 }
 
 // ── create_deck
@@ -307,22 +310,55 @@ async function createDeck(user: { id: number } & TierFields, input: Record<strin
   const format = str(input.format, 30).toLowerCase() || "commander";
   const commander = str(input.commander, 120) || null;
   const cards = cardInputs(input.cards);
-  if (commander && !cards.some((c) => c.name.toLowerCase() === commander.toLowerCase())) {
-    cards.unshift({ name: commander, quantity: 1, board: "deck" });
+  // The commander goes in the deck; a partner pair ("A + B") as two cards.
+  for (const head of (commander ?? "").split(/\s+\+\s+/).map((n) => n.trim()).filter(Boolean).reverse()) {
+    if (!cards.some((c) => c.name.toLowerCase() === head.toLowerCase())) cards.unshift({ name: head, quantity: 1, board: "deck" });
   }
   const { found, missing } = await resolve(cards.map((c) => c.name));
+
+  // A Commander deck needs a real commander: a legendary creature, or a card
+  // that says it can be your commander (a partner pair is "A + B"). Checked
+  // before anything is created, and the model is told why, so it picks again.
+  let identity: string | null = null;
+  if (format === "commander") {
+    if (!commander) return { result: "A Commander deck needs a commander. Name one (a legendary creature) and try again.", isError: true };
+    const heads = commander.split(/\s+\+\s+/).map((n) => n.trim()).filter(Boolean);
+    const headCards = heads.map((n) => found.get(normalizeCardKey(n)) ?? null);
+    const unknown = heads.filter((_, i) => !headCards[i]);
+    if (unknown.length) return { result: `Couldn't find ${unknown.join(" and ")} on Scryfall, so no deck was created. Check the commander's name.`, isError: true };
+    const bad = headCards.filter((c) => !canBeCommander(c!.typeLine, c!.oracleText) && !(heads.length === 2 && isBackground(c!.typeLine)));
+    if (bad.length) {
+      return {
+        result:
+          `No deck was created: ${bad.map((c) => `${c!.name} is a "${c!.typeLine}"`).join("; ")}, so it can't be a commander. ` +
+          "A commander must be a legendary creature, or a card whose text says it can be your commander. Pick another and call create_deck again.",
+        isError: true,
+      };
+    }
+    identity = headCards.map((c) => c!.colorIdentity ?? "").join("");
+  }
+
   const deck = await prisma.deck.create({
     data: { name, format, commander, userId: user.id, publicId: newPublicId() },
     select: { id: true, publicId: true, name: true, format: true },
   });
-  const items = cards
+  const resolved = cards
     .map((c) => ({ card: found.get(normalizeCardKey(c.name)), quantity: c.quantity, board: c.board }))
     .filter((x): x is { card: OutCard; quantity: number; board: Board } => Boolean(x.card));
+  // Outside the commander's colour identity: illegal in the deck, so left out.
+  const offColor = identity === null ? [] : resolved.filter((x) => !fitsIdentity(x.card.colorIdentity, identity!)).map((x) => x.card.name);
+  const items = identity === null ? resolved : resolved.filter((x) => fitsIdentity(x.card.colorIdentity, identity!));
   const copies = await addCards(deck, items);
   const link = `[${deck.name}](/deck/${deck.publicId})`;
   return {
-    result: `Created ${link} (id ${deck.publicId}) with ${copies} cards.${missing.length ? ` Not found, so not added: ${missing.join(", ")}.` : ""}`,
-    note: `✓ Created ${link} · ${copies} cards${missing.length ? ` · ${missing.length} not found` : ""}`,
+    result:
+      `Created ${link} (id ${deck.publicId}) with ${copies} cards.` +
+      (missing.length ? ` Not found, so not added: ${missing.join(", ")}.` : "") +
+      (offColor.length ? ` Outside the commander's colour identity, so not added: ${offColor.join(", ")}.` : ""),
+    note:
+      `✓ Created ${link} · ${copies} cards` +
+      (missing.length ? ` · ${missing.length} not found` : "") +
+      (offColor.length ? ` · ${offColor.length} off-colour left out` : ""),
     changed: true,
   };
 }
@@ -375,9 +411,20 @@ async function editDeck(userId: number, input: Record<string, unknown>): Promise
     await prisma.poolCard.update({ where: { id: row.id }, data: { board: m.to } });
     moved++;
   }
-  const items = add
+  const resolvedAdds = add
     .map((c) => ({ card: found.get(normalizeCardKey(c.name)), quantity: c.quantity, board: c.board }))
     .filter((x): x is { card: OutCard; quantity: number; board: Board } => Boolean(x.card));
+  // A Commander deck only takes cards inside its commander's colour identity,
+  // read off the commander's own card(s) in the deck.
+  let identity: string | null = null;
+  if (deck.format.toLowerCase() === "commander" && deck.commander) {
+    const heads = deck.commander.split(/\s+\+\s+/).map((n) => n.trim().toLowerCase());
+    const rows = await prisma.poolCard.findMany({ where: { deckId: deck.id }, select: { name: true, colorIdentity: true } });
+    const own = rows.filter((r) => heads.includes(r.name.toLowerCase()) && r.colorIdentity !== null);
+    if (own.length) identity = own.map((r) => r.colorIdentity).join("");
+  }
+  const offColor = identity === null ? [] : resolvedAdds.filter((x) => !fitsIdentity(x.card.colorIdentity, identity!)).map((x) => x.card.name);
+  const items = identity === null ? resolvedAdds : resolvedAdds.filter((x) => fitsIdentity(x.card.colorIdentity, identity!));
   const added = await addCards(deck, items);
 
   const link = `[${deck.name}](/deck/${deck.publicId})`;
@@ -386,7 +433,8 @@ async function editDeck(userId: number, input: Record<string, unknown>): Promise
     result:
       `Changed ${link}: ${parts || "no changes"}. A version was saved first ("${snap.version.label}").` +
       (missing.length ? ` Not found on Scryfall: ${missing.join(", ")}.` : "") +
-      (notInDeck.length ? ` Not in the deck, so skipped: ${notInDeck.join(", ")}.` : ""),
+      (notInDeck.length ? ` Not in the deck, so skipped: ${notInDeck.join(", ")}.` : "") +
+      (offColor.length ? ` Outside the commander's colour identity, so not added: ${offColor.join(", ")}.` : ""),
     note: `✓ Edited ${link} · ${parts || "no changes"} · version saved first`,
     changed: true,
   };
