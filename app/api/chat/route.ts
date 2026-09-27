@@ -353,7 +353,17 @@ export async function POST(req: Request) {
   });
 
   const encoder = new TextEncoder();
+  // The player pressed Stop (or left): end the model call and run no more
+  // tools, so a stopped answer can't go on editing the deck unseen.
+  let stopped = false;
+  let current: { abort(): void } | null = null;
+  const stop = () => {
+    stopped = true;
+    current?.abort();
+  };
+  req.signal.addEventListener("abort", stop);
   const stream = new ReadableStream<Uint8Array>({
+    cancel: stop,
     async start(controller) {
       // The model goes silent for long stretches — while it thinks before the
       // first token, and again every time it runs a web search — long enough
@@ -416,7 +426,7 @@ export async function POST(req: Request) {
         // turn back (no extra user message: the API sees the trailing tool
         // block and picks up where it left off).
         let finalStop: Anthropic.Message["stop_reason"] = null;
-        for (let attempt = 0; attempt < MAX_PASSES; attempt++) {
+        for (let attempt = 0; attempt < MAX_PASSES && !stopped; attempt++) {
           const ai = anthropic.messages.stream({
             model: "claude-opus-5-5",
             // Opus 5.5 allows 128K output. 16000 was chosen when a full decklist
@@ -432,6 +442,7 @@ export async function POST(req: Request) {
             tools,
             messages: convo,
           });
+          current = ai;
           for await (const event of ai) {
             if (event.type === "content_block_start") {
               inTextBlock = event.content_block.type === "text";
@@ -451,7 +462,7 @@ export async function POST(req: Request) {
             convo.push({ role: "assistant", content: final.content });
             continue;
           }
-          if (final.stop_reason !== "tool_use" || !ownedDeck || !user) break;
+          if (final.stop_reason !== "tool_use" || !ownedDeck || !user || stopped) break;
           // Run the deck tools the model asked for, show the player what they
           // did, and hand the results back for the next pass.
           const results: Anthropic.ToolResultBlockParam[] = [];
@@ -473,6 +484,16 @@ export async function POST(req: Request) {
         controller.close();
       } catch (e) {
         clearInterval(heartbeat);
+        // Stopped on purpose: the abort surfaces here as an error, and there's
+        // no one left to read an apology.
+        if (stopped) {
+          try {
+            controller.close();
+          } catch {
+            /* already cancelled */
+          }
+          return;
+        }
         // The detail goes to the logs; the player gets a sentence to act on.
         console.error("[chat] failed", e instanceof Error ? e.message : e);
         const busy = e instanceof Anthropic.APIError && (e.status === 429 || e.status === 529 || (e.status ?? 0) >= 500);

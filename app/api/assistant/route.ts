@@ -219,7 +219,16 @@ export async function POST(req: Request) {
 
   const anthropic = new Anthropic();
   const encoder = new TextEncoder();
+  // Stop (or leaving) ends the model call and runs no more tools — see /api/chat.
+  let stopped = false;
+  let current: { abort(): void } | null = null;
+  const stop = () => {
+    stopped = true;
+    current?.abort();
+  };
+  req.signal.addEventListener("abort", stop);
   const stream = new ReadableStream<Uint8Array>({
+    cancel: stop,
     async start(controller) {
       // Newline heartbeats through the silent stretches (thinking, searches),
       // only between text blocks where a newline is invisible — see /api/chat.
@@ -235,7 +244,7 @@ export async function POST(req: Request) {
       try {
         const convo: Anthropic.MessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
         let finalStop: Anthropic.Message["stop_reason"] = null;
-        for (let pass = 0; pass < MAX_PASSES; pass++) {
+        for (let pass = 0; pass < MAX_PASSES && !stopped; pass++) {
           const ai = anthropic.messages.stream({
             model: "claude-opus-5-5",
             max_tokens: 32000,
@@ -244,6 +253,7 @@ export async function POST(req: Request) {
             tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }, ...ASSISTANT_TOOLS],
             messages: convo,
           });
+          current = ai;
           for await (const event of ai) {
             if (event.type === "content_block_start") inTextBlock = event.content_block.type === "text";
             else if (event.type === "content_block_stop") inTextBlock = false;
@@ -264,7 +274,7 @@ export async function POST(req: Request) {
             convo.push({ role: "assistant", content: final.content });
             continue;
           }
-          if (final.stop_reason !== "tool_use") break;
+          if (final.stop_reason !== "tool_use" || stopped) break;
 
           // Run the tools the model asked for, show the player what they did,
           // and hand the results back for the next pass.
@@ -284,6 +294,7 @@ export async function POST(req: Request) {
         const note = stopNote(finalStop);
         if (note) controller.enqueue(encoder.encode(`\n\n${note}`));
       } catch (e) {
+        if (stopped) return; // the abort surfacing as an error; `finally` closes up
         // The detail goes to the logs; the player gets a sentence they can act on.
         console.error("[assistant] failed", e instanceof Error ? e.message : e);
         const busy = e instanceof Anthropic.APIError && (e.status === 429 || e.status === 529 || (e.status ?? 0) >= 500);
@@ -296,7 +307,11 @@ export async function POST(req: Request) {
         );
       } finally {
         clearInterval(heartbeat);
-        controller.close();
+        try {
+          controller.close();
+        } catch {
+          /* already cancelled */
+        }
       }
     },
   });
