@@ -21,9 +21,9 @@ import DeckStatsPane from "@/components/deck/DeckStatsPane";
 import OrderModal from "@/components/deck/OrderModal";
 import VersionsModal from "@/components/deck/VersionsModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, dangerBtn } from "@/components/deck/ui";
-import { OutCard, resolveNamed } from "@/lib/scryfall";
+import { OutCard, resolveNamedDetailed } from "@/lib/scryfall";
 import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard, deleteCard, setQuantity } from "@/lib/pool-client";
-import { singletonCapped } from "@/lib/format";
+import { canBeCommander, isBackground, singletonCapped } from "@/lib/format";
 import { applyPending, flushQueue, pendingFor } from "@/lib/offline-queue";
 import { cardWarnings } from "@/lib/legality";
 import { getIdentityTheme } from "@/lib/identity-theme";
@@ -318,6 +318,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   // commander's color identity (resolved from Scryfall) for legality checks
   const [cmdrIdentity, setCmdrIdentity] = useState<string | null>(null);
+  // What's wrong with the commander, if anything: a name Scryfall doesn't know,
+  // or a card that can't lead a deck. Null while checking, when it's fine, or
+  // when Scryfall didn't answer (a failed lookup is not an invalid commander).
+  const [cmdrProblem, setCmdrProblem] = useState<string | null>(null);
 
   // The signed-in user's owned-card collection (lowercased names). Drives the
   // "owned" badges on pool/deck cards and grounds the AI in what they have.
@@ -417,16 +421,30 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     }
   }, [pool, deckId, loadPool]);
 
-  // Resolve the commander's color identity once per commander change.
+  // Check the commander once per commander change: resolve each card (a
+  // partner pair is "A + B"), take their combined colour identity for the
+  // legality checks, and say so when a name isn't a card or can't lead a deck.
   useEffect(() => {
     const name = deck?.commander?.trim();
+    setCmdrProblem(null);
     if (!name || (deck?.format ?? "").toLowerCase() !== "commander") {
       setCmdrIdentity(null);
       return;
     }
     let cancelled = false;
-    resolveNamed(name).then((c) => {
-      if (!cancelled) setCmdrIdentity(c?.colorIdentity ?? null);
+    const heads = name.split(/\s+\+\s+/).map((n) => n.trim()).filter(Boolean);
+    Promise.all(heads.map((h) => resolveNamedDetailed(h))).then((rs) => {
+      if (cancelled) return;
+      const problems: string[] = [];
+      rs.forEach((r, i) => {
+        if (r.status === "notfound") problems.push(`“${heads[i]}” isn’t a card Scryfall knows`);
+        else if (r.status === "ok" && !canBeCommander(r.card.typeLine, r.card.oracleText) && !(heads.length === 2 && isBackground(r.card.typeLine))) {
+          problems.push(`${r.card.name} can’t be a commander: it’s a ${r.card.typeLine}`);
+        }
+      });
+      setCmdrProblem(problems.length ? problems.join(" · ") : null);
+      const found = rs.filter((r) => r.status === "ok").map((r) => r.card!.colorIdentity ?? "");
+      setCmdrIdentity(found.length === heads.length ? found.join("") : null);
     });
     return () => {
       cancelled = true;
@@ -1011,6 +1029,19 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               {deck?.commander && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24, fontSize: 14, color: "var(--w-2)" }}>
                   Helmed by <b style={{ color: "var(--w-1)" }}>{deck.commander}</b>
+                </div>
+              )}
+              {cmdrProblem && (
+                <div role="alert" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, margin: "-12px 0 22px", padding: "10px 14px", borderRadius: 12, background: "rgba(194,64,42,.18)", boxShadow: "inset 0 0 0 1px rgba(255,156,134,.45)", fontSize: 13.5, color: "var(--w-1)", maxWidth: 620 }}>
+                  <TriangleAlert size={16} strokeWidth={2.25} color="#ff9c86" style={{ flex: "none" }} />
+                  <span style={{ flex: 1, minWidth: 200 }}>
+                    <b>Not a legal commander.</b> {cmdrProblem}. A commander must be a legendary creature, or a card that says it can be your commander.
+                  </span>
+                  {canEdit && (
+                    <button type="button" onClick={openSettings} className="id-ghost" style={{ padding: "6px 12px", fontSize: 13 }}>
+                      Fix in Edit deck
+                    </button>
+                  )}
                 </div>
               )}
               {/* The two actions that BUILD the deck, the pair the iOS deck
