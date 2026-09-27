@@ -58,6 +58,8 @@ export function useAssistantFocus(focus: AssistantFocus | null) {
   useEffect(() => () => setFocus(null), [setFocus]);
 }
 
+const OPEN_KEY = "sp-assistant-open";
+
 /** Tells pages holding deck data that a reply changed a deck. */
 export const DECKS_CHANGED_EVENT = "spellpool:decks-changed";
 
@@ -297,6 +299,25 @@ export default function AssistantProvider({ children }: { children: React.ReactN
     setUnseen(false);
   }, [load]);
   const refresh = useCallback(() => void load(), [load]);
+
+  // Open stays open across a reload or a full page load (a refresh, a deck
+  // opened by its URL), not only across in-app navigation, which keeps this
+  // provider mounted anyway. Per tab: sessionStorage. Restored first, then
+  // kept in step.
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(OPEN_KEY) === "1") setIsOpen(true);
+    } catch {
+      /* storage off: it just starts closed */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(OPEN_KEY, isOpen ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [isOpen]);
   const close = useCallback(() => {
     setIsOpen(false);
     setMenu(null);
