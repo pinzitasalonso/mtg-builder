@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell, { errorBox, footNote, goldBtn, h1, input, lede, linkBtn, noticeBox } from "@/components/AuthShell";
 import { safeNextPath } from "@/lib/next-path";
 import { track } from "@/lib/track";
+import { forgetAll } from "@/lib/client-cache";
 
 // The app's own table, not a deck page's ground. `getIdentityTheme(null)`
 // returns the indigo felt, which stopped being the table when the home was
@@ -54,6 +55,7 @@ export default function LoginForm({ googleEnabled }: { googleEnabled: boolean })
           }
           return;
         }
+        forgetAll(); // signed in: nothing from the signed-out visit carries over
         router.push(next);
         router.refresh();
         return;

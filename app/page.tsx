@@ -7,7 +7,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
-import HomeAssistant from "@/components/HomeAssistant";
+import { DECKS_CHANGED_EVENT, useAssistant } from "@/components/assistant/AssistantProvider";
+import { forgetAll, peek, remember } from "@/lib/client-cache";
+import { forgetOfflineData, forgetSession, offlineSession, rememberSession } from "@/lib/offline-session";
 import LandingVisual from "@/components/LandingVisual";
 import CommanderInput from "@/components/CommanderInput";
 import { GetProButton, usePaywallAvailable } from "@/components/GetPro";
@@ -68,24 +70,39 @@ const FEATURES: { n: string; t: string; d: string; v: "prompt" | "swipe" | "curv
   { v: "curve", n: "03", t: "Brew to 100", d: "Watch your curve, color identity, and type balance update live. Export to your deck builder the moment it's legal." },
 ];
 
+interface HomeCache {
+  me: Me | null;
+  decks: Deck[];
+  publicDecks: Deck[];
+  collection: { unique: number; total: number; pending: number; sample: string[] };
+}
+
 export default function HomePage() {
   const router = useRouter();
   // undefined = still resolving the session; null = signed out.
-  const [me, setMe] = useState<Me | undefined>(undefined);
+  // Seeded from this visit's last copy (lib/client-cache), so coming back
+  // home shows the decks at once while loadAll re-checks them.
+  const [cached] = useState(() => peek<HomeCache>("home"));
+  const [me, setMe] = useState<Me | undefined>(cached?.me);
   /// Why a create or a duplicate was refused — almost always the free plan's
   /// deck cap, which the server explains in the response body.
   const [createError, setCreateError] = useState("");
   const [listError, setListError] = useState("");
-  const [decks, setDecks] = useState<Deck[]>([]);
-  const [publicDecks, setPublicDecks] = useState<Deck[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [decks, setDecks] = useState<Deck[]>(cached?.decks ?? []);
+  const [publicDecks, setPublicDecks] = useState<Deck[]>(cached?.publicDecks ?? []);
+  const [loaded, setLoaded] = useState(Boolean(cached));
+  // The server couldn't be reached: what's shown is the last saved copy.
+  const [offline, setOffline] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showCollection, setShowCollection] = useState(false);
-  // The all-decks assistant. Its conversation lives in sessionStorage, so closing
-  // the panel (or reloading) keeps it.
-  const [showAssistant, setShowAssistant] = useState(false);
+  // The app's one assistant (components/assistant): its conversation lives on
+  // the server and follows the player from page to page.
+  const assistant = useAssistant();
   // Collection summary for the home block: count + a few names for thumbnails.
-  const [collection, setCollection] = useState<{ unique: number; total: number; pending: number; sample: string[] }>({ unique: 0, total: 0, pending: 0, sample: [] });
+  const [collection, setCollection] = useState<HomeCache["collection"]>(cached?.collection ?? { unique: 0, total: 0, pending: 0, sample: [] });
+  useEffect(() => {
+    if (loaded && me !== undefined) remember<HomeCache>("home", { me, decks, publicDecks, collection });
+  }, [loaded, me, decks, publicDecks, collection]);
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
   const [creating, setCreating] = useState(false);
   // Whether Pro is on sale on the web yet — until it is, it's "coming soon".
@@ -103,32 +120,59 @@ export default function HomePage() {
   }
 
   async function loadAll() {
-    const meBody = await fetch("/api/auth/me")
-      .then((r) => r.json())
-      .catch(() => ({ user: null }));
-    const user: Me = meBody?.user ?? null;
+    // Only the server saying "signed out" signs you out. No answer at all
+    // (offline) or a server error keeps the last session, for a day — see
+    // lib/offline-session.
+    let user: Me;
+    let reached = true;
+    try {
+      const r = await fetch("/api/auth/me");
+      if (!r.ok) throw new Error(String(r.status));
+      user = ((await r.json())?.user ?? null) as Me;
+      if (user) rememberSession(user);
+      else forgetSession();
+    } catch {
+      reached = false;
+      user = offlineSession<NonNullable<Me>>();
+    }
+    setOffline(!reached);
     setMe(user);
-    const [own, pub] = await Promise.all([
-      user ? fetch("/api/decks").then((r) => (r.ok ? r.json() : [])) : Promise.resolve([]),
-      fetch("/api/decks?public=1").then((r) => (r.ok ? r.json() : [])),
-    ]);
-    setDecks(own);
-    setPublicDecks(pub);
+    // Offline, these come from the service worker's last copy; if even that
+    // is missing, keep what's on screen rather than blank it.
+    const list = (url: string) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+    const [own, pub] = await Promise.all([user ? list("/api/decks") : Promise.resolve([]), list("/api/decks?public=1")]);
+    if (own) setDecks(own);
+    if (pub) setPublicDecks(pub);
     setLoaded(true);
-    if (user) loadCollection();
-    else setCollection({ unique: 0, total: 0, pending: 0, sample: [] });
+    if (user && reached) loadCollection();
+    else if (!user) setCollection({ unique: 0, total: 0, pending: 0, sample: [] });
   }
 
   useEffect(() => {
     loadAll();
     track("visit");
+    // A reply that built or changed a deck: show it in the list.
+    const onChanged = () => void loadAll();
+    window.addEventListener(DECKS_CHANGED_EVENT, onChanged);
+    // Back online: check in with the server again.
+    window.addEventListener("online", onChanged);
+    return () => {
+      window.removeEventListener(DECKS_CHANGED_EVENT, onChanged);
+      window.removeEventListener("online", onChanged);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function signOut() {
+    forgetAll();
+    await forgetOfflineData();
     await fetch("/api/auth/logout", { method: "POST" });
     setMe(null);
     setDecks([]);
+    assistant.refresh();
     loadAll();
   }
 
@@ -362,6 +406,11 @@ export default function HomePage() {
             <div>
               <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Your decks</div>
               <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,52px)", margin: 0, color: "var(--t1)" }}>Pick up where you left off.</h2>
+              {offline && (
+                <div role="status" style={{ marginTop: 10, fontSize: 13.5, fontWeight: 600, color: "var(--t2)" }}>
+                  You’re offline — showing your decks as they were last saved.
+                </div>
+              )}
               {listError && (
                 <div
                   role="status"
@@ -392,7 +441,7 @@ export default function HomePage() {
           {decks.length > 0 && (
             <button
               type="button"
-              onClick={() => setShowAssistant(true)}
+              onClick={assistant.open}
               className="home-ask"
               style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", margin: "0 0 26px", padding: "14px 18px", borderRadius: 18, border: "1px solid var(--line)", background: "var(--bg2)", color: "var(--t2)", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-ui)", boxShadow: "0 4px 14px -8px rgba(0,0,0,.25)" }}
             >
@@ -514,7 +563,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {showAssistant && <HomeAssistant decks={decks.map((d) => ({ publicId: d.publicId, name: d.name }))} onClose={() => setShowAssistant(false)} onDecksChanged={loadAll} />}
       {showCollection && <CollectionView onClose={() => setShowCollection(false)} onChanged={loadCollection} />}
 
       {showModal && (

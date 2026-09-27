@@ -118,6 +118,7 @@ function PrimerMarkdown({ text }: { text: string }) {
     tokens.map((t, i) => {
       const key = `${keyPrefix}-${i}`;
       if (t.type === "text") return <span key={key}>{t.value}</span>;
+      if (t.type === "italic") return <em key={key}>{renderInline(t.tokens, key)}</em>;
       if (t.type === "bold") {
         return (
           <strong key={key} style={{ fontWeight: 700 }}>

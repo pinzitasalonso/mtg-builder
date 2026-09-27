@@ -192,3 +192,35 @@ describe("cutCandidates", () => {
     expect(cutCandidates(md)).toEqual(["Divination"]);
   });
 });
+
+describe("italics", () => {
+  it("reads _this_ and *this* as italic", () => {
+    expect(tokenizeInline("_Sorry — try again._")).toEqual([{ type: "italic", tokens: [{ type: "text", value: "Sorry — try again." }] }]);
+    expect(tokenizeInline("a *quick* note")).toEqual([
+      { type: "text", value: "a " },
+      { type: "italic", tokens: [{ type: "text", value: "quick" }] },
+      { type: "text", value: " note" },
+    ]);
+  });
+  it("leaves underscores and asterisks inside words alone", () => {
+    expect(tokenizeInline("snake_case_name and 2*3*4")).toEqual([{ type: "text", value: "snake_case_name and 2*3*4" }]);
+  });
+  it("keeps bold and card links working inside and beside italics", () => {
+    expect(tokenizeInline("_add [[Sol Ring]]_ and **go**")).toEqual([
+      { type: "italic", tokens: [{ type: "text", value: "add " }, { type: "card", value: "Sol Ring" }] },
+      { type: "text", value: " and " },
+      { type: "bold", tokens: [{ type: "text", value: "go" }] },
+    ]);
+  });
+  it("finds card names inside italics", () => {
+    expect(cardNamesIn("_try [[Sol Ring]]_")).toContain("Sol Ring");
+  });
+});
+
+describe("italics with underscores inside words", () => {
+  it("keeps snake_case words inside an italic span", () => {
+    expect(tokenizeInline("_(400 invalid_request_error: bad)_")).toEqual([
+      { type: "italic", tokens: [{ type: "text", value: "(400 invalid_request_error: bad)" }] },
+    ]);
+  });
+});
