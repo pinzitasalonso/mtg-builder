@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
 import { DECKS_CHANGED_EVENT, useAssistant } from "@/components/assistant/AssistantProvider";
+import { forgetAll, peek, remember } from "@/lib/client-cache";
 import LandingVisual from "@/components/LandingVisual";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
@@ -67,24 +68,37 @@ const FEATURES: { n: string; t: string; d: string; v: "prompt" | "swipe" | "curv
   { v: "curve", n: "03", t: "Brew to 100", d: "Watch your curve, color identity, and type balance update live. Export to your deck builder the moment it's legal." },
 ];
 
+interface HomeCache {
+  me: Me | null;
+  decks: Deck[];
+  publicDecks: Deck[];
+  collection: { unique: number; total: number; pending: number; sample: string[] };
+}
+
 export default function HomePage() {
   const router = useRouter();
   // undefined = still resolving the session; null = signed out.
-  const [me, setMe] = useState<Me | undefined>(undefined);
+  // Seeded from this visit's last copy (lib/client-cache), so coming back
+  // home shows the decks at once while loadAll re-checks them.
+  const [cached] = useState(() => peek<HomeCache>("home"));
+  const [me, setMe] = useState<Me | undefined>(cached?.me);
   /// Why a create or a duplicate was refused — almost always the free plan's
   /// deck cap, which the server explains in the response body.
   const [createError, setCreateError] = useState("");
   const [listError, setListError] = useState("");
-  const [decks, setDecks] = useState<Deck[]>([]);
-  const [publicDecks, setPublicDecks] = useState<Deck[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [decks, setDecks] = useState<Deck[]>(cached?.decks ?? []);
+  const [publicDecks, setPublicDecks] = useState<Deck[]>(cached?.publicDecks ?? []);
+  const [loaded, setLoaded] = useState(Boolean(cached));
   const [showModal, setShowModal] = useState(false);
   const [showCollection, setShowCollection] = useState(false);
   // The app's one assistant (components/assistant): its conversation lives on
   // the server and follows the player from page to page.
   const assistant = useAssistant();
   // Collection summary for the home block: count + a few names for thumbnails.
-  const [collection, setCollection] = useState<{ unique: number; total: number; pending: number; sample: string[] }>({ unique: 0, total: 0, pending: 0, sample: [] });
+  const [collection, setCollection] = useState<HomeCache["collection"]>(cached?.collection ?? { unique: 0, total: 0, pending: 0, sample: [] });
+  useEffect(() => {
+    if (loaded && me !== undefined) remember<HomeCache>("home", { me, decks, publicDecks, collection });
+  }, [loaded, me, decks, publicDecks, collection]);
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
   const [creating, setCreating] = useState(false);
 
@@ -127,6 +141,7 @@ export default function HomePage() {
   }, []);
 
   async function signOut() {
+    forgetAll();
     await fetch("/api/auth/logout", { method: "POST" });
     setMe(null);
     setDecks([]);

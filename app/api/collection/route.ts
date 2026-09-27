@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { parseCollectionText } from "@/lib/collection-csv";
@@ -16,7 +17,7 @@ const MAX_ENTRIES = 20000;
 // added are matched to Scryfall by a background job (lib/collection-indexer.ts);
 // a GET only makes sure that job is running, and `pending` / `indexing` let the
 // client show progress. It returns at once, even mid-import.
-export async function GET() {
+export async function GET(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ cards: [], unique: 0, total: 0, pending: 0 });
 
@@ -43,7 +44,7 @@ export async function GET() {
   const total = rows.reduce((s, r) => s + r.quantity, 0);
   // Names Scryfall had no card for, so the player can fix or retry them.
   const unrecognised = pending > 0 ? [] : rows.filter(isUnrecognised).map((r) => r.name);
-  return NextResponse.json({ cards, unique: rows.length, total, pending, unrecognised, indexing });
+  return jsonWithEtag(req, { cards, unique: rows.length, total, pending, unrecognised, indexing });
 }
 
 // Import a pasted list or a CSV export (Moxfield, ManaBox, Deckbox, TCGplayer…

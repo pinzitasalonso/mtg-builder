@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { forgetAll } from "@/lib/client-cache";
 import AuthShell, {
   errorBox,
   footNote,
@@ -127,6 +128,7 @@ function ChooseNew({ token }: { token: string }) {
         return;
       }
       // Confirm signs you in, so there is nowhere to go but the decks.
+      forgetAll(); // signed in: nothing from the signed-out visit carries over
       router.push("/");
       router.refresh();
     } catch {
