@@ -124,6 +124,19 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
       required: ["deck_id", "label"],
     },
   },
+  {
+    name: "set_commander",
+    description:
+      "Change the commander of one of the player's Commander decks. The new commander must be a legendary creature, " +
+      "or a card whose text says it can be your commander; for partners pass \"A + B\". A version is saved first. " +
+      "The new commander goes into the deck, the old one moves to the pool, and the result lists any deck cards " +
+      "that fall outside the new colour identity so you can offer to swap them. Only when the player asked.",
+    input_schema: {
+      type: "object",
+      properties: { deck_id: { type: "string" }, commander: { type: "string", description: "Exact name, or \"A + B\" for partners." } },
+      required: ["deck_id", "commander"],
+    },
+  },
 ];
 
 // ── card_details
@@ -438,6 +451,63 @@ async function editDeck(userId: number, input: Record<string, unknown>): Promise
 
 // ── save_version
 
+// ── set_commander
+
+async function setCommander(userId: number, input: Record<string, unknown>): Promise<ToolOutcome> {
+  const deck = await ownDeck(userId, str(input.deck_id, 40));
+  if (!deck?.publicId) return { result: "No deck of the player's has that id.", isError: true };
+  if (deck.format.toLowerCase() !== "commander") return { result: `${deck.name} is a ${deck.format} deck; only Commander decks have a commander.`, isError: true };
+  const wanted = str(input.commander, 160);
+  const heads = wanted.split(/\s+\+\s+/).map((n) => n.trim()).filter(Boolean);
+  if (heads.length === 0 || heads.length > 2) return { result: "Name one commander, or two partners as \"A + B\".", isError: true };
+
+  // Check before touching anything.
+  const { found } = await resolve(heads);
+  const cards = heads.map((h) => found.get(normalizeCardKey(h)) ?? null);
+  const unknown = heads.filter((_, i) => !cards[i]);
+  if (unknown.length) return { result: `Couldn't find ${unknown.join(" and ")} on Scryfall, so the commander wasn't changed.`, isError: true };
+  const bad = cards.filter((c) => !canBeCommander(c!.typeLine, c!.oracleText) && !(heads.length === 2 && isBackground(c!.typeLine)));
+  if (bad.length) {
+    return {
+      result:
+        `The commander wasn't changed: ${bad.map((c) => `${c!.name} is a "${c!.typeLine}"`).join("; ")}, so it can't be a commander. ` +
+        "A commander must be a legendary creature, or a card whose text says it can be your commander.",
+      isError: true,
+    };
+  }
+
+  const snap = await snapshotDeck(deck.id, `Before commander: ${wanted}`.slice(0, 80));
+  if (!snap.ok) return { result: `Didn't change the commander: couldn't save a version first (${snap.error})`, isError: true };
+
+  const newName = cards.map((c) => c!.name).join(" + ");
+  const oldHeads = (deck.commander ?? "").split(/\s+\+\s+/).map((n) => n.trim().toLowerCase()).filter(Boolean);
+  const newKeys = new Set(cards.map((c) => c!.name.toLowerCase()));
+  await prisma.deck.update({ where: { id: deck.id }, data: { commander: newName } });
+  // The old commander steps down to the pool (still there to keep or cut).
+  const rows = await prisma.poolCard.findMany({ where: { deckId: deck.id }, select: { id: true, name: true } });
+  for (const r of rows) {
+    if (oldHeads.includes(r.name.toLowerCase()) && !newKeys.has(r.name.toLowerCase())) {
+      await prisma.poolCard.update({ where: { id: r.id }, data: { board: "pool" } });
+    }
+  }
+  await addCards(deck, cards.map((c) => ({ card: c!, quantity: 1, board: "deck" as Board })));
+
+  // What no longer fits: deck cards outside the new colour identity.
+  const identity = cards.map((c) => c!.colorIdentity ?? "").join("");
+  const deckRows = await prisma.poolCard.findMany({ where: { deckId: deck.id, board: "deck" }, select: { name: true, colorIdentity: true } });
+  const offColor = deckRows.filter((r) => !fitsIdentity(r.colorIdentity, identity)).map((r) => r.name);
+
+  const link = `[${deck.name}](/deck/${deck.publicId})`;
+  return {
+    result:
+      `Changed ${link}'s commander to ${newName}. A version was saved first ("${snap.version.label}").` +
+      (oldHeads.length ? " The old commander moved to the pool." : "") +
+      (offColor.length ? ` ${offColor.length} deck card(s) are now outside the colour identity: ${offColor.join(", ")}.` : " Every deck card fits the new colour identity."),
+    note: `✓ ${link} is now led by ${newName} · version saved first` + (offColor.length ? ` · ${offColor.length} off-colour` : ""),
+    changed: true,
+  };
+}
+
 async function saveVersion(userId: number, input: Record<string, unknown>): Promise<ToolOutcome> {
   const deck = await ownDeck(userId, str(input.deck_id, 40));
   if (!deck?.publicId) return { result: "No deck of the player's has that id.", isError: true };
@@ -467,6 +537,8 @@ export async function runAssistantTool(
         return await editDeck(user.id, args);
       case "save_version":
         return await saveVersion(user.id, args);
+      case "set_commander":
+        return await setCommander(user.id, args);
       default:
         return { result: `Unknown tool ${name}.`, isError: true };
     }
