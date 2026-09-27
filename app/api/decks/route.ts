@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { newPublicId } from "@/lib/deck-id";
@@ -46,7 +47,8 @@ export async function GET(req: Request) {
     for (const ch of c.colorIdentity) if ("WUBRG".includes(ch)) set.add(ch);
     colorsByDeck.set(c.deckId, set);
   }
-  return NextResponse.json(
+  return jsonWithEtag(
+    req,
     decks.map((d) => ({
       ...d,
       _count: { cards: deckCountByDeck.get(d.id) ?? 0 },

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, canEditDeck, currentUser, viewableDeckByPublicId } from "@/lib/auth";
 import { clampDeckRecord } from "@/lib/deck-record";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
@@ -15,7 +16,7 @@ export async function GET(
     where: { id: deck.id },
     include: { _count: { select: { cards: true } } },
   });
-  return NextResponse.json({
+  return jsonWithEtag(req, {
     ...counted,
     isPublic: deck.userId === null,
     canEdit: canEditDeck(deck, user?.id ?? null),

@@ -30,6 +30,7 @@ import { applyPending, flushQueue, pendingFor } from "@/lib/offline-queue";
 import { cardWarnings } from "@/lib/legality";
 import { getIdentityTheme } from "@/lib/identity-theme";
 import { fetchCollection } from "@/lib/collection-client";
+import { peek, remember } from "@/lib/client-cache";
 import { track } from "@/lib/track";
 import {
   CardArt,
@@ -212,9 +213,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const deckId = id;
   const router = useRouter();
 
-  const [deck, setDeck] = useState<Deck | null>(null);
+  // Coming back to a deck seen this visit shows its last copy at once; the
+  // loads below then re-check it (see lib/client-cache).
+  const [deck, setDeck] = useState<Deck | null>(() => peek<Deck>(`deck:${deckId}`) ?? null);
   const [deckMissing, setDeckMissing] = useState(false);
-  const [pool, setPool] = useState<PoolCard[]>([]);
+  const [pool, setPool] = useState<PoolCard[]>(() => peek<PoolCard[]>(`cards:${deckId}`) ?? []);
   const [searchResults, setSearchResults] = useState<SearchCard[]>([]);
   const [swipeOpen, setSwipeOpen] = useState(false);
   const [swipeQuery, setSwipeQuery] = useState("");
@@ -328,7 +331,17 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   // The signed-in user's owned-card collection (lowercased names). Drives the
   // "owned" badges on pool/deck cards and grounds the AI in what they have.
-  const [ownedNames, setOwnedNames] = useState<string[]>([]);
+  const [ownedNames, setOwnedNames] = useState<string[]>(() => peek<string[]>("owned-names") ?? []);
+  // Every change, loaded or local, becomes the copy shown next time.
+  useEffect(() => {
+    if (deck) remember(`deck:${deckId}`, deck);
+  }, [deck, deckId]);
+  useEffect(() => {
+    remember(`cards:${deckId}`, pool);
+  }, [pool, deckId]);
+  useEffect(() => {
+    remember("owned-names", ownedNames);
+  }, [ownedNames]);
   const ownedSet = new Set(ownedNames.map((n) => n.toLowerCase()));
 
   const loadPool = useCallback(async () => {

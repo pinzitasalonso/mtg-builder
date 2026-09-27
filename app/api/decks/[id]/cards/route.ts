@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser, viewableDeckByPublicId } from "@/lib/auth";
 import { ensureCommanderCard, singletonCapped } from "@/lib/commander";
@@ -6,7 +7,7 @@ import { ensureCommanderCard, singletonCapped } from "@/lib/commander";
 const MAX_QTY = 999;
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
@@ -18,7 +19,7 @@ export async function GET(
     where: { deckId: deck.id },
     orderBy: { addedAt: "asc" },
   });
-  return NextResponse.json(cards);
+  return jsonWithEtag(req, cards);
 }
 
 export async function POST(
