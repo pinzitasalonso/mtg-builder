@@ -496,9 +496,12 @@ export default function DeckChat({
             overflow: "auto",
             border: "1px solid var(--line)",
             borderRadius: 12,
-            padding: "12px 14px",
+            padding: "11px 14px",
             fontFamily: "var(--font-body)",
-            fontSize: 14.5,
+            // 16px, not smaller: iOS Safari zooms the page into any field
+            // under 16px on focus, which pushed the full-screen chat's
+            // header and Send button off screen.
+            fontSize: 16,
             lineHeight: 1.4,
             background: "var(--surface)",
             color: "var(--text)",
