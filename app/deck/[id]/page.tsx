@@ -1494,20 +1494,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {/* The assistant, off the hero tile. Wide, because its answers carry card
           links you hover to preview. */}
       {chatOpen && canEdit && (
-        <ModalShell onDismiss={() => setChatOpen(false)} maxWidth={780} zIndex={68}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 14 }}>
-            <span className="id-display" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 22, color: "var(--w-1)" }}><Sparkles size={20} strokeWidth={2} /> Ask the AI</span>
-            <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>build · judge · refine</span>
-            <button
-              onClick={() => setChatOpen(false)}
-              aria-label="Close"
-              style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--w-3)", fontSize: 22, lineHeight: 1, cursor: "pointer", padding: 0 }}
-            >
-              ×
-            </button>
-          </div>
-          <DeckChat chat={chat} />
-        </ModalShell>
+        <FullScreenChat onClose={() => setChatOpen(false)} deckName={deck?.name ?? ""}>
+          <DeckChat chat={chat} fill />
+        </FullScreenChat>
       )}
 
       {/* swipe-to-add modal */}
@@ -1955,6 +1944,53 @@ const deckTileGrid: React.CSSProperties = {
   gridTemplateColumns: "repeat(auto-fill, minmax(min(168px, calc(50% - 7px)), 1fr))",
   gap: 14,
 };
+
+/* The deck assistant, full screen: a header with the deck's name and a close
+   button, and the chat filling the rest, its composer docked at the bottom.
+   Esc closes it and the page behind stops scrolling. */
+function FullScreenChat({ onClose, deckName, children }: { onClose: () => void; deckName: string; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="deck-chat-title"
+      style={{ position: "fixed", inset: 0, zIndex: 68, background: "var(--bg)", display: "flex", flexDirection: "column", animation: "sp-fade .15s ease" }}
+    >
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "12px clamp(16px, 4vw, 32px)" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", alignItems: "center", gap: 10 }}>
+          <Sparkles size={20} strokeWidth={2} color="var(--gold)" style={{ flex: "none" }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 id="deck-chat-title" style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "clamp(17px, 4.6vw, 22px)", fontWeight: 700, color: "var(--frame-ink, var(--text))", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              Ask the AI{deckName ? ` · ${deckName}` : ""}
+            </h2>
+            <div style={{ fontSize: 13, color: "var(--t3, var(--text-muted))", marginTop: 2 }}>Build, judge and refine this deck.</div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ width: 36, height: 36, flex: "none", borderRadius: 999, border: "none", background: "var(--bg3)", color: "var(--t2, var(--text-muted))", display: "grid", placeItems: "center", cursor: "pointer" }}>
+            <X size={18} strokeWidth={2.25} />
+          </button>
+        </div>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, padding: "clamp(12px, 3vw, 24px) clamp(16px, 4vw, 32px) max(16px, env(safe-area-inset-bottom))" }}>
+        <div style={{ maxWidth: 860, height: "100%", margin: "0 auto" }}>{children}</div>
+      </div>
+    </div>
+  );
+}
 
 /* Full card-image tile for the decklist: the card art with quantity / owned /
    warning badges, a hover remove (unless it's the commander), and click-to-review. */
