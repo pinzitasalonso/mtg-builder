@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState, useCallback, useRef } from "react";
+import { use, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -16,6 +16,8 @@ import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import PlaytestModal from "@/components/deck/PlaytestModal";
 import GameCodeModal from "@/components/deck/GameCodeModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
+import AssistantScreen from "@/components/assistant/AssistantScreen";
+import { useAssistant, useAssistantFocus, type AssistantFocus } from "@/components/assistant/AssistantProvider";
 import DeckPrimer from "@/components/deck/DeckPrimer";
 import DeckStatsPane from "@/components/deck/DeckStatsPane";
 import OrderModal from "@/components/deck/OrderModal";
@@ -828,8 +830,17 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     return Math.min(manaValue(c.manaCost), 7) === deckFilter.value;
   };
 
-  // One AI conversation for the whole page — rendered in the pool search panel
-  // and again on the mobile deck tab, both views sharing this state.
+  // The AI. Signed in and on your own deck, it's the app's one assistant
+  // (components/assistant): the conversation that follows you from deck to
+  // deck, told this is the deck on screen. Otherwise (signed out, someone
+  // else's shared deck, an ownerless public one) it's this page's own chat.
+  const assistant = useAssistant();
+  const sharedChat = assistant.available === true && !!deck?.canEdit && !deck?.isPublic;
+  const assistantFocus = useMemo<AssistantFocus | null>(
+    () => (sharedChat && deck ? { publicId: deckId, name: deck.name, pool, ownedNames, onPoolChanged: loadPool } : null),
+    [sharedChat, deck, deckId, pool, ownedNames, loadPool]
+  );
+  useAssistantFocus(assistantFocus);
   const chat = useDeckChat({
     deckId,
     pool,
@@ -1059,7 +1070,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       <i>Search, or paste a list.</i>
                     </span>
                   </button>
-                  <button className="deck-action deck-action-ai" onClick={() => setChatOpen(true)}>
+                  <button className="deck-action deck-action-ai" onClick={() => (sharedChat ? assistant.open() : setChatOpen(true))}>
                     <span className="deck-action-icon" aria-hidden><Sparkles size={19} strokeWidth={2} /></span>
                     <span className="deck-action-text">
                       <b>Ask the AI about this deck</b>
@@ -1514,10 +1525,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {/* The assistant, off the hero tile. Wide, because its answers carry card
           links you hover to preview. */}
-      {chatOpen && canEdit && (
-        <FullScreenChat onClose={() => setChatOpen(false)} deckName={deck?.name ?? ""}>
+      {chatOpen && canEdit && !sharedChat && (
+        <AssistantScreen title={`Ask the AI${deck?.name ? ` · ${deck.name}` : ""}`} subtitle="Build, judge and refine this deck." onClose={() => setChatOpen(false)}>
           <DeckChat chat={chat} fill />
-        </FullScreenChat>
+        </AssistantScreen>
       )}
 
       {/* swipe-to-add modal */}
@@ -1965,53 +1976,6 @@ const deckTileGrid: React.CSSProperties = {
   gridTemplateColumns: "repeat(auto-fill, minmax(min(168px, calc(50% - 7px)), 1fr))",
   gap: 14,
 };
-
-/* The deck assistant, full screen: a header with the deck's name and a close
-   button, and the chat filling the rest, its composer docked at the bottom.
-   Esc closes it and the page behind stops scrolling. */
-function FullScreenChat({ onClose, deckName, children }: { onClose: () => void; deckName: string; children: React.ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, []);
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="deck-chat-title"
-      style={{ position: "fixed", inset: 0, zIndex: 68, background: "var(--bg)", display: "flex", flexDirection: "column", animation: "sp-fade .15s ease" }}
-    >
-      <div style={{ borderBottom: "1px solid var(--line)", padding: "12px clamp(16px, 4vw, 32px)" }}>
-        <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", alignItems: "center", gap: 10 }}>
-          <Sparkles size={20} strokeWidth={2} color="var(--gold)" style={{ flex: "none" }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2 id="deck-chat-title" style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "clamp(17px, 4.6vw, 22px)", fontWeight: 700, color: "var(--frame-ink, var(--text))", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              Ask the AI{deckName ? ` · ${deckName}` : ""}
-            </h2>
-            <div style={{ fontSize: 13, color: "var(--t3, var(--text-muted))", marginTop: 2 }}>Build, judge and refine this deck.</div>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Close" style={{ width: 36, height: 36, flex: "none", borderRadius: 999, border: "none", background: "var(--bg3)", color: "var(--t2, var(--text-muted))", display: "grid", placeItems: "center", cursor: "pointer" }}>
-            <X size={18} strokeWidth={2.25} />
-          </button>
-        </div>
-      </div>
-      <div style={{ flex: 1, minHeight: 0, padding: "clamp(12px, 3vw, 24px) clamp(16px, 4vw, 32px) max(16px, env(safe-area-inset-bottom))" }}>
-        <div style={{ maxWidth: 860, height: "100%", margin: "0 auto" }}>{children}</div>
-      </div>
-    </div>
-  );
-}
 
 /* Full card-image tile for the decklist: the card art with quantity / owned /
    warning badges, a hover remove (unless it's the commander), and click-to-review. */

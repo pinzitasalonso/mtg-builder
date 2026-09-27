@@ -10,9 +10,15 @@ import { track } from "@/lib/track";
 import Link from "next/link";
 import { DECKS_CHANGED, deckRef, rewriteDeckLinks } from "@/lib/assistant";
 
-interface ChatMessage {
+export interface ChatMessage {
+  /** Set for messages kept on the server (the signed-in assistant). */
+  id?: number;
   role: "user" | "assistant";
   content: string;
+  /** An assistant reply's state on the server: running, done, stopped, failed, interrupted. */
+  status?: string;
+  /** The deck on screen when this was asked (null: the home page). */
+  deck?: { publicId: string; name: string } | null;
 }
 
 // Full-card image straight from Scryfall by name — used to preview cards that
@@ -44,12 +50,40 @@ export interface DeckChatController {
   ownedLower: Set<string>;
   notFound: Set<string>;
   validCards: Set<string>;
-  toggleCard: (name: string) => void;
+  /** A card link was clicked (`el` is the link, to anchor a menu to). */
+  toggleCard: (name: string, el?: Element) => void;
   bulkAdd: (names: string[]) => void;
   bulkRemove: (names: string[]) => void;
+  /** Whether "Add all / Cut" make sense: only with a deck on screen. */
+  canBulk: boolean;
+  /** The deck on screen, so messages asked elsewhere can say where. */
+  focusDeckId: string | null;
   send: (text: string) => void;
   /** Stop the answer being streamed. What arrived so far stays. */
   stop: () => void;
+}
+
+/* The deck-side half of a chat: which suggested cards are in the deck, which
+   the player owns, which names are real cards, and the actions on them. With
+   no deck on screen (`deckId` null) a card click goes to `onPickDeck`, which
+   asks which deck it's for. */
+export interface DeckActions {
+  error: string;
+  setError: React.Dispatch<React.SetStateAction<string>>;
+  busy: Set<string>;
+  bulkBusy: boolean;
+  bulkProgress: { mode: "add" | "remove"; done: number; total: number } | null;
+  preview: Preview | null;
+  setPreview: React.Dispatch<React.SetStateAction<Preview | null>>;
+  poolByLower: Map<string, PoolEntry>;
+  ownedLower: Set<string>;
+  notFound: Set<string>;
+  validCards: Set<string>;
+  toggleCard: (name: string, el?: Element) => void;
+  bulkAdd: (names: string[]) => void;
+  bulkRemove: (names: string[]) => void;
+  canBulk: boolean;
+  focusDeckId: string | null;
 }
 
 /* Conversational AI deck assistant state. The player describes an idea or
@@ -59,24 +93,24 @@ export interface DeckChatController {
    remove it. Conversation is multi-turn for the session — it persists while
    the deck page is mounted, including across search-mode tab switches and the
    mobile pool/deck tabs, and resets on reload. */
-export function useDeckChat({
+export function useDeckActions({
   deckId,
   pool,
-  commander,
   ownedNames,
   onPoolChanged,
+  messages,
+  streaming,
+  onPickDeck,
 }: {
-  deckId: string;
+  deckId: string | null;
   pool: PoolEntry[];
-  commander: string | null | undefined;
   /** Card names from the player's collection — marks suggestions they own. */
   ownedNames: string[];
   onPoolChanged: () => void;
-}): DeckChatController {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
+  messages: ChatMessage[];
+  streaming: boolean;
+  onPickDeck?: (name: string, rect: DOMRect) => void;
+}): DeckActions {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -140,11 +174,15 @@ export function useDeckChat({
 
   // Click a card link: add it if it's not in the pool, otherwise remove that row
   // from the deck. Either way the pool reloads so the link's state flips.
-  async function toggleCard(name: string) {
+  async function toggleCard(name: string, el?: Element) {
     const key = normalizeCardKey(name);
     if (busy.has(key)) return;
     setPreview(null);
     setError("");
+    if (!deckId) {
+      if (el) onPickDeck?.(name, el.getBoundingClientRect());
+      return;
+    }
     setBusy((prev) => new Set(prev).add(key));
     try {
       const entry = poolByLower.get(key);
@@ -168,7 +206,7 @@ export function useDeckChat({
   // Add every suggested card not already in the pool — resolved in one batched
   // Scryfall lookup and inserted in a single request (fast, no per-card hammering).
   async function bulkAdd(names: string[]) {
-    if (bulkBusy) return;
+    if (bulkBusy || !deckId) return;
     const todo = names.filter((n) => !poolByLower.has(normalizeCardKey(n)) && !notFound.has(normalizeCardKey(n)));
     if (todo.length === 0) return;
     setBulkBusy(true);
@@ -183,7 +221,7 @@ export function useDeckChat({
 
   // Remove every suggested card that's currently in the deck (the cuts).
   async function bulkRemove(names: string[]) {
-    if (bulkBusy) return;
+    if (bulkBusy || !deckId) return;
     const rows = names
       .map((n) => poolByLower.get(normalizeCardKey(n)))
       .filter((r): r is PoolEntry => Boolean(r));
@@ -201,6 +239,50 @@ export function useDeckChat({
     setBulkBusy(false);
     setBulkProgress(null);
   }
+
+  return {
+    error,
+    setError,
+    busy,
+    bulkBusy,
+    bulkProgress,
+    preview,
+    setPreview,
+    poolByLower,
+    ownedLower,
+    notFound,
+    validCards,
+    toggleCard,
+    bulkAdd,
+    bulkRemove,
+    canBulk: Boolean(deckId),
+    focusDeckId: deckId,
+  };
+}
+
+/* The deck chat for signed-out players (and the stateless /api/chat): the
+   conversation lives in this page and ends with it. Signed in, the deck page
+   uses the app-wide assistant instead (components/assistant). */
+export function useDeckChat({
+  deckId,
+  pool,
+  commander,
+  ownedNames,
+  onPoolChanged,
+}: {
+  deckId: string;
+  pool: PoolEntry[];
+  commander: string | null | undefined;
+  /** Card names from the player's collection — marks suggestions they own. */
+  ownedNames: string[];
+  onPoolChanged: () => void;
+}): DeckChatController {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const actions = useDeckActions({ deckId, pool, ownedNames, onPoolChanged, messages, streaming });
+  const { setError } = actions;
 
   async function send(text: string) {
     const content = text.trim();
@@ -273,27 +355,7 @@ export function useDeckChat({
     abortRef.current?.abort();
   }
 
-  return {
-    messages,
-    input,
-    setInput,
-    streaming,
-    error,
-    busy,
-    bulkBusy,
-    bulkProgress,
-    preview,
-    setPreview,
-    poolByLower,
-    ownedLower,
-    notFound,
-    validCards,
-    toggleCard,
-    bulkAdd,
-    bulkRemove,
-    send,
-    stop,
-  };
+  return { ...actions, messages, input, setInput, streaming, send, stop };
 }
 
 /* One-tap prompts for the empty state. The deck judge lives here now — it used
@@ -322,8 +384,14 @@ export default function DeckChat({
   chat,
   onEngaged,
   fill = false,
+  starters = STARTERS,
+  intro,
 }: {
   chat: DeckChatController;
+  /** One-tap prompts for the empty state. Defaults to the deck ones. */
+  starters?: { label: string; prompt: string; featured?: boolean }[];
+  /** The line above the starters. Defaults to the deck one. */
+  intro?: React.ReactNode;
   /** Full-screen use: the transcript takes all the height there is, and the
    *  starters and composer sit at the bottom. */
   fill?: boolean;
@@ -348,6 +416,8 @@ export default function DeckChat({
     toggleCard,
     bulkAdd,
     bulkRemove,
+    canBulk,
+    focusDeckId,
     send,
     stop,
   } = chat;
@@ -398,7 +468,14 @@ export default function DeckChat({
         >
           {messages.map((m, i) =>
             m.role === "user" ? (
-              <div key={i} style={{ display: "flex", justifyContent: "flex-end" }}>
+              <div key={m.id ?? i} style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                {/* Asked about another deck (or from home): say which, since
+                    the one conversation follows the player around. */}
+                {m.deck !== undefined && (m.deck?.publicId ?? null) !== focusDeckId && (
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-muted)" }}>
+                    {m.deck ? <>On <Link href={`/deck/${m.deck.publicId}`} style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 2 }}>{m.deck.name}</Link></> : "From home"}
+                  </span>
+                )}
                 <div
                   style={{
                     maxWidth: "85%",
@@ -416,7 +493,7 @@ export default function DeckChat({
               </div>
             ) : m.content ? (
               <AssistantMessage
-                key={i}
+                key={m.id ?? i}
                 content={m.content}
                 poolByLower={poolByLower}
                 ownedLower={ownedLower}
@@ -425,14 +502,19 @@ export default function DeckChat({
                 busy={busy}
                 bulkBusy={bulkBusy}
                 bulkProgress={bulkProgress}
-                showActions={!(streaming && i === messages.length - 1)}
+                showActions={canBulk && !(streaming && i === messages.length - 1)}
+                stopped={m.status === "stopped"}
                 onCard={toggleCard}
                 onPreview={setPreview}
                 onAddAll={bulkAdd}
                 onRemoveAll={bulkRemove}
               />
+            ) : m.status && m.status !== "running" ? (
+              <div key={m.id ?? i} style={{ fontSize: 13, color: "var(--text-muted)" }}>
+                {m.status === "stopped" ? "Stopped before answering." : "No answer came back. Ask again?"}
+              </div>
             ) : (
-              <Thinking key={i} />
+              <Thinking key={m.id ?? i} />
             )
           )}
         </div>
@@ -448,11 +530,11 @@ export default function DeckChat({
           <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
             <Sparkles size={15} strokeWidth={2} color="var(--gold)" style={{ flex: "none", marginTop: 3 }} />
             <p style={{ margin: 0, fontSize: 13.5, color: "var(--w-2, var(--text-muted))", lineHeight: 1.5 }}>
-              Describe what the deck needs — Spellpool pulls <b style={{ color: "var(--w-1, var(--text))" }}>real cards</b> in your color identity.
+              {intro ?? <>Describe what the deck needs — Spellpool pulls <b style={{ color: "var(--w-1, var(--text))" }}>real cards</b> in your color identity.</>}
             </p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {STARTERS.map((s) => (
+            {starters.map((s) => (
               <button
                 key={s.label}
                 type="button"
@@ -689,12 +771,14 @@ function AssistantMessage({
   bulkBusy,
   bulkProgress,
   showActions,
+  stopped = false,
   onCard,
   onPreview,
   onAddAll,
   onRemoveAll,
 }: {
   content: string;
+  stopped?: boolean;
   poolByLower: Map<string, PoolEntry>;
   ownedLower: Set<string>;
   notFound: Set<string>;
@@ -703,7 +787,7 @@ function AssistantMessage({
   bulkBusy: boolean;
   bulkProgress: { mode: "add" | "remove"; done: number; total: number } | null;
   showActions: boolean;
-  onCard: (name: string) => void;
+  onCard: (name: string, el?: Element) => void;
   onPreview: (p: Preview | null) => void;
   onAddAll: (names: string[]) => void;
   onRemoveAll: (names: string[]) => void;
@@ -745,6 +829,7 @@ function AssistantMessage({
         onCard={onCard}
         onPreview={onPreview}
       />
+      {stopped && <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 4 }}>Stopped.</div>}
       {showBar && (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 8 }}>
           {toAdd.length > 0 && (
@@ -830,7 +915,7 @@ function ChatMarkdown({
   ownedLower: Set<string>;
   notFound: Set<string>;
   busy: Set<string>;
-  onCard: (name: string) => void;
+  onCard: (name: string, el?: Element) => void;
   onPreview: (p: Preview | null) => void;
   validCards: Set<string>;
 }) {
@@ -849,7 +934,7 @@ function ChatMarkdown({
         owned={ownedLower.has(nameKey)}
         busy={busy.has(nameKey)}
         imageUri={entry?.imageUri || null}
-        onClick={() => onCard(name)}
+        onClick={(el) => onCard(name, el)}
         onPreview={onPreview}
       />
     );
@@ -952,7 +1037,7 @@ function CardLink({
   owned: boolean;
   busy: boolean;
   imageUri: string | null;
-  onClick: () => void;
+  onClick: (el: Element) => void;
   onPreview: (p: Preview | null) => void;
 }) {
   const [hover, setHover] = useState(false);
@@ -977,7 +1062,7 @@ function CardLink({
     <span style={{ whiteSpace: "nowrap" }}>
       <button
         type="button"
-        onClick={onClick}
+        onClick={(e) => onClick(e.currentTarget)}
         disabled={busy}
         title={title}
         onPointerEnter={(e) => {
