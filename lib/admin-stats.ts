@@ -27,6 +27,8 @@ export interface AccountRow {
   games: number;
   /** Their latest sign-in, question, new deck or added card. */
   lastActive: string;
+  /** Their decks, newest first (for the expandable row). */
+  deckList?: { publicId: string; name: string; format: string; cards: number; scanned: boolean; createdAt: string }[];
 }
 
 export interface FunnelStep {
@@ -38,6 +40,11 @@ export interface AdminSummary {
   accounts: number;
   pro: number;
   active: { d1: number; d7: number; d30: number };
+  /** Active in the last 7 days and joined before that: people coming back. */
+  returning7d: number;
+  /** New accounts in the last 7 days, and the 7 before, for the change. */
+  signups7d: number;
+  signupsPrev7d: number;
   /** New accounts per UTC day, the last 30 days, oldest first. */
   signups: { day: string; count: number }[];
   /** Accounts that got at least this far. */
@@ -71,6 +78,9 @@ export function summarize(rows: AccountRow[], now = Date.now()): AdminSummary {
     accounts: rows.length,
     pro: count((r) => r.tier === "pro"),
     active: { d1: count((r) => within(r.lastActive, 1)), d7: count((r) => within(r.lastActive, 7)), d30: count((r) => within(r.lastActive, 30)) },
+    returning7d: count((r) => within(r.lastActive, 7) && !within(r.createdAt, 7)),
+    signups7d: count((r) => within(r.createdAt, 7)),
+    signupsPrev7d: count((r) => within(r.createdAt, 14) && !within(r.createdAt, 7)),
     signups: days.map((day) => ({ day, count: perDay.get(day)! })),
     ai: {
       total: rows.reduce((n, r) => n + r.aiQuestions, 0),

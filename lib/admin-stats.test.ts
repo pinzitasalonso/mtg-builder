@@ -21,6 +21,10 @@ describe("summarize", () => {
     expect(s.accounts).toBe(3);
     expect(s.pro).toBe(1);
     expect(s.active).toEqual({ d1: 1, d7: 2, d30: 2 });
+    // #2 joined 7 days ago and came back 5 days ago: returning.
+    expect(s.returning7d).toBe(1);
+    expect(s.signups7d).toBe(1);
+    expect(s.signupsPrev7d).toBe(1);
   });
   it("buckets signups into the last 30 days, oldest first", () => {
     expect(s.signups).toHaveLength(30);
