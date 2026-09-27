@@ -54,7 +54,8 @@ const INSTRUCTIONS =
   "popularity, prices). Use it when a judgement turns on a card's exact text, legality or price and you are " +
   "not certain, or for a card you don't know. create_deck builds a new deck (a fresh build, a copy, or a " +
   "new version of an existing deck as its own deck). edit_deck changes an existing deck: it saves a version " +
-  "first automatically, so the player can go back. save_version snapshots a deck. ACT ONLY WHEN ASKED: " +
+  "first automatically, so the player can go back. set_commander changes a Commander deck's commander (also " +
+  "saving a version first) and reports cards that fall outside the new colours. save_version snapshots a deck. ACT ONLY WHEN ASKED: " +
   "suggest changes freely, but create or edit a deck only when the player asked you to or clearly agreed. " +
   "When you build a deck, make it complete and legal for its format (Commander: exactly 100 cards including " +
   "the commander, singleton, within the commander's color identity), prefer cards they own, and say after " +

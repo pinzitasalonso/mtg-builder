@@ -52,7 +52,8 @@ function deckToolsBlock(publicId: string, name: string): string {
     `\n\nDECK TOOLS: you can act on this deck ("${name}", id ${publicId}). save_version snapshots it under a ` +
     "label. edit_deck adds, removes or moves cards between the deck and its pool, and saves a version first so " +
     "the player can restore it. create_deck makes a new deck: use it for a copy or a new version as its own deck, " +
-    "with the full list. card_details looks cards up on Scryfall. Act only when the player asks you to, or clearly " +
+    "with the full list. set_commander changes its commander (it must be a legendary creature or say it can be " +
+    "your commander; a version is saved first). card_details looks cards up on Scryfall. Act only when the player asks you to, or clearly " +
     "agrees. After acting, say what you did in one line. Links to decks look like [Name](/deck/<id>)."
   );
 }
