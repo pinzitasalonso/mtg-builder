@@ -18,11 +18,10 @@ export interface AccountRow {
   cards: number;
   /** Different cards in their collection. */
   collection: number;
-  /** Questions asked of the assistant (the web thread; kept since it moved to the server). */
+  /** Questions asked of the assistant. Counted from its server-side thread,
+   *  so from when it moved there (27 Sep 2026); older chats weren't kept. */
   aiQuestions: number;
   aiQuestions7d: number;
-  /** AI calls on today's meter (web + iOS, all chats). */
-  aiToday: number;
   scans: number;
   versions: number;
   games: number;
@@ -43,6 +42,12 @@ export interface AdminSummary {
   signups: { day: string; count: number }[];
   /** Accounts that got at least this far. */
   funnel: FunnelStep[];
+  ai: {
+    total: number;
+    last7d: number;
+    /** Accounts that asked at least once in the last 7 days. */
+    askers7d: number;
+  };
 }
 
 const DAY = 86_400_000;
@@ -67,12 +72,17 @@ export function summarize(rows: AccountRow[], now = Date.now()): AdminSummary {
     pro: count((r) => r.tier === "pro"),
     active: { d1: count((r) => within(r.lastActive, 1)), d7: count((r) => within(r.lastActive, 7)), d30: count((r) => within(r.lastActive, 30)) },
     signups: days.map((day) => ({ day, count: perDay.get(day)! })),
+    ai: {
+      total: rows.reduce((n, r) => n + r.aiQuestions, 0),
+      last7d: rows.reduce((n, r) => n + r.aiQuestions7d, 0),
+      askers7d: count((r) => r.aiQuestions7d > 0),
+    },
     funnel: [
       { label: "Signed up", count: rows.length },
       { label: "Verified", count: count((r) => r.verified) },
       { label: "Made a deck", count: count((r) => r.decks > 0) },
       { label: "Built a full deck", count: count((r) => r.builtDecks > 0) },
-      { label: "Asked the AI", count: count((r) => r.aiQuestions > 0 || r.aiToday > 0) },
+      { label: "Asked the AI", count: count((r) => r.aiQuestions > 0) },
       { label: "Scanned a deck", count: count((r) => r.scans > 0) },
     ],
   };

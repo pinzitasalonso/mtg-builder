@@ -12,6 +12,7 @@ const field = getIdentityField("U");
 interface Accounts {
   summary: AdminSummary;
   formats: { format: string; count: number }[];
+  aiDays: { day: string; count: number }[];
   accounts: AccountRow[];
 }
 
@@ -110,10 +111,26 @@ export default function AdminPage() {
               <Stat label="Decks" value={data.decks} />
             </div>
 
+            {/* The assistant. Counted from its server-side thread, so from
+                when it moved there; older chats weren't kept. */}
+            <div className="id-label" style={{ color: "var(--w-3)", marginBottom: 12 }}>AI assistant · since 27 Sep</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 30 }}>
+              <Stat label="Questions, 7 days" value={acc?.summary.ai.last7d} accent />
+              <Stat label="People asking, 7 days" value={acc?.summary.ai.askers7d} />
+              <Stat label="Questions in all" value={acc?.summary.ai.total} />
+              <Stat
+                label="Each asker, 7 days"
+                value={acc && acc.summary.ai.askers7d ? Math.round((acc.summary.ai.last7d / acc.summary.ai.askers7d) * 10) / 10 : undefined}
+              />
+            </div>
+
             {acc && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 420px), 1fr))", gap: 18, marginBottom: 30 }}>
                 <Panel title="New accounts" note={`${sum(acc.summary.signups.map((d) => d.count))} in the last 30 days`}>
                   <DayBars series={acc.summary.signups.map((d) => ({ day: d.day, value: d.count }))} unit="new account" />
+                </Panel>
+                <Panel title="AI questions" note={`${sum(acc.aiDays.map((d) => d.count))} in the last 30 days`}>
+                  <DayBars series={acc.aiDays.map((d) => ({ day: d.day, value: d.count }))} unit="question" />
                 </Panel>
                 <Panel title="How far people get" note="Accounts that reached each step">
                   <HBars rows={acc.summary.funnel.map((f) => ({ label: f.label, value: f.count }))} of={acc.summary.accounts} />
@@ -290,7 +307,7 @@ const COLS: { key: SortKey; label: string; num?: boolean }[] = [
   { key: "decks", label: "Decks", num: true },
   { key: "cards", label: "Cards", num: true },
   { key: "collection", label: "Owned", num: true },
-  { key: "aiQuestions", label: "AI asks", num: true },
+  { key: "aiQuestions", label: "AI questions", num: true },
   { key: "scans", label: "Scans", num: true },
   { key: "games", label: "Games", num: true },
 ];
@@ -326,7 +343,7 @@ function AccountsTable({ rows }: { rows: AccountRow[] }) {
         <div>
           <div className="id-display" style={{ fontSize: 22, color: "var(--w-1)" }}>Accounts</div>
           <div className="id-mono" style={{ fontSize: 12, color: "var(--w-3)", marginTop: 4 }}>
-            {shown.length === rows.length ? `${rows.length} accounts` : `${shown.length} of ${rows.length}`} · AI asks count the web assistant; “today” is every chat
+            {shown.length === rows.length ? `${rows.length} accounts` : `${shown.length} of ${rows.length}`} · AI questions since 27 Sep
           </div>
         </div>
         <input
@@ -371,9 +388,9 @@ function AccountsTable({ rows }: { rows: AccountRow[] }) {
                 <td style={{ ...td, textAlign: "right" }} title={`${r.builtDecks} full · ${r.versions} saved versions`}>{r.decks}</td>
                 <td style={{ ...td, textAlign: "right" }}>{r.cards.toLocaleString()}</td>
                 <td style={{ ...td, textAlign: "right" }}>{r.collection.toLocaleString()}</td>
-                <td style={{ ...td, textAlign: "right" }} title={`${r.aiQuestions7d} this week · ${r.aiToday} today (all chats)`}>
-                  {r.aiQuestions}
-                  {r.aiToday > 0 && <span style={{ color: "var(--w-3)" }}> · {r.aiToday} today</span>}
+                <td style={{ ...td, textAlign: "right" }}>
+                  <div style={{ color: r.aiQuestions ? "var(--w-1)" : undefined }}>{r.aiQuestions}</div>
+                  {r.aiQuestions7d > 0 && <div style={{ fontSize: 11.5, color: "var(--w-3)" }}>{r.aiQuestions7d} this week</div>}
                 </td>
                 <td style={{ ...td, textAlign: "right" }}>{r.scans}</td>
                 <td style={{ ...td, textAlign: "right" }}>{r.games}</td>

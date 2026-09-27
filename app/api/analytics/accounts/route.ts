@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { isAnalyticsAdmin } from "@/lib/analytics";
 import { latest, summarize, type AccountRow } from "@/lib/admin-stats";
-import { utcDay } from "@/lib/limits";
+import { lastNDays } from "@/lib/admin-stats";
 
 export const runtime = "nodejs";
 
@@ -17,7 +17,7 @@ export async function GET() {
   const weekAgo = new Date(Date.now() - 7 * 86_400_000);
   const [users, decks, deckCards, lastCard, versions, collection, sessions, threads] = await Promise.all([
     prisma.user.findMany({
-      select: { id: true, email: true, displayName: true, createdAt: true, tier: true, emailVerifiedAt: true, passwordHash: true, aiDay: true, aiCount: true, accounts: { select: { provider: true } } },
+      select: { id: true, email: true, displayName: true, createdAt: true, tier: true, emailVerifiedAt: true, passwordHash: true, accounts: { select: { provider: true } } },
       orderBy: { createdAt: "desc" },
     }),
     prisma.deck.findMany({ where: { userId: { not: null } }, select: { id: true, userId: true, format: true, createdAt: true, gamesPlayed: true, analyzedAt: true } }),
@@ -60,7 +60,6 @@ export async function GET() {
     decksBy.set(d.userId!, list);
   }
 
-  const today = utcDay();
   const rows: AccountRow[] = users.map((u) => {
     const own = decksBy.get(u.id) ?? [];
     const cards = own.map((d) => cardsBy.get(d.id) ?? 0);
@@ -79,7 +78,6 @@ export async function GET() {
       collection: collectionBy.get(u.id) ?? 0,
       aiQuestions: askedBy.get(u.id)?.n ?? 0,
       aiQuestions7d: asked7dBy.get(u.id) ?? 0,
-      aiToday: u.aiDay === today ? u.aiCount : 0,
       scans: own.filter((d) => d.analyzedAt).length,
       versions: own.reduce((n, d) => n + (versionsBy.get(d.id) ?? 0), 0),
       games: own.reduce((n, d) => n + d.gamesPlayed, 0),
@@ -87,11 +85,24 @@ export async function GET() {
     };
   });
 
+  // Questions per day, the last 30 days, from the assistant's thread.
+  const days = lastNDays(30);
+  const recent = await prisma.assistantMessage.findMany({
+    where: { role: "user", createdAt: { gte: new Date(days[0] + "T00:00:00Z") } },
+    select: { createdAt: true },
+  });
+  const perDay = new Map(days.map((d) => [d, 0]));
+  for (const m of recent) {
+    const d = m.createdAt.toISOString().slice(0, 10);
+    if (perDay.has(d)) perDay.set(d, perDay.get(d)! + 1);
+  }
+
   const formats = new Map<string, number>();
   for (const d of decks) formats.set(d.format, (formats.get(d.format) ?? 0) + 1);
 
   return NextResponse.json({
     summary: summarize(rows),
+    aiDays: days.map((day) => ({ day, count: perDay.get(day)! })),
     formats: [...formats].map(([format, count]) => ({ format, count })).sort((a, b) => b.count - a.count),
     accounts: rows,
   });
