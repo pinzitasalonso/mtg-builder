@@ -9,6 +9,7 @@ import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
 import { DECKS_CHANGED_EVENT, useAssistant } from "@/components/assistant/AssistantProvider";
 import { forgetAll, peek, remember } from "@/lib/client-cache";
+import { forgetOfflineData, forgetSession, offlineSession, rememberSession } from "@/lib/offline-session";
 import LandingVisual from "@/components/LandingVisual";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
@@ -89,6 +90,8 @@ export default function HomePage() {
   const [decks, setDecks] = useState<Deck[]>(cached?.decks ?? []);
   const [publicDecks, setPublicDecks] = useState<Deck[]>(cached?.publicDecks ?? []);
   const [loaded, setLoaded] = useState(Boolean(cached));
+  // The server couldn't be reached: what's shown is the last saved copy.
+  const [offline, setOffline] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showCollection, setShowCollection] = useState(false);
   // The app's one assistant (components/assistant): its conversation lives on
@@ -114,20 +117,35 @@ export default function HomePage() {
   }
 
   async function loadAll() {
-    const meBody = await fetch("/api/auth/me")
-      .then((r) => r.json())
-      .catch(() => ({ user: null }));
-    const user: Me = meBody?.user ?? null;
+    // Only the server saying "signed out" signs you out. No answer at all
+    // (offline) or a server error keeps the last session, for a day — see
+    // lib/offline-session.
+    let user: Me;
+    let reached = true;
+    try {
+      const r = await fetch("/api/auth/me");
+      if (!r.ok) throw new Error(String(r.status));
+      user = ((await r.json())?.user ?? null) as Me;
+      if (user) rememberSession(user);
+      else forgetSession();
+    } catch {
+      reached = false;
+      user = offlineSession<NonNullable<Me>>();
+    }
+    setOffline(!reached);
     setMe(user);
-    const [own, pub] = await Promise.all([
-      user ? fetch("/api/decks").then((r) => (r.ok ? r.json() : [])) : Promise.resolve([]),
-      fetch("/api/decks?public=1").then((r) => (r.ok ? r.json() : [])),
-    ]);
-    setDecks(own);
-    setPublicDecks(pub);
+    // Offline, these come from the service worker's last copy; if even that
+    // is missing, keep what's on screen rather than blank it.
+    const list = (url: string) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+    const [own, pub] = await Promise.all([user ? list("/api/decks") : Promise.resolve([]), list("/api/decks?public=1")]);
+    if (own) setDecks(own);
+    if (pub) setPublicDecks(pub);
     setLoaded(true);
-    if (user) loadCollection();
-    else setCollection({ unique: 0, total: 0, pending: 0, sample: [] });
+    if (user && reached) loadCollection();
+    else if (!user) setCollection({ unique: 0, total: 0, pending: 0, sample: [] });
   }
 
   useEffect(() => {
@@ -136,12 +154,18 @@ export default function HomePage() {
     // A reply that built or changed a deck: show it in the list.
     const onChanged = () => void loadAll();
     window.addEventListener(DECKS_CHANGED_EVENT, onChanged);
-    return () => window.removeEventListener(DECKS_CHANGED_EVENT, onChanged);
+    // Back online: check in with the server again.
+    window.addEventListener("online", onChanged);
+    return () => {
+      window.removeEventListener(DECKS_CHANGED_EVENT, onChanged);
+      window.removeEventListener("online", onChanged);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function signOut() {
     forgetAll();
+    await forgetOfflineData();
     await fetch("/api/auth/logout", { method: "POST" });
     setMe(null);
     setDecks([]);
@@ -362,6 +386,11 @@ export default function HomePage() {
             <div>
               <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Your decks</div>
               <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,52px)", margin: 0, color: "var(--t1)" }}>Pick up where you left off.</h2>
+              {offline && (
+                <div role="status" style={{ marginTop: 10, fontSize: 13.5, fontWeight: 600, color: "var(--t2)" }}>
+                  You’re offline — showing your decks as they were last saved.
+                </div>
+              )}
               {listError && (
                 <div
                   role="status"
