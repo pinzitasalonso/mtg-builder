@@ -307,8 +307,12 @@ const STARTERS: { label: string; prompt: string; featured?: boolean }[] = [
 export default function DeckChat({
   chat,
   onEngaged,
+  fill = false,
 }: {
   chat: DeckChatController;
+  /** Full-screen use: the transcript takes all the height there is, and the
+   *  starters and composer sit at the bottom. */
+  fill?: boolean;
   /** Reports when the user engages the chat (focus / conversation started). */
   onEngaged?: (engaged: boolean) => void;
 }) {
@@ -354,7 +358,10 @@ export default function DeckChat({
   const empty = messages.length === 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, ...(fill ? { height: "100%", minHeight: 0 } : {}) }}>
+      {/* Full screen and nothing said yet: the starters sit at the bottom, by
+          the composer, where the thumb is. */}
+      {fill && empty && <div style={{ flex: 1 }} />}
       {/* transcript */}
       {!empty && (
         <div
@@ -366,7 +373,7 @@ export default function DeckChat({
             pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
           style={{
-            maxHeight: 460,
+            ...(fill ? { flex: 1, minHeight: 0 } : { maxHeight: 460 }),
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
