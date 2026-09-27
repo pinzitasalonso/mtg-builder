@@ -7,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
-import HomeAssistant from "@/components/HomeAssistant";
+import { DECKS_CHANGED_EVENT, useAssistant } from "@/components/assistant/AssistantProvider";
 import LandingVisual from "@/components/LandingVisual";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
@@ -80,9 +80,9 @@ export default function HomePage() {
   const [loaded, setLoaded] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showCollection, setShowCollection] = useState(false);
-  // The all-decks assistant. Its conversation lives in sessionStorage, so closing
-  // the panel (or reloading) keeps it.
-  const [showAssistant, setShowAssistant] = useState(false);
+  // The app's one assistant (components/assistant): its conversation lives on
+  // the server and follows the player from page to page.
+  const assistant = useAssistant();
   // Collection summary for the home block: count + a few names for thumbnails.
   const [collection, setCollection] = useState<{ unique: number; total: number; pending: number; sample: string[] }>({ unique: 0, total: 0, pending: 0, sample: [] });
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
@@ -119,6 +119,10 @@ export default function HomePage() {
   useEffect(() => {
     loadAll();
     track("visit");
+    // A reply that built or changed a deck: show it in the list.
+    const onChanged = () => void loadAll();
+    window.addEventListener(DECKS_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(DECKS_CHANGED_EVENT, onChanged);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -126,6 +130,7 @@ export default function HomePage() {
     await fetch("/api/auth/logout", { method: "POST" });
     setMe(null);
     setDecks([]);
+    assistant.refresh();
     loadAll();
   }
 
@@ -363,7 +368,7 @@ export default function HomePage() {
           {decks.length > 0 && (
             <button
               type="button"
-              onClick={() => setShowAssistant(true)}
+              onClick={assistant.open}
               className="home-ask"
               style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", margin: "0 0 26px", padding: "14px 18px", borderRadius: 18, border: "1px solid var(--line)", background: "var(--bg2)", color: "var(--t2)", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-ui)", boxShadow: "0 4px 14px -8px rgba(0,0,0,.25)" }}
             >
@@ -485,7 +490,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {showAssistant && <HomeAssistant decks={decks.map((d) => ({ publicId: d.publicId, name: d.name }))} onClose={() => setShowAssistant(false)} onDecksChanged={loadAll} />}
       {showCollection && <CollectionView onClose={() => setShowCollection(false)} onChanged={loadCollection} />}
 
       {showModal && (

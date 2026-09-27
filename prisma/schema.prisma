@@ -54,6 +54,7 @@ model User {
   authCodes    AuthCode[]
   collection   CollectionCard[]
   playCodes    PlayCode[]
+  assistantThreads AssistantThread[]
 }
 
 // A card the user physically owns, for "do I have this?" checks across their
@@ -184,6 +185,7 @@ model Deck {
   user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   cards     PoolCard[]
   versions  DeckVersion[]
+  assistantMessages AssistantMessage[]
   playCodes PlayCode[]
   games     GameLog[]
 }
@@ -280,4 +282,38 @@ model DeckVersion {
   createdAt DateTime @default(now())
 
   @@index([deckId])
+}
+
+// The assistant's conversation. One assistant for the whole app: the same
+// thread follows the player from deck to deck, and lives here rather than in
+// the browser so an answer keeps being written after the chat is closed, the
+// page reloads or the phone suspends the tab. "New conversation" starts a new
+// thread; the latest one is the live one.
+model AssistantThread {
+  id        Int                @id @default(autoincrement())
+  userId    Int
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime           @default(now())
+  messages  AssistantMessage[]
+
+  @@index([userId])
+}
+
+model AssistantMessage {
+  id        Int             @id @default(autoincrement())
+  threadId  Int
+  thread    AssistantThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role      String // "user" | "assistant"
+  content   String          @default("")
+  // An assistant reply's state: "running" while the server writes it, then
+  // "done", "stopped" (the player pressed Stop), "failed", or "interrupted"
+  // (the server restarted under it, e.g. a deploy).
+  status    String          @default("done")
+  // The deck on screen when this was asked, so the thread can show which deck
+  // a question was about. Kept as history if the deck is deleted (set null).
+  deckId    Int?
+  deck      Deck?           @relation(fields: [deckId], references: [id], onDelete: SetNull)
+  createdAt DateTime        @default(now())
+
+  @@index([threadId])
 }

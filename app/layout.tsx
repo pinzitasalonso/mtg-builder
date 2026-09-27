@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { SITE_DESCRIPTION, SITE_URL } from "@/lib/landing";
 import { IBM_Plex_Mono, Inter } from "next/font/google";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import AssistantProvider from "@/components/assistant/AssistantProvider";
 import "./globals.css";
 
 // Inter, for body AND headlines — the face the designs are drawn in and the
@@ -77,7 +78,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`h-full ${inter.variable} ${plexMono.variable}`}>
       <body className="min-h-full flex flex-col">
-        {children}
+        {/* The one AI assistant: mounted here so its conversation, and a reply
+            it is still writing, carry across pages. */}
+        <AssistantProvider>{children}</AssistantProvider>
         <ServiceWorkerRegister />
       </body>
     </html>
