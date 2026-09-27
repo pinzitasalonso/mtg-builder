@@ -348,6 +348,13 @@ button {
     opacity: 1;
   }
 }
+
+/* The assistant's side panel sliding in from the right (wide screens). */
+@keyframes sp-panel-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
 @keyframes sp-pop {
   from {
     opacity: 0;
