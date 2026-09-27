@@ -287,6 +287,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   /// It used to be a panel wedged between the hero and the panes, which cost
   /// every pane a screenful of height whether or not you were talking to it.
   const [chatOpen, setChatOpen] = useState(false);
+  const [warningsOpen, setWarningsOpen] = useState(false);
 
   /// "Add cards" jumps to the pool and puts the cursor in its search box.
   /// Bumped rather than called directly: the pool pane mounts on the same
@@ -1433,8 +1434,28 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
           {deckWarningCount > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--gold)", marginBottom: 12 }}>
-              <TriangleAlert size={14} strokeWidth={2.25} style={{ flex: "none" }} /> {deckWarningCount} card{deckWarningCount === 1 ? "" : "s"} with legality warnings — the marked cards say why.
+            <div style={{ marginBottom: 12 }}>
+              {/* A button, not a hover: phones have no hover, so the reasons
+                  have to be one tap away. */}
+              <button
+                type="button"
+                onClick={() => setWarningsOpen((o) => !o)}
+                aria-expanded={warningsOpen}
+                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--gold)", background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", font: "inherit", fontWeight: 600 }}
+              >
+                <TriangleAlert size={14} strokeWidth={2.25} style={{ flex: "none" }} />
+                {deckWarningCount} card{deckWarningCount === 1 ? "" : "s"} with legality warnings
+                <ChevronDown size={14} strokeWidth={2.25} style={{ flex: "none", transform: warningsOpen ? "rotate(180deg)" : "none", transition: "transform .15s ease" }} />
+              </button>
+              {warningsOpen && (
+                <ul style={{ listStyle: "none", margin: "8px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {deckCards.filter((c) => warningOf(c)).map((c) => (
+                    <li key={c.dbId} style={{ fontSize: 13, lineHeight: 1.4, color: "var(--w-2)" }}>
+                      <b style={{ color: "var(--w-1)" }}>{c.name}</b>: {warningOf(c)}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
@@ -2013,6 +2034,7 @@ function DeckCardTile({
       (non-commander decks, basics in commander); shows a − / + stepper. */
   onQty?: (next: number) => void;
 }) {
+  const [showWarning, setShowWarning] = useState(false);
   return (
     <div
       className="card-tile"
@@ -2074,10 +2096,26 @@ function DeckCardTile({
           </span>
         )
       )}
+      {warning && showWarning && (
+        <div
+          role="note"
+          onClick={(e) => { e.stopPropagation(); setShowWarning(false); }}
+          style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "10px 10px 38px", background: "rgba(0,0,0,.84)", color: "#fff", fontSize: 12, lineHeight: 1.35, cursor: "pointer" }}
+        >
+          {warning}
+        </div>
+      )}
       {warning && (
-        <span title={warning} aria-label={warning} style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setShowWarning((v) => !v); }}
+          title={warning}
+          aria-label={`Legality warning: ${warning}`}
+          aria-expanded={showWarning}
+          style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", width: 26, height: 26, border: "none", padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+        >
           <TriangleAlert size={14} strokeWidth={2.25} />
-        </span>
+        </button>
       )}
       {removable && (
         <button
@@ -2116,6 +2154,7 @@ function IdCardLine({
   onOpen?: () => void;
   trailing?: React.ReactNode;
 }) {
+  const [showWarning, setShowWarning] = useState(false);
   return (
     <div
       className="id-card id-deckrow"
@@ -2130,9 +2169,24 @@ function IdCardLine({
           {card.quantity > 1 && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--w-3)", flex: "none" }}>{card.quantity}×</span>}
           <span style={{ fontSize: 14, fontWeight: 700, color: "var(--w-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
           {owned && <Check size={14} strokeWidth={3} color="#4ecb8f" style={{ flex: "none" }} aria-label="In your collection"><title>In your collection</title></Check>}
-          {warning && <TriangleAlert size={14} strokeWidth={2.25} color="#ff9c86" style={{ flex: "none" }} aria-label={warning}><title>{warning}</title></TriangleAlert>}
+          {warning && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowWarning((v) => !v); }}
+              title={warning}
+              aria-label={`Legality warning: ${warning}`}
+              aria-expanded={showWarning}
+              style={{ flex: "none", display: "grid", placeItems: "center", width: 24, height: 24, margin: -5, border: "none", background: "none", padding: 0, cursor: "pointer", color: "#ff9c86" }}
+            >
+              <TriangleAlert size={14} strokeWidth={2.25} />
+            </button>
+          )}
         </div>
-        <div style={{ fontSize: 11.5, color: "var(--w-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
+        {warning && showWarning ? (
+          <div style={{ fontSize: 11.5, lineHeight: 1.35, color: "#ff9c86" }}>{warning}</div>
+        ) : (
+          <div style={{ fontSize: 11.5, color: "var(--w-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
+        )}
       </div>
       <ManaCost cost={card.manaCost} size={14} />
       {trailing}
