@@ -23,8 +23,8 @@
 // is metered — so the pane reads whatever the last scan stored and offers the
 // button to run a new one.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link2, ScanSearch } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ChevronDown, Link2, ScanSearch } from "lucide-react";
 import { GetProButton } from "@/components/GetPro";
 import type { DeckScoreReport } from "@/lib/deck-score-report";
 import type { AnalysisDocument, DeckScan } from "@/lib/deck-analysis";
@@ -197,15 +197,44 @@ function ProfileRow({ label, value, detail }: { label: string; value: string; de
 }
 
 /** One figure of the at-a-glance row: a small label, the number, a note. */
-function StatTile({ label, value, detail, warn }: { label: string; value: string; detail?: string | null; warn?: boolean }) {
-  return (
-    <div style={{ padding: "12px 14px", borderRadius: 14, background: "var(--w-fill)", boxShadow: "inset 0 0 0 1px var(--w-line)", minWidth: 0 }}>
-      <div className="id-label" style={{ fontSize: 10.5, color: "var(--w-3)", marginBottom: 6 }}>{label}</div>
+function StatTile({
+  label,
+  value,
+  detail,
+  warn,
+  onClick,
+  actionLabel,
+}: {
+  label: string;
+  value: string;
+  detail?: string | null;
+  warn?: boolean;
+  /** Makes the tile a button (e.g. Combos → the combo list). */
+  onClick?: () => void;
+  actionLabel?: string;
+}) {
+  const box: React.CSSProperties = { padding: "12px 14px", borderRadius: 14, background: "var(--w-fill)", boxShadow: "inset 0 0 0 1px var(--w-line)", minWidth: 0 };
+  const body = (
+    <>
+      <div className="id-label" style={{ fontSize: 10.5, color: "var(--w-3)", marginBottom: 6, display: "flex", justifyContent: "space-between", gap: 6 }}>
+        {label}
+        {onClick && <ChevronDown size={13} strokeWidth={2.5} aria-hidden />}
+      </div>
       <div style={{ fontSize: 20, fontWeight: 700, color: warn ? "#ffb4a3" : "var(--w-1)", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{value}</div>
       {detail && <div style={{ fontSize: 11.5, color: "var(--w-3)", marginTop: 4, lineHeight: 1.35 }}>{detail}</div>}
-    </div>
+    </>
+  );
+  if (!onClick) return <div style={box}>{body}</div>;
+  return (
+    <button type="button" onClick={onClick} aria-label={actionLabel} className="stat-tile-link" style={{ ...box, border: "none", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer" }}>
+      {body}
+    </button>
   );
 }
+
+/** The Combos tile asks the combo list (further down the Stats pane) to open
+ *  and come into view. An event, because the two sit in different sections. */
+const SHOW_COMBOS = "spellpool:show-combos";
 
 /**
  * The verdict, at a glance: size, bracket, average cost, combos — a row of
@@ -280,7 +309,13 @@ export function InsightProfile({
         />
         <StatTile label="Bracket" value={`${BRACKET_NUMBER[shown.bracket]} · ${BRACKET_LABEL[shown.bracket]}`} detail={bracketNote} />
         {Number.isFinite(avgManaValue) && <StatTile label="Average cost" value={avgManaValue.toFixed(2)} detail="mana value, lands excluded" />}
-        <StatTile label="Combos" value={comboValue} detail={comboDetail} />
+        <StatTile
+          label="Combos"
+          value={comboValue}
+          detail={comboDetail}
+          onClick={comboList && comboList.length > 0 ? () => window.dispatchEvent(new Event(SHOW_COMBOS)) : undefined}
+          actionLabel={comboList && comboList.length > 0 ? `Show the ${comboList.length} combo${comboList.length === 1 ? "" : "s"}` : undefined}
+        />
       </div>
       {score && (
         <div style={{ maxWidth: 620 }}>
@@ -383,6 +418,16 @@ function InsightScore({ score, scannedAt }: { score: DeckScoreReport; scannedAt:
 export function InsightPlay({ insight }: { insight: DeckInsightData }) {
   const [showCombos, setShowCombos] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const combosRef = useRef<HTMLDivElement>(null);
+  // Opened from the Combos tile: open the list and bring it into view.
+  useEffect(() => {
+    const show = () => {
+      setShowCombos(true);
+      requestAnimationFrame(() => combosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    };
+    window.addEventListener(SHOW_COMBOS, show);
+    return () => window.removeEventListener(SHOW_COMBOS, show);
+  }, []);
   const { combos, history } = insight;
   const comboCount = combos?.combos.length ?? 0;
   const games = history?.games ?? [];
@@ -391,7 +436,7 @@ export function InsightPlay({ insight }: { insight: DeckInsightData }) {
   const won = games.filter((g) => g.won).length;
 
   return (
-    <div>
+    <div ref={combosRef} id="deck-combos" style={{ scrollMarginTop: 90 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
         {comboCount > 0 && (
           <Pill on={showCombos} onClick={() => setShowCombos((v) => !v)}>

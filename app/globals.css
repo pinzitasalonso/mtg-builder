@@ -348,6 +348,13 @@ button {
     opacity: 1;
   }
 }
+
+/* The assistant's side panel sliding in from the right (wide screens). */
+@keyframes sp-panel-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
 @keyframes sp-pop {
   from {
     opacity: 0;
@@ -1656,4 +1663,15 @@ button {
    ground under every paywall surface in the iOS app, instead. */
 #rcb-ui-pw-root {
   --rc-purchases-ui-bg-color: #181228;
+}
+
+/* A stat tile that opens something (Combos → the combo list). */
+.stat-tile-link {
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.stat-tile-link:hover {
+  box-shadow: inset 0 0 0 1px var(--w-2) !important;
+}
+.stat-tile-link:active {
+  transform: scale(0.98);
 }
