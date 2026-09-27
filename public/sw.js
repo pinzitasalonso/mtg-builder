@@ -1,6 +1,7 @@
 /* Spellpool service worker — installable PWA + offline review support.
    - App shell & static assets: cache-first.
-   - Deck card lists: network-first, cached so a deck can be reviewed offline.
+   - The deck list, each deck and its cards: network-first, cached so decks
+     can be opened and reviewed offline.
    - Scryfall card art: cache-first (CDN, long-lived).
    - Everything else (auth, chat, search, mutations): network-only / passthrough.
    Mutations made offline aren't handled here — the app queues them and replays
@@ -38,8 +39,10 @@ self.addEventListener("fetch", (event) => {
 
   if (url.origin !== self.location.origin) return;
 
-  // Deck card lists — network-first, cached for offline review.
-  if (url.pathname.startsWith("/api/decks/") && url.pathname.endsWith("/cards")) {
+  // What a deck page and home need to open offline — the deck list, a deck,
+  // its cards — network-first, cached for offline review. (Signing out
+  // deletes these; see lib/offline-session.)
+  if (url.pathname === "/api/decks" || /^\/api\/decks\/[^/]+(\/cards)?$/.test(url.pathname)) {
     event.respondWith(networkFirst(req, RUNTIME));
     return;
   }

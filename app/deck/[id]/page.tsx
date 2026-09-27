@@ -29,7 +29,7 @@ import { canBeCommander, isBackground, singletonCapped } from "@/lib/format";
 import { applyPending, flushQueue, pendingFor } from "@/lib/offline-queue";
 import { cardWarnings } from "@/lib/legality";
 import { getIdentityTheme } from "@/lib/identity-theme";
-import { fetchCollection } from "@/lib/collection-client";
+import { tryFetchCollection } from "@/lib/collection-client";
 import { peek, remember } from "@/lib/client-cache";
 import { track } from "@/lib/track";
 import {
@@ -410,7 +410,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       })
       .catch(() => {});
     loadPool();
-    fetchCollection().then((c) => setOwnedNames(c.cards.map((card) => card.name)));
+    // Null when it couldn't be fetched (offline): keep the names we have.
+    tryFetchCollection().then((c) => c && setOwnedNames(c.cards.map((card) => card.name)));
   }, [deckId, loadPool, router]);
 
   // Backfill legality data and AI role tags for rows that still lack them.
