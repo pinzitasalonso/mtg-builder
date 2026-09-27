@@ -4,16 +4,16 @@ import { latest, summarize, type AccountRow } from "./admin-stats";
 const NOW = Date.parse("2026-09-27T12:00:00Z");
 const row = (o: Partial<AccountRow>): AccountRow => ({
   id: 1, email: "a@x.com", name: null, createdAt: "2026-09-27T08:00:00Z", tier: "free", verified: true, signIn: ["password"],
-  decks: 0, builtDecks: 0, cards: 0, collection: 0, aiQuestions: 0, aiQuestions7d: 0, aiToday: 0, scans: 0, versions: 0, games: 0,
+  decks: 0, builtDecks: 0, cards: 0, collection: 0, aiQuestions: 0, aiQuestions7d: 0, scans: 0, versions: 0, games: 0,
   lastActive: "2026-09-27T09:00:00Z", ...o,
 });
 
 describe("summarize", () => {
   const s = summarize(
     [
-      row({ id: 1, tier: "pro", decks: 2, builtDecks: 1, aiQuestions: 3, scans: 1 }),
+      row({ id: 1, tier: "pro", decks: 2, builtDecks: 1, aiQuestions: 3, aiQuestions7d: 2, scans: 1 }),
       row({ id: 2, verified: false, createdAt: "2026-09-20T10:00:00Z", lastActive: "2026-09-22T10:00:00Z", decks: 1 }),
-      row({ id: 3, createdAt: "2026-06-01T10:00:00Z", lastActive: "2026-06-02T10:00:00Z", aiToday: 1 }),
+      row({ id: 3, createdAt: "2026-06-01T10:00:00Z", lastActive: "2026-06-02T10:00:00Z", aiQuestions: 1 }),
     ],
     NOW
   );
@@ -27,6 +27,9 @@ describe("summarize", () => {
     expect(s.signups[29]).toEqual({ day: "2026-09-27", count: 1 });
     expect(s.signups.find((d) => d.day === "2026-09-20")?.count).toBe(1);
     expect(s.signups.reduce((n, d) => n + d.count, 0)).toBe(2); // June is out of range
+  });
+  it("totals the AI questions", () => {
+    expect(s.ai).toEqual({ total: 4, last7d: 2, askers7d: 1 });
   });
   it("walks the funnel", () => {
     expect(s.funnel.map((f) => f.count)).toEqual([3, 2, 2, 1, 2, 1]);
