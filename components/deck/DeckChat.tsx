@@ -943,6 +943,7 @@ function ChatMarkdown({
     tokens.map((t, i) => {
       const key = `${keyPrefix}-${i}`;
       if (t.type === "text") return <span key={key}>{t.value}</span>;
+      if (t.type === "italic") return <em key={key}>{renderInline(t.tokens, key)}</em>;
       if (t.type === "bold") {
         // Guardrail: a bold span that's actually a real card name (the model
         // forgot the brackets) still becomes a clickable link.
