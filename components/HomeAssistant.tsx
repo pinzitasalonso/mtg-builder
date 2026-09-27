@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import { ArrowUp, Plus, RotateCcw, Sparkles, X } from "lucide-react";
+import { ArrowUp, Plus, RotateCcw, Sparkles, Square, X } from "lucide-react";
 import { parseBlocks, type Block, type InlineToken } from "@/lib/chat-markdown";
 import { GetProButton } from "@/components/GetPro";
 import { DECKS_CHANGED, deckRef, rewriteDeckLinks } from "@/lib/assistant";
@@ -83,6 +83,11 @@ export default function HomeAssistant({
     if (pinned.current) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
+  // Stop cuts the answer short; closing the assistant stops it too, so the
+  // server isn't left working (or editing decks) for no one.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   async function send(text: string) {
     const content = text.trim();
     if (!content || streaming) return;
@@ -94,9 +99,12 @@ export default function HomeAssistant({
     setAiLimited(false);
     setStreaming(true);
     pinned.current = true;
+    const abort = new AbortController();
+    abortRef.current = abort;
     try {
       const res = await fetch("/api/assistant", {
         method: "POST",
+        signal: abort.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: history }),
       });
@@ -120,11 +128,16 @@ export default function HomeAssistant({
         setMessages((prev) => [...prev.slice(0, -1), { role: "assistant", content: shown }]);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "The assistant is unavailable right now.");
-      // Drop the empty reply bubble, and put the question back to retry.
+      const stopped = abort.signal.aborted;
+      // Stopped by the player: no error, but a tool may have run before it.
+      if (stopped) onDecksChanged?.();
+      else setError(e instanceof Error ? e.message : "The assistant is unavailable right now.");
+      // Drop the empty reply bubble, and put the question back to retry —
+      // unless, after a stop, the player has already typed something else.
       setMessages((prev) => (prev[prev.length - 1]?.content ? prev : prev.slice(0, -2)));
-      setInput(content);
+      setInput((cur) => (stopped && cur.trim() ? cur : content));
     } finally {
+      if (abortRef.current === abort) abortRef.current = null;
       setStreaming(false);
     }
   }
@@ -283,9 +296,15 @@ export default function HomeAssistant({
             aria-label="Your question"
             style={{ flex: 1, resize: "none", border: "1px solid var(--line)", borderRadius: 14, padding: "10px 14px", fontFamily: "var(--font-ui)", fontSize: 16, lineHeight: 1.4, background: "var(--bg2, var(--bg))", color: "var(--t1, var(--text))", outline: "none" }}
           />
-          <button type="submit" disabled={streaming || !input.trim()} aria-label="Send" className="id-btn" style={{ width: 44, height: 44, padding: 0, justifyContent: "center", flex: "none", opacity: streaming || !input.trim() ? 0.5 : 1 }}>
-            <ArrowUp size={19} strokeWidth={2.5} />
-          </button>
+          {streaming ? (
+            <button key="stop" type="button" onClick={(e) => { e.preventDefault(); abortRef.current?.abort(); }} aria-label="Stop the answer" title="Stop" className="id-btn" style={{ width: 44, height: 44, padding: 0, justifyContent: "center", flex: "none" }}>
+              <Square size={14} strokeWidth={0} fill="currentColor" />
+            </button>
+          ) : (
+            <button key="send" type="submit" disabled={!input.trim()} aria-label="Send" className="id-btn" style={{ width: 44, height: 44, padding: 0, justifyContent: "center", flex: "none", opacity: !input.trim() ? 0.5 : 1 }}>
+              <ArrowUp size={19} strokeWidth={2.5} />
+            </button>
+          )}
         </form>
         </div>
       </div>

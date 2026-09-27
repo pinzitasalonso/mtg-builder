@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Plus, Sparkles, X, ZoomIn } from "lucide-react";
+import { Plus, Sparkles, Square, X, ZoomIn } from "lucide-react";
 import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
 import { Block, InlineToken, boldNamesIn, cardNamesIn, cutCandidates, flattenInline, normalizeCardKey, parseBlocks } from "@/lib/chat-markdown";
 import { GetProButton } from "@/components/GetPro";
@@ -52,6 +52,8 @@ export interface DeckChatController {
   bulkAdd: (names: string[]) => void;
   bulkRemove: (names: string[]) => void;
   send: (text: string) => void;
+  /** Stop the answer being streamed. What arrived so far stays. */
+  stop: () => void;
 }
 
 /* Conversational AI deck assistant state. The player describes an idea or
@@ -78,6 +80,7 @@ export function useDeckChat({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const [error, setError] = useState("");
   const [aiLimited, setAiLimited] = useState(false);
   const [busy, setBusy] = useState<Set<string>>(new Set());
@@ -215,9 +218,12 @@ export function useDeckChat({
     setStreaming(true);
     setError("");
     setAiLimited(false);
+    const abort = new AbortController();
+    abortRef.current = abort;
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
+        signal: abort.signal,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: history,
@@ -255,7 +261,9 @@ export function useDeckChat({
         });
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Chat failed");
+      // Stopped by the player: no error. A tool may have run before the stop.
+      if (abort.signal.aborted) onPoolChanged();
+      else setError(e instanceof Error ? e.message : "Chat failed");
       // Drop the empty assistant bubble if nothing streamed in.
       setMessages((prev) => {
         const last = prev[prev.length - 1];
@@ -263,8 +271,13 @@ export function useDeckChat({
         return prev;
       });
     } finally {
+      if (abortRef.current === abort) abortRef.current = null;
       setStreaming(false);
     }
+  }
+
+  function stop() {
+    abortRef.current?.abort();
   }
 
   return {
@@ -291,6 +304,7 @@ export function useDeckChat({
     bulkAdd,
     bulkRemove,
     send,
+    stop,
   };
 }
 
@@ -319,8 +333,12 @@ const STARTERS: { label: string; prompt: string; featured?: boolean }[] = [
 export default function DeckChat({
   chat,
   onEngaged,
+  fill = false,
 }: {
   chat: DeckChatController;
+  /** Full-screen use: the transcript takes all the height there is, and the
+   *  starters and composer sit at the bottom. */
+  fill?: boolean;
   /** Reports when the user engages the chat (focus / conversation started). */
   onEngaged?: (engaged: boolean) => void;
 }) {
@@ -345,6 +363,7 @@ export default function DeckChat({
     bulkAdd,
     bulkRemove,
     send,
+    stop,
   } = chat;
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -368,7 +387,10 @@ export default function DeckChat({
   const empty = messages.length === 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12, ...(fill ? { height: "100%", minHeight: 0 } : {}) }}>
+      {/* Full screen and nothing said yet: the starters sit at the bottom, by
+          the composer, where the thumb is. */}
+      {fill && empty && <div style={{ flex: 1 }} />}
       {/* transcript */}
       {!empty && (
         <div
@@ -380,7 +402,7 @@ export default function DeckChat({
             pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
           }}
           style={{
-            maxHeight: 460,
+            ...(fill ? { flex: 1, minHeight: 0 } : { maxHeight: 460 }),
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
@@ -503,7 +525,6 @@ export default function DeckChat({
           }}
           placeholder="Tell the assistant your idea…"
           rows={1}
-          disabled={streaming}
           style={{
             flex: 1,
             height: 46,
@@ -511,9 +532,12 @@ export default function DeckChat({
             overflow: "auto",
             border: "1px solid var(--line)",
             borderRadius: 12,
-            padding: "12px 14px",
+            padding: "11px 14px",
             fontFamily: "var(--font-body)",
-            fontSize: 14.5,
+            // 16px, not smaller: iOS Safari zooms the page into any field
+            // under 16px on focus, which pushed the full-screen chat's
+            // header and Send button off screen.
+            fontSize: 16,
             lineHeight: 1.4,
             background: "var(--surface)",
             color: "var(--text)",
@@ -521,26 +545,62 @@ export default function DeckChat({
             boxSizing: "border-box",
           }}
         />
-        <button
-          type="submit"
-          disabled={streaming || !input.trim()}
-          style={{
-            padding: "0 22px",
-            height: 46,
-            borderRadius: 12,
-            border: "none",
-            cursor: streaming || !input.trim() ? "default" : "pointer",
-            background: "var(--accent)",
-            color: "var(--accent-ink)",
-            fontFamily: "var(--font-ui)",
-            fontWeight: 700,
-            fontSize: 14.5,
-            whiteSpace: "nowrap",
-            opacity: streaming || !input.trim() ? 0.6 : 1,
-          }}
-        >
-          {streaming ? "…" : "Send"}
-        </button>
+        {streaming ? (
+          // Stop, so the player can cut an answer short and add something.
+          // The box beside it stays usable meanwhile.
+          // Its own key, and the click's default cancelled: otherwise React
+          // reuses this element as the Send button, which the stop turns it
+          // back into before the click finishes, and the click submits the draft.
+          <button
+            key="stop"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              stop();
+            }}
+            aria-label="Stop the answer"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 7,
+              padding: "0 18px",
+              height: 46,
+              borderRadius: 12,
+              border: "1px solid var(--line)",
+              cursor: "pointer",
+              background: "var(--surface)",
+              color: "var(--text)",
+              fontFamily: "var(--font-ui)",
+              fontWeight: 700,
+              fontSize: 14.5,
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Square size={12} strokeWidth={0} fill="currentColor" /> Stop
+          </button>
+        ) : (
+          <button
+            key="send"
+            type="submit"
+            disabled={!input.trim()}
+            style={{
+              padding: "0 22px",
+              height: 46,
+              borderRadius: 12,
+              border: "none",
+              cursor: !input.trim() ? "default" : "pointer",
+              background: "var(--accent)",
+              color: "var(--accent-ink)",
+              fontFamily: "var(--font-ui)",
+              fontWeight: 700,
+              fontSize: 14.5,
+              whiteSpace: "nowrap",
+              opacity: !input.trim() ? 0.6 : 1,
+            }}
+          >
+            Send
+          </button>
+        )}
       </form>
 
       {preview && <CardPreview preview={preview} onDismiss={() => setPreview(null)} />}

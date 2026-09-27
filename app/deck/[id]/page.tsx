@@ -22,9 +22,9 @@ import DeckStatsPane from "@/components/deck/DeckStatsPane";
 import OrderModal from "@/components/deck/OrderModal";
 import VersionsModal from "@/components/deck/VersionsModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, dangerBtn } from "@/components/deck/ui";
-import { OutCard, resolveNamed } from "@/lib/scryfall";
+import { OutCard, resolveNamedDetailed } from "@/lib/scryfall";
 import { PoolEntry, Board, poolByName, resolveAndAdd, moveCard, deleteCard, setQuantity } from "@/lib/pool-client";
-import { singletonCapped } from "@/lib/format";
+import { canBeCommander, isBackground, singletonCapped } from "@/lib/format";
 import { applyPending, flushQueue, pendingFor } from "@/lib/offline-queue";
 import { cardWarnings } from "@/lib/legality";
 import { getIdentityTheme } from "@/lib/identity-theme";
@@ -290,6 +290,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   /// It used to be a panel wedged between the hero and the panes, which cost
   /// every pane a screenful of height whether or not you were talking to it.
   const [chatOpen, setChatOpen] = useState(false);
+  const [warningsOpen, setWarningsOpen] = useState(false);
 
   /// "Add cards" jumps to the pool and puts the cursor in its search box.
   /// Bumped rather than called directly: the pool pane mounts on the same
@@ -321,6 +322,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   // commander's color identity (resolved from Scryfall) for legality checks
   const [cmdrIdentity, setCmdrIdentity] = useState<string | null>(null);
+  // What's wrong with the commander, if anything: a name Scryfall doesn't know,
+  // or a card that can't lead a deck. Null while checking, when it's fine, or
+  // when Scryfall didn't answer (a failed lookup is not an invalid commander).
+  const [cmdrProblem, setCmdrProblem] = useState<string | null>(null);
 
   // The signed-in user's owned-card collection (lowercased names). Drives the
   // "owned" badges on pool/deck cards and grounds the AI in what they have.
@@ -420,16 +425,30 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     }
   }, [pool, deckId, loadPool]);
 
-  // Resolve the commander's color identity once per commander change.
+  // Check the commander once per commander change: resolve each card (a
+  // partner pair is "A + B"), take their combined colour identity for the
+  // legality checks, and say so when a name isn't a card or can't lead a deck.
   useEffect(() => {
     const name = deck?.commander?.trim();
+    setCmdrProblem(null);
     if (!name || (deck?.format ?? "").toLowerCase() !== "commander") {
       setCmdrIdentity(null);
       return;
     }
     let cancelled = false;
-    resolveNamed(name).then((c) => {
-      if (!cancelled) setCmdrIdentity(c?.colorIdentity ?? null);
+    const heads = name.split(/\s+\+\s+/).map((n) => n.trim()).filter(Boolean);
+    Promise.all(heads.map((h) => resolveNamedDetailed(h))).then((rs) => {
+      if (cancelled) return;
+      const problems: string[] = [];
+      rs.forEach((r, i) => {
+        if (r.status === "notfound") problems.push(`“${heads[i]}” isn’t a card Scryfall knows`);
+        else if (r.status === "ok" && !canBeCommander(r.card.typeLine, r.card.oracleText) && !(heads.length === 2 && isBackground(r.card.typeLine))) {
+          problems.push(`${r.card.name} can’t be a commander: it’s a ${r.card.typeLine}`);
+        }
+      });
+      setCmdrProblem(problems.length ? problems.join(" · ") : null);
+      const found = rs.filter((r) => r.status === "ok").map((r) => r.card!.colorIdentity ?? "");
+      setCmdrIdentity(found.length === heads.length ? found.join("") : null);
     });
     return () => {
       cancelled = true;
@@ -1018,6 +1037,19 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   Helmed by <b style={{ color: "var(--w-1)" }}>{deck.commander}</b>
                 </div>
               )}
+              {cmdrProblem && (
+                <div role="alert" style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 10, margin: "-12px 0 22px", padding: "10px 14px", borderRadius: 12, background: "rgba(194,64,42,.18)", boxShadow: "inset 0 0 0 1px rgba(255,156,134,.45)", fontSize: 13.5, color: "var(--w-1)", maxWidth: 620 }}>
+                  <TriangleAlert size={16} strokeWidth={2.25} color="#ff9c86" style={{ flex: "none" }} />
+                  <span style={{ flex: 1, minWidth: 200 }}>
+                    <b>Not a legal commander.</b> {cmdrProblem}. A commander must be a legendary creature, or a card that says it can be your commander.
+                  </span>
+                  {canEdit && (
+                    <button type="button" onClick={openSettings} className="id-ghost" style={{ padding: "6px 12px", fontSize: 13 }}>
+                      Fix in Edit deck
+                    </button>
+                  )}
+                </div>
+              )}
               {/* The two actions that BUILD the deck, the pair the iOS deck
                   page leads with. Playtest and Copy decklist used to sit here;
                   neither builds anything, and both outranked the assistant by
@@ -1422,8 +1454,28 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             </div>
           </div>
           {deckWarningCount > 0 && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--gold)", marginBottom: 12 }}>
-              <TriangleAlert size={14} strokeWidth={2.25} style={{ flex: "none" }} /> {deckWarningCount} card{deckWarningCount === 1 ? "" : "s"} with legality warnings — the marked cards say why.
+            <div style={{ marginBottom: 12 }}>
+              {/* A button, not a hover: phones have no hover, so the reasons
+                  have to be one tap away. */}
+              <button
+                type="button"
+                onClick={() => setWarningsOpen((o) => !o)}
+                aria-expanded={warningsOpen}
+                style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, color: "var(--gold)", background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left", font: "inherit", fontWeight: 600 }}
+              >
+                <TriangleAlert size={14} strokeWidth={2.25} style={{ flex: "none" }} />
+                {deckWarningCount} card{deckWarningCount === 1 ? "" : "s"} with legality warnings
+                <ChevronDown size={14} strokeWidth={2.25} style={{ flex: "none", transform: warningsOpen ? "rotate(180deg)" : "none", transition: "transform .15s ease" }} />
+              </button>
+              {warningsOpen && (
+                <ul style={{ listStyle: "none", margin: "8px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+                  {deckCards.filter((c) => warningOf(c)).map((c) => (
+                    <li key={c.dbId} style={{ fontSize: 13, lineHeight: 1.4, color: "var(--w-2)" }}>
+                      <b style={{ color: "var(--w-1)" }}>{c.name}</b>: {warningOf(c)}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
@@ -1483,20 +1535,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {/* The assistant, off the hero tile. Wide, because its answers carry card
           links you hover to preview. */}
       {chatOpen && canEdit && (
-        <ModalShell onDismiss={() => setChatOpen(false)} maxWidth={780} zIndex={68}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 14 }}>
-            <span className="id-display" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 22, color: "var(--w-1)" }}><Sparkles size={20} strokeWidth={2} /> Ask the AI</span>
-            <span className="id-mono" style={{ fontSize: 12, color: "var(--w-3)" }}>build · judge · refine</span>
-            <button
-              onClick={() => setChatOpen(false)}
-              aria-label="Close"
-              style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--w-3)", fontSize: 22, lineHeight: 1, cursor: "pointer", padding: 0 }}
-            >
-              ×
-            </button>
-          </div>
-          <DeckChat chat={chat} />
-        </ModalShell>
+        <FullScreenChat onClose={() => setChatOpen(false)} deckName={deck?.name ?? ""}>
+          <DeckChat chat={chat} fill />
+        </FullScreenChat>
       )}
 
       {/* swipe-to-add modal */}
@@ -1945,6 +1986,53 @@ const deckTileGrid: React.CSSProperties = {
   gap: 14,
 };
 
+/* The deck assistant, full screen: a header with the deck's name and a close
+   button, and the chat filling the rest, its composer docked at the bottom.
+   Esc closes it and the page behind stops scrolling. */
+function FullScreenChat({ onClose, deckName, children }: { onClose: () => void; deckName: string; children: React.ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="deck-chat-title"
+      style={{ position: "fixed", inset: 0, zIndex: 68, background: "var(--bg)", display: "flex", flexDirection: "column", animation: "sp-fade .15s ease" }}
+    >
+      <div style={{ borderBottom: "1px solid var(--line)", padding: "12px clamp(16px, 4vw, 32px)" }}>
+        <div style={{ maxWidth: 860, margin: "0 auto", display: "flex", alignItems: "center", gap: 10 }}>
+          <Sparkles size={20} strokeWidth={2} color="var(--gold)" style={{ flex: "none" }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h2 id="deck-chat-title" style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "clamp(17px, 4.6vw, 22px)", fontWeight: 700, color: "var(--frame-ink, var(--text))", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              Ask the AI{deckName ? ` · ${deckName}` : ""}
+            </h2>
+            <div style={{ fontSize: 13, color: "var(--t3, var(--text-muted))", marginTop: 2 }}>Build, judge and refine this deck.</div>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ width: 36, height: 36, flex: "none", borderRadius: 999, border: "none", background: "var(--bg3)", color: "var(--t2, var(--text-muted))", display: "grid", placeItems: "center", cursor: "pointer" }}>
+            <X size={18} strokeWidth={2.25} />
+          </button>
+        </div>
+      </div>
+      <div style={{ flex: 1, minHeight: 0, padding: "clamp(12px, 3vw, 24px) clamp(16px, 4vw, 32px) max(16px, env(safe-area-inset-bottom))" }}>
+        <div style={{ maxWidth: 860, height: "100%", margin: "0 auto" }}>{children}</div>
+      </div>
+    </div>
+  );
+}
+
 /* Full card-image tile for the decklist: the card art with quantity / owned /
    warning badges, a hover remove (unless it's the commander), and click-to-review. */
 function DeckCardTile({
@@ -1966,6 +2054,7 @@ function DeckCardTile({
       (non-commander decks, basics in commander); shows a − / + stepper. */
   onQty?: (next: number) => void;
 }) {
+  const [showWarning, setShowWarning] = useState(false);
   return (
     <div
       className="card-tile"
@@ -2027,10 +2116,26 @@ function DeckCardTile({
           </span>
         )
       )}
+      {warning && showWarning && (
+        <div
+          role="note"
+          onClick={(e) => { e.stopPropagation(); setShowWarning(false); }}
+          style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "10px 10px 38px", background: "rgba(0,0,0,.84)", color: "#fff", fontSize: 12, lineHeight: 1.35, cursor: "pointer" }}
+        >
+          {warning}
+        </div>
+      )}
       {warning && (
-        <span title={warning} aria-label={warning} style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", width: 24, height: 24, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setShowWarning((v) => !v); }}
+          title={warning}
+          aria-label={`Legality warning: ${warning}`}
+          aria-expanded={showWarning}
+          style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", width: 26, height: 26, border: "none", padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+        >
           <TriangleAlert size={14} strokeWidth={2.25} />
-        </span>
+        </button>
       )}
       {removable && (
         <button
@@ -2069,6 +2174,7 @@ function IdCardLine({
   onOpen?: () => void;
   trailing?: React.ReactNode;
 }) {
+  const [showWarning, setShowWarning] = useState(false);
   return (
     <div
       className="id-card id-deckrow"
@@ -2083,9 +2189,24 @@ function IdCardLine({
           {card.quantity > 1 && <span style={{ fontSize: 12, fontWeight: 700, color: "var(--w-3)", flex: "none" }}>{card.quantity}×</span>}
           <span style={{ fontSize: 14, fontWeight: 700, color: "var(--w-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
           {owned && <Check size={14} strokeWidth={3} color="#4ecb8f" style={{ flex: "none" }} aria-label="In your collection"><title>In your collection</title></Check>}
-          {warning && <TriangleAlert size={14} strokeWidth={2.25} color="#ff9c86" style={{ flex: "none" }} aria-label={warning}><title>{warning}</title></TriangleAlert>}
+          {warning && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowWarning((v) => !v); }}
+              title={warning}
+              aria-label={`Legality warning: ${warning}`}
+              aria-expanded={showWarning}
+              style={{ flex: "none", display: "grid", placeItems: "center", width: 24, height: 24, margin: -5, border: "none", background: "none", padding: 0, cursor: "pointer", color: "#ff9c86" }}
+            >
+              <TriangleAlert size={14} strokeWidth={2.25} />
+            </button>
+          )}
         </div>
-        <div style={{ fontSize: 11.5, color: "var(--w-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
+        {warning && showWarning ? (
+          <div style={{ fontSize: 11.5, lineHeight: 1.35, color: "#ff9c86" }}>{warning}</div>
+        ) : (
+          <div style={{ fontSize: 11.5, color: "var(--w-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.typeLine}</div>
+        )}
       </div>
       <ManaCost cost={card.manaCost} size={14} />
       {trailing}
