@@ -1665,3 +1665,22 @@ button {
 .stat-tile-link:active {
   transform: scale(0.98);
 }
+
+/* Admin dashboard */
+.admin-nav:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--w-1) !important;
+}
+.admin-row:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+@media (max-width: 560px) {
+  .admin-hide-sm {
+    display: none;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

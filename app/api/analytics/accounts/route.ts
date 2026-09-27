@@ -20,7 +20,11 @@ export async function GET() {
       select: { id: true, email: true, displayName: true, createdAt: true, tier: true, emailVerifiedAt: true, passwordHash: true, accounts: { select: { provider: true } } },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.deck.findMany({ where: { userId: { not: null } }, select: { id: true, userId: true, format: true, createdAt: true, gamesPlayed: true, analyzedAt: true } }),
+    prisma.deck.findMany({
+      where: { userId: { not: null } },
+      select: { id: true, publicId: true, name: true, userId: true, format: true, createdAt: true, gamesPlayed: true, analyzedAt: true },
+      orderBy: { createdAt: "desc" },
+    }),
     prisma.poolCard.groupBy({ by: ["deckId"], where: { board: "deck" }, _sum: { quantity: true } }),
     prisma.poolCard.groupBy({ by: ["deckId"], _max: { addedAt: true } }),
     prisma.deckVersion.groupBy({ by: ["deckId"], _count: { _all: true } }),
@@ -81,6 +85,14 @@ export async function GET() {
       scans: own.filter((d) => d.analyzedAt).length,
       versions: own.reduce((n, d) => n + (versionsBy.get(d.id) ?? 0), 0),
       games: own.reduce((n, d) => n + d.gamesPlayed, 0),
+      deckList: own.slice(0, 25).map((d) => ({
+        publicId: d.publicId ?? "",
+        name: d.name,
+        format: d.format,
+        cards: cardsBy.get(d.id) ?? 0,
+        scanned: Boolean(d.analyzedAt),
+        createdAt: d.createdAt.toISOString(),
+      })),
       lastActive: latest(u.createdAt, sessionBy.get(u.id), askedBy.get(u.id)?.last, ...own.map((d) => d.createdAt), ...own.map((d) => lastCardBy.get(d.id))),
     };
   });
@@ -96,6 +108,12 @@ export async function GET() {
     const d = m.createdAt.toISOString().slice(0, 10);
     if (perDay.has(d)) perDay.set(d, perDay.get(d)! + 1);
   }
+  // Decks made per day, the same 30 days.
+  const deckPerDay = new Map(days.map((d) => [d, 0]));
+  for (const d of decks) {
+    const k = d.createdAt.toISOString().slice(0, 10);
+    if (deckPerDay.has(k)) deckPerDay.set(k, deckPerDay.get(k)! + 1);
+  }
 
   const formats = new Map<string, number>();
   for (const d of decks) formats.set(d.format, (formats.get(d.format) ?? 0) + 1);
@@ -103,6 +121,7 @@ export async function GET() {
   return NextResponse.json({
     summary: summarize(rows),
     aiDays: days.map((day) => ({ day, count: perDay.get(day)! })),
+    deckDays: days.map((day) => ({ day, count: deckPerDay.get(day)! })),
     formats: [...formats].map(([format, count]) => ({ format, count })).sort((a, b) => b.count - a.count),
     accounts: rows,
   });
