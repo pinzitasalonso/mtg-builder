@@ -497,7 +497,7 @@ export async function scryfallSearch(query: string): Promise<ScryfallSearchResul
 // ---------------------------------------------------------------------------
 
 /**
- * What CRISPI needs about a card that a PoolCard row does not store: mana
+ * What the Score needs about a card that a PoolCard row does not store: mana
  * value as Scryfall computes it, power and toughness, keywords, the mana a
  * permanent produces, and the oracle text of BOTH faces of a double-faced or
  * adventure card (the row keeps only the front).
