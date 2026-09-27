@@ -1003,6 +1003,7 @@ button {
 .pt-root {
   position: fixed;
   inset: 0;
+  right: var(--assistant-w, 0px);
   z-index: 72;
   display: flex;
   flex-direction: column;

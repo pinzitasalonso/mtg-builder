@@ -540,7 +540,10 @@ export default function HomePage() {
         <div
           style={{
             position: "fixed",
-            inset: 0,
+            top: 0,
+            left: 0,
+            bottom: 0,
+            right: "var(--assistant-w, 0px)",
             background: "rgba(8,6,18,.55)",
             backdropFilter: "blur(4px)",
             display: "flex",

@@ -161,6 +161,9 @@ export default function SwipeModal<T extends SwipeCard>({
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // Keys typed into a text box are for it — the assistant's panel beside
+      // this, most of all — not a swipe, and Esc there isn't "close review".
+      if ((e.target as HTMLElement | null)?.closest?.("input, textarea, select, [contenteditable='true']")) return;
       if (e.key === "ArrowRight") act("right");
       else if (e.key === "ArrowLeft") act("left");
       // Down rather than a letter: it sits with the arrows already driving
@@ -233,7 +236,11 @@ export default function SwipeModal<T extends SwipeCard>({
     <div
       style={{
         position: "fixed",
-        inset: 0,
+        // Up to the assistant's side panel, when it's open beside the page.
+        top: 0,
+        left: 0,
+        bottom: 0,
+        right: "var(--assistant-w, 0px)",
         zIndex: 60,
         animation: "sp-fade .2s ease",
         background: "color-mix(in srgb, var(--bg) 94%, transparent)",
