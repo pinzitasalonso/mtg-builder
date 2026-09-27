@@ -54,6 +54,29 @@ const FLUSH_MS = 1000;
 
 export const INTERRUPTED_NOTE = "_(This answer was cut off when the server restarted. Ask again to pick it up.)_";
 
+/** An error worth retrying: the service busy or failing, or the connection. */
+export function isTransient(e: unknown): boolean {
+  if (e instanceof Anthropic.APIConnectionError) return true;
+  if (e instanceof Anthropic.APIError && e.status !== undefined) {
+    return e.status === 408 || e.status === 409 || e.status === 429 || e.status >= 500;
+  }
+  // Errors that arrive mid-stream (an "overloaded" event, a dropped socket)
+  // come without a status; read what they say.
+  const msg = e instanceof Error ? e.message : String(e);
+  return /overloaded|rate.?limit|timed? ?out|timeout|ECONNRESET|socket|terminated|fetch failed|network|connection/i.test(msg);
+}
+
+/** A short, shareable reason for a failed reply: status, kind, message. */
+export function describeError(e: unknown): string {
+  // The API's own body when there is one ({error: {type, message}}), else the
+  // error's message. Markdown's * [ ] ` are dropped so it renders as written.
+  const body = e instanceof Anthropic.APIError ? (e.error as { error?: { type?: string; message?: string } } | undefined)?.error : undefined;
+  const status = e instanceof Anthropic.APIError && e.status ? `${e.status} ` : "";
+  const kind = body?.type ?? (e instanceof Error ? e.name : "Error");
+  const msg = body?.message ?? (e instanceof Error ? e.message : String(e));
+  return `${status}${kind}: ${msg}`.replace(/\s+/g, " ").replace(/[*[\]`]/g, "").trim().slice(0, 220);
+}
+
 function stopNote(stop: Anthropic.Message["stop_reason"]): string | null {
   switch (stop) {
     case "max_tokens":
@@ -144,19 +167,34 @@ export function startRun(opts: {
       const convo: Anthropic.MessageParam[] = historyForModel(rows);
       let finalStop: Anthropic.Message["stop_reason"] = null;
       for (let pass = 0; pass < MAX_PASSES && !stopped; pass++) {
-        const ai = anthropic.messages.stream({
-          model: "claude-opus-5-5",
-          max_tokens: 32000,
-          output_config: { effort: "medium" },
-          system,
-          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }, ...ASSISTANT_TOOLS],
-          messages: convo,
-        });
-        current = ai;
-        for await (const event of ai) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") append(event.delta.text);
+        // A pass that fails for a passing reason (overloaded, a 5xx, a dropped
+        // connection) before writing anything is tried again, twice, rather
+        // than ending the answer. Once text has gone out, a retry would write
+        // it twice, so the error stands.
+        let final: Anthropic.Message | null = null;
+        for (let attempt = 0; final === null; attempt++) {
+          const before = run.text.length;
+          try {
+            const ai = anthropic.messages.stream({
+              model: "claude-opus-5-5",
+              max_tokens: 32000,
+              output_config: { effort: "medium" },
+              system,
+              tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 3 }, ...ASSISTANT_TOOLS],
+              messages: convo,
+            });
+            current = ai;
+            for await (const event of ai) {
+              if (event.type === "content_block_delta" && event.delta.type === "text_delta") append(event.delta.text);
+            }
+            final = await ai.finalMessage();
+          } catch (e) {
+            if (stopped || attempt >= 2 || !isTransient(e) || run.text.length > before) throw e;
+            console.warn(`[assistant] pass=${pass} attempt=${attempt} retrying: ${describeError(e)}`);
+            await new Promise((res) => setTimeout(res, attempt === 0 ? 2000 : 6000));
+            if (stopped) throw e;
+          }
         }
-        const final = await ai.finalMessage();
         const u = final.usage;
         console.log(
           `[assistant] pass=${pass} decks=${stats.decks} owned=${stats.owned} researched=${stats.researched} ` +
@@ -196,14 +234,14 @@ export function startRun(opts: {
       if (stopped) {
         await finish("stopped");
       } else {
-        // The detail goes to the logs; the player gets a sentence to act on.
-        console.error("[assistant] failed", e instanceof Error ? e.message : e);
-        const busy = e instanceof Anthropic.APIError && (e.status === 429 || e.status === 529 || (e.status ?? 0) >= 500);
+        // The whole error goes to the logs. The player gets a sentence to act
+        // on, and a short reason, so a report of it says what went wrong.
+        console.error("[assistant] failed", e instanceof Error ? e.stack ?? e.message : e);
         await finish(
           "failed",
-          busy
+          isTransient(e)
             ? "\n\n_The assistant is busy right now. Give it a moment and ask again._"
-            : "\n\n_Sorry — the assistant hit an error. Try asking again._"
+            : `\n\n_Sorry — the assistant hit an error. Try asking again._\n\n_(${describeError(e)})_`
         );
       }
     }

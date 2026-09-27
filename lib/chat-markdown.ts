@@ -8,6 +8,7 @@
 export type InlineToken =
   | { type: "text"; value: string }
   | { type: "bold"; tokens: InlineToken[] }
+  | { type: "italic"; tokens: InlineToken[] }
   | { type: "card"; value: string };
 
 export type Block =
@@ -19,14 +20,17 @@ export type Block =
 // spans are tokenized recursively so a [[Card]] inside **...** is still a link.
 export function tokenizeInline(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
-  // Match a complete card link or a complete bold span, whichever comes first.
-  const re = /\[\[([^\]]+)\]\]|\*\*([^*]+?)\*\*/g;
+  // Match a complete card link, bold span or italic span, whichever comes
+  // first. Italics are _this_ or *this*, and only as whole words: a lone
+  // underscore or asterisk inside a word stays text.
+  const re = /\[\[([^\]]+)\]\]|\*\*([^*]+?)\*\*|(?<![\w_])_(?!\s)((?:[^_\n]|(?<=\w)_(?=\w))+?)_(?![\w_])|(?<![\w*])\*(?![\s*])([^*\n]+?)\*(?![\w*])/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) tokens.push({ type: "text", value: text.slice(last, m.index) });
     if (m[1] !== undefined) tokens.push({ type: "card", value: m[1].trim() });
-    else tokens.push({ type: "bold", tokens: tokenizeInline(m[2]) });
+    else if (m[2] !== undefined) tokens.push({ type: "bold", tokens: tokenizeInline(m[2]) });
+    else tokens.push({ type: "italic", tokens: tokenizeInline(m[3] ?? m[4]) });
     last = m.index + m[0].length;
   }
   if (last < text.length) tokens.push({ type: "text", value: text.slice(last) });
@@ -154,7 +158,7 @@ export function boldNamesIn(md: string): string[] {
 // Flatten inline tokens to their plain text (used to read a bold span's content).
 export function flattenInline(tokens: InlineToken[]): string {
   return tokens
-    .map((t) => (t.type === "bold" ? flattenInline(t.tokens) : t.value))
+    .map((t) => (t.type === "bold" || t.type === "italic" ? flattenInline(t.tokens) : t.value))
     .join("");
 }
 
@@ -182,6 +186,11 @@ function adviceOf(heading: string): SectionAdvice {
 function firstCardIn(tokens: InlineToken[]): string | null {
   for (const t of tokens) {
     if (t.type === "card") return t.value.trim();
+    if (t.type === "italic") {
+      const inner = firstCardIn(t.tokens);
+      if (inner) return inner;
+      continue;
+    }
     if (t.type === "bold") {
       const inner = firstCardIn(t.tokens);
       if (inner) return inner;
@@ -266,7 +275,7 @@ export function cutCandidates(md: string): string[] {
 function flattenCards(tokens: InlineToken[]): string {
   return tokens
     .map((t) =>
-      t.type === "card" ? `[[${t.value}]]` : t.type === "bold" ? flattenCards(t.tokens) : t.value
+      t.type === "card" ? `[[${t.value}]]` : t.type === "bold" || t.type === "italic" ? flattenCards(t.tokens) : t.value
     )
     .join("");
 }
