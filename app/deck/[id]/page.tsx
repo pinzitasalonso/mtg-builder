@@ -671,13 +671,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // Fork the deck into an editable copy of one's own (the read-only viewer's
   // main action) and open it.
   const [forking, setForking] = useState(false);
-  async function duplicateThisDeck(mode: "all" | "list" | "missing" = "all") {
+  async function duplicateThisDeck() {
     setForking(true);
-    const res = await fetch(`/api/decks/${deckId}/duplicate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(mode === "missing" ? { missing: true } : { pool: mode === "all" }),
-    });
+    const res = await fetch(`/api/decks/${deckId}/duplicate`, { method: "POST" });
     if (res.ok) {
       const copy = await res.json();
       if (copy?.publicId) { router.push(`/deck/${copy.publicId}`); return; }
@@ -951,7 +947,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 Edit deck
               </button>
             ) : (
-              <button className="id-btn" style={{ padding: "10px 18px" }} onClick={() => duplicateThisDeck()} disabled={forking}>
+              <button className="id-btn" style={{ padding: "10px 18px" }} onClick={duplicateThisDeck} disabled={forking}>
                 {forking ? "Duplicating…" : <><Copy size={15} strokeWidth={2.25} /> Duplicate</>}
               </button>
             )}
@@ -981,12 +977,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       { label: copied === "list" ? "Copied!" : "Copy decklist", icon: copied === "list" ? Check : ClipboardCopy, on: copyDecklist, disabled: deckCards.length === 0, keepOpen: true },
                       { label: "Buy list", icon: ShoppingCart, on: () => setOrderOpen(true), disabled: deckCards.length === 0 },
                       { label: "Versions", icon: History, on: () => setVersionsOpen(true) },
-                      { label: forking ? "Duplicating…" : "Duplicate deck", icon: Copy, on: () => duplicateThisDeck("all"), disabled: forking },
-                      // Only worth offering when there's a pool to leave behind.
-                      ...(poolCards.length > 0 ? [{ label: "Duplicate without pool", icon: Copy, on: () => duplicateThisDeck("list"), disabled: forking }] : []),
-                      // The deck less your collection: a shopping list. Needs
-                      // you signed in (your collection) and owning something.
-                      ...(ownedNames.length > 0 ? [{ label: "Duplicate what I’m missing", icon: ShoppingCart, on: () => duplicateThisDeck("missing"), disabled: forking }] : []),
                       ...(canEdit ? [
                         { label: "Add lands & staples", icon: Mountain, on: () => setTool("lands") },
                         { label: "Export / import", icon: ArrowUpDown, on: () => setTool("export") },

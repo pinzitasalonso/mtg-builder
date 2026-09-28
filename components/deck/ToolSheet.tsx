@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { tryFetchCollection } from "@/lib/collection-client";
+import { withoutOwned } from "@/lib/collection-diff";
 import { Check } from "lucide-react";
 import { parseDecklist } from "@/lib/decklist";
 import { ImportEntry, ImportResult, PoolEntry, importByName, poolByName, setQuantity, deleteCard } from "@/lib/pool-client";
@@ -71,8 +73,23 @@ export default function ToolSheet({
 
   // ── Export — standard "{qty} {name}" decklist; deck board first, then the
   // remaining pool as a commented section (the importer skips "//" lines).
-  const deckLines = pool.filter((c) => c.board === "deck").map((c) => `${c.quantity} ${c.name}`);
-  const poolLines = pool.filter((c) => c.board !== "deck").map((c) => `${c.quantity} ${c.name}`);
+  // Two settings, remembered on this device: leave the pool out, and leave out
+  // what you own (copy for copy — 30 Mountains with 10 owned exports 20), which
+  // turns the export into a shopping list.
+  const [withPool, setWithPool] = useState(() => readSetting("sp-export-pool", true));
+  const [skipOwned, setSkipOwned] = useState(() => readSetting("sp-export-skip-owned", false));
+  const [owned, setOwned] = useState<{ name: string; quantity: number }[] | null>(null);
+  useEffect(() => {
+    if (tool !== "export") return;
+    // null when signed out or offline: the setting then isn't offered.
+    void tryFetchCollection().then((c) => setOwned(c && c.cards.length ? c.cards.map((x) => ({ name: x.name, quantity: x.quantity })) : null));
+  }, [tool]);
+  const leaveOut = (rows: PoolEntry[]) => (skipOwned && owned ? withoutOwned(rows, owned) : rows);
+  const deckRows = leaveOut(pool.filter((c) => c.board === "deck"));
+  const poolRows = withPool ? leaveOut(pool.filter((c) => c.board !== "deck")) : [];
+  const deckLines = deckRows.map((c) => `${c.quantity} ${c.name}`);
+  const poolLines = poolRows.map((c) => `${c.quantity} ${c.name}`);
+  const exportCount = [...deckRows, ...poolRows].reduce((n, c) => n + c.quantity, 0);
   const exportText =
     deckLines.length > 0 && poolLines.length > 0
       ? [...deckLines, "", "// Pool", ...poolLines].join("\n")
@@ -166,13 +183,30 @@ export default function ToolSheet({
 
       {tool === "export" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Toggle
+              on={withPool}
+              onChange={(v) => { setWithPool(v); saveSetting("sp-export-pool", v); }}
+              label="Include the pool"
+              note="After the deck, under // Pool"
+              disabled={!pool.some((c) => c.board !== "deck")}
+            />
+            {owned && (
+              <Toggle
+                on={skipOwned}
+                onChange={(v) => { setSkipOwned(v); saveSetting("sp-export-skip-owned", v); }}
+                label="Leave out cards I own"
+                note="Only what you'd still need to buy"
+              />
+            )}
+          </div>
           <p style={noteP}>
-            {pool.length} cards · standard {`{qty} {name}`} format.
+            {exportCount} card{exportCount === 1 ? "" : "s"} · standard {`{qty} {name}`} format.
           </p>
           <textarea readOnly value={exportText} onFocus={(e) => e.currentTarget.select()} className="cc-paper" style={{ ...paperInput, minHeight: 220, fontFamily: "var(--font-mono, monospace)", fontSize: 13.5, resize: "vertical" }} />
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button onClick={onClose} style={ghostBtn}>Close</button>
-            <button onClick={copyExport} disabled={pool.length === 0} style={goldBtn}>{copied ? <><Check size={15} strokeWidth={2.5} /> Copied</> : "Copy to clipboard"}</button>
+            <button onClick={copyExport} disabled={!exportText} style={goldBtn}>{copied ? <><Check size={15} strokeWidth={2.5} /> Copied</> : "Copy to clipboard"}</button>
           </div>
         </div>
       )}
@@ -309,5 +343,34 @@ export default function ToolSheet({
         </div>
       )}
     </ModalShell>
+  );
+}
+
+function readSetting(key: string, fallback: boolean): boolean {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v === "1";
+  } catch {
+    return fallback;
+  }
+}
+function saveSetting(key: string, v: boolean): void {
+  try {
+    localStorage.setItem(key, v ? "1" : "0");
+  } catch {
+    /* storage off: it just isn't remembered */
+  }
+}
+
+/* A labelled switch row for the export settings. */
+function Toggle({ on, onChange, label, note, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; note?: string; disabled?: boolean }) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderRadius: 10, background: "rgba(0,0,0,.12)", cursor: disabled ? "default" : "pointer", opacity: disabled ? 0.5 : 1 }}>
+      <input type="checkbox" role="switch" checked={on && !disabled} disabled={disabled} onChange={(e) => onChange(e.target.checked)} style={{ width: 18, height: 18, accentColor: "var(--gold, #fdf26f)", flex: "none" }} />
+      <span style={{ display: "flex", flexDirection: "column" }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: "var(--frame-ink)" }}>{label}</span>
+        {note && <span style={{ fontSize: 12, color: "var(--t2)" }}>{note}</span>}
+      </span>
+    </label>
   );
 }
