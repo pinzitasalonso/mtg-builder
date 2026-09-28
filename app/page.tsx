@@ -16,7 +16,6 @@ import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/m
 import { fetchCollection } from "@/lib/collection-client";
 import { track } from "@/lib/track";
 import { getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
-import { BRACKET_LABEL, BRACKET_NUMBER, type Bracket } from "@/lib/deck-insight";
 import type { ScanSummary } from "@/lib/deck-analysis";
 
 /* The home view wears the commander-blue identity field — the same immersive
@@ -761,11 +760,6 @@ const BRACKET_TINT: Record<number, string> = {
 /** The action buttons' slots, from the tile's top-right corner inward. */
 const actionRight = (slot: number): number => 10 + slot * 38;
 
-function bracketName(n: number): string {
-  const b = (Object.keys(BRACKET_NUMBER) as Bracket[]).find((k) => BRACKET_NUMBER[k] === n);
-  return b ? BRACKET_LABEL[b] : "";
-}
-
 function DeckTable({
   decks,
   onOpen,
@@ -803,12 +797,12 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
   const isCommander = deck.format.toLowerCase() === "commander";
   // Brackets are Commander's; another format's deck shows only its Score.
   const bracket = isCommander ? scan?.bracket ?? null : null;
-  // One line under the commander: the format when it isn't Commander, the
-  // bracket once scanned, and before a scan, how far along the list is — the
-  // count only matters while a deck is being built.
+  // One line under the commander: the format when it isn't Commander, and
+  // before a scan, how far along the list is — the count only matters while
+  // a deck is being built. The bracket is the badge on the art alone, and its
+  // name (Upgraded, Optimized…) is left out: it only restates the number.
   const meta = [
     isCommander ? null : deck.format.charAt(0).toUpperCase() + deck.format.slice(1),
-    bracket ? `Bracket ${bracket} · ${bracketName(bracket)}` : null,
     scan ? null : count === target ? "Not scored yet" : `${count}/${target} cards`,
   ]
     .filter(Boolean)
@@ -843,7 +837,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             {bracket && (
               <span
                 className="id-mono"
-                title={`Bracket ${bracket} · ${bracketName(bracket)}, as of its last scan`}
+                title={`Bracket ${bracket}, as of its last scan`}
                 style={{
                   position: "absolute",
                   bottom: 10,
@@ -874,9 +868,8 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
                 {meta}
               </span>
               {scan && (
-                <span className="id-mono" title="Score, as of its last scan" style={{ whiteSpace: "nowrap" }}>
-                  <span style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{scan.label}</span>
-                  <span style={{ fontSize: 11.5, color: "rgba(255,255,255,.6)", marginLeft: 5 }}>Score</span>
+                <span className="id-mono" title="Score, as of its last scan" style={{ fontSize: 16, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>
+                  {scan.label}
                 </span>
               )}
             </div>
