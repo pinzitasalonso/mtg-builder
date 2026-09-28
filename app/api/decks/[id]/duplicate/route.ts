@@ -5,11 +5,15 @@ import { newPublicId } from "@/lib/deck-id";
 import { DECK_LIMIT_MSG } from "@/lib/limits";
 import { canCreateDeck } from "@/lib/limits-db";
 import { recordEvent } from "@/lib/analytics";
+import { withoutOwned } from "@/lib/collection-diff";
 
 // Copy a deck (any deck the caller can see — their own or a public one) into a
 // fresh deck they own, cards and all. The copy starts as a new, independent
 // deck: its own publicId, owned by the current user (or public when signed out).
 // Body { pool: false } copies the decklist only, leaving the pool behind.
+// { missing: true } copies only what the caller doesn't own yet — the deck
+// board less their collection, copy for copy (30 Mountains, 10 owned: 20) —
+// which is a shopping list. It implies no pool, and needs a signed-in caller.
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -24,12 +28,18 @@ export async function POST(
   if (!source) return NextResponse.json({ error: "deck not found" }, { status: 404 });
 
   const body = await req.json().catch(() => null);
-  const withPool = body?.pool !== false;
-  const cards = await prisma.poolCard.findMany({ where: { deckId: source.id, ...(withPool ? {} : { board: "deck" }) } });
+  const missing = body?.missing === true;
+  if (missing && !user) return NextResponse.json({ error: "Sign in to leave out the cards you own." }, { status: 401 });
+  const withPool = body?.pool !== false && !missing;
+  let cards = await prisma.poolCard.findMany({ where: { deckId: source.id, ...(withPool ? {} : { board: "deck" }) } });
+  if (missing) {
+    const owned = await prisma.collectionCard.findMany({ where: { userId: user!.id }, select: { name: true, quantity: true } });
+    cards = withoutOwned(cards, owned);
+  }
 
   const copy = await prisma.deck.create({
     data: {
-      name: `${source.name} (copy)`,
+      name: `${source.name} (${missing ? "to buy" : "copy"})`,
       format: source.format,
       commander: source.commander,
       primer: source.primer,

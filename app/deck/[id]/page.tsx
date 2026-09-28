@@ -671,12 +671,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // Fork the deck into an editable copy of one's own (the read-only viewer's
   // main action) and open it.
   const [forking, setForking] = useState(false);
-  async function duplicateThisDeck(withPool = true) {
+  async function duplicateThisDeck(mode: "all" | "list" | "missing" = "all") {
     setForking(true);
     const res = await fetch(`/api/decks/${deckId}/duplicate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pool: withPool }),
+      body: JSON.stringify(mode === "missing" ? { missing: true } : { pool: mode === "all" }),
     });
     if (res.ok) {
       const copy = await res.json();
@@ -981,9 +981,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       { label: copied === "list" ? "Copied!" : "Copy decklist", icon: copied === "list" ? Check : ClipboardCopy, on: copyDecklist, disabled: deckCards.length === 0, keepOpen: true },
                       { label: "Buy list", icon: ShoppingCart, on: () => setOrderOpen(true), disabled: deckCards.length === 0 },
                       { label: "Versions", icon: History, on: () => setVersionsOpen(true) },
-                      { label: forking ? "Duplicating…" : "Duplicate deck", icon: Copy, on: () => duplicateThisDeck(true), disabled: forking },
+                      { label: forking ? "Duplicating…" : "Duplicate deck", icon: Copy, on: () => duplicateThisDeck("all"), disabled: forking },
                       // Only worth offering when there's a pool to leave behind.
-                      ...(poolCards.length > 0 ? [{ label: "Duplicate without pool", icon: Copy, on: () => duplicateThisDeck(false), disabled: forking }] : []),
+                      ...(poolCards.length > 0 ? [{ label: "Duplicate without pool", icon: Copy, on: () => duplicateThisDeck("list"), disabled: forking }] : []),
+                      // The deck less your collection: a shopping list. Needs
+                      // you signed in (your collection) and owning something.
+                      ...(ownedNames.length > 0 ? [{ label: "Duplicate what I’m missing", icon: ShoppingCart, on: () => duplicateThisDeck("missing"), disabled: forking }] : []),
                       ...(canEdit ? [
                         { label: "Add lands & staples", icon: Mountain, on: () => setTool("lands") },
                         { label: "Export / import", icon: ArrowUpDown, on: () => setTool("export") },
