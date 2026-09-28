@@ -9,8 +9,9 @@ import { recordEvent } from "@/lib/analytics";
 // Copy a deck (any deck the caller can see — their own or a public one) into a
 // fresh deck they own, cards and all. The copy starts as a new, independent
 // deck: its own publicId, owned by the current user (or public when signed out).
+// Body { pool: false } copies the decklist only, leaving the pool behind.
 export async function POST(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
@@ -22,7 +23,9 @@ export async function POST(
   const source = await viewableDeckByPublicId((await params).id, user?.id ?? null);
   if (!source) return NextResponse.json({ error: "deck not found" }, { status: 404 });
 
-  const cards = await prisma.poolCard.findMany({ where: { deckId: source.id } });
+  const body = await req.json().catch(() => null);
+  const withPool = body?.pool !== false;
+  const cards = await prisma.poolCard.findMany({ where: { deckId: source.id, ...(withPool ? {} : { board: "deck" }) } });
 
   const copy = await prisma.deck.create({
     data: {
