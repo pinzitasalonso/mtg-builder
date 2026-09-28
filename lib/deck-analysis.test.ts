@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildAnalysisPrompt, decklistBlock, judgementFrom, parseAnalysis } from "./deck-analysis";
+import { buildAnalysisPrompt, decklistBlock, judgementFrom, parseAnalysis, scanSummary } from "./deck-analysis";
 import { boundJudgement, scoreDeck } from "./deck-score-report";
 import type { ScoredCard } from "./deck-score-classify";
 
@@ -88,5 +88,35 @@ describe("prompt", () => {
     expect(prompt).toContain("PLAYER'S NOTES");
     expect(prompt).toContain("It is a voltron deck.");
     expect(prompt).toContain("SCORE AND WORKING");
+  });
+});
+
+describe("scanSummary", () => {
+  const stored = (score: object) => JSON.stringify({ score, analysis: null, notes: null, scannedAt: "2026-09-27T00:00:00Z" });
+
+  it("reads the Score and the bracket from a stored scan", () => {
+    expect(scanSummary(stored({ index: 6.25, label: "6.25", bracketFloor: 3 }))).toEqual({ score: 6.25, label: "6.25", bracket: 3 });
+  });
+
+  it("works on a real report", () => {
+    const report = scoreDeck(deck(), [], 2);
+    const summary = scanSummary(JSON.stringify({ score: report, analysis: null, notes: null, scannedAt: "" }));
+    expect(summary).toEqual({ score: report.index, label: report.label, bracket: report.bracketFloor });
+  });
+
+  it("prints the Score itself when the label is missing", () => {
+    expect(scanSummary(stored({ index: 7 }))).toEqual({ score: 7, label: "7", bracket: null });
+  });
+
+  it("drops a bracket outside 1–5", () => {
+    expect(scanSummary(stored({ index: 5, label: "5", bracketFloor: 9 }))?.bracket).toBeNull();
+  });
+
+  it("is null for a deck never scanned, or a scan it cannot read", () => {
+    expect(scanSummary(null)).toBeNull();
+    expect(scanSummary("")).toBeNull();
+    expect(scanSummary("{not json")).toBeNull();
+    expect(scanSummary(JSON.stringify({ analysis: null }))).toBeNull();
+    expect(scanSummary(stored({ index: "6" }))).toBeNull();
   });
 });

@@ -1782,7 +1782,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {/* card preview modal */}
       {preview && (
         <div
-          style={{ position: "fixed", inset: 0, background: "rgba(21,21,26,.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 65, animation: "sp-fade .15s ease" }}
+          style={{ position: "fixed", top: 0, left: 0, bottom: 0, right: "var(--assistant-w, 0px)", background: "rgba(21,21,26,.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex: 65, animation: "sp-fade .15s ease" }}
           onClick={() => setPreview(null)}
         >
           <div

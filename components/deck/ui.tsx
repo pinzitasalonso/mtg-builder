@@ -161,7 +161,7 @@ export function ModalShell({
 
   return (
     <div
-      style={{ position: "fixed", inset: 0, background: "rgba(8,6,11,.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex, animation: "sp-fade .15s ease" }}
+      style={{ position: "fixed", top: 0, left: 0, bottom: 0, right: "var(--assistant-w, 0px)", background: "rgba(8,6,11,.6)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16, zIndex, animation: "sp-fade .15s ease" }}
       onClick={(e) => e.target === e.currentTarget && onDismiss()}
     >
       <div

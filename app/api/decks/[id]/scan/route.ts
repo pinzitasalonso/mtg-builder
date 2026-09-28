@@ -16,6 +16,7 @@ import {
   buildAnalysisPrompt,
   judgementFrom,
   parseAnalysis,
+  readStoredScan,
   type DeckScan,
 } from "@/lib/deck-analysis";
 import { scanLimitMsg } from "@/lib/limits";
@@ -39,16 +40,6 @@ export const runtime = "nodejs";
 // fails — a scan that produced nothing is not one the player used.
 
 /** The stored scan, or null when the deck has never been scanned. */
-function readStored(raw: string | null): DeckScan | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as DeckScan;
-    return parsed && typeof parsed === "object" && parsed.score && typeof parsed.score.index === "number" ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -56,7 +47,7 @@ export async function GET(
   const user = await currentUser();
   const deck = await viewableDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
-  return NextResponse.json({ scan: readStored(deck.analysis) });
+  return NextResponse.json({ scan: readStoredScan(deck.analysis) });
 }
 
 export async function POST(

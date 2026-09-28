@@ -7,6 +7,7 @@ import { deckLimitMsg } from "@/lib/limits";
 import { proOnSale } from "@/lib/revenuecat";
 import { canCreateDeck } from "@/lib/limits-db";
 import { recordEvent } from "@/lib/analytics";
+import { scanSummary } from "@/lib/deck-analysis";
 
 // One-time: assign an unguessable publicId to any deck created before this
 // column existed, so every deck has a stable URL. No-op once all are filled.
@@ -48,12 +49,16 @@ export async function GET(req: Request) {
     for (const ch of c.colorIdentity) if ("WUBRG".includes(ch)) set.add(ch);
     colorsByDeck.set(c.deckId, set);
   }
+  // The last scan travels as its summary (Score and bracket, for the deck's
+  // tile), not as the stored JSON: the full scan is several KB a deck, and
+  // both clients read it from /scan on the deck's own page.
   return jsonWithEtag(
     req,
-    decks.map((d) => ({
+    decks.map(({ analysis, ...d }) => ({
       ...d,
       _count: { cards: deckCountByDeck.get(d.id) ?? 0 },
       colors: ["W", "U", "B", "R", "G"].filter((ch) => colorsByDeck.get(d.id)?.has(ch)),
+      scan: scanSummary(analysis),
     }))
   );
 }

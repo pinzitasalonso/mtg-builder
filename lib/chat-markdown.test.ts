@@ -224,3 +224,14 @@ describe("italics with underscores inside words", () => {
     ]);
   });
 });
+
+describe("single-bracket card names", () => {
+  it("links [Name] like [[Name]]", () => {
+    expect(cardNamesIn("Yes. [Warren Soultrader] is decent; take [Ashnod's Altar].")).toEqual(["Warren Soultrader", "Ashnod's Altar"]);
+    const [p] = parseBlocks("Pair [Viscera Seer] with [[Blood Artist]].");
+    expect(p.type === "p" && p.inline.filter((t) => t.type === "card").map((t) => (t as { value: string }).value)).toEqual(["Viscera Seer", "Blood Artist"]);
+  });
+  it("leaves markdown links, citations and lowercase alone", () => {
+    expect(cardNamesIn("[Krenko goblins](/deck/abc) and a note [1] and [see above]")).toEqual([]);
+  });
+});

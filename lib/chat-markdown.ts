@@ -44,8 +44,23 @@ const OL_RE = /^\d+\.\s+(.*)$/;
 // Parse a Markdown string into block-level tokens. Consecutive list items of the
 // same kind group into one list block; consecutive plain lines join into one
 // paragraph; blank lines separate blocks.
+/* The model is told to write cards as [[Name]], and sometimes writes [Name].
+   Those become [[Name]] too, so they link like any other card; one that
+   isn't a card shows as plain text once Scryfall says so (the not-found
+   check every bracketed name gets). Left alone: markdown links ([x](/y)),
+   [[double]] brackets already, and things that don't read as a name — too
+   long, not capitalised, or just a number like a citation [1]. */
+const SINGLE_BRACKET = /(?<!\[)\[([^[\]\n]{2,60})\](?![\](\[])/g;
+export function promoteCardBrackets(md: string): string {
+  return md.replace(SINGLE_BRACKET, (whole, inner: string) => {
+    const name = inner.trim();
+    if (!/^[\p{Lu}\d"']/u.test(name) || /^\d+$/.test(name) || name.split(/\s+/).length > 8) return whole;
+    return `[[${name}]]`;
+  });
+}
+
 export function parseBlocks(md: string): Block[] {
-  const lines = md.replace(/\r\n/g, "\n").split("\n");
+  const lines = promoteCardBrackets(md).replace(/\r\n/g, "\n").split("\n");
   const blocks: Block[] = [];
   let para: string[] = [];
 
@@ -108,7 +123,7 @@ export function parseBlocks(md: string): Block[] {
 export function cardNamesIn(md: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const m of md.matchAll(/\[\[([^\]]+)\]\]/g)) {
+  for (const m of promoteCardBrackets(md).matchAll(/\[\[([^\]]+)\]\]/g)) {
     const name = m[1].trim();
     const key = name.toLowerCase();
     if (name && !seen.has(key)) {

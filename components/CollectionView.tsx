@@ -285,7 +285,10 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
     <div
       style={{
         position: "fixed",
-        inset: 0,
+        top: 0,
+        left: 0,
+        bottom: 0,
+        right: "var(--assistant-w, 0px)",
         zIndex: 70,
         ...theme.vars,
         background: theme.bg,

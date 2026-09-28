@@ -65,7 +65,11 @@ export default function AssistantScreen({
     const prev = { paddingRight: b.paddingRight, transition: b.transition };
     b.transition = "padding-right .18s ease";
     b.paddingRight = PANEL_W;
+    // The page's own full-window layers (swipe review, dialogs, the
+    // collection, playtest) stop at the panel's edge by this.
+    document.documentElement.style.setProperty("--assistant-w", PANEL_W);
     return () => {
+      document.documentElement.style.removeProperty("--assistant-w");
       b.paddingRight = prev.paddingRight;
       setTimeout(() => (b.transition = prev.transition), 200);
     };

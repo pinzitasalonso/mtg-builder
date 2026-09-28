@@ -185,7 +185,12 @@ export function startRun(opts: {
             });
             current = ai;
             for await (const event of ai) {
-              if (event.type === "content_block_delta" && event.delta.type === "text_delta") append(event.delta.text);
+              // A reply comes in several text blocks (before and after a web
+              // search, around a tool call). Each starts a new paragraph: run
+              // together, "…not two." and "## Better picks" became one line.
+              if (event.type === "content_block_start" && event.content_block.type === "text" && run.text && !run.text.endsWith("\n\n")) {
+                append(run.text.endsWith("\n") ? "\n" : "\n\n");
+              } else if (event.type === "content_block_delta" && event.delta.type === "text_delta") append(event.delta.text);
             }
             final = await ai.finalMessage();
           } catch (e) {
