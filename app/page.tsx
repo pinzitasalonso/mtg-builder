@@ -15,7 +15,9 @@ import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
 import { track } from "@/lib/track";
-import { getIdentityField, liftHex, LIGHT_VARS } from "@/lib/identity-theme";
+import { getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
+import { BRACKET_LABEL, BRACKET_NUMBER, type Bracket } from "@/lib/deck-insight";
+import type { ScanSummary } from "@/lib/deck-analysis";
 
 /* The home view wears the commander-blue identity field — the same immersive
    look the deck pages use, matching the Color Identity design. */
@@ -38,6 +40,8 @@ interface Deck {
   pinned?: boolean;
   colors?: string[];
   _count: { cards: number };
+  /** The last scan, summarised; null (or absent, in an older cached list) when never scanned. */
+  scan?: ScanSummary | null;
 }
 
 // `aiRemaining` and `deckLimit` are null for pro (no cap) and absent only if
@@ -744,6 +748,24 @@ function CollectionBlock({ unique, total, pending, sample, onOpen }: { unique: n
 }
 
 /* ---------- color-identity deck tiles ---------- */
+
+/** A tint per bracket, for the badge on a tile's art: cool to hot. */
+const BRACKET_TINT: Record<number, string> = {
+  1: "#B8C4D6",
+  2: "#6FD8A4",
+  3: "#B9A2FF",
+  4: "#FFA266",
+  5: "#FF7474",
+};
+
+/** The action buttons' slots, from the tile's top-right corner inward. */
+const actionRight = (slot: number): number => 10 + slot * 38;
+
+function bracketName(n: number): string {
+  const b = (Object.keys(BRACKET_NUMBER) as Bracket[]).find((k) => BRACKET_NUMBER[k] === n);
+  return b ? BRACKET_LABEL[b] : "";
+}
+
 function DeckTable({
   decks,
   onOpen,
@@ -777,7 +799,20 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
   const field = getIdentityField(colors.join(""));
   const count = deck._count?.cards || 0;
   const target = deckTarget(deck.format);
-  const pct = Math.min(1, count / Math.max(1, target));
+  const scan = deck.scan ?? null;
+  const isCommander = deck.format.toLowerCase() === "commander";
+  // Brackets are Commander's; another format's deck shows only its Score.
+  const bracket = isCommander ? scan?.bracket ?? null : null;
+  // One line under the commander: the format when it isn't Commander, the
+  // bracket once scanned, and before a scan, how far along the list is — the
+  // count only matters while a deck is being built.
+  const meta = [
+    isCommander ? null : deck.format.charAt(0).toUpperCase() + deck.format.slice(1),
+    bracket ? `Bracket ${bracket} · ${bracketName(bracket)}` : null,
+    scan ? null : count === target ? "Not scored yet" : `${count}/${target} cards`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
     <Reveal delay={60 + Math.min(index, 8) * 50}>
       <div className="deck-tile" style={{ position: "relative" }}>
@@ -805,73 +840,48 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             <div style={{ position: "absolute", top: 12, left: 14 }}>
               <ColorPips colors={colors} size={20} />
             </div>
-            <span
-              style={{
-                position: "absolute",
-                bottom: 10,
-                right: 14,
-                fontFamily: "var(--font-mono)",
-                fontSize: 11,
-                color: "rgba(255,255,255,.78)",
-                background: "rgba(0,0,0,.32)",
-                padding: "3px 8px",
-                borderRadius: 6,
-                textTransform: "capitalize",
-              }}
-            >
-              {deck.format}
-            </span>
+            {bracket && (
+              <span
+                className="id-mono"
+                title={`Bracket ${bracket} · ${bracketName(bracket)}, as of its last scan`}
+                style={{
+                  position: "absolute",
+                  bottom: 10,
+                  right: 14,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: "#181228",
+                  background: BRACKET_TINT[bracket],
+                  padding: "3px 8px",
+                  borderRadius: 7,
+                  boxShadow: "0 2px 6px rgba(0,0,0,.35)",
+                }}
+              >
+                B{bracket}
+              </span>
+            )}
           </div>
-          <div style={{ padding: "14px 18px 18px" }}>
+          <div style={{ padding: "14px 18px 16px" }}>
             <div className="id-display" style={{ fontSize: 30, lineHeight: 0.9, marginBottom: 5, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {deck.name}
             </div>
-            <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.78)", marginBottom: 16, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.78)", marginBottom: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {deck.commander || "An untitled brew"}
             </div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-              <div style={{ flex: 1, height: 6, borderRadius: 4, background: "rgba(255,255,255,.16)", overflow: "hidden" }}>
-                {/* The deck's own color, lifted so it reads on the tile's
-                    gradient. Not var(--gold): the deck section redefines that
-                    as the page's blue. */}
-                <div style={{ width: `${pct * 100}%`, height: "100%", background: liftHex(field.bg), borderRadius: 4 }} />
-              </div>
-              <span className="id-mono" style={{ fontSize: 12.5, color: "#fff", fontWeight: 600 }}>
-                {count}
-                <span style={{ color: "rgba(255,255,255,.55)" }}>/{target}</span>
+            {/* One height whether or not the Score is there, so tiles in a row match. */}
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, height: 20, lineHeight: "20px" }}>
+              <span style={{ fontSize: 13, color: "rgba(255,255,255,.66)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {meta}
               </span>
+              {scan && (
+                <span className="id-mono" title="Score, as of its last scan" style={{ whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{scan.label}</span>
+                  <span style={{ fontSize: 11.5, color: "rgba(255,255,255,.6)", marginLeft: 5 }}>Score</span>
+                </span>
+              )}
             </div>
           </div>
         </button>
-        {/* Pin: gold once pinned, so the top of the list reads as
-            chosen. All three actions are always visible (see .deck-tile-card). */}
-        {onPin && <button
-          className="tile-action"
-          onClick={(e) => { e.stopPropagation(); onPin(); }}
-          title={deck.pinned ? "Unpin deck" : "Pin deck to the top"}
-          aria-label={deck.pinned ? "Unpin deck" : "Pin deck to the top"}
-          aria-pressed={Boolean(deck.pinned)}
-          data-on={deck.pinned ? "true" : undefined}
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 86,
-            width: 30,
-            height: 30,
-            borderRadius: 8,
-            border: "none",
-            cursor: "pointer",
-            background: deck.pinned ? "var(--gold)" : "rgba(0,0,0,.5)",
-            color: deck.pinned ? "var(--accent-ink)" : "#fff",
-            fontSize: 12,
-                        display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 2,
-          }}
-        >
-          <Pin size={15} strokeWidth={2.25} fill={deck.pinned ? "currentColor" : "none"} />
-        </button>}
         <button
           className="tile-action"
           onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
@@ -880,7 +890,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
           style={{
             position: "absolute",
             top: 10,
-            right: 48,
+            right: actionRight(onPin ? 2 : 1),
             width: 30,
             height: 30,
             borderRadius: 8,
@@ -905,7 +915,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
           style={{
             position: "absolute",
             top: 10,
-            right: 10,
+            right: actionRight(onPin ? 1 : 0),
             width: 30,
             height: 30,
             borderRadius: 8,
@@ -922,6 +932,38 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
         >
           <Trash2 size={15} strokeWidth={2.25} />
         </button>
+        {/* Pin: gold once pinned, so the top of the list reads as
+            chosen. The actions wait for a mouse hover; a set pin always
+            shows, and so does everything on a touch screen (see .deck-tile).
+            The pin takes the corner so it sits there alone when the others
+            are hidden. */}
+        {onPin && <button
+          className="tile-action"
+          onClick={(e) => { e.stopPropagation(); onPin(); }}
+          title={deck.pinned ? "Unpin deck" : "Pin deck to the top"}
+          aria-label={deck.pinned ? "Unpin deck" : "Pin deck to the top"}
+          aria-pressed={Boolean(deck.pinned)}
+          data-on={deck.pinned ? "true" : undefined}
+          style={{
+            position: "absolute",
+            top: 10,
+            right: actionRight(0),
+            width: 30,
+            height: 30,
+            borderRadius: 8,
+            border: "none",
+            cursor: "pointer",
+            background: deck.pinned ? "var(--gold)" : "rgba(0,0,0,.5)",
+            color: deck.pinned ? "var(--accent-ink)" : "#fff",
+            fontSize: 12,
+                        display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2,
+          }}
+        >
+          <Pin size={15} strokeWidth={2.25} fill={deck.pinned ? "currentColor" : "none"} />
+        </button>}
       </div>
     </Reveal>
   );

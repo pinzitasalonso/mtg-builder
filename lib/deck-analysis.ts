@@ -255,3 +255,42 @@ export function judgementFrom(out: AnalysisOutput, computedTurn: number): Judgem
   j.dependencyReason = out.judgement.dependencyReason || undefined;
   return j;
 }
+
+/** A stored scan (Deck.analysis) read back, or null when absent or unreadable. */
+export function readStoredScan(raw: string | null | undefined): DeckScan | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as DeckScan;
+    return parsed && typeof parsed === "object" && parsed.score && typeof parsed.score.index === "number" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * What a deck's tile in the list shows of its last scan: the Score and the
+ * bracket it came out at. Read from the stored scan, so the list runs no
+ * scan of its own. The bracket is the scan's `bracketFloor` — the rules
+ * bracket at the time, or the Score's floor when that is higher — so it is
+ * the deck as of its scan, like the Score beside it.
+ */
+export interface ScanSummary {
+  /** The Score, 0–10 on the quarter grid. */
+  score: number;
+  /** The Score as the deck page prints it: "6.25", "7". */
+  label: string;
+  /** 1–5, or null when the scan carries none. */
+  bracket: number | null;
+}
+
+export function scanSummary(raw: string | null | undefined): ScanSummary | null {
+  const scan = readStoredScan(raw);
+  if (!scan || !Number.isFinite(scan.score.index)) return null;
+  const { index, label, bracketFloor } = scan.score;
+  const bracket = Number.isInteger(bracketFloor) && bracketFloor >= 1 && bracketFloor <= 5 ? bracketFloor : null;
+  return {
+    score: index,
+    label: typeof label === "string" && label ? label : String(Number(index.toFixed(2))),
+    bracket,
+  };
+}
