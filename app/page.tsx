@@ -799,8 +799,9 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
   const bracket = isCommander ? scan?.bracket ?? null : null;
   // One line under the commander: the format when it isn't Commander, and
   // before a scan, how far along the list is — the count only matters while
-  // a deck is being built. The bracket is the badge on the art alone, and its
-  // name (Upgraded, Optimized…) is left out: it only restates the number.
+  // a deck is being built. The bracket and the Score are the pill on the art;
+  // the bracket's name (Upgraded, Optimized…) is left out, since it only
+  // restates the number.
   const meta = [
     isCommander ? null : deck.format.charAt(0).toUpperCase() + deck.format.slice(1),
     scan ? null : count === target ? "Not scored yet" : `${count}/${target} cards`,
@@ -808,8 +809,10 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
     .filter(Boolean)
     .join(" · ");
   return (
-    <Reveal delay={60 + Math.min(index, 8) * 50}>
-      <div className="deck-tile" style={{ position: "relative" }}>
+    // The tile fills its grid cell, so tiles in a row match in height whether
+    // or not they have the line under the commander.
+    <Reveal delay={60 + Math.min(index, 8) * 50} style={{ height: "100%" }}>
+      <div className="deck-tile" style={{ position: "relative", height: "100%" }}>
         <button
           className="deck-tile-card"
           onClick={onOpen}
@@ -817,6 +820,9 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             textAlign: "left",
             cursor: "pointer",
             width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
             padding: 0,
             border: "none",
             borderRadius: 18,
@@ -828,30 +834,34 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             transition: "transform .2s, box-shadow .2s",
           }}
         >
-          <div style={{ position: "relative", height: 132 }}>
+          <div style={{ position: "relative", height: 132, flexShrink: 0 }}>
             <CardArt name={commanderArtName(deck.commander)} label={deck.name} colors={colors} version="art_crop" radius={0} style={{ position: "absolute", inset: 0 }} />
             <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 30%, ${field.deep}ee)` }} />
             <div style={{ position: "absolute", top: 12, left: 14 }}>
               <ColorPips colors={colors} size={20} />
             </div>
-            {bracket && (
+            {/* The last scan, as one pill: the bracket in its tint, joined to
+                the Score. A deck in another format has no bracket, so its
+                pill is the Score alone. */}
+            {scan && (
               <span
-                className="id-mono"
-                title={`Bracket ${bracket}, as of its last scan`}
+                title={`${bracket ? `Bracket ${bracket}, ` : ""}Score ${scan.label}, as of its last scan`}
                 style={{
                   position: "absolute",
                   bottom: 10,
                   right: 14,
-                  fontSize: 12,
-                  fontWeight: 700,
+                  display: "inline-flex",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  fontSize: 14,
+                  lineHeight: "26px",
                   color: "#181228",
-                  background: BRACKET_TINT[bracket],
-                  padding: "3px 8px",
-                  borderRadius: 7,
-                  boxShadow: "0 2px 6px rgba(0,0,0,.35)",
+                  fontVariantNumeric: "tabular-nums",
+                  boxShadow: "0 2px 8px rgba(0,0,0,.4)",
                 }}
               >
-                B{bracket}
+                {bracket && <span style={{ background: BRACKET_TINT[bracket], fontWeight: 800, padding: "0 9px" }}>B{bracket}</span>}
+                <span style={{ background: "#F4F0E6", fontWeight: 600, padding: "0 10px" }}>{scan.label}</span>
               </span>
             )}
           </div>
@@ -859,20 +869,14 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             <div className="id-display" style={{ fontSize: 30, lineHeight: 0.9, marginBottom: 5, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {deck.name}
             </div>
-            <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.78)", marginBottom: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.78)", marginBottom: meta ? 12 : 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {deck.commander || "An untitled brew"}
             </div>
-            {/* One height whether or not the Score is there, so tiles in a row match. */}
-            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, height: 20, lineHeight: "20px" }}>
-              <span style={{ fontSize: 13, color: "rgba(255,255,255,.66)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {meta && (
+              <div style={{ fontSize: 13, lineHeight: "20px", color: "rgba(255,255,255,.66)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {meta}
-              </span>
-              {scan && (
-                <span className="id-mono" title="Score, as of its last scan" style={{ fontSize: 16, fontWeight: 700, color: "#fff", whiteSpace: "nowrap" }}>
-                  {scan.label}
-                </span>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </button>
         <button
