@@ -72,9 +72,6 @@ const FEATURES: { n: string; t: string; d: string; v: "prompt" | "swipe" | "curv
   { v: "curve", n: "03", t: "Brew to 100", d: "Watch your curve, color identity, and type balance update live. Export to your deck builder the moment it's legal." },
 ];
 
-/** What a copy takes: everything, the list only, or the list less what you own. */
-type CopyMode = "all" | "list" | "missing";
-
 interface HomeCache {
   me: Me | null;
   decks: Deck[];
@@ -257,12 +254,8 @@ export default function HomePage() {
     loadAll();
   }
 
-  async function duplicateDeck(id: string, mode: CopyMode = "all") {
-    const res = await fetch(`/api/decks/${id}/duplicate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(mode === "missing" ? { missing: true } : { pool: mode === "all" }),
-    });
+  async function duplicateDeck(id: string) {
+    const res = await fetch(`/api/decks/${id}/duplicate`, { method: "POST" });
     // Duplicating is the other way past the deck cap, and it answered a 403 by
     // doing nothing at all. Its own notice rather than the new-deck modal's —
     // opening "Begin a new deck" to explain a failed duplicate is a non sequitur.
@@ -436,7 +429,7 @@ export default function HomePage() {
               <ArrowRight size={17} strokeWidth={2.25} style={{ flex: "none" }} />
             </button>
           )}
-          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} signedIn={Boolean(me)} onPin={pinDeck} onNew={() => setShowModal(true)} showNew={loaded} />
+          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onPin={pinDeck} onNew={() => setShowModal(true)} showNew={loaded} />
           <CollectionBlock unique={collection.unique} total={collection.total} pending={collection.pending} sample={collection.sample} onOpen={() => setShowCollection(true)} />
           <div style={{ height: 64 }} />
         </div>
@@ -540,7 +533,7 @@ export default function HomePage() {
             </div>
             <button className="id-pill-gold" style={{ padding: "11px 20px", background: "#fdf26f", color: "#181228", borderColor: "transparent" }} onClick={() => setShowModal(true)}>New brew <ArrowRight size={15} strokeWidth={2.25} /></button>
           </div>
-          <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} signedIn={Boolean(me)} onNew={() => setShowModal(true)} showNew={loaded && !me} />
+          <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
         </div>
       </div>
 
@@ -772,7 +765,6 @@ function DeckTable({
   onOpen,
   onDelete,
   onDuplicate,
-  signedIn,
   onPin,
   onNew,
   showNew,
@@ -780,9 +772,7 @@ function DeckTable({
   decks: Deck[];
   onOpen: (d: Deck) => void;
   onDelete: (id: string) => void;
-  onDuplicate: (id: string, mode?: CopyMode) => void;
-  /** Offer "what I'm missing" (needs the signed-in player's collection). */
-  signedIn?: boolean;
+  onDuplicate: (id: string) => void;
   /** Absent on the public gallery: pinning is a personal order, not everyone's. */
   onPin?: (id: string, pinned: boolean) => void;
   onNew: () => void;
@@ -791,16 +781,14 @@ function DeckTable({
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(258px, 1fr))", gap: 22 }}>
       {decks.map((d, i) => (
-        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.publicId)} onDuplicate={(mode) => onDuplicate(d.publicId, mode)} signedIn={signedIn} onPin={onPin ? () => onPin(d.publicId, !d.pinned) : undefined} />
+        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.publicId)} onDuplicate={() => onDuplicate(d.publicId)} onPin={onPin ? () => onPin(d.publicId, !d.pinned) : undefined} />
       ))}
       {showNew && <NewDeckTile onNew={onNew} />}
     </div>
   );
 }
 
-function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin, signedIn }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void; onDuplicate: (mode: CopyMode) => void; onPin?: () => void; signedIn?: boolean }) {
-  // The copy button asks what to copy: the whole deck, or the list alone.
-  const [copyMenu, setCopyMenu] = useState(false);
+function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void; onDuplicate: () => void; onPin?: () => void }) {
   const colors = deck.colors?.length ? deck.colors : ["C"];
   const field = getIdentityField(colors.join(""));
   const count = deck._count?.cards || 0;
@@ -895,11 +883,9 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin, signedIn 
         </button>
         <button
           className="tile-action"
-          onClick={(e) => { e.stopPropagation(); setCopyMenu((v) => !v); }}
+          onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
           title="Duplicate deck"
           aria-label="Duplicate deck"
-          aria-haspopup="menu"
-          aria-expanded={copyMenu}
           style={{
             position: "absolute",
             top: 10,
@@ -920,35 +906,6 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin, signedIn 
         >
           <Copy size={15} strokeWidth={2.25} />
         </button>
-        {copyMenu && (
-          <>
-            <div onClick={() => setCopyMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 4 }} />
-            <div
-              role="menu"
-              aria-label="Duplicate"
-              className="id-card"
-              style={{ position: "absolute", top: 46, right: 10, zIndex: 5, width: 214, padding: 6, display: "flex", flexDirection: "column", gap: 2, background: "var(--bg)", borderRadius: 12, boxShadow: "0 14px 32px -10px rgba(0,0,0,.45), inset 0 0 0 1px var(--line)" }}
-            >
-              {([
-                { label: "Duplicate deck", note: "The list and the pool", mode: "all" },
-                { label: "Duplicate without pool", note: "Only the cards in the deck", mode: "list" },
-                ...(signedIn ? [{ label: "Duplicate what I’m missing", note: "The deck, less the cards you own", mode: "missing" }] : []),
-              ] as { label: string; note: string; mode: CopyMode }[]).map((o) => (
-                <button
-                  key={o.label}
-                  role="menuitem"
-                  type="button"
-                  className="tools-item"
-                  onClick={(e) => { e.stopPropagation(); setCopyMenu(false); onDuplicate(o.mode); }}
-                  style={{ textAlign: "left", padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", color: "var(--t1, var(--text))", cursor: "pointer" }}
-                >
-                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{o.label}</div>
-                  <div style={{ fontSize: 12, color: "var(--t3, var(--text-muted))", marginTop: 1 }}>{o.note}</div>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
         <button
           className="tile-action"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
