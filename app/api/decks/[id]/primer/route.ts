@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
-import { AI_LIMIT_MSG } from "@/lib/limits";
+import { aiLimitMsg } from "@/lib/limits";
 import { consumeAi } from "@/lib/limits-db";
+import { proOnSale } from "@/lib/revenuecat";
 import { findCombos, type ComboResult } from "@/lib/combos";
 import { readStoredScan } from "@/lib/deck-analysis";
 import { primerPrompt, PRIMER_INSTRUCTIONS } from "@/lib/primer";
@@ -30,7 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     orderBy: { name: "asc" },
   });
   if (cards.length < 10) return NextResponse.json({ error: "Add some cards first: a primer needs a deck to describe." }, { status: 400 });
-  if (!(await consumeAi(user))) return NextResponse.json({ error: AI_LIMIT_MSG, code: "ai_limit" }, { status: 429 });
+  if (!(await consumeAi(user))) return NextResponse.json({ error: aiLimitMsg(proOnSale()), code: "ai_limit" }, { status: 429 });
 
   // Combos, best-effort and bounded: a slow Spellbook shouldn't hold the draft.
   const commanderKeys = new Set((deck.commander ?? "").split("+").map((n) => n.trim().toLowerCase()).filter(Boolean));
