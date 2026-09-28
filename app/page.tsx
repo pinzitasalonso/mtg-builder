@@ -798,13 +798,15 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
   // Brackets are Commander's; another format's deck shows only its Score.
   const bracket = isCommander ? scan?.bracket ?? null : null;
   // One line under the commander: the format when it isn't Commander, and
-  // before a scan, how far along the list is — the count only matters while
-  // a deck is being built. The bracket and the Score are the pill on the art;
+  // before a scan, how far along an unfinished list is — the count only
+  // matters while a deck is being built. The bracket and the Score are the pill on the art;
   // the bracket's name (Upgraded, Optimized…) is left out, since it only
   // restates the number.
   const meta = [
     isCommander ? null : deck.format.charAt(0).toUpperCase() + deck.format.slice(1),
-    scan ? null : count === target ? "Not scored yet" : `${count}/${target} cards`,
+    // A full deck without a scan says nothing: "Not scored yet" only made
+    // its row of tiles taller.
+    scan || count === target ? null : `${count}/${target} cards`,
   ]
     .filter(Boolean)
     .join(" · ");
