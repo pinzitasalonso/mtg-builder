@@ -254,8 +254,12 @@ export default function HomePage() {
     loadAll();
   }
 
-  async function duplicateDeck(id: string) {
-    const res = await fetch(`/api/decks/${id}/duplicate`, { method: "POST" });
+  async function duplicateDeck(id: string, withPool = true) {
+    const res = await fetch(`/api/decks/${id}/duplicate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pool: withPool }),
+    });
     // Duplicating is the other way past the deck cap, and it answered a 403 by
     // doing nothing at all. Its own notice rather than the new-deck modal's —
     // opening "Begin a new deck" to explain a failed duplicate is a non sequitur.
@@ -772,7 +776,7 @@ function DeckTable({
   decks: Deck[];
   onOpen: (d: Deck) => void;
   onDelete: (id: string) => void;
-  onDuplicate: (id: string) => void;
+  onDuplicate: (id: string, withPool?: boolean) => void;
   /** Absent on the public gallery: pinning is a personal order, not everyone's. */
   onPin?: (id: string, pinned: boolean) => void;
   onNew: () => void;
@@ -781,14 +785,16 @@ function DeckTable({
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(258px, 1fr))", gap: 22 }}>
       {decks.map((d, i) => (
-        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.publicId)} onDuplicate={() => onDuplicate(d.publicId)} onPin={onPin ? () => onPin(d.publicId, !d.pinned) : undefined} />
+        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.publicId)} onDuplicate={(withPool) => onDuplicate(d.publicId, withPool)} onPin={onPin ? () => onPin(d.publicId, !d.pinned) : undefined} />
       ))}
       {showNew && <NewDeckTile onNew={onNew} />}
     </div>
   );
 }
 
-function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void; onDuplicate: () => void; onPin?: () => void }) {
+function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void; onDuplicate: (withPool: boolean) => void; onPin?: () => void }) {
+  // The copy button asks what to copy: the whole deck, or the list alone.
+  const [copyMenu, setCopyMenu] = useState(false);
   const colors = deck.colors?.length ? deck.colors : ["C"];
   const field = getIdentityField(colors.join(""));
   const count = deck._count?.cards || 0;
@@ -883,9 +889,11 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
         </button>
         <button
           className="tile-action"
-          onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+          onClick={(e) => { e.stopPropagation(); setCopyMenu((v) => !v); }}
           title="Duplicate deck"
           aria-label="Duplicate deck"
+          aria-haspopup="menu"
+          aria-expanded={copyMenu}
           style={{
             position: "absolute",
             top: 10,
@@ -906,6 +914,34 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
         >
           <Copy size={15} strokeWidth={2.25} />
         </button>
+        {copyMenu && (
+          <>
+            <div onClick={() => setCopyMenu(false)} style={{ position: "fixed", inset: 0, zIndex: 4 }} />
+            <div
+              role="menu"
+              aria-label="Duplicate"
+              className="id-card"
+              style={{ position: "absolute", top: 46, right: 10, zIndex: 5, width: 214, padding: 6, display: "flex", flexDirection: "column", gap: 2, background: "var(--bg)", borderRadius: 12, boxShadow: "0 14px 32px -10px rgba(0,0,0,.45), inset 0 0 0 1px var(--line)" }}
+            >
+              {[
+                { label: "Duplicate deck", note: "The list and the pool", pool: true },
+                { label: "Duplicate without pool", note: "Only the cards in the deck", pool: false },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  role="menuitem"
+                  type="button"
+                  className="tools-item"
+                  onClick={(e) => { e.stopPropagation(); setCopyMenu(false); onDuplicate(o.pool); }}
+                  style={{ textAlign: "left", padding: "8px 10px", borderRadius: 8, border: "none", background: "transparent", color: "var(--t1, var(--text))", cursor: "pointer" }}
+                >
+                  <div style={{ fontSize: 13.5, fontWeight: 700 }}>{o.label}</div>
+                  <div style={{ fontSize: 12, color: "var(--t3, var(--text-muted))", marginTop: 1 }}>{o.note}</div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
         <button
           className="tile-action"
           onClick={(e) => { e.stopPropagation(); onDelete(); }}
