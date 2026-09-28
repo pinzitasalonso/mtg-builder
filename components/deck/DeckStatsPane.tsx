@@ -14,6 +14,7 @@
 //     combos. Last, because they're long, and the numbers are what you open
 //     this tab to glance at.
 
+import { useEffect, useRef } from "react";
 import {
   InsightAnalysis,
   InsightEightByEight,
@@ -84,10 +85,13 @@ export default function DeckStatsPane({
   const insight = useDeckInsight(deckId, insightCards);
   const stats = deckStats(deckCards);
 
-  const showPrimer = primerOpen || Boolean(primer) || !canEdit;
-  // An owner with no primer and no readings gets no section — the Tools menu
-  // is how you start one, the same as before this pane existed.
-  const showPlay = showPrimer || insight.hasPlayReadings || Boolean(insight.scan?.analysis);
+  // The primer always shows, now that an empty one offers to write itself
+  // with the AI: an owner with none sees the offer, a viewer sees the owner's
+  // (or that there isn't one). Tools → Primer brings it into view.
+  const primerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (primerOpen) requestAnimationFrame(() => primerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, [primerOpen]);
 
   if (deckCards.length === 0) {
     return (
@@ -151,17 +155,15 @@ export default function DeckStatsPane({
         </StatSection>
       </div>
 
-      {showPlay && (
-        <StatSection title="How it plays">
+      <StatSection title="How it plays">
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {showPrimer && (
+            <div ref={primerRef} style={{ scrollMarginTop: 90 }}>
               <DeckPrimer deckId={deckId} primer={primer} canEdit={canEdit} onSaved={onPrimerSaved} />
-            )}
+            </div>
             {insight.scan?.analysis && <InsightAnalysis analysis={insight.scan.analysis} />}
             <InsightPlay insight={insight} />
           </div>
         </StatSection>
-      )}
     </div>
   );
 }

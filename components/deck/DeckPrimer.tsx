@@ -13,6 +13,7 @@
    a primer is for reading, not for adding cards. */
 
 import { useMemo, useRef, useState } from "react";
+import { Sparkles, Square } from "lucide-react";
 import { Block, InlineToken, parseBlocks } from "@/lib/chat-markdown";
 import { ghostBtn, goldBtn } from "./ui";
 
@@ -35,6 +36,54 @@ export default function DeckPrimer({
   // Which text the server currently holds, so re-saving an unchanged primer
   // doesn't fire a PATCH.
   const saved = useRef(primer);
+  // Drafting with the AI: the draft streams in (shown rendered), then opens in
+  // the editor to change and save. Nothing is saved until Save.
+  const [drafting, setDrafting] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [fromAi, setFromAi] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const writeWithAi = async () => {
+    setAiError("");
+    setFailed(false);
+    setDraft("");
+    setEditing(true);
+    setDrafting(true);
+    setFromAi(true);
+    const abort = new AbortController();
+    abortRef.current = abort;
+    let text = "";
+    try {
+      const res = await fetch(`/api/decks/${deckId}/primer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+        signal: abort.signal,
+      });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Couldn’t write a draft right now.");
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+        setDraft(text);
+      }
+    } catch (e) {
+      if (!abort.signal.aborted) setAiError(e instanceof Error ? e.message : "Couldn’t write a draft right now.");
+      // Nothing came: back to what was there.
+      if (!text.trim()) {
+        setDraft(primer);
+        setEditing(false);
+      }
+    } finally {
+      abortRef.current = null;
+      setDrafting(false);
+    }
+  };
 
   const save = async (text: string) => {
     if (text === saved.current) {
@@ -67,14 +116,32 @@ export default function DeckPrimer({
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {failed && <span className="id-label" style={{ fontSize: 10, color: "var(--danger)" }}>Didn’t save</span>}
           {canEdit && !editing && (
+            <>
+              <button
+                style={{ ...ghostBtn, padding: "6px 14px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}
+                onClick={() => void writeWithAi()}
+                title={has ? "Draft a new primer from the deck (you review it before it replaces this one)" : "Draft a primer from the deck"}
+              >
+                <Sparkles size={14} strokeWidth={2.25} /> {has ? "Rewrite with AI" : "Write with AI"}
+              </button>
+              <button
+                style={{ ...ghostBtn, padding: "6px 14px", fontSize: 13 }}
+                onClick={() => { setDraft(primer); setFromAi(false); setEditing(true); }}
+              >
+                {has ? "Edit" : "Write one"}
+              </button>
+            </>
+          )}
+          {drafting && (
             <button
-              style={{ ...ghostBtn, padding: "6px 14px", fontSize: 13 }}
-              onClick={() => { setDraft(primer); setEditing(true); }}
+              key="stop"
+              style={{ ...ghostBtn, padding: "6px 14px", fontSize: 13, display: "inline-flex", alignItems: "center", gap: 6 }}
+              onClick={(e) => { e.preventDefault(); abortRef.current?.abort(); }}
             >
-              {has ? "Edit" : "Write one"}
+              <Square size={11} strokeWidth={0} fill="currentColor" /> Stop
             </button>
           )}
-          {editing && (
+          {editing && !drafting && (
             <>
               <button style={{ ...ghostBtn, padding: "6px 14px", fontSize: 13 }} onClick={() => setEditing(false)}>
                 Cancel
@@ -87,7 +154,22 @@ export default function DeckPrimer({
         </div>
       </div>
 
-      {editing ? (
+      {aiError && <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--danger)" }}>{aiError}</p>}
+      {drafting ? (
+        draft ? (
+          <PrimerMarkdown text={draft} />
+        ) : (
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--w-3)", display: "flex", alignItems: "center", gap: 8 }}>
+            <Sparkles size={14} strokeWidth={2.25} style={{ animation: "mn-blink 1.1s infinite" }} /> Reading the deck and writing a draft…
+          </p>
+        )
+      ) : editing ? (
+        <>
+        {fromAi && (
+          <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--w-3)" }}>
+            AI draft — change anything you like, then Save. {has ? "Cancel keeps the primer you had." : "Cancel throws it away."}
+          </p>
+        )}
         <textarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
@@ -95,6 +177,7 @@ export default function DeckPrimer({
           rows={14}
           style={{ width: "100%", border: "none", outline: "none", resize: "vertical", background: "transparent", fontFamily: "var(--font-body)", fontSize: 14.5, lineHeight: 1.6, color: "var(--text)", minHeight: 220, padding: 0 }}
         />
+        </>
       ) : has ? (
         <PrimerMarkdown text={primer} />
       ) : (
