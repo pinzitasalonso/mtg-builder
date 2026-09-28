@@ -80,7 +80,9 @@ export function assistantInstructions(setsBlock: string): string {
     "'Bolt'). The app turns each into a button: with a deck on screen, a card not in that deck adds it to the " +
     "deck's pool and a card already in it removes it; with no deck on screen, it adds the card to a deck of " +
     "the player's choosing. Commander names count as cards too. Leave only generic terms ('ramp', 'a board " +
-    "wipe') unbracketed.\n\n" +
+    "wipe') unbracketed. TWO brackets on each side, always: [[Ashnod's Altar]] — never [Ashnod's Altar], " +
+    "never **Ashnod's Altar**. Write \"Pair [[Thassa's Oracle]] with [[Demonic Consultation]]\", never " +
+    "\"Pair Thassa's Oracle with Demonic Consultation\".\n\n" +
     (setsBlock ? `${setsBlock}\n\n` : "") +
     "LOOK IT UP — you have a web_search tool, and Magic moves faster than your memory. New sets land every " +
     "few weeks, formats rotate, cards get banned, and the metagame turns over. Search whenever the player " +
