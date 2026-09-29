@@ -9,7 +9,14 @@ Each file in `decks/` is one deck with what it SHOULD read — DeckCheck's scan
 of the same list where we have one, or a rubric anchor (a precon reads about
 5, cEDH above 8.5) where we do not. `npm run calibrate` scores every deck and
 prints, per deck, each axis against the reference and the counts behind it.
-It fails when an axis is out of tolerance.
+It fails when an axis is out of tolerance, and when the Score moves on an
+edit that changes nothing: every deck is also scored with its rows reversed
+(must match exactly) and with one basic swapped for its snow version (the
+index may move 0.1 at most).
+
+The references are DeckCheck CRISPI scans from early September 2026.
+DeckCheck retired CRISPI on 18 September for its Threat Index, so new
+DeckCheck scans read on a different scale and can't be added as they are.
 
 It hits Scryfall and Commander Spellbook, cached in `.cache.json` after the
 first run, so it stays out of `npm test`.
