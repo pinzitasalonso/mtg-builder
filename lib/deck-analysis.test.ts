@@ -63,15 +63,18 @@ describe("judgement bounds", () => {
     expect(boundJudgement({ commanderDependency: "moderate" }, "moderate").commanderDependency).toBeUndefined();
   });
 
-  it("applies to the report, and the working says so", () => {
+  it("shows beside the report and leaves the number alone", () => {
     const cards = deck();
     const computed = scoreDeck(cards, [], 2);
     const judged = scoreDeck(cards, [], 2, judgementFrom({
       analysis: { overview: "x", strategy: [], mulligan: [], keyCards: [], tips: [], weaknesses: { critical: [], minor: [] }, axes: [] },
       judgement: { fundamentalTurn: computed.fundamentalTurn - 4, turnReason: "Sneak Attack package.", commanderDependency: "high", dependencyReason: "Voltron." },
     }, computed.fundamentalTurn));
-    expect(judged.fundamentalTurn).toBe(computed.fundamentalTurn - 2);
-    expect(judged.speed).toBeGreaterThanOrEqual(computed.speed);
+    // Measured only: an unchanged list scores the same whatever the analysis says.
+    expect(judged.fundamentalTurn).toBe(computed.fundamentalTurn);
+    expect(judged.speed).toBe(computed.speed);
+    expect(judged.index).toBe(computed.index);
+    expect(judged.resilience).toBe(computed.resilience);
     const speed = judged.axes.find((a) => a.key === "speed")!;
     expect(speed.facts.some((f) => f.includes("Sneak Attack package"))).toBe(true);
     const resilience = judged.axes.find((a) => a.key === "resilience")!;

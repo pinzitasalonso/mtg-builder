@@ -174,7 +174,8 @@ export const ANALYSIS_INSTRUCTIONS =
   "- tips: 3–6 practical lines — sequencing, what to hold up, when to commit, political reads.\n" +
   "- weaknesses: critical (things that beat the deck outright) and minor (annoyances). 1–3 each, each naming the kind of card or play.\n" +
   "- axes: one note per axis (consistency, resilience, interaction, speed): one or two sentences reading the number against the deck — what it gets right, what it misses, what the player would change to move it.\n\n" +
-  "The judgement. The rubric leaves two calls to a reader, and you make them:\n" +
+  "The judgement. The rubric leaves two calls to a reader, and you make them. They are shown beside the Score with your reason; " +
+  "they do not change the number, which is measured, so say plainly where you think the measurement is wrong:\n" +
   "- fundamentalTurn: the turn this deck takes its first player out of the game in at least half of its games with no disruption. " +
   "Start from the computed turn (a goldfish simulation that does not model reanimation, cost reducers, cheating threats " +
   "into play, extra turns, or the player's notes). Move it only when the list or the notes give a concrete reason — " +
