@@ -203,10 +203,14 @@ describe("resilience", () => {
 });
 
 describe("deckScore", () => {
-  it("averages the four onto the quarter grid", () => {
+  it("averages the four to two decimals, the way DeckCheck's sheet reads", () => {
     const r = deckScore({ speed: 7, consistency: 6, interaction: 7, resilience: 5 });
     expect(r.index).toBe(6.25);
     expect(r.display).toBe("6.25");
+    // Braids on DeckCheck: 6 / 9.75 / 8.75 / 7 reads 7.88, not 8.
+    expect(deckScore({ speed: 7, consistency: 6, interaction: 8.75, resilience: 9.75 }).index).toBe(7.88);
+    // Two decks an eighth apart no longer tie on the quarter grid.
+    expect(deckScore({ speed: 4, consistency: 5, interaction: 5.5, resilience: 4 }).display).toBe("4.63");
   });
 
   it("caps speed at 8 when consistency is 7 or lower", () => {

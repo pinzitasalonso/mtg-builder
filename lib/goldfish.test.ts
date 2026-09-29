@@ -25,6 +25,36 @@ describe("goldfish", () => {
     expect(a.wonByTurn).toEqual(b.wonByTurn);
   });
 
+  it("deals the same games however the list is ordered", () => {
+    const reads = classify(beatdown()).reads;
+    const a = goldfish(reads, [], { hands: 200 });
+    const b = goldfish([...reads].reverse(), [], { hands: 200 });
+    expect(b.fundamentalTurn).toBe(a.fundamentalTurn);
+    expect(b.wonByTurn).toEqual(a.wonByTurn);
+  });
+
+  it("doesn't care what order the combo lines and their outlets arrive in", () => {
+    const reads = classify(beatdown()).reads;
+    const lines = [
+      { pieces: ["Bear 1", "Bear 2"], manaNeeded: 2, lethal: true, anyOf: ["Bear 3", "Bear 4"] },
+      { pieces: ["Bear 5", "Bear 6"], manaNeeded: 4, lethal: true, anyOf: ["Bear 7"] },
+    ];
+    const flipped = [...lines].reverse().map((l) => ({ ...l, anyOf: [...l.anyOf].reverse() }));
+    const a = goldfish(reads, lines, { hands: 200 });
+    const b = goldfish(reads, flipped, { hands: 200 });
+    expect(b.wonByTurn).toEqual(a.wonByTurn);
+  });
+
+  it("reads the turn continuously, so a no-op rename barely moves it", () => {
+    const base = beatdown();
+    // Rename one land: same card, different name, so a different place in the
+    // shuffled order. The old list-hash seed dealt entirely new hands here.
+    const renamed = base.map((c) => (c.name === "Forest 0" ? { ...c, name: "Snow-Covered Forest" } : c));
+    const a = goldfish(classify(base).reads, []).fundamentalTurn;
+    const b = goldfish(classify(renamed).reads, []).fundamentalTurn;
+    expect(Math.abs(a - b)).toBeLessThanOrEqual(0.2);
+  });
+
   it("reads a pile of bears as a battlecruiser clock", () => {
     const r = goldfish(classify(beatdown()).reads, [], { hands: 120 });
     expect(r.fundamentalTurn).toBeGreaterThanOrEqual(7);
@@ -47,8 +77,9 @@ describe("goldfish", () => {
     const lines = [{ pieces: ["Thassa's Oracle", "Demonic Consultation"], manaNeeded: 0, lethal: true }];
     const r = goldfish(classify(deck).reads, lines, { hands: 120 });
     expect(r.comboWins).toBeGreaterThan(r.combatWins);
-    // Sixteen live cards in ninety-nine, ten cantrips: two live by turn 6 in half the hands.
-    expect(r.fundamentalTurn).toBeLessThanOrEqual(7);
+    // Sixteen live cards in ninety-nine, ten cantrips: two live by turn 6 or 7
+    // in half the hands. The turn reads continuously now, so "turn 7" is up to 7.35.
+    expect(r.fundamentalTurn).toBeLessThanOrEqual(7.5);
     const slow = goldfish(classify(beatdown()).reads, [], { hands: 120 });
     expect(r.fundamentalTurn).toBeLessThan(slow.fundamentalTurn);
   });
@@ -92,6 +123,19 @@ describe("goldfish", () => {
     expect(sim["Walking Ballista"]!.sink).toBe(true);
     expect(sim["Stroke of Genius"]!.sink).toBe(true);
     expect(sim["Mind Stone"]!.sink).toBe(false);
+  });
+
+  it("reads a Heartwood token as a mana rock, and its maker as a creature", () => {
+    const reads = classify([
+      ...lands(36),
+      card("Hungering Puppetbeast", { typeLine: "Artifact Creature — Beast Construct", oracleText: 'When this creature enters, create a Heartwood token. (It\'s a red and green artifact with "{T}: Add {R} or {G}.")', manaCost: "{3}", manaValue: 3 }),
+      card("Tenured Tethermage", { typeLine: "Creature — Human Artificer", oracleText: "When this creature enters, you may sacrifice a land. If you do, create two tapped Heartwood tokens.", manaCost: "{2}", manaValue: 2 }),
+    ]).reads;
+    const sim = Object.fromEntries(reads.map((r) => [r.card.name, toSimCard(r)]));
+    expect(sim["Hungering Puppetbeast"]!.rock).toBe(1);
+    expect(sim["Hungering Puppetbeast"]!.creature).toBe(true);
+    expect(sim["Tenured Tethermage"]!.rock).toBe(2);
+    expect(sim["Tenured Tethermage"]!.entersTapped).toBe(true);
   });
 
   it("refuses to goldfish a list that is not a deck", () => {

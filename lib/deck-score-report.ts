@@ -57,12 +57,15 @@ function lineMana(manaNeeded: string): number {
 }
 
 /**
- * The two judgements the rubric leaves to a reader, applied on top of the
- * computed read — within bounds. The goldfish's turn can move by at most two
- * turns either way (it does not see reanimation, Show and Tell, or the
- * player's notes) and commander dependency by one step, and each carries the
- * reason it moved, which the working shows. Wider than that and the number
- * would be the judgement rather than the deck.
+ * The two judgements the rubric leaves to a reader: the analysis's own read
+ * of the fundamental turn and of commander dependency, each with its reason.
+ *
+ * SHOWN, NOT APPLIED. They used to move the Score within bounds (two turns,
+ * one dependency step), which made the number depend on a model's reading
+ * that differs from one scan to the next: rescanning an unchanged list could
+ * move it. The Score is now measured only, so the same list always scores
+ * the same, and the analysis's view sits in the working beside it, clamped
+ * to the same bounds so it reads as a correction, not a second opinion.
  */
 export interface Judgement {
   /** Up to two turns either way on the goldfish's fundamental turn, on the half-turn grid. */
@@ -99,8 +102,8 @@ export function scoreDeck(
   judgement: Judgement = {}
 ): DeckScoreReport {
   const c = classify(cards, lines);
+  // The analysis's reads, bounded, for the working only. See `Judgement`.
   const j = boundJudgement(judgement, c.resilience.commanderDependency);
-  if (j.commanderDependency) c.resilience.commanderDependency = j.commanderDependency;
 
   const consistency = consistencyReading(c.consistency);
   const interaction = interactionReading(c.interaction);
@@ -125,7 +128,7 @@ export function scoreDeck(
     return { pieces: l.pieces, manaNeeded: lineMana(l.manaNeeded), lethal: false };
   });
   const fish = goldfish(c.reads, goldfishLines);
-  const fundamentalTurn = Math.max(1, Math.min(14, fish.fundamentalTurn + (j.turnDelta ?? 0)));
+  const fundamentalTurn = fish.fundamentalTurn;
   const speed = speedFromFundamentalTurn(fundamentalTurn);
 
   const result = deckScore({
@@ -178,16 +181,20 @@ export function scoreDeck(
       ? `${plural(c.comboLines.total, "win line")} count as ${trim(c.comboLines.counted)}${c.comboLines.clunky ? ` (${c.comboLines.clunky} clunky at half)` : ""}${c.comboLines.sharedFailure ? ", sharing a point of failure" : ""}; ${trim(resilience.effectiveLines)} after the tutor-access adjustment.`
       : "No combo line that wins or goes infinite.",
     `Combat rows: ${trim(combat.threats)} threats, ${combat.protectionCards} protection cards (${combat.protectionEffective} effective), ${trim(combat.recursionPoints)} recursion points with ${plural(combat.rebuildEngines, "rebuild engine")}, ${plural(combat.boardLevelProtection, "board-level protection effect")}.`,
-    j.commanderDependency
-      ? `Commander dependency read as ${j.commanderDependency} rather than the computed ${c.commanderDependencyReason.split(":")[0]!.toLowerCase()}: ${j.dependencyReason ?? "the scan's judgement"}.`
-      : `Commander dependency: ${c.commanderDependencyReason}`,
+    `Commander dependency: ${c.commanderDependencyReason}`,
   ];
+  if (j.commanderDependency) {
+    resilienceFacts.push(`The analysis reads commander dependency as ${j.commanderDependency}: ${j.dependencyReason ?? "no reason given"}. The Score keeps the computed read, so the same list always scores the same.`);
+  }
   if ((c.resilience.engineExposure ?? 0) < 0 && c.exposure.className) {
     resilienceFacts.push(`Engine exposure ${c.resilience.engineExposure}: ${Math.round(c.exposure.share * 100)}% of the nonland cards are ${c.exposure.className}-based with ${plural(c.exposure.answers, "answer")} to an artifact or enchantment.`);
   }
 
   const speedFacts = [...fish.notes];
-  if (j.turnDelta) speedFacts.push(`Read as turn ${trim(fundamentalTurn)} rather than the goldfish's ${trim(fish.fundamentalTurn)}: ${j.turnReason ?? "the scan's judgement"}.`);
+  if (j.turnDelta) {
+    const read = Math.max(1, Math.min(14, fish.fundamentalTurn + j.turnDelta));
+    speedFacts.push(`The analysis reads it as turn ${trim(read)}: ${j.turnReason ?? "no reason given"}. The Score keeps the goldfish's turn, so the same list always scores the same.`);
+  }
   if (speed !== result.speed) speedFacts.push(`Speed ${trim(speed)} capped at 8: Consistency is ${trim(consistency.score)} and a turn-3 deck needs a 7.5 or better.`);
 
   const axes: AxisReport[] = [

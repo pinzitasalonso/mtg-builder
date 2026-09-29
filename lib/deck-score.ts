@@ -497,7 +497,10 @@ export interface DeckScoreResult extends AxisScores {
  */
 export function deckScore(scores: AxisScores): DeckScoreResult {
   const speed = scores.speed >= 9 && scores.consistency <= 7 ? 8 : scores.speed;
-  const index = snapQuarter((speed + scores.consistency + scores.interaction + scores.resilience) / 4);
+  // The plain average, to two decimals — DeckCheck's own sheet reads 7.88
+  // for 6 / 9.75 / 8.75 / 7, not 8. Snapping it to the quarter grid the
+  // axes live on tied decks that differ: 4.63 and 4.75 both read 4.75.
+  const index = Math.round(((speed + scores.consistency + scores.interaction + scores.resilience) / 4) * 100) / 100;
   return {
     ...scores,
     speed,

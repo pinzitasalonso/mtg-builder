@@ -32,8 +32,8 @@ export const runtime = "nodejs";
 // ON DEMAND, not on every visit. A scan is a Scryfall call, a Spellbook call,
 // a few hundred goldfish hands and a model pass, and it is metered: one a day
 // on the free plan, unlimited on Pro. GET reads what the last scan stored;
-// POST runs a new one. The rubric half is deterministic, so a re-scan of an
-// unchanged list moves only where the analysis and the judgement do.
+// POST runs a new one. The Score is measured only, so a re-scan of an
+// unchanged list gives the same number; only the written analysis changes.
 //
 // The meter is spent before the model runs and given back if the analysis
 // fails — a scan that produced nothing is not one the player used.
@@ -145,7 +145,8 @@ export async function POST(
       `[scan] deck=${deck.publicId} in=${response.usage.input_tokens} cache_read=${response.usage.cache_read_input_tokens ?? 0} out=${response.usage.output_tokens}`
     );
 
-    // The Score again, with the judgement applied within bounds.
+    // The Score again, with the analysis's two reads written into the working.
+    // They don't move the number: the same list always scores the same.
     const score = scoreDeck(cards, combos.combos, rulesBracket, judgementFrom(parsed, computed.fundamentalTurn));
     const scan: DeckScan = {
       score,

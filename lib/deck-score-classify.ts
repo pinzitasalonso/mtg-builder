@@ -135,14 +135,22 @@ function read(card: ScoredCard): Read {
 const has = (r: Read, re: RegExp): boolean => re.test(r.text);
 const firstHas = (r: Read, re: RegExp): boolean => re.test(r.first);
 
+/**
+ * The text's lines with any ability word taken off the front: "Landfall —
+ * Whenever a land…", "Constellation — Whenever…", "Channel — {1}{G}, Discard…".
+ * An ability word has no rules meaning, and left on it hid the trigger or
+ * the cost behind it from every check below.
+ */
+const abilityLines = (r: Read): string[] => r.text.split("\n").map((line) => line.replace(/^[a-z][a-z' -]* — /, ""));
+
 /** A line of the text that is an activated ability ("cost: effect"). */
 const activatedLine = (r: Read, re: RegExp): boolean =>
-  r.text.split("\n").some((line) => /^[^:]{1,80}:/.test(line) && re.test(line));
+  abilityLines(r).some((line) => /^[^:]{1,80}:/.test(line) && re.test(line));
 const triggeredLine = (r: Read, re: RegExp): boolean =>
-  r.text.split("\n").some((line) => /^(whenever|at the beginning of|when )/.test(line) && re.test(line));
+  abilityLines(r).some((line) => /^(whenever|at the beginning of|when )/.test(line) && re.test(line));
 const etbOnly = (r: Read, re: RegExp): boolean =>
-  r.text.split("\n").some((line) => /^when ~ enters/.test(line) && re.test(line)) &&
-  !r.text.split("\n").some((line) => /^(whenever|at the beginning of)/.test(line) && re.test(line)) &&
+  abilityLines(r).some((line) => /^when ~ enters/.test(line) && re.test(line)) &&
+  !abilityLines(r).some((line) => /^(whenever|at the beginning of)/.test(line) && re.test(line)) &&
   !activatedLine(r, re);
 const combatLine = (r: Read, re: RegExp): boolean =>
   r.text
@@ -165,6 +173,9 @@ export interface TutorReading {
 }
 
 const SEARCH = /search your library/;
+/** Digging the top of the library for a card and putting it into play or hand. */
+const DIG_TO_PLAY =
+  /(reveal cards from the top of your library until you reveal|look at the top (\w+|x) cards of your library)[^.]*\.[^.]*(put (that card|it|one of them|a [^.]*card from among them|[^.]* card from among them)[^.]*(onto the battlefield|into your hand))/;
 const LAND_TARGET = /\b(land|plains|island|swamp|mountain|forest|gate|locus|desert)\b/;
 const NONLAND_TARGET = /\b(nonland|creature|artifact|enchantment|instant|sorcery|planeswalker|permanent|card named|legendary|equipment|aura|spell)\b/;
 
@@ -303,6 +314,21 @@ export function drawReading(r: Read): DrawReading | null {
     if (r.isPermanent && !r.isCreature && !r.isLand && activatedLine(r, selectionText)) return { points: 3, kind: "selection" };
     return curatedDraw(r);
   }
+  // Empower Jace (Reality Fracture) puts loyalty on a Jace token whose −3
+  // draws a card and −1 surveils; the reminder text that says so is
+  // stripped, so the keyword is read here. A permanent that empowers on a
+  // repeating trigger or an activation is a draw engine; one empowerment is
+  // a one-shot, and a small one (under 3, not enough for the draw) is a
+  // surveil at best.
+  // On a Jace card itself the reader has already turned "Jace" into "~".
+  const EMPOWER = /\bempower (jace|~) (\d+|x)\b/;
+  const empower = r.text.match(EMPOWER);
+  if (empower) {
+    const repeatable = r.isPermanent && ((triggeredLine(r, EMPOWER) && !etbOnly(r, EMPOWER)) || activatedLine(r, EMPOWER));
+    if (repeatable) return curatedDraw(r) ?? { points: 4, kind: "engine" };
+    const amount = empower[2] === "x" ? 3 : Number(empower[2]);
+    return curatedDraw(r) ?? { points: 2, kind: amount >= 3 ? "oneshot" : "selection" };
+  }
   if (has(r, /investigate|create a clue/)) return { points: 2, kind: "oneshot" };
   // Impulse draw: exile the top and play it.
   if (has(r, /exile the top (card|two cards|three cards)[\s\S]{0,120}you may (play|cast)/)) {
@@ -366,7 +392,7 @@ const COUNTER = /counter target (spell|ability|activated|triggered|noncreature|c
 // or a combo. A colour hoser (Pyroblast, Hydroblast) counters only when the
 // table plays the colour: interaction, but not a counter suite.
 const REDIRECT = /change the targets? of target spell|choose new targets for target spell|gain control of target (noncreature )?spell/;
-const COLOUR_HOSER = /counter target (blue|black|red|green|white) (spell|instant|sorcery|creature spell|noncreature spell)|counter target spell if it's (blue|black|red|green|white)/;
+const COLOUR_HOSER = /counter target (blue|black|red|green|white)( or (blue|black|red|green|white))? (spell|instant|sorcery|creature spell|noncreature spell)|counter target spell if it's (blue|black|red|green|white)/;
 const WIPE = /(destroy|exile) (all|each) (creature|creatures|nonland permanent|nonland permanents|permanent|permanents|artifact|artifacts|enchantment|enchantments|other creatures|other permanents|artifacts and enchantments|artifacts, creatures, and enchantments|nontoken|creatures and planeswalkers)|each player sacrifices all|all creatures get -\d+\/-\d+|each creature gets -x\/-x|all creatures get -x\/-x|each creature gets -\d+\/-\d+|deals? \d+ damage to each creature/;
 const GRAVEYARD_HATE = /exile (target|all|each) (player's|opponent's|card|cards)[^.]*graveyard|exile all (cards from all )?graveyards|exile target card from a graveyard|exile each opponent's graveyard|cards in graveyards can't|from graveyards? can't/;
 const HAND_ATTACK = /target (player|opponent) (reveals|discards)|each opponent discards/;
@@ -743,9 +769,12 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
   // role of eight is +5 more, to +20. Tutor points, per DeckCheck's sheet.
   const roles: { role: string; count: number }[] = [];
   const subtypeCounts = new Map<string, number>();
+  // Every nonland card's subtypes, not just creatures': a Saga, Aura or
+  // Equipment theme the commander names is as much a role as a tribe is.
   for (const r of reads) {
-    if (!r.isCreature || r.isLand) continue;
-    const sub = (r.type.split("—")[1] ?? "").trim().split(/\s+/).filter(Boolean);
+    if (r.isLand) continue;
+    // Each face's subtypes: a Praetor whose back face is a Saga is both.
+    const sub = r.type.split(" // ").flatMap((face) => (face.split("—")[1] ?? "").trim().split(/\s+/)).filter(Boolean);
     for (const s of new Set(sub)) subtypeCounts.set(s, (subtypeCounts.get(s) ?? 0) + copies(r));
   }
   let tribe = { subtype: null as string | null, count: 0 };
@@ -828,7 +857,14 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
   for (const c of commanders) {
     const t = tutorReads.get(c);
     const d = drawReads.get(c);
-    if ((t && t.engine) || (d && d.kind === "selection" && activatedLine(c, /look at the top|scry|surveil/))) commandZoneEngine = "access";
+    // A commander that keeps turning the top of the library into the piece
+    // it wants — Tom Bombadil fetching the next Saga onto the battlefield,
+    // Kinnan's dig for a non-Human — is a repeatable battlefield tutor in
+    // all but wording: "reveal until", "look at the top", never "search".
+    const digsForPieces =
+      c.isPermanent &&
+      (triggeredLine(c, DIG_TO_PLAY) || activatedLine(c, DIG_TO_PLAY));
+    if ((t && t.engine) || digsForPieces || (d && d.kind === "selection" && activatedLine(c, /look at the top|scry|surveil/))) commandZoneEngine = "access";
     else if (d && (d.kind === "engine" || d.kind === "premium" || d.kind === "combat" || d.kind === "burst") && !commandZoneEngine) commandZoneEngine = "volume";
   }
   // Trigger amplifiers count only with 10+ cards in the amplified family.
