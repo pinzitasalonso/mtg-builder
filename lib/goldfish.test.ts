@@ -25,6 +25,24 @@ describe("goldfish", () => {
     expect(a.wonByTurn).toEqual(b.wonByTurn);
   });
 
+  it("deals the same games however the list is ordered", () => {
+    const reads = classify(beatdown()).reads;
+    const a = goldfish(reads, [], { hands: 200 });
+    const b = goldfish([...reads].reverse(), [], { hands: 200 });
+    expect(b.fundamentalTurn).toBe(a.fundamentalTurn);
+    expect(b.wonByTurn).toEqual(a.wonByTurn);
+  });
+
+  it("reads the turn continuously, so a no-op rename barely moves it", () => {
+    const base = beatdown();
+    // Rename one land: same card, different name, so a different place in the
+    // shuffled order. The old list-hash seed dealt entirely new hands here.
+    const renamed = base.map((c) => (c.name === "Forest 0" ? { ...c, name: "Snow-Covered Forest" } : c));
+    const a = goldfish(classify(base).reads, []).fundamentalTurn;
+    const b = goldfish(classify(renamed).reads, []).fundamentalTurn;
+    expect(Math.abs(a - b)).toBeLessThanOrEqual(0.2);
+  });
+
   it("reads a pile of bears as a battlecruiser clock", () => {
     const r = goldfish(classify(beatdown()).reads, [], { hands: 120 });
     expect(r.fundamentalTurn).toBeGreaterThanOrEqual(7);
@@ -47,8 +65,9 @@ describe("goldfish", () => {
     const lines = [{ pieces: ["Thassa's Oracle", "Demonic Consultation"], manaNeeded: 0, lethal: true }];
     const r = goldfish(classify(deck).reads, lines, { hands: 120 });
     expect(r.comboWins).toBeGreaterThan(r.combatWins);
-    // Sixteen live cards in ninety-nine, ten cantrips: two live by turn 6 in half the hands.
-    expect(r.fundamentalTurn).toBeLessThanOrEqual(7);
+    // Sixteen live cards in ninety-nine, ten cantrips: two live by turn 6 or 7
+    // in half the hands. The turn reads continuously now, so "turn 7" is up to 7.35.
+    expect(r.fundamentalTurn).toBeLessThanOrEqual(7.5);
     const slow = goldfish(classify(beatdown()).reads, [], { hands: 120 });
     expect(r.fundamentalTurn).toBeLessThan(slow.fundamentalTurn);
   });

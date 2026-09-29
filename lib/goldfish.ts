@@ -36,7 +36,7 @@ export interface GoldfishLine {
 }
 
 export interface GoldfishResult {
-  /** The fundamental turn, on the half-turn grid the rubric reads. 14 means "14 or later". */
+  /** The fundamental turn, to a tenth: where half the hands have taken a player out. 14 means "14 or later". */
   fundamentalTurn: number;
   /** Fraction of hands that had taken a player out by each turn (index = turn). */
   wonByTurn: number[];
@@ -96,6 +96,8 @@ interface SimCard {
 }
 
 const MAX_TURN = 14;
+/** The seed every deck is dealt from. Any constant does; it only has to be the same one. */
+const GOLDFISH_SEED = 0x5eed_cafe;
 
 /** mulberry32 — small, fast, and the same sequence for the same seed. */
 function rng(seed: number): () => number {
@@ -107,17 +109,6 @@ function rng(seed: number): () => number {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
-
-function hashNames(names: string[]): number {
-  let h = 2166136261;
-  for (const n of [...names].sort()) {
-    for (let i = 0; i < n.length; i++) {
-      h ^= n.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-  }
-  return h >>> 0;
 }
 
 const wordNumber = (w: string): number =>
@@ -329,8 +320,17 @@ export function goldfish(
   const nonland = reads.filter((r) => !r.isLand && !r.card.isCommander);
   const avgMv = nonland.length ? nonland.reduce((n, r) => n + r.mv * r.copies, 0) / nonland.reduce((n, r) => n + r.copies, 0) : 3;
   for (const c of deck) if (c.key === "ad nauseam") c.drawNow = Math.max(6, Math.min(16, Math.round(30 / Math.max(1, avgMv * 1.6))));
-  const hands = options.hands ?? 300;
-  const seed = options.seed ?? hashNames(reads.map((r) => `${r.key}x${r.copies}`));
+  // One seed for every deck, and the library in name order before it is
+  // shuffled. The seed used to be a hash of the list, so swapping an Island
+  // for a Snow-Covered Island dealt a different 300 hands and could move the
+  // Speed axis a full point on a deck nothing had changed about. Now a list
+  // deals the same games however its rows are ordered, a no-op edit barely
+  // moves them, and 2,000 hands leave the 50% crossing to within a few
+  // hundredths of a turn. The goldfish runs at ~0.1ms a hand, so this costs
+  // well under a second a scan.
+  const hands = options.hands ?? 2000;
+  const seed = options.seed ?? GOLDFISH_SEED;
+  deck.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
   const random = rng(seed);
 
   // Anything in the deck that pours infinite mana into a kill is an outlet
@@ -896,22 +896,23 @@ export function goldfish(
   const wonByTurn: number[] = new Array(MAX_TURN + 1).fill(0);
   for (const t of wonAt) for (let i = t; i <= MAX_TURN; i++) wonByTurn[i]! += 1 / hands;
 
-  // The fundamental turn: the first turn half the hands have taken a player
-  // out. When the turn before was already close, the deck straddles the two
-  // and reads the half-step; "if you are torn, take the slower turn" is the
-  // 0.35 below rather than 0.5.
-  let T = MAX_TURN;
+  // The fundamental turn: when half the hands have taken a player out.
+  //
+  // Read continuously. It used to be the first whole turn past 50%, or the
+  // half-step before it when the crossing fell in the first 35% of that turn —
+  // a cliff, and decks sitting on it flipped half a turn (a Speed point at the
+  // fast end) between one set of hands and the next. Now it is where the 50%
+  // line crosses, interpolated between turns, plus the same 0.35 as before:
+  // "if you are torn, take the slower turn". On average that reads exactly as
+  // the old rule did; it just no longer jumps.
+  let fundamentalTurn = MAX_TURN;
   for (let t = 1; t <= MAX_TURN; t++) {
     if (wonByTurn[t]! >= 0.5) {
-      T = t;
+      const before = t > 1 ? wonByTurn[t - 1]! : 0;
+      const p = (0.5 - before) / Math.max(1e-9, wonByTurn[t]! - before);
+      fundamentalTurn = Math.min(MAX_TURN, Math.round((t - 1 + p + 0.35) * 10) / 10);
       break;
     }
-  }
-  let fundamentalTurn = T;
-  if (wonByTurn[T]! >= 0.5 && T > 1) {
-    const before = wonByTurn[T - 1]!;
-    const p = (0.5 - before) / Math.max(1e-9, wonByTurn[T]! - before);
-    if (p <= 0.35) fundamentalTurn = T - 0.5;
   }
 
   const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
