@@ -33,6 +33,18 @@ describe("goldfish", () => {
     expect(b.wonByTurn).toEqual(a.wonByTurn);
   });
 
+  it("doesn't care what order the combo lines and their outlets arrive in", () => {
+    const reads = classify(beatdown()).reads;
+    const lines = [
+      { pieces: ["Bear 1", "Bear 2"], manaNeeded: 2, lethal: true, anyOf: ["Bear 3", "Bear 4"] },
+      { pieces: ["Bear 5", "Bear 6"], manaNeeded: 4, lethal: true, anyOf: ["Bear 7"] },
+    ];
+    const flipped = [...lines].reverse().map((l) => ({ ...l, anyOf: [...l.anyOf].reverse() }));
+    const a = goldfish(reads, lines, { hands: 200 });
+    const b = goldfish(reads, flipped, { hands: 200 });
+    expect(b.wonByTurn).toEqual(a.wonByTurn);
+  });
+
   it("reads the turn continuously, so a no-op rename barely moves it", () => {
     const base = beatdown();
     // Rename one land: same card, different name, so a different place in the

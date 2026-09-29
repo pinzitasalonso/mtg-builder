@@ -132,6 +132,24 @@ describe("calibration", () => {
           for (const g of a.cards) if (g.names.length) report.push(`    ${g.label}: ${g.names.join(", ")}`);
         }
 
+        // Stability: the Score must not move on edits that change nothing.
+        // The same list in reverse row order has to score identically, and
+        // one basic swapped for its snow version (same card, new name, so a
+        // new place in the shuffled library) may move the index by 0.1 at most.
+        const reversed = scoreDeck([...cards].reverse(), combos, 2);
+        if (reversed.index !== r.index || reversed.fundamentalTurn !== r.fundamentalTurn) {
+          axisIssues.push(`row order moved the Score: ${fmt(r.index)} → ${fmt(reversed.index)}`);
+        }
+        const basic = cards.find((c) => /^basic land/i.test(c.typeLine));
+        if (basic) {
+          const snow = { ...basic, name: `Snow-Covered ${basic.name}`, typeLine: basic.typeLine.replace(/^Basic Land/i, "Basic Snow Land"), quantity: 1 };
+          const swapped = cards.flatMap((c) => (c !== basic ? [c] : c.quantity > 1 ? [{ ...c, quantity: c.quantity - 1 }, snow] : [snow]));
+          const moved = scoreDeck(swapped, combos, 2);
+          const delta = Math.abs(moved.index - r.index);
+          report.push(`Stability: ${basic.name} → Snow-Covered moves the index ${fmt(delta)}, turn ${fmt(r.fundamentalTurn)} → ${fmt(moved.fundamentalTurn)}`);
+          if (delta > 0.1) axisIssues.push(`a no-op basic swap moved the index ${fmt(delta)}`);
+        }
+
         for (const a of axisIssues) report.push(`  ✗ ${a}`);
         if (!axisIssues.length) report.push("  ✓ within tolerance");
         for (const a of axisIssues) failures.push(`${deck.name}: ${a}`);

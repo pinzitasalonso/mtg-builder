@@ -330,19 +330,25 @@ export function goldfish(
   // well under a second a scan.
   const hands = options.hands ?? 2000;
   const seed = options.seed ?? GOLDFISH_SEED;
-  deck.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  const byKey = (a: SimCard, b: SimCard) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+  deck.sort(byKey);
+  commanders.sort(byKey);
   const random = rng(seed);
 
   // Anything in the deck that pours infinite mana into a kill is an outlet
   // for every line that makes it — the commander's own activation included.
   const sinkKeys = [...deck, ...commanders].filter((c) => c.sink).map((c) => c.key);
+  // Lines and their outlets in a canonical order, like the library: which
+  // outlet a line reaches for first must not depend on the order the caller
+  // listed the cards in.
   const lethalLines = lines
     .filter((l) => l.lethal && l.pieces.length > 0)
     .map((l) => ({
       pieces: l.pieces.map(nameKey),
       manaNeeded: l.manaNeeded,
-      anyOf: l.anyOf ? [...new Set([...l.anyOf.map(nameKey), ...sinkKeys])] : [],
-    }));
+      anyOf: l.anyOf ? [...new Set([...l.anyOf.map(nameKey), ...sinkKeys])].sort() : [],
+    }))
+    .sort((a, b) => (a.pieces.join("|") < b.pieces.join("|") ? -1 : a.pieces.join("|") > b.pieces.join("|") ? 1 : 0));
   const commanderKeys = new Set(commanders.map((c) => c.key));
   // A tutor that is itself a piece of a win line (Demonic Consultation) is
   // held for the line, never spent finding something else.
