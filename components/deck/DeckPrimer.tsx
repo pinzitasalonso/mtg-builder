@@ -16,6 +16,7 @@ import { useMemo, useRef, useState } from "react";
 import { Sparkles, Square } from "lucide-react";
 import { Block, InlineToken, parseBlocks } from "@/lib/chat-markdown";
 import { ghostBtn, goldBtn } from "./ui";
+import { GetProButton } from "@/components/GetPro";
 
 export default function DeckPrimer({
   deckId,
@@ -40,11 +41,14 @@ export default function DeckPrimer({
   // the editor to change and save. Nothing is saved until Save.
   const [drafting, setDrafting] = useState(false);
   const [aiError, setAiError] = useState("");
+  // The error is the free plan's daily AI budget: offer Pro beside it.
+  const [aiLimited, setAiLimited] = useState(false);
   const [fromAi, setFromAi] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const writeWithAi = async () => {
     setAiError("");
+    setAiLimited(false);
     setFailed(false);
     setDraft("");
     setEditing(true);
@@ -62,6 +66,7 @@ export default function DeckPrimer({
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
+        setAiLimited(data.code === "ai_limit");
         throw new Error(data.error || "Couldn’t write a draft right now.");
       }
       const reader = res.body.getReader();
@@ -154,7 +159,17 @@ export default function DeckPrimer({
         </div>
       </div>
 
-      {aiError && <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--danger)" }}>{aiError}</p>}
+      {aiError && (
+        <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--danger)" }}>
+          {aiError}
+          {aiLimited && (
+            <>
+              {" "}
+              <GetProButton onUpgraded={() => { setAiError(""); setAiLimited(false); }} />
+            </>
+          )}
+        </p>
+      )}
       {drafting ? (
         draft ? (
           <PrimerMarkdown text={draft} />

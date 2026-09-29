@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FREE_AI_PER_DAY, FREE_SCANS_PER_DAY, aiRemaining, isPro, scansRemaining, utcDay } from "./limits";
+import { FREE_AI_PER_DAY, FREE_SCANS_PER_DAY, aiLimitMsg, aiRemaining, deckLimitMsg, isPro, scanLimitMsg, scansRemaining, utcDay } from "./limits";
 
 describe("utcDay", () => {
   it("stamps the UTC calendar day", () => {
@@ -38,5 +38,18 @@ describe("scansRemaining", () => {
     expect(scansRemaining({ tier: "free", scanDay: "2026-07-10", scanCount: 1 }, now)).toBe(FREE_SCANS_PER_DAY);
     expect(scansRemaining({ tier: "free", scanDay: "2026-07-11", scanCount: 1 }, now)).toBe(0);
     expect(scansRemaining({ tier: "pro", scanDay: "2026-07-11", scanCount: 9 }, now)).toBeNull();
+  });
+});
+
+describe("limit messages", () => {
+  const all = [deckLimitMsg, aiLimitMsg, scanLimitMsg];
+  it("call Pro coming soon until the web paywall is on sale", () => {
+    for (const msg of all) expect(msg(false)).toContain("Spellpool Pro, coming soon,");
+  });
+  it("just name Pro once it's on sale — the client puts Get Pro beside it", () => {
+    for (const msg of all) {
+      expect(msg(true)).not.toContain("coming soon");
+      expect(msg(true)).toMatch(/Spellpool Pro (lifts the limit|makes scans unlimited)\.$/);
+    }
   });
 });

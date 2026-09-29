@@ -16,6 +16,7 @@ import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import PlaytestModal from "@/components/deck/PlaytestModal";
 import GameCodeModal from "@/components/deck/GameCodeModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
+import { GetProButton } from "@/components/GetPro";
 import AssistantScreen from "@/components/assistant/AssistantScreen";
 import { useAssistant, useAssistantFocus, type AssistantFocus } from "@/components/assistant/AssistantProvider";
 import DeckPrimer from "@/components/deck/DeckPrimer";
@@ -227,6 +228,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [generatedQuery, setGeneratedQuery] = useState("");
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
+  // The error is the free plan's daily AI budget: offer Pro beside it.
+  const [searchLimited, setSearchLimited] = useState(false);
   const [preview, setPreview] = useState<SearchCard | null>(null);
   const [searchMode, setSearchMode] = useState<SearchMode>("name");
   const [nameInput, setNameInput] = useState("");
@@ -490,6 +493,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       track("card_search");
       setSearching(true);
       setSearchError("");
+      setSearchLimited(false);
       setSearchResults([]);
       setGeneratedQuery("");
       setSources([]);
@@ -510,6 +514,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         const data = await res.json();
         if (!res.ok) {
           setSearchError(data.details?.details ?? data.error ?? "Search failed");
+          setSearchLimited(data.code === "ai_limit");
         } else {
           // In singleton decks, hide cards already in the deck — by id and by
           // name — so the swipe never offers a duplicate. Other formats allow
@@ -1380,7 +1385,22 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             )}
 
             {searchMode === "scryfall" && searchError && (
-              <div style={{ marginTop: 12 }}><ErrorNote>{searchError}</ErrorNote></div>
+              <div style={{ marginTop: 12 }}>
+                <ErrorNote>
+                  {searchError}
+                  {searchLimited && (
+                    <>
+                      {" "}
+                      <GetProButton
+                        onUpgraded={() => {
+                          setSearchError("");
+                          setSearchLimited(false);
+                        }}
+                      />
+                    </>
+                  )}
+                </ErrorNote>
+              </div>
             )}
             {searchMode === "scryfall" && !swipeOpen && searchResults.length > 0 && (
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, color: "var(--text-muted)" }}>

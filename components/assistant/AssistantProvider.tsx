@@ -89,6 +89,8 @@ export default function AssistantProvider({ children }: { children: React.ReactN
   const [isOpen, setIsOpen] = useState(false);
   const [focus, setFocusState] = useState<AssistantFocus | null>(null);
   const [sendError, setSendError] = useState("");
+  // The send error is the free plan's daily AI budget: offer Pro beside it.
+  const [aiLimited, setAiLimited] = useState(false);
   // A reply finished while the chat was closed: the pill says so.
   const [unseen, setUnseen] = useState(false);
   const [menu, setMenu] = useState<{ name: string; rect: DOMRect } | null>(null);
@@ -214,6 +216,7 @@ export default function AssistantProvider({ children }: { children: React.ReactN
       if (!content || running) return;
       track("ai_message");
       setSendError("");
+      setAiLimited(false);
       setInput("");
       const res = await fetch("/api/assistant", {
         method: "POST",
@@ -223,6 +226,7 @@ export default function AssistantProvider({ children }: { children: React.ReactN
       const data = res ? await res.json().catch(() => ({})) : {};
       if (!res || !res.ok) {
         setSendError(data.error || "The assistant is unavailable right now.");
+        setAiLimited(data.code === "ai_limit");
         setInput((cur) => cur || content);
         return;
       }
@@ -244,6 +248,7 @@ export default function AssistantProvider({ children }: { children: React.ReactN
     if (res?.ok) {
       setMessages([]);
       setSendError("");
+      setAiLimited(false);
     }
   }, []);
 
@@ -281,6 +286,12 @@ export default function AssistantProvider({ children }: { children: React.ReactN
   const chat: DeckChatController = {
     ...actions,
     error: sendError || actions.error,
+    aiLimited: aiLimited && Boolean(sendError),
+    dismissError: () => {
+      setSendError("");
+      setAiLimited(false);
+      actions.setError("");
+    },
     messages,
     input,
     setInput,

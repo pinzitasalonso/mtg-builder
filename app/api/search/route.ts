@@ -3,7 +3,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { mapPool } from "@/lib/async";
 import { currentUser } from "@/lib/auth";
 import { ANON_LIMIT_MSG, anonAiAllowed, clientIp } from "@/lib/ratelimit";
-import { AI_LIMIT_MSG } from "@/lib/limits";
+import { aiLimitMsg } from "@/lib/limits";
+import { proOnSale } from "@/lib/revenuecat";
 import { consumeAi } from "@/lib/limits-db";
 import { extractJson, messageText, strArr } from "@/lib/ai";
 import { OutCard, naturalToScryfall, resolveNamed, scryfallSearch } from "@/lib/scryfall";
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: ANON_LIMIT_MSG }, { status: 429 });
   }
   if (user && !(await consumeAi(user))) {
-    return NextResponse.json({ error: AI_LIMIT_MSG, code: "ai_limit" }, { status: 429 });
+    return NextResponse.json({ error: aiLimitMsg(proOnSale()), code: "ai_limit" }, { status: 429 });
   }
   const { prompt, filters, mode, currentDeck } = await req.json();
   if (!prompt || typeof prompt !== "string" || !prompt.trim()) {

@@ -17,7 +17,7 @@ export default function TermsPage() {
       <h1 className="id-display" style={{ fontSize: "clamp(34px,6vw,52px)", margin: "26px 0 4px", color: "var(--t1)" }}>
         Terms of Use
       </h1>
-      <p style={{ ...P, color: "var(--t3)" }}>Last updated July 17, 2026 · Applies to spellpool.com and the Spellpool iOS app.</p>
+      <p style={{ ...P, color: "var(--t3)" }}>Last updated September 24, 2026 · Applies to spellpool.com and the Spellpool iOS app.</p>
 
       <h2 style={H2}>The service</h2>
       <p style={P}>
@@ -36,12 +36,31 @@ export default function TermsPage() {
 
       <h2 style={H2}>Spellpool Pro (auto-renewing subscription)</h2>
       <p style={P}>
-        Spellpool Pro lifts the free plan&apos;s limits (synced decks and daily AI asks). It&apos;s an
-        auto-renewable subscription purchased through your Apple ID. Payment is charged to your Apple ID
-        at confirmation of purchase at the price shown; the subscription renews automatically unless
-        cancelled at least 24 hours before the end of the current period. Manage or cancel any time in
-        your Apple ID subscription settings. Cancelling stops future charges; access continues to the end
-        of the paid period. Refunds are handled by Apple under their standard terms.
+        Spellpool Pro lifts the free plan&apos;s limits (synced decks, daily AI asks and deck scans). It&apos;s
+        an auto-renewing subscription tied to your Spellpool account, so it applies on spellpool.com and in
+        the iOS app alike. You can buy it in either place, and the place you bought it is the one that
+        bills you.
+      </p>
+      <p style={P}>
+        <strong>In the iOS app</strong>, it&apos;s purchased through your Apple ID. Payment is charged to your
+        Apple ID at confirmation of purchase at the price shown; the subscription renews automatically
+        unless cancelled at least 24 hours before the end of the current period. Manage or cancel any time
+        in your Apple ID subscription settings. Refunds are handled by Apple under their standard terms.
+      </p>
+      <p style={P}>
+        <strong>On spellpool.com</strong>, our order process is conducted by our online reseller Paddle.com.
+        Paddle.com is the Merchant of Record for all our web orders: it takes the payment, handles sales tax
+        and VAT, and provides customer service for billing and returns, under its{" "}
+        <a href="https://www.paddle.com/legal/checkout-buyer-terms" style={{ color: "var(--gold)" }}>Buyer Terms</a>.
+        You&apos;re charged at confirmation of purchase at the price shown, then at the start of each period
+        until you cancel. Manage or cancel any time from{" "}
+        <Link href="/pro" style={{ color: "var(--gold)" }}>spellpool.com/pro</Link> or the link in your
+        Paddle receipt email. For a refund, contact Paddle at{" "}
+        <a href="https://paddle.net" style={{ color: "var(--gold)" }}>paddle.net</a>, or email us (below).
+      </p>
+      <p style={P}>
+        Either way, a free trial, when offered, becomes a paid subscription at its end unless you cancel
+        before then. Cancelling stops future charges; access continues to the end of the paid period.
       </p>
 
       <h2 style={H2}>AI answers</h2>

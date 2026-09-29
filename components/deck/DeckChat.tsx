@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Plus, Sparkles, Square, X, ZoomIn } from "lucide-react";
 import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
 import { Block, InlineToken, boldNamesIn, cardNamesIn, cutCandidates, flattenInline, normalizeCardKey, parseBlocks } from "@/lib/chat-markdown";
+import { GetProButton } from "@/components/GetPro";
 import { collectionByName } from "@/lib/scryfall";
 import { track } from "@/lib/track";
 import Link from "next/link";
@@ -41,6 +42,9 @@ export interface DeckChatController {
   setInput: React.Dispatch<React.SetStateAction<string>>;
   streaming: boolean;
   error: string;
+  /** The error is the free plan's daily AI budget — the moment to offer Pro. */
+  aiLimited: boolean;
+  dismissError: () => void;
   busy: Set<string>;
   bulkBusy: boolean;
   bulkProgress: { mode: "add" | "remove"; done: number; total: number } | null;
@@ -281,6 +285,8 @@ export function useDeckChat({
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  // The error is the free plan's daily AI budget: offer Pro beside it.
+  const [aiLimited, setAiLimited] = useState(false);
   const actions = useDeckActions({ deckId, pool, ownedNames, onPoolChanged, messages, streaming });
   const { setError } = actions;
 
@@ -294,6 +300,7 @@ export function useDeckChat({
     setInput("");
     setStreaming(true);
     setError("");
+    setAiLimited(false);
     const abort = new AbortController();
     abortRef.current = abort;
     try {
@@ -315,6 +322,7 @@ export function useDeckChat({
       });
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
+        if (data.code === "ai_limit") setAiLimited(true);
         throw new Error(data.error || "The assistant is unavailable right now.");
       }
       const reader = res.body.getReader();
@@ -355,7 +363,12 @@ export function useDeckChat({
     abortRef.current?.abort();
   }
 
-  return { ...actions, messages, input, setInput, streaming, send, stop };
+  function dismissError() {
+    setError("");
+    setAiLimited(false);
+  }
+
+  return { ...actions, messages, input, setInput, streaming, aiLimited, dismissError, send, stop };
 }
 
 /* One-tap prompts for the empty state. The deck judge lives here now — it used
@@ -404,6 +417,8 @@ export default function DeckChat({
     setInput,
     streaming,
     error,
+    aiLimited,
+    dismissError,
     busy,
     bulkBusy,
     bulkProgress,
@@ -521,7 +536,15 @@ export default function DeckChat({
       )}
 
       {error && (
-        <div style={{ fontSize: 13.5, color: "var(--danger)", padding: "0 2px" }}>{error}</div>
+        <div style={{ fontSize: 13.5, color: "var(--danger)", padding: "0 2px" }}>
+          {error}
+          {aiLimited && (
+            <>
+              {" "}
+              <GetProButton onUpgraded={dismissError} />
+            </>
+          )}
+        </div>
       )}
 
       {/* intro line + one-tap starters (only before the first message) */}

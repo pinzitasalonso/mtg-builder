@@ -12,6 +12,7 @@ import { forgetAll, peek, remember } from "@/lib/client-cache";
 import { forgetOfflineData, forgetSession, offlineSession, rememberSession } from "@/lib/offline-session";
 import LandingVisual from "@/components/LandingVisual";
 import CommanderInput from "@/components/CommanderInput";
+import { GetProButton, usePaywallAvailable } from "@/components/GetPro";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
 import { track } from "@/lib/track";
@@ -107,6 +108,8 @@ export default function HomePage() {
   }, [loaded, me, decks, publicDecks, collection]);
   const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
   const [creating, setCreating] = useState(false);
+  // Whether Pro is on sale on the web yet — until it is, it's "coming soon".
+  const [proOnSale] = usePaywallAvailable();
 
   async function loadCollection() {
     const c = await fetchCollection();
@@ -227,7 +230,7 @@ export default function HomePage() {
     return (
       <span
         className="home-meter"
-        title="Free plan. Spellpool Pro, coming soon, lifts both limits."
+        title={proOnSale ? "Free plan. Spellpool Pro lifts both limits." : "Free plan. Spellpool Pro, coming soon, lifts both limits."}
         style={{
           fontSize: 11.5,
           fontWeight: 600,
@@ -243,6 +246,17 @@ export default function HomePage() {
       </span>
     );
   })();
+
+  /// At the deck cap: the refusals below offer Pro right beside the reason,
+  /// the way iOS raises its paywall at the moment a limit is reached.
+  const atDeckCap = typeof me?.deckLimit === "number" && decks.length >= me.deckLimit;
+
+  /// A purchase from any Get Pro on this page: the caps and their errors go.
+  function upgraded() {
+    setCreateError("");
+    setListError("");
+    loadAll();
+  }
 
   // Pinned decks sort first; the list re-fetches so the order follows.
   async function pinDeck(id: string, pinned: boolean) {
@@ -310,15 +324,21 @@ export default function HomePage() {
             {me ? (
               <>
                 {me.tier === "pro" ? (
-                  <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.14em", color: "var(--accent-ink)", background: "var(--gold)", padding: "3px 8px", borderRadius: 999 }}>
+                  // The subscription's page (/pro) — where it's billed, when it
+                  // renews, and the link that manages it.
+                  <Link href="/pro" title="Manage Spellpool Pro" style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.14em", color: "var(--accent-ink)", background: "var(--gold)", padding: "3px 8px", borderRadius: 999, textDecoration: "none" }}>
                     PRO
-                  </span>
+                  </Link>
                 ) : (
                   // What the free plan has left, which the web never showed —
                   // so a player met both caps as a refusal rather than as a
                   // number they had been watching go down. iOS puts the same
                   // two figures in Account and beside the assistant's input.
-                  planMeter
+                  // Then the way past them, as iOS has Upgrade to Pro there.
+                  <>
+                    {planMeter}
+                    <GetProButton variant="pill" onUpgraded={upgraded} />
+                  </>
                 )}
                 <span className="home-email" title={me.email} style={{ fontSize: 13, color: "var(--t3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {me.email}
@@ -401,6 +421,15 @@ export default function HomePage() {
                   style={{ marginTop: 12, fontSize: 13.5, color: "var(--danger)", lineHeight: 1.45, cursor: "pointer", maxWidth: 520 }}
                 >
                   {listError}
+                  {atDeckCap && (
+                    <>
+                      {" "}
+                      {/* Not a click on the notice: that dismisses it. */}
+                      <span onClick={(e) => e.stopPropagation()}>
+                        <GetProButton onUpgraded={upgraded} />
+                      </span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -593,6 +622,12 @@ export default function HomePage() {
               {createError && (
                 <div style={{ fontSize: 13.5, color: "var(--danger)", lineHeight: 1.45, marginTop: 2 }}>
                   {createError}
+                  {atDeckCap && (
+                    <>
+                      {" "}
+                      <GetProButton onUpgraded={upgraded} />
+                    </>
+                  )}
                 </div>
               )}
               <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>

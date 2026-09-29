@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
-import { AI_LIMIT_MSG } from "@/lib/limits";
+import { aiLimitMsg } from "@/lib/limits";
+import { proOnSale } from "@/lib/revenuecat";
 import { consumeAi } from "@/lib/limits-db";
 import { INTERRUPTED_NOTE, getRun, runningForUser, startRun } from "@/lib/assistant-runner";
 
@@ -77,7 +78,7 @@ export async function POST(req: Request) {
       : null;
   // Metered after validation, so a malformed request doesn't cost a question.
   if (!(await consumeAi(user))) {
-    return NextResponse.json({ error: AI_LIMIT_MSG, code: "ai_limit" }, { status: 429 });
+    return NextResponse.json({ error: aiLimitMsg(proOnSale()), code: "ai_limit" }, { status: 429 });
   }
 
   const thread = (await latestThread(user.id)) ?? (await prisma.assistantThread.create({ data: { userId: user.id }, select: { id: true } }));
