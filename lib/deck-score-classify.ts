@@ -165,6 +165,9 @@ export interface TutorReading {
 }
 
 const SEARCH = /search your library/;
+/** Digging the top of the library for a card and putting it into play or hand. */
+const DIG_TO_PLAY =
+  /(reveal cards from the top of your library until you reveal|look at the top (\w+|x) cards of your library)[^.]*\.[^.]*(put (that card|it|one of them|a [^.]*card from among them|[^.]* card from among them)[^.]*(onto the battlefield|into your hand))/;
 const LAND_TARGET = /\b(land|plains|island|swamp|mountain|forest|gate|locus|desert)\b/;
 const NONLAND_TARGET = /\b(nonland|creature|artifact|enchantment|instant|sorcery|planeswalker|permanent|card named|legendary|equipment|aura|spell)\b/;
 
@@ -743,9 +746,12 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
   // role of eight is +5 more, to +20. Tutor points, per DeckCheck's sheet.
   const roles: { role: string; count: number }[] = [];
   const subtypeCounts = new Map<string, number>();
+  // Every nonland card's subtypes, not just creatures': a Saga, Aura or
+  // Equipment theme the commander names is as much a role as a tribe is.
   for (const r of reads) {
-    if (!r.isCreature || r.isLand) continue;
-    const sub = (r.type.split("—")[1] ?? "").trim().split(/\s+/).filter(Boolean);
+    if (r.isLand) continue;
+    // Each face's subtypes: a Praetor whose back face is a Saga is both.
+    const sub = r.type.split(" // ").flatMap((face) => (face.split("—")[1] ?? "").trim().split(/\s+/)).filter(Boolean);
     for (const s of new Set(sub)) subtypeCounts.set(s, (subtypeCounts.get(s) ?? 0) + copies(r));
   }
   let tribe = { subtype: null as string | null, count: 0 };
@@ -828,7 +834,14 @@ export function classify(cards: ScoredCard[], lines: ComboLineInput[] = []): Cla
   for (const c of commanders) {
     const t = tutorReads.get(c);
     const d = drawReads.get(c);
-    if ((t && t.engine) || (d && d.kind === "selection" && activatedLine(c, /look at the top|scry|surveil/))) commandZoneEngine = "access";
+    // A commander that keeps turning the top of the library into the piece
+    // it wants — Tom Bombadil fetching the next Saga onto the battlefield,
+    // Kinnan's dig for a non-Human — is a repeatable battlefield tutor in
+    // all but wording: "reveal until", "look at the top", never "search".
+    const digsForPieces =
+      c.isPermanent &&
+      (triggeredLine(c, DIG_TO_PLAY) || activatedLine(c, DIG_TO_PLAY));
+    if ((t && t.engine) || digsForPieces || (d && d.kind === "selection" && activatedLine(c, /look at the top|scry|surveil/))) commandZoneEngine = "access";
     else if (d && (d.kind === "engine" || d.kind === "premium" || d.kind === "combat" || d.kind === "burst") && !commandZoneEngine) commandZoneEngine = "volume";
   }
   // Trigger amplifiers count only with 10+ cards in the amplified family.

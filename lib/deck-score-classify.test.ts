@@ -64,6 +64,30 @@ describe("tutors", () => {
     expect(classify([...lands, entomb, reanimate(1), reanimate(2), reanimate(3)]).consistency.tutorPoints).toBe(4);
   });
 
+  it("reads a commander that digs the next piece onto the battlefield as an access engine", () => {
+    const tom = card("Tom Bombadil", {
+      isCommander: true,
+      typeLine: "Legendary Creature — God Bard",
+      oracleText:
+        "As long as there are four or more lore counters among Sagas you control, Tom Bombadil has hexproof and indestructible.\nWhenever the final chapter ability of a Saga you control resolves, reveal cards from the top of your library until you reveal a Saga card. Put that card onto the battlefield and the rest on the bottom of your library in a random order. This ability triggers only once each turn.",
+    });
+    expect(classify([...lands, tom]).consistency.commandZoneEngine).toBe("access");
+    // A commander with no such ability stays a plain commander.
+    expect(classify([...lands, card("Bear Lord", { isCommander: true })]).consistency.commandZoneEngine).toBeNull();
+  });
+
+  it("counts a Saga theme the commander names, back faces included, as a role", () => {
+    const tom = card("Tom Bombadil", { isCommander: true, oracleText: "Whenever the final chapter ability of a Saga you control resolves, draw a card." });
+    const sagas = Array.from({ length: 8 }, (_, i) => spell(`Saga ${i}`, "Enchantment — Saga", "I — Draw a card.", 3));
+    const backFaces = Array.from({ length: 2 }, (_, i) =>
+      card(`Praetor ${i}`, { typeLine: "Legendary Creature — Phyrexian Praetor // Enchantment — Saga" })
+    );
+    const c = classify([...lands, tom, ...sagas, ...backFaces]);
+    expect(c.redundancy.subtype).toBe("saga");
+    expect(c.redundancy.count).toBe(10);
+    expect(c.redundancy.bonus).toBe(10);
+  });
+
   it("adds the commander bonuses", () => {
     const c = classify(
       [...lands, card("Sisay", { isCommander: true, oracleText: "{W}{U}{B}{R}{G}: Search your library for a legendary permanent card, put it onto the battlefield, then shuffle." })],
