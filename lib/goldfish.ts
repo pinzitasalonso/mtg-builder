@@ -161,7 +161,9 @@ export function toSimCard(r: CardRead): SimCard {
   // Tokens: the clock of every go-wide deck, and the whole of Krenko's.
   const tok = t.match(/create (a|an|two|three|four|five|x|\d+|a number of|that many) (\d+)\/\d+ [^.]*tokens?/);
   if (tok) {
-    const line = t.split("\n").find((l) => /create (a|an|two|three|four|five|x|\d+|a number of|that many) \d+\/\d+/.test(l)) ?? t;
+    // Ability word off the front ("Landfall — Whenever…"), or the trigger
+    // reads as a one-time maker.
+    const line = (t.split("\n").find((l) => /create (a|an|two|three|four|five|x|\d+|a number of|that many) \d+\/\d+/.test(l)) ?? t).replace(/^[a-z][a-z' -]* — /, "");
     const byPower = /equal to (~'s|its|that creature's) power/.test(line);
     const byBoard = /where x is the number of (creatures|\w+s) you control|equal to the number of (creatures|\w+s) you control/.test(line);
     const amount: number | "board" | "power" = byPower ? "power" : byBoard ? "board" : /^(x|a number of|that many)$/.test(tok[1]!) ? 2 : wordNumber(tok[1]!);
@@ -227,6 +229,14 @@ export function toSimCard(r: CardRead): SimCard {
     card.ritualNet = card.ritualAmount - r.mv;
   }
   if (card.rock && /enters (the battlefield )?tapped/.test(t)) card.entersTapped = true;
+  // Heartwood tokens (Reality Fracture) are mana rocks: "{T}: Add {R} or {G}"
+  // — but that lives in reminder text, which the reader strips. A card that
+  // makes one when it arrives is a rock of that many; "tapped" ones wait a turn.
+  const heartwood = t.match(/create (a|an|one|two|three) (tapped )?heartwood tokens?/);
+  if (heartwood && card.rock === 0 && card.dork === 0) {
+    card.rock = wordNumber(heartwood[1]!);
+    if (heartwood[2]) card.entersTapped = true;
+  }
 
   // Land ramp spells and creatures.
   const ramp = t.match(/search your library for (up to )?(a|an|two|three|x) (basic )?(land|forest|plains|island|swamp|mountain)[^.]*(onto the battlefield|put (it|them|one of them|those cards) onto)/);
@@ -753,7 +763,9 @@ export function goldfish(
           mana -= c.mv;
           hand.splice(hand.indexOf(c), 1);
           if (c.rock > 0) rocks.push({ mana: c.rock, activeFrom: c.entersTapped ? t + 1 : t });
-          if (c.dork > 0) landPermanent(c);
+          // A creature that ramps (a dork, or one that makes a Heartwood
+          // token) is still a creature on the board.
+          if (c.dork > 0 || c.creature) landPermanent(c);
           else {
             battlefieldKeys.add(c.key);
             if (c.doubler === "nonland" || c.doubler === "all") doublerNonland += 1;

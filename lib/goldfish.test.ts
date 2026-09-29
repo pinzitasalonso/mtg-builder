@@ -125,6 +125,19 @@ describe("goldfish", () => {
     expect(sim["Mind Stone"]!.sink).toBe(false);
   });
 
+  it("reads a Heartwood token as a mana rock, and its maker as a creature", () => {
+    const reads = classify([
+      ...lands(36),
+      card("Hungering Puppetbeast", { typeLine: "Artifact Creature — Beast Construct", oracleText: 'When this creature enters, create a Heartwood token. (It\'s a red and green artifact with "{T}: Add {R} or {G}.")', manaCost: "{3}", manaValue: 3 }),
+      card("Tenured Tethermage", { typeLine: "Creature — Human Artificer", oracleText: "When this creature enters, you may sacrifice a land. If you do, create two tapped Heartwood tokens.", manaCost: "{2}", manaValue: 2 }),
+    ]).reads;
+    const sim = Object.fromEntries(reads.map((r) => [r.card.name, toSimCard(r)]));
+    expect(sim["Hungering Puppetbeast"]!.rock).toBe(1);
+    expect(sim["Hungering Puppetbeast"]!.creature).toBe(true);
+    expect(sim["Tenured Tethermage"]!.rock).toBe(2);
+    expect(sim["Tenured Tethermage"]!.entersTapped).toBe(true);
+  });
+
   it("refuses to goldfish a list that is not a deck", () => {
     const r = goldfish(classify([card("A"), card("B")]).reads, []);
     expect(r.hands).toBe(0);

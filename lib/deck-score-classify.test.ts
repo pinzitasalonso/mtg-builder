@@ -136,6 +136,23 @@ describe("draw", () => {
     expect(names).toContain("Barrier Breach · 2");
   });
 
+  it("reads Empower Jace as card flow, engine when it repeats", () => {
+    const reminder = ' (Put two loyalty counters on a Jace token you control. If you don\'t control one, first create a blue Jace planeswalker token with "[−1]: Surveil 1" and "[−3]: Draw a card.")';
+    const c = classify([
+      ...lands,
+      card("Keeper of the Quiet Hour", { typeLine: "Artifact Creature — Chimera", oracleText: `When this creature enters, empower Jace 2.${reminder}` }),
+      card("Avatar of Burgeoning Echoes", { typeLine: "Creature — Avatar", oracleText: `Landfall — Whenever a land you control enters, empower Jace 2.${reminder}` }),
+      card("Jace, Reality Sculptor", { typeLine: "Legendary Planeswalker — Jace", oracleText: "+1: Empower Jace X, where X is the number of Islands you control.\n−3: Until your next turn, whenever a creature attacks you or a planeswalker you control, it gets -5/-0 until end of turn.", power: null, toughness: null, manaValue: 4 }),
+      spell("Jace's Machinations", "Instant", `Until end of turn, you may activate loyalty abilities of Jace planeswalkers you control on any player's turn any time you could cast an instant.\nEmpower Jace 8.${reminder}`, 3),
+    ]);
+    const names = c.groups.draw?.names ?? [];
+    expect(names).toContain("Keeper of the Quiet Hour · 2");
+    expect(names).toContain("Avatar of Burgeoning Echoes · 4");
+    expect(names).toContain("Jace's Machinations · 2");
+    // Its own name is "~" to the reader, "Empower Jace" included.
+    expect(names).toContain("Jace, Reality Sculptor · 4");
+  });
+
   it("caps selection at thirty points", () => {
     const cantrips = Array.from({ length: 15 }, (_, i) => spell(`Cantrip ${i}`, "Instant", "Scry 1. Draw a card.", 1));
     expect(classify([...lands, ...cantrips]).consistency.drawPoints).toBe(30);
@@ -177,6 +194,12 @@ describe("interaction", () => {
     // Bolt Bend 1 (redirect) + 2 (free, listed) + 1 (instant), Pyroblast 1 (instant), Counterspell 3.
     expect(c.interaction.stackPoints).toBe(4 + 1 + 3);
     expect(c.resilience.stackProtectionPieces).toBe(2);
+  });
+
+  it("counts a two-colour hoser as interaction", () => {
+    const c = classify([...lands, spell("Precise Redaction", "Instant", "Counter target white or black spell.", 1)]);
+    expect(c.interaction.pieces).toBe(1);
+    expect(c.interaction.counterspells).toBe(0);
   });
 
   it("judges a creature-only wrath one-sided in a creature-light deck", () => {
