@@ -2043,11 +2043,6 @@ function DeckCardTile({
         radius={0}
         style={{ position: "absolute", inset: 0 }}
       />
-      {owned && (
-        <span title="In your collection" aria-label="In your collection" style={{ position: "absolute", top: 7, left: 7, display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, background: "rgba(13,138,95,.92)", color: "#fff", borderRadius: 999, boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}>
-          <Check size={14} strokeWidth={3} />
-        </span>
-      )}
       {onQty ? (
         <span
           onClick={(e) => e.stopPropagation()}
@@ -2090,7 +2085,7 @@ function DeckCardTile({
           title={warning}
           aria-label={`Legality warning: ${warning}`}
           aria-expanded={showWarning}
-          style={{ position: "absolute", bottom: 7, right: removable ? 44 : 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", width: 26, height: 26, border: "none", padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+          style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", width: 26, height: 26, border: "none", padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <TriangleAlert size={14} strokeWidth={2.25} />
         </button>
@@ -2101,17 +2096,25 @@ function DeckCardTile({
           title="Remove from deck"
           aria-label="Remove from deck"
           className="card-tile-remove"
-          // Bottom right, over the rules text: top right sat on the mana cost.
-          style={{ ...poolIconBtn, position: "absolute", bottom: 7, right: 7, color: "#ff9b8a" }}
+          // Top left, over the start of the name: top right sat on the mana
+          // cost, bottom right on power and toughness.
+          style={{ ...poolIconBtn, position: "absolute", top: 7, left: 7, color: "#ff9b8a" }}
         >
           <X size={16} strokeWidth={2.5} />
         </button>
       )}
     </div>
       {/* The name as real text, not just the scan: the browser's find-in-page
-          can then jump to a card in the deck. */}
-      <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 600, lineHeight: 1.25, color: "var(--w-1)", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {card.name}
+          can then jump to a card in the deck. "In your collection" sits beside
+          it (it used to be on the art's top-left corner, now the remove
+          button's). */}
+      <div style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, minWidth: 0 }}>
+        {owned && (
+          <span title="In your collection" aria-label="In your collection" style={{ flex: "none", display: "flex", alignItems: "center", justifyContent: "center", width: 16, height: 16, background: "rgba(13,138,95,.92)", color: "#fff", borderRadius: 999 }}>
+            <Check size={11} strokeWidth={3.25} />
+          </span>
+        )}
+        <span style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.25, color: "var(--w-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
       </div>
     </div>
   );
