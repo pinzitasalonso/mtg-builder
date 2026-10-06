@@ -2090,7 +2090,7 @@ function DeckCardTile({
           title={warning}
           aria-label={`Legality warning: ${warning}`}
           aria-expanded={showWarning}
-          style={{ position: "absolute", bottom: 7, right: 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", width: 26, height: 26, border: "none", padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+          style={{ position: "absolute", bottom: 7, right: removable ? 44 : 7, background: "rgba(0,0,0,.72)", color: "#ffd23f", width: 26, height: 26, border: "none", padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
         >
           <TriangleAlert size={14} strokeWidth={2.25} />
         </button>
@@ -2101,7 +2101,8 @@ function DeckCardTile({
           title="Remove from deck"
           aria-label="Remove from deck"
           className="card-tile-remove"
-          style={{ ...poolIconBtn, position: "absolute", top: 7, right: 7, color: "#ff9b8a" }}
+          // Bottom right, over the rules text: top right sat on the mana cost.
+          style={{ ...poolIconBtn, position: "absolute", bottom: 7, right: 7, color: "#ff9b8a" }}
         >
           <X size={16} strokeWidth={2.5} />
         </button>
