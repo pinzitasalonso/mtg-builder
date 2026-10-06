@@ -7,6 +7,7 @@ import { DECK_LIMIT_MSG } from "@/lib/limits";
 import { canCreateDeck } from "@/lib/limits-db";
 import { recordEvent } from "@/lib/analytics";
 import { scanSummary } from "@/lib/deck-analysis";
+import { sweepEmptyPublicDecks } from "@/lib/public-sweep";
 
 // One-time: assign an unguessable publicId to any deck created before this
 // column existed, so every deck has a stable URL. No-op once all are filled.
@@ -24,8 +25,13 @@ export async function GET(req: Request) {
   const user = await currentUser();
   await backfillPublicIds();
   const wantPublic = new URL(req.url).searchParams.get("public") === "1";
+  const listingPublic = !(user && !wantPublic);
+  if (listingPublic) sweepEmptyPublicDecks();
   const decks = await prisma.deck.findMany({
-    where: user && !wantPublic ? { userId: user.id } : { userId: null },
+    // The public gallery shows only decks with something in them: an empty
+    // one is an abandoned start, not a brew (and the sweep deletes it after
+    // a day).
+    where: listingPublic ? { userId: null, cards: { some: {} } } : { userId: user!.id },
     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
     take: 100,
   });
