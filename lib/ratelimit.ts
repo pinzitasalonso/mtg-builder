@@ -43,23 +43,11 @@ export function clientIp(req: Request): string {
   return req.headers.get("x-real-ip")?.trim() || "unknown";
 }
 
-const WINDOW_MS = 60_000;
-// Guests all burn the site owner's Anthropic key, so a global ceiling caps the
-// total spend, while a tighter per-IP cap keeps one client from eating the
-// whole shared budget (which the old single global bucket allowed).
-const ANON_GLOBAL_MAX = 6;
-const ANON_PER_IP_MAX = 2;
-
-/* Consume one anonymous AI call if BOTH the per-client and the shared budgets
-   allow it. Per-IP is checked first, so an abusive client is turned away
-   without spending from the shared ceiling. */
-export function anonAiAllowed(ip: string): boolean {
-  if (!rateLimit(`anon-ai:ip:${ip}`, ANON_PER_IP_MAX, WINDOW_MS)) return false;
-  return rateLimit("anon-ai:global", ANON_GLOBAL_MAX, WINDOW_MS);
-}
-
-export const ANON_LIMIT_MSG =
-  "The free AI budget is busy right now (a couple of calls per minute, shared by all guests). Try again in a minute — or sign in for unlimited use.";
+/* The AI is for signed-in players only. Guests used to share a small
+   per-minute budget, but it had no daily ceiling, reset on every restart and
+   spent the site's own Anthropic key; an account gives each player a daily
+   meter instead (lib/limits). */
+export const SIGN_IN_FOR_AI_MSG = "Sign in to use the AI — it's free, and you get a few questions a day.";
 
 /* ---- auth throttles ----------------------------------------------------- */
 

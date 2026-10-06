@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { mapPool } from "@/lib/async";
 import { currentUser } from "@/lib/auth";
-import { ANON_LIMIT_MSG, anonAiAllowed, clientIp } from "@/lib/ratelimit";
+import { SIGN_IN_FOR_AI_MSG } from "@/lib/ratelimit";
 import { AI_LIMIT_MSG } from "@/lib/limits";
 import { consumeAi } from "@/lib/limits-db";
 import { extractJson, messageText, strArr } from "@/lib/ai";
@@ -78,13 +78,11 @@ async function aiRecommend(
 }
 
 export async function POST(req: Request) {
-  // Publicly deployed: anonymous visitors may search, but they share one
-  // small per-minute AI budget so drive-bys can't burn the Anthropic key.
+  // The AI is for signed-in players only: every call spends the site's
+  // Anthropic budget, and an account gives it a daily meter.
   const user = await currentUser();
-  if (!user && !anonAiAllowed(clientIp(req))) {
-    return NextResponse.json({ error: ANON_LIMIT_MSG }, { status: 429 });
-  }
-  if (user && !(await consumeAi(user))) {
+  if (!user) return NextResponse.json({ error: SIGN_IN_FOR_AI_MSG, code: "sign_in" }, { status: 401 });
+  if (!(await consumeAi(user))) {
     return NextResponse.json({ error: AI_LIMIT_MSG, code: "ai_limit" }, { status: 429 });
   }
   const { prompt, filters, mode, currentDeck } = await req.json();
