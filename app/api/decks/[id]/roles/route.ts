@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
-import { ANON_LIMIT_MSG, anonAiAllowed, clientIp } from "@/lib/ratelimit";
 import { extractJson, messageText } from "@/lib/ai";
 
 export const runtime = "nodejs";
@@ -50,11 +49,9 @@ export async function POST(
     return NextResponse.json({ tagged, aiSkipped: needAi.length > 0 });
   }
 
-  // Anonymous visitors share one small AI budget; lands above were still
-  // tagged locally, so report rather than 429 — the client retries later.
-  if (!user && !anonAiAllowed(clientIp(req))) {
-    return NextResponse.json({ tagged, aiSkipped: true, limited: ANON_LIMIT_MSG });
-  }
+  // The AI part is for signed-in players only (see /api/search). Lands above
+  // were still tagged locally, so report what was done rather than fail.
+  if (!user) return NextResponse.json({ tagged, aiSkipped: true });
 
   const list = needAi
     .map((c) => `- ${c.name} · ${c.typeLine ?? "?"} · ${(c.oracleText ?? "").slice(0, 220)}`)

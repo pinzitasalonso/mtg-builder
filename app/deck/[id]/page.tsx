@@ -1084,7 +1084,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       <i>Search, or paste a list.</i>
                     </span>
                   </button>
-                  <button className="deck-action deck-action-ai" onClick={() => (sharedChat ? assistant.open() : setChatOpen(true))}>
+                  <button className="deck-action deck-action-ai" onClick={() => (sharedChat ? assistant.open() : assistant.available === false ? router.push("/login") : setChatOpen(true))}>
                     <span className="deck-action-icon" aria-hidden><Sparkles size={19} strokeWidth={2} /></span>
                     <span className="deck-action-text">
                       <b>Ask the AI about this deck</b>

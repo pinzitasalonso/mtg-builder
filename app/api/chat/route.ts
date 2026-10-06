@@ -4,7 +4,7 @@ import { currentUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { ASSISTANT_TOOLS, runAssistantTool } from "@/lib/assistant-tools";
 import { DECKS_CHANGED } from "@/lib/assistant";
-import { ANON_LIMIT_MSG, anonAiAllowed, clientIp } from "@/lib/ratelimit";
+import { SIGN_IN_FOR_AI_MSG } from "@/lib/ratelimit";
 import { AI_LIMIT_MSG } from "@/lib/limits";
 import { consumeAi } from "@/lib/limits-db";
 import {
@@ -125,12 +125,11 @@ function stopNote(stop: Anthropic.Message["stop_reason"]): string | null {
 // reasons about the player's idea and weaves in combos. Every card it recommends
 // is wrapped in [[Card Name]] so the client can render it as a click-to-add link.
 export async function POST(req: Request) {
-  // Guests share the anonymous budget; free accounts spend their daily meter.
+  // Signed-in players only (see /api/search); free accounts spend their
+  // daily meter.
   const user = await currentUser();
-  if (!user && !anonAiAllowed(clientIp(req))) {
-    return NextResponse.json({ error: ANON_LIMIT_MSG }, { status: 429 });
-  }
-  if (user && !(await consumeAi(user))) {
+  if (!user) return NextResponse.json({ error: SIGN_IN_FOR_AI_MSG, code: "sign_in" }, { status: 401 });
+  if (!(await consumeAi(user))) {
     return NextResponse.json({ error: AI_LIMIT_MSG, code: "ai_limit" }, { status: 429 });
   }
 
