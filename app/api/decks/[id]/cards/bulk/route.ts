@@ -63,7 +63,9 @@ export async function POST(
     ops.push(
       prisma.poolCard.upsert({
         where: { deckId_scryfallId: { deckId, scryfallId: c.scryfallId } },
-        update: capped ? { quantity: 1 } : { quantity: { increment: qty } },
+        // Imported into the deck, a card already in the pool moves up with it;
+        // imported into the pool, a card already in the deck stays there.
+        update: { ...(capped ? { quantity: 1 } : { quantity: { increment: qty } }), ...(board === "deck" ? { board: "deck" } : {}) },
         create: {
           deckId,
           scryfallId: c.scryfallId,

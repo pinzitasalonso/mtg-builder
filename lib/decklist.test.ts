@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseDecklist } from "./decklist";
+import { parseDecklist, parseDecklistBoards } from "./decklist";
 
 describe("parseDecklist", () => {
   it("parses '{qty} {name}' lines", () => {
@@ -54,5 +54,33 @@ describe("parseDecklist", () => {
       { name: "Cultivate", qty: 1 },
       { name: "Duress", qty: 2 },
     ]);
+  });
+});
+
+describe("parseDecklistBoards", () => {
+  it("reads a Moxfield-style export: headings are sections, not cards", () => {
+    const { deck, pool } = parseDecklistBoards("Commander\n1 Krenko, Mob Boss\n\nDeck\n1 Sol Ring\n30 Mountain\n\nSideboard\n1 Goblin King\n\nMaybeboard (2)\n1 Skullclamp\n1 Shock");
+    expect(deck.map((e) => e.name)).toEqual(["Krenko, Mob Boss", "Sol Ring", "Mountain"]);
+    expect(pool.map((e) => e.name)).toEqual(["Goblin King", "Skullclamp", "Shock"]);
+  });
+  it("reads Spellpool's own export: the pool after // Pool", () => {
+    const { deck, pool } = parseDecklistBoards("1 Sol Ring\n1 Arcane Signet\n\n// Pool\n1 Mind Stone");
+    expect(deck.map((e) => e.name)).toEqual(["Sol Ring", "Arcane Signet"]);
+    expect(pool.map((e) => e.name)).toEqual(["Mind Stone"]);
+  });
+  it("puts MTGO's SB: lines in the pool", () => {
+    const { deck, pool } = parseDecklistBoards("4 Lightning Bolt\nSB: 2 Duress");
+    expect(deck).toEqual([{ name: "Lightning Bolt", qty: 4 }]);
+    expect(pool).toEqual([{ name: "Duress", qty: 2 }]);
+  });
+  it("keeps one-word card names as cards", () => {
+    const { deck } = parseDecklistBoards("Counterspell\nOpt\n1 Commander's Sphere");
+    expect(deck.map((e) => e.name)).toEqual(["Counterspell", "Opt", "Commander's Sphere"]);
+  });
+});
+
+describe("parseDecklist with headings", () => {
+  it("skips section headings and merges every board", () => {
+    expect(parseDecklist("Deck\n2 Island\nSideboard\n1 Island").map((e) => [e.name, e.qty])).toEqual([["Island", 3]]);
   });
 });

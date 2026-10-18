@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { tryFetchCollection } from "@/lib/collection-client";
 import { withoutOwned } from "@/lib/collection-diff";
 import { Check } from "lucide-react";
-import { parseDecklist } from "@/lib/decklist";
-import { ImportEntry, ImportResult, PoolEntry, importByName, poolByName, setQuantity, deleteCard } from "@/lib/pool-client";
+import { parseDecklistBoards } from "@/lib/decklist";
+import { ImportEntry, ImportResult, PoolEntry, importByName, poolByName, setQuantity, deleteCard, type Board } from "@/lib/pool-client";
 import { ModalShell, ghostBtn, goldBtn, paperInput } from "./ui";
 
 export type Tool = "export" | "import" | "lands";
@@ -49,17 +49,30 @@ export default function ToolSheet({
   tool,
   deckId,
   pool,
+  commander,
+  initialImport = "",
   onClose,
   onChanged,
 }: {
   tool: Tool;
   deckId: string;
   pool: PoolEntry[];
+  /** The deck's commander: a replacing import keeps it. */
+  commander?: string | null;
+  /** A list pasted elsewhere (the Add cards box), to start the import with. */
+  initialImport?: string;
   onClose: () => void;
   onChanged: () => Promise<void> | void;
 }) {
   const [copied, setCopied] = useState(false);
-  const [importText, setImportText] = useState("");
+  const [importText, setImportText] = useState(initialImport);
+  // Where an import goes: the deck (its sideboard/maybeboard to the pool), or
+  // all of it to the pool. Replacing clears the deck's list first, after
+  // saving it as a version.
+  const [importTo, setImportTo] = useState<Board>("deck");
+  const [replace, setReplace] = useState(false);
+  // Lookups that failed, by the board they were headed for, for Retry.
+  const [retry, setRetry] = useState<{ deck: ImportEntry[]; pool: ImportEntry[] }>({ deck: [], pool: [] });
   const [importing, setImporting] = useState(false);
   // Outcome of the last import, in three buckets so a throttled lookup is
   // never presented as a card that doesn't exist. `failed` is retryable.
@@ -104,39 +117,69 @@ export default function ToolSheet({
     }
   }
 
-  // ── Import — parse "{qty} {name}" lines and add them in bulk (batched
-  // Scryfall lookup, one insert). Shared by the first run and by Retry, which
-  // re-submits only the entries whose lookup failed and folds the outcome in.
-  async function importEntries(entries: ImportEntry[], prior: ImportResult | null) {
+  // ── Import — parse the pasted list into its deck and pool sections and add
+  // them in bulk (batched Scryfall lookup, one insert per board). Retry
+  // re-submits only the lookups that failed and folds the outcome in.
+  async function importBoards(lists: { deck: ImportEntry[]; pool: ImportEntry[] }, prior: ImportResult | null) {
+    const known = poolByName(pool);
+    const sum: ImportResult = { added: prior?.added ?? 0, notFound: [...(prior?.notFound ?? [])], failed: [] };
+    const failed = { deck: [] as ImportEntry[], pool: [] as ImportEntry[] };
+    for (const board of ["deck", "pool"] as const) {
+      if (!lists[board].length) continue;
+      const r = await importByName(deckId, lists[board], known, board);
+      sum.added += r.added;
+      sum.notFound.push(...r.notFound);
+      sum.failed.push(...r.failed);
+      failed[board] = r.failed;
+    }
+    setRetry(failed);
+    return sum;
+  }
+  async function runImport() {
+    const parsed = parseDecklistBoards(importText);
+    const lists = importTo === "deck" ? parsed : { deck: [], pool: [...parsed.deck, ...parsed.pool] };
+    if (lists.deck.length + lists.pool.length === 0) {
+      setImportNote("Nothing to import — paste a decklist first.");
+      return;
+    }
     setImporting(true);
     setImportNote(null);
+    setImportResult(null);
     try {
-      const r = await importByName(deckId, entries, poolByName(pool));
+      if (replace && importTo === "deck") {
+        // Saved first, so the old list is one Restore away in Versions.
+        const v = await fetch(`/api/decks/${deckId}/versions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ label: "Before import" }),
+        }).catch(() => null);
+        if (!v?.ok) {
+          setImportNote("Couldn’t save a version of the current list first, so nothing was replaced. Try again.");
+          return;
+        }
+        const cmd = (commander ?? "").trim().toLowerCase();
+        const old = pool.filter((c) => c.board === "deck" && c.name.trim().toLowerCase() !== cmd);
+        for (let i = 0; i < old.length; i += 8) await Promise.all(old.slice(i, i + 8).map((c) => deleteCard(deckId, c.dbId)));
+      }
+      setImportResult(await importBoards(lists, null));
       await onChanged();
-      setImportResult({
-        added: (prior?.added ?? 0) + r.added,
-        notFound: [...(prior?.notFound ?? []), ...r.notFound],
-        failed: r.failed,
-      });
+      setImportText("");
+      setReplace(false);
     } catch {
-      setImportNote("Something went wrong while importing — check the pool, then try again.");
+      setImportNote("Something went wrong while importing — check the deck, then try again.");
     } finally {
       setImporting(false);
     }
   }
-  async function runImport() {
-    const entries = parseDecklist(importText);
-    if (entries.length === 0) {
-      setImportNote("Nothing to import — paste a decklist first.");
-      return;
-    }
-    setImportResult(null);
-    await importEntries(entries, null);
-    setImportText("");
-  }
   async function retryFailed() {
-    if (!importResult?.failed.length) return;
-    await importEntries(importResult.failed, importResult);
+    if (!retry.deck.length && !retry.pool.length) return;
+    setImporting(true);
+    try {
+      setImportResult(await importBoards(retry, importResult));
+      await onChanged();
+    } finally {
+      setImporting(false);
+    }
   }
 
   // Lands already in the pool, so their counts can be edited in place. Matches on
@@ -214,8 +257,33 @@ export default function ToolSheet({
       {tool === "import" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <p style={noteP}>
-            Paste a decklist — one card per line (e.g. <code>1 Lightning Bolt</code>). Cards not already in the pool are added.
+            Paste a decklist — one card per line (e.g. <code>1 Lightning Bolt</code>). Exports from Moxfield, Archidekt, MTGO
+            and Spellpool work: a <b>Sideboard</b> or <b>Maybeboard</b> goes to the pool.
           </p>
+          <div role="radiogroup" aria-label="Import into" style={{ display: "flex", gap: 6 }}>
+            {([["deck", "Into the deck"], ["pool", "Into the pool"]] as const).map(([v, label]) => (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                aria-checked={importTo === v}
+                onClick={() => setImportTo(v)}
+                disabled={importing}
+                style={{ flex: 1, padding: "8px 10px", borderRadius: 999, border: "1px solid " + (importTo === v ? "transparent" : "var(--line)"), background: importTo === v ? "var(--accent)" : "transparent", color: importTo === v ? "var(--accent-ink)" : "var(--frame-ink)", fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {importTo === "deck" && pool.some((c) => c.board === "deck") && (
+            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "8px 12px", borderRadius: 10, background: "rgba(0,0,0,.12)", cursor: "pointer" }}>
+              <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} disabled={importing} style={{ width: 18, height: 18, marginTop: 1, accentColor: "var(--gold, #fdf26f)", flex: "none" }} />
+              <span style={{ display: "flex", flexDirection: "column" }}>
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--frame-ink)" }}>Replace the deck’s current list</span>
+                <span style={{ fontSize: 12, color: "var(--t2)" }}>Saves it as a version first, so you can restore it from Versions.{commander ? " The commander stays." : ""}</span>
+              </span>
+            </label>
+          )}
           <textarea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
@@ -237,7 +305,7 @@ export default function ToolSheet({
                   {importResult.notFound.join(", ")}
                 </div>
               )}
-              {importResult.failed.length > 0 && (
+              {importResult.failed.length > 0 && (retry.deck.length > 0 || retry.pool.length > 0) && (
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
                   <span style={{ flex: 1, minWidth: 200 }}>
                     <b>{importResult.failed.length} lookup{importResult.failed.length === 1 ? "" : "s"} failed</b> — Scryfall
@@ -253,7 +321,7 @@ export default function ToolSheet({
           <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
             <button onClick={onClose} style={ghostBtn}>Close</button>
             <button onClick={runImport} disabled={importing || !importText.trim()} style={goldBtn}>
-              {importing ? "Importing…" : "Import"}
+              {importing ? "Importing…" : replace && importTo === "deck" ? "Replace & import" : "Import"}
             </button>
           </div>
         </div>
