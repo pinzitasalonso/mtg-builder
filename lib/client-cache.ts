@@ -18,6 +18,10 @@ export function remember<T>(key: string, value: T): void {
   store.set(key, value);
 }
 
+export function forget(key: string): void {
+  store.delete(key);
+}
+
 /** On sign-out: another account must never see this one's decks. */
 export function forgetAll(): void {
   store.clear();

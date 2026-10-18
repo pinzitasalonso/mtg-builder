@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowRight, ChevronDown, Copy, Dices, Gauge, History, Library, Link2, LogOut, Pin, Plus, ShoppingCart, Smartphone, Sparkles, Trash2, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Check, ChevronDown, Copy, Dices, Gauge, History, Library, Link2, LogOut, Pin, Plus, ShoppingCart, Smartphone, Sparkles, Trash2, type LucideIcon } from "lucide-react";
 import { LANDING_FAQ, LANDING_FEATURES, landingJsonLd, type LandingFeature } from "@/lib/landing";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import CollectionView from "@/components/CollectionView";
 import { DECKS_CHANGED_EVENT, useAssistant } from "@/components/assistant/AssistantProvider";
-import { forgetAll, peek, remember } from "@/lib/client-cache";
+import { forget, forgetAll, peek, remember } from "@/lib/client-cache";
 import { forgetOfflineData, forgetSession, offlineSession, rememberSession } from "@/lib/offline-session";
 import LandingVisual from "@/components/LandingVisual";
 import CommanderInput from "@/components/CommanderInput";
@@ -90,6 +90,14 @@ export default function HomePage() {
   /// deck cap, which the server explains in the response body.
   const [createError, setCreateError] = useState("");
   const [listError, setListError] = useState("");
+  // A short confirmation at the bottom of the screen ("Deleted …").
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function flashToast(msg: string) {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
+  }
   const [decks, setDecks] = useState<Deck[]>(cached?.decks ?? []);
   const [publicDecks, setPublicDecks] = useState<Deck[]>(cached?.publicDecks ?? []);
   const [loaded, setLoaded] = useState(Boolean(cached));
@@ -205,9 +213,28 @@ export default function HomePage() {
     router.push(`/deck/${created.publicId}`);
   }
 
+  // Delete from a tile: confirm by name, take the tile away at once, say so,
+  // and put it back with a reason if the server refused. It used to delete
+  // and quietly reload, so nothing visible happened until the list came back
+  // (and a failure looked exactly like a success).
   async function deleteDeck(id: string) {
-    if (!confirm("Delete this deck?")) return;
-    await fetch(`/api/decks/${id}`, { method: "DELETE" });
+    const name = [...decks, ...publicDecks].find((d) => d.publicId === id)?.name ?? "this deck";
+    if (!confirm(`Delete “${name}”? This can’t be undone.`)) return;
+    setListError("");
+    const before = { decks, publicDecks };
+    setDecks((ds) => ds.filter((d) => d.publicId !== id));
+    setPublicDecks((ds) => ds.filter((d) => d.publicId !== id));
+    const res = await fetch(`/api/decks/${id}`, { method: "DELETE" }).catch(() => null);
+    // A 404 means it's already gone, which is what was asked for.
+    if (!res || (!res.ok && res.status !== 404)) {
+      setDecks(before.decks);
+      setPublicDecks(before.publicDecks);
+      setListError(res ? `Couldn’t delete “${name}”. Try again.` : `Couldn’t delete “${name}” — you seem to be offline.`);
+      return;
+    }
+    forget(`deck:${id}`);
+    forget(`cards:${id}`);
+    flashToast(`Deleted “${name}”`);
     loadAll();
   }
 
@@ -621,6 +648,39 @@ export default function HomePage() {
           by Scryfall.
         </p>
       </footer>
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          onClick={() => setToast(null)}
+          style={{
+            position: "fixed",
+            left: "50%",
+            bottom: "max(24px, calc(env(safe-area-inset-bottom) + 12px))",
+            transform: "translateX(-50%)",
+            zIndex: 55,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            maxWidth: "calc(100vw - 32px)",
+            padding: "11px 18px",
+            borderRadius: 999,
+            background: "var(--t1, #14121c)",
+            color: "var(--bg, #fff)",
+            fontSize: 14,
+            fontWeight: 600,
+            boxShadow: "0 12px 30px -10px rgba(0,0,0,.45)",
+            animation: "sp-fade .15s ease",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          <Check size={16} strokeWidth={2.5} style={{ flex: "none" }} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{toast}</span>
+        </div>
+      )}
     </main>
   );
 }
