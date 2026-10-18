@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  ArrowLeft, ArrowUpDown, BookOpen, Check, ChevronDown, ClipboardCopy, Copy, Crown, Dices, Download, Eye, Share2, History,
+  ArrowLeft, BookOpen, Check, ChevronDown, Copy, Crown, Dices, Download, Eye, Share2, History,
   ListChecks, Mountain, Plus, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
   type LucideIcon,
 } from "lucide-react";
@@ -249,7 +249,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [scanOpen, setScanOpen] = useState(false);
   // Count of offline review decisions waiting to sync (drives the banner).
   const [pendingSync, setPendingSync] = useState(0);
-  const [copied, setCopied] = useState<"" | "link" | "list">("");
+  const [copied, setCopied] = useState<"" | "link">("");
   // deck-panel sort: by type (grouped), by cost (mv), or A–Z
   const [deckSort, setDeckSort] = useState<"type" | "cost" | "name">("type");
 
@@ -263,6 +263,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // One message line for the Edit deck modal: a failed save, share or delete.
   const [settingsError, setSettingsError] = useState("");
 
+  // A list pasted into the Add cards box, handed to the import sheet.
+  const [importSeed, setImportSeed] = useState("");
+  const openImport = (text: string) => {
+    setImportSeed(text);
+    setTool("import");
+  };
   // tool sheet (export / import / lands) — its state lives in <ToolSheet>
   const [tool, setTool] = useState<Tool | null>(null);
 
@@ -641,7 +647,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     setSettingsOpen(true);
   }
 
-  function flash(which: "link" | "list") {
+  function flash(which: "link") {
     setCopied(which);
     setTimeout(() => setCopied(""), 1600);
   }
@@ -689,12 +695,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       if (copy?.publicId) { router.push(`/deck/${copy.publicId}`); return; }
     }
     setForking(false);
-  }
-  function copyDecklist() {
-    const lines: string[] = [];
-    if (deck?.commander) lines.push(`1 ${deck.commander}`);
-    for (const c of deckCards) if (c.name !== deck?.commander) lines.push(`${c.quantity} ${c.name}`);
-    navigator.clipboard?.writeText(lines.join("\n")).then(() => flash("list")).catch(() => {});
   }
 
   async function saveSettings(e: React.FormEvent) {
@@ -987,12 +987,16 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       // Holds the menu open so the copy is confirmed. As a
                       // hero button this said "Copied!"; closing on click
                       // would have made copying silent.
-                      { label: copied === "list" ? "Copied!" : "Copy decklist", icon: copied === "list" ? Check : ClipboardCopy, on: copyDecklist, disabled: deckCards.length === 0, keepOpen: true },
+                      // One place each to take a list out and to bring one in.
+                      // Export copies the list (with the pool, or without the
+                      // cards you own, if you like); it replaced a separate
+                      // "Copy decklist" that did the same with no settings.
+                      { label: "Export decklist", icon: Download, on: () => setTool("export"), disabled: pool.length === 0 },
+                      ...(canEdit ? [{ label: "Import decklist", icon: Upload, on: () => openImport("") }] : []),
                       { label: "Buy list", icon: ShoppingCart, on: () => setOrderOpen(true), disabled: deckCards.length === 0 },
                       { label: "Versions", icon: History, on: () => setVersionsOpen(true) },
                       ...(canEdit ? [
                         { label: "Add lands & staples", icon: Mountain, on: () => setTool("lands") },
-                        { label: "Export / import", icon: ArrowUpDown, on: () => setTool("export") },
                         { group: "At the table" },
                         { label: "Game code", icon: Ticket, on: () => setGameCodeOpen(true) },
                         { group: "Write-ups" },
@@ -1361,8 +1365,16 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   <input
                     ref={poolSearchRef}
                     className="cc-paper"
-                    placeholder="Search by card name…"
+                    placeholder="Search by card name, or paste a list…"
                     value={nameInput}
+                    // A whole list pasted here goes to the import sheet, ready to run.
+                    onPaste={(e) => {
+                      const text = e.clipboardData.getData("text");
+                      if (text.split("\n").filter((l) => l.trim()).length >= 2) {
+                        e.preventDefault();
+                        openImport(text);
+                      }
+                    }}
                     onChange={(e) => {
                       setNameInput(e.target.value);
                       setNameError("");
@@ -1695,7 +1707,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {/* export / import / lands tool sheet */}
       {tool && (
-        <ToolSheet tool={tool} deckId={deckId} pool={pool} onClose={() => setTool(null)} onChanged={loadPool} />
+        <ToolSheet tool={tool} deckId={deckId} pool={pool} commander={deck?.commander ?? null} initialImport={tool === "import" ? importSeed : ""} onClose={() => setTool(null)} onChanged={loadPool} />
       )}
 
       {/* review-pool swipe modal — triage: right promotes to the deck, left
