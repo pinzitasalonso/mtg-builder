@@ -80,6 +80,20 @@ export async function setQuantity(deckId: string, dbId: number, quantity: number
   return res.ok;
 }
 
+// Swap a row to another printing of the same card. Returns an error message,
+// or null on success (409: that printing is already a separate row).
+export async function setPrinting(deckId: string, dbId: number, scryfallId: string, imageUri: string): Promise<string | null> {
+  const res = await fetch(`/api/decks/${deckId}/cards/${dbId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scryfallId, imageUri }),
+  }).catch(() => null);
+  if (!res) return "You seem to be offline.";
+  if (res.ok) return null;
+  const body = await res.json().catch(() => ({}));
+  return body?.error || "Couldn’t change the printing.";
+}
+
 // Remove a pool row entirely. Queued for replay if offline.
 export async function deleteCard(deckId: string, dbId: number): Promise<boolean> {
   try {

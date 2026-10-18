@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { asOwned, ownedPrintingsFor } from "@/lib/owned-printings";
 import prisma from "@/lib/prisma";
 import { newPublicId } from "@/lib/deck-id";
 import { singletonCapped } from "@/lib/commander";
@@ -258,8 +259,10 @@ async function resolve(names: string[]): Promise<{ found: Map<string, OutCard>; 
 
 /** Add resolved cards to a deck. A card already there (by name) gains copies
  *  and moves to the requested board; singleton formats cap at one. */
-async function addCards(deck: { id: number; format: string }, items: { card: OutCard; quantity: number; board: Board }[]) {
+async function addCards(deck: { id: number; format: string; userId?: number | null }, items: { card: OutCard; quantity: number; board: Board }[]) {
   const rows = await prisma.poolCard.findMany({ where: { deckId: deck.id }, select: { id: true, name: true, quantity: true } });
+  // Cards the player owns go in as the printings they own.
+  const owned = deck.userId ? await ownedPrintingsFor(deck.userId, items.map((i) => i.card.name)) : new Map();
   const byName = new Map(rows.map((r) => [r.name.toLowerCase(), r]));
   let copies = 0;
   for (const { card, quantity, board } of items) {
@@ -273,14 +276,15 @@ async function addCards(deck: { id: number; format: string }, items: { card: Out
       continue;
     }
     const n = capped ? 1 : quantity;
+    const mine = asOwned({ name: card.name, scryfallId: card.id, imageUri: card.imageUri }, owned);
     const created = await prisma.poolCard.upsert({
-      where: { deckId_scryfallId: { deckId: deck.id, scryfallId: card.id } },
+      where: { deckId_scryfallId: { deckId: deck.id, scryfallId: mine.scryfallId } },
       update: { quantity: { increment: n }, board },
       create: {
         deckId: deck.id,
-        scryfallId: card.id,
+        scryfallId: mine.scryfallId,
         name: card.name,
-        imageUri: card.imageUri,
+        imageUri: mine.imageUri,
         manaCost: card.manaCost,
         typeLine: card.typeLine,
         oracleText: card.oracleText,
@@ -307,7 +311,7 @@ function cardInputs(v: unknown): CardInput[] {
 
 async function ownDeck(userId: number, publicId: string) {
   if (!publicId) return null;
-  return prisma.deck.findFirst({ where: { publicId, userId }, select: { id: true, publicId: true, name: true, format: true, commander: true } });
+  return prisma.deck.findFirst({ where: { publicId, userId }, select: { id: true, publicId: true, name: true, format: true, commander: true, userId: true } });
 }
 
 // ── create_deck

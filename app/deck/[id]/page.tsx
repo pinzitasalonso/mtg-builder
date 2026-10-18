@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   ArrowLeft, ArrowUpDown, BookOpen, Check, ChevronDown, ClipboardCopy, Copy, Crown, Dices, Download, Eye, Share2, History,
-  ListChecks, Mountain, Plus, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
+  Library, ListChecks, Mountain, Plus, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
   type LucideIcon,
 } from "lucide-react";
 import Logo from "@/components/Logo";
@@ -16,6 +16,7 @@ import ToolSheet, { Tool } from "@/components/deck/ToolSheet";
 import PlaytestModal from "@/components/deck/PlaytestModal";
 import GameCodeModal from "@/components/deck/GameCodeModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
+import DeckCardSheet, { type OwnedCopy } from "@/components/deck/DeckCardSheet";
 import AssistantScreen from "@/components/assistant/AssistantScreen";
 import { useAssistant, useAssistantFocus, type AssistantFocus } from "@/components/assistant/AssistantProvider";
 import DeckPrimer from "@/components/deck/DeckPrimer";
@@ -332,6 +333,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // The signed-in user's owned-card collection (lowercased names). Drives the
   // "owned" badges on pool/deck cards and grounds the AI in what they have.
   const [ownedNames, setOwnedNames] = useState<string[]>(() => peek<string[]>("owned-names") ?? []);
+  // Copies and the printing owned, by lowercase name, for the card sheet.
+  const [ownedCopies, setOwnedCopies] = useState<Map<string, OwnedCopy>>(new Map());
+  // The card open in the sheet (its dbId), and the outcome of "Use printings I own".
+  const [sheetId, setSheetId] = useState<number | null>(null);
+  const [printingNote, setPrintingNote] = useState("");
   // Every change, loaded or local, becomes the copy shown next time.
   useEffect(() => {
     if (deck) remember(`deck:${deckId}`, deck);
@@ -411,7 +417,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       .catch(() => {});
     loadPool();
     // Null when it couldn't be fetched (offline): keep the names we have.
-    tryFetchCollection().then((c) => c && setOwnedNames(c.cards.map((card) => card.name)));
+    tryFetchCollection().then((c) => {
+      if (!c) return;
+      setOwnedNames(c.cards.map((card) => card.name));
+      setOwnedCopies(new Map(c.cards.map((card) => [card.name.toLowerCase(), { quantity: card.quantity, imageUri: card.imageUri ?? null }])));
+    });
   }, [deckId, loadPool, router]);
 
   // Backfill legality data and AI role tags for rows that still lack them.
@@ -759,7 +769,20 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // owner never sees a flash of the view-only layout.
   const canEdit = deck?.canEdit !== false;
   // Tapping a deck card: owners triage it in review; viewers just preview it.
-  const openCard = (c: PoolCard) => (canEdit ? startDeckReview(c) : setPreview(c));
+  // Tapping a deck card opens its sheet: what it does, whether you own it,
+  // and (for the owner) its printing and moves. The swipe review is still the
+  // Review button.
+  const openCard = (c: PoolCard) => setSheetId(c.dbId);
+  const sheetCard = sheetId === null ? null : pool.find((c) => c.dbId === sheetId) ?? null;
+
+  async function switchToOwnedPrintings() {
+    setPrintingNote("Updating…");
+    const res = await fetch(`/api/decks/${deckId}/cards/owned-printings`, { method: "POST" }).catch(() => null);
+    const n = res?.ok ? ((await res.json()).changed as number) : -1;
+    setPrintingNote(n < 0 ? "Couldn’t update" : n === 0 ? "Already your printings" : `Switched ${n} card${n === 1 ? "" : "s"}`);
+    if (n > 0) await loadPool();
+    setTimeout(() => setPrintingNote(""), 2500);
+  }
 
   // The auto-included commander (commander decks) can't be removed or reviewed out.
   const isCommander = (c: PoolCard) =>
@@ -980,6 +1003,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       ...(canEdit ? [
                         { label: "Add lands & staples", icon: Mountain, on: () => setTool("lands") },
                         { label: "Export / import", icon: ArrowUpDown, on: () => setTool("export") },
+                        // The printings in your collection, for cards added before it was imported.
+                        ...(ownedCopies.size > 0 ? [{ label: printingNote || "Use printings I own", icon: Library, on: () => void switchToOwnedPrintings(), keepOpen: true, disabled: printingNote === "Updating…" }] : []),
                         { group: "At the table" },
                         { label: "Game code", icon: Ticket, on: () => setGameCodeOpen(true) },
                         { group: "Write-ups" },
@@ -1502,7 +1527,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       <div style={{ marginBottom: 24 }}>
                         <DeckSectionHead cat="Commander" n={1} />
                         <div style={deckTileGrid}>
-                          <DeckCardTile card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} removable={false} onOpen={!canEdit ? () => setPreview(commander) : undefined} onRemove={() => {}} />
+                          <DeckCardTile card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} removable={false} onOpen={() => openCard(commander)} onRemove={() => {}} />
                         </div>
                       </div>
                     )}
@@ -1758,6 +1783,21 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {/* saved versions — snapshot now, compare an earlier one with the current list */}
       {versionsOpen && <VersionsModal deckId={deckId} pool={pool} canEdit={canEdit} onClose={() => setVersionsOpen(false)} onRestored={loadPool} />}
+
+      {/* a deck card, opened */}
+      {sheetCard && (
+        <DeckCardSheet
+          deckId={deckId}
+          card={sheetCard}
+          canEdit={canEdit}
+          isCommander={isCommander(sheetCard)}
+          owned={ownedCopies.get(sheetCard.name.toLowerCase()) ?? null}
+          warning={warningOf(sheetCard)}
+          canSetQty={!singletonCapped(deck?.format ?? "commander", sheetCard.typeLine)}
+          onChanged={loadPool}
+          onClose={() => setSheetId(null)}
+        />
+      )}
 
       {/* card preview modal */}
       {preview && (

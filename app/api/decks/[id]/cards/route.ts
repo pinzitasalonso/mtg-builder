@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { asOwned, ownedPrintingsFor } from "@/lib/owned-printings";
 import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser, viewableDeckByPublicId } from "@/lib/auth";
@@ -31,13 +32,21 @@ export async function POST(
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const deckId = deck.id;
   const body = await req.json();
-  const { scryfallId, name, imageUri, manaCost, typeLine, oracleText } = body;
+  const { manaCost, typeLine, oracleText } = body;
+  let { scryfallId, imageUri } = body;
+  const { name } = body;
   if (
     typeof scryfallId !== "string" || !scryfallId ||
     typeof name !== "string" || !name ||
     typeof imageUri !== "string" || !imageUri
   ) {
     return NextResponse.json({ error: "scryfallId, name, imageUri required" }, { status: 400 });
+  }
+  // A card the player owns goes in as the printing they own.
+  if (user) {
+    const owned = asOwned({ name, scryfallId, imageUri }, await ownedPrintingsFor(user.id, [name]));
+    scryfallId = owned.scryfallId;
+    imageUri = owned.imageUri;
   }
 
   // quantity is how many copies to add; defaults to 1, clamped so a bad client
