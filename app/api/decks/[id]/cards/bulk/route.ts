@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
 import { singletonCapped } from "@/lib/commander";
+import { asOwned, ownedPrintingsFor } from "@/lib/owned-printings";
 
 const MAX_QTY = 999;
 const MAX_CARDS = 500;
@@ -20,7 +21,16 @@ export async function POST(
 
   const body = await req.json().catch(() => null);
   const board = body?.board === "deck" ? "deck" : "pool";
-  const list = Array.isArray(body?.cards) ? body.cards.slice(0, MAX_CARDS) : [];
+  let list = Array.isArray(body?.cards) ? body.cards.slice(0, MAX_CARDS) : [];
+  // Cards the player owns go in as the printings they own.
+  if (user) {
+    const owned = await ownedPrintingsFor(user.id, list.map((c: { name?: unknown }) => (typeof c?.name === "string" ? c.name : "")));
+    list = list.map((c: { name?: unknown; scryfallId?: unknown; imageUri?: unknown }) =>
+      typeof c?.name === "string" && typeof c.scryfallId === "string" && typeof c.imageUri === "string"
+        ? asOwned(c as { name: string; scryfallId: string; imageUri: string }, owned)
+        : c
+    );
+  }
   const str = (v: unknown) => (typeof v === "string" ? v : null);
 
   // Which of these are already in the pool — a capped (singleton) card that

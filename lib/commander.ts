@@ -1,11 +1,12 @@
 import prisma from "@/lib/prisma";
+import { asOwned, ownedPrintingsFor } from "@/lib/owned-printings";
 import { resolveNamed } from "@/lib/scryfall";
 
 // Pure format rules live in lib/format (client-safe); re-exported here so the
 // API routes keep a single import for all commander logic.
 export { isBasicLand, singletonCapped } from "@/lib/format";
 
-type DeckLike = { id: number; format: string; commander: string | null };
+type DeckLike = { id: number; format: string; commander: string | null; userId?: number | null };
 
 // True when a card is the deck's commander (commander format only).
 export function isCommanderCard(deck: DeckLike | null | undefined, cardName: string): boolean {
@@ -27,8 +28,13 @@ export async function ensureCommanderCard(deck: DeckLike): Promise<void> {
   });
   if (onDeck.some((c) => c.name.toLowerCase() === want)) return;
 
-  const card = await resolveNamed(deck.commander.trim());
-  if (!card) return;
+  const found = await resolveNamed(deck.commander.trim());
+  if (!found) return;
+  // The owner's own printing of their commander, when they have one.
+  const own = deck.userId
+    ? asOwned({ name: found.name, scryfallId: found.id, imageUri: found.imageUri }, await ownedPrintingsFor(deck.userId, [found.name]))
+    : null;
+  const card = own ? { ...found, id: own.scryfallId, imageUri: own.imageUri } : found;
   // Upsert so a commander already sitting in the pool is promoted to the deck
   // rather than duplicated.
   await prisma.poolCard.upsert({
