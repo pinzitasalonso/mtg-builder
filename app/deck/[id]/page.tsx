@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   ArrowLeft, ArrowUpDown, BookOpen, Check, ChevronDown, ClipboardCopy, Copy, Crown, Dices, Download, Eye, Share2, History,
-  Library, ListChecks, Mountain, Plus, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
+  ListChecks, Mountain, Plus, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
   type LucideIcon,
 } from "lucide-react";
 import Logo from "@/components/Logo";
@@ -335,9 +335,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [ownedNames, setOwnedNames] = useState<string[]>(() => peek<string[]>("owned-names") ?? []);
   // Copies and the printing owned, by lowercase name, for the card sheet.
   const [ownedCopies, setOwnedCopies] = useState<Map<string, OwnedCopy>>(new Map());
-  // The card open in the sheet (its dbId), and the outcome of "Use printings I own".
+  // The card open in the sheet (its dbId).
   const [sheetId, setSheetId] = useState<number | null>(null);
-  const [printingNote, setPrintingNote] = useState("");
   // Every change, loaded or local, becomes the copy shown next time.
   useEffect(() => {
     if (deck) remember(`deck:${deckId}`, deck);
@@ -359,7 +358,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     }
     if (!res.ok) return;
     const data = await res.json();
-    const mapped: PoolCard[] = data.map((c: { id: number; scryfallId: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null; quantity?: number; board?: string; role?: string | null; colorIdentity?: string | null; legalities?: string | null }) => {
+    const mapped: PoolCard[] = data.map((c: { id: number; scryfallId: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null; quantity?: number; board?: string; role?: string | null; colorIdentity?: string | null; legalities?: string | null; printingPinned?: boolean }) => {
       let legalities: Record<string, string> | null = null;
       if (c.legalities) {
         try {
@@ -381,6 +380,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
         role: c.role ?? null,
         colorIdentity: c.colorIdentity ?? null,
         legalities,
+        printingPinned: c.printingPinned === true,
       };
     });
     // Overlay any not-yet-synced offline review decisions for this deck.
@@ -768,21 +768,11 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // The API says so via canEdit; treat an unloaded deck as editable so the
   // owner never sees a flash of the view-only layout.
   const canEdit = deck?.canEdit !== false;
-  // Tapping a deck card: owners triage it in review; viewers just preview it.
   // Tapping a deck card opens its sheet: what it does, whether you own it,
   // and (for the owner) its printing and moves. The swipe review is still the
   // Review button.
   const openCard = (c: PoolCard) => setSheetId(c.dbId);
   const sheetCard = sheetId === null ? null : pool.find((c) => c.dbId === sheetId) ?? null;
-
-  async function switchToOwnedPrintings() {
-    setPrintingNote("Updating…");
-    const res = await fetch(`/api/decks/${deckId}/cards/owned-printings`, { method: "POST" }).catch(() => null);
-    const n = res?.ok ? ((await res.json()).changed as number) : -1;
-    setPrintingNote(n < 0 ? "Couldn’t update" : n === 0 ? "Already your printings" : `Switched ${n} card${n === 1 ? "" : "s"}`);
-    if (n > 0) await loadPool();
-    setTimeout(() => setPrintingNote(""), 2500);
-  }
 
   // The auto-included commander (commander decks) can't be removed or reviewed out.
   const isCommander = (c: PoolCard) =>
@@ -1003,8 +993,6 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       ...(canEdit ? [
                         { label: "Add lands & staples", icon: Mountain, on: () => setTool("lands") },
                         { label: "Export / import", icon: ArrowUpDown, on: () => setTool("export") },
-                        // The printings in your collection, for cards added before it was imported.
-                        ...(ownedCopies.size > 0 ? [{ label: printingNote || "Use printings I own", icon: Library, on: () => void switchToOwnedPrintings(), keepOpen: true, disabled: printingNote === "Updating…" }] : []),
                         { group: "At the table" },
                         { label: "Game code", icon: Ticket, on: () => setGameCodeOpen(true) },
                         { group: "Write-ups" },

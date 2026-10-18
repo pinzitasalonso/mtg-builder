@@ -262,6 +262,10 @@ model PoolCard {
   colorIdentity String?
   // Scryfall legalities map, JSON-encoded; null = not yet enriched.
   legalities    String?
+  // True once the player picked this printing themselves. Until then the
+  // card follows their collection: it shows the printing they own, switched
+  // automatically when the deck is opened (lib/owned-printings).
+  printingPinned Boolean @default(false)
   addedAt       DateTime @default(now())
 
   @@unique([deckId, scryfallId])

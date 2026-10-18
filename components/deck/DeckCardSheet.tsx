@@ -214,6 +214,15 @@ export default function DeckCardSheet({
                 />
               )}
             </div>
+            {/* Which printing shows, and why: yours by default, or the one you
+                picked (which sticks until you pick yours again). */}
+            {mine && (
+              <p style={{ margin: "0 0 12px", fontSize: 13, color: "var(--text-muted)", lineHeight: 1.45 }}>
+                {card.printingPinned && currentId !== ownedId
+                  ? <>You picked this printing, so it stays. Pick <b style={{ color: "var(--text)" }}>Yours</b> to match your collection again.</>
+                  : "Shows the printing in your collection. Pick another to use it instead."}
+              </p>
+            )}
             {error && <p role="alert" style={{ margin: "0 0 10px", fontSize: 13, color: "var(--danger, #ff8a7a)" }}>{error}</p>}
             {failed ? (
               <p style={{ margin: 0, fontSize: 14, color: "var(--text-muted)" }}>Couldn’t load the printings. Close and open the card to try again.</p>

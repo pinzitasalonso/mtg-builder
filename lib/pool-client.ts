@@ -12,6 +12,8 @@ export interface PoolEntry extends OutCard {
   quantity: number;
   board: Board;
   role: string | null;
+  /** The player picked this printing; it no longer follows their collection. */
+  printingPinned?: boolean;
 }
 
 // Build a normalizeCardKey(name) → card map of the current pool. Matching by NAME (not
