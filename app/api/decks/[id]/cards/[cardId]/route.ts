@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ownedPrintingsFor } from "@/lib/owned-printings";
 import prisma from "@/lib/prisma";
 import { parseId } from "@/lib/api";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
@@ -22,7 +23,7 @@ export async function PATCH(
   const deckId = deck.id;
   const body = await req.json();
 
-  const data: { board?: string; quantity?: number; scryfallId?: string; imageUri?: string } = {};
+  const data: { board?: string; quantity?: number; scryfallId?: string; imageUri?: string; printingPinned?: boolean } = {};
   if (body.board !== undefined) {
     if (body.board !== "pool" && body.board !== "deck") {
       return NextResponse.json({ error: "board must be 'pool' or 'deck'" }, { status: 400 });
@@ -69,6 +70,15 @@ export async function PATCH(
         return NextResponse.json({ error: "Commander decks allow only one copy of a non-basic card." }, { status: 409 });
       }
     }
+  }
+
+  // A printing picked by hand sticks: the automatic switch to the owner's
+  // collection leaves it alone. Picking the printing they own is the same as
+  // not overriding, so the card follows the collection again.
+  if (data.scryfallId !== undefined) {
+    const row = await prisma.poolCard.findFirst({ where: { id: cid, deckId }, select: { name: true } });
+    const own = row && user && deck.userId === user.id ? (await ownedPrintingsFor(user.id, [row.name])).get(row.name.trim().replace(/\s+/g, " ").toLowerCase()) : undefined;
+    data.printingPinned = own ? own.scryfallId !== data.scryfallId : true;
   }
 
   try {

@@ -37,3 +37,25 @@ export function asOwned<T extends { name: string; scryfallId: string; imageUri: 
   const o = owned.get(key(card.name));
   return o ? { ...card, scryfallId: o.scryfallId, imageUri: o.imageUri } : card;
 }
+
+/** Switch a deck's cards to the printings its owner has, leaving alone any
+ *  printing they picked themselves (printingPinned) and any card whose owned
+ *  printing is already its own row. Returns how many changed. Run when the
+ *  owner opens the deck, so a newly imported collection shows up there. */
+export async function applyOwnedPrintings(deckId: number, userId: number): Promise<number> {
+  const rows = await prisma.poolCard.findMany({ where: { deckId }, select: { id: true, name: true, scryfallId: true, printingPinned: true } });
+  const owned = await ownedPrintingsFor(userId, rows.filter((r) => !r.printingPinned).map((r) => r.name));
+  if (!owned.size) return 0;
+  const taken = new Set(rows.map((r) => r.scryfallId));
+  let changed = 0;
+  for (const r of rows) {
+    if (r.printingPinned) continue;
+    const o = owned.get(key(r.name));
+    if (!o || o.scryfallId === r.scryfallId || taken.has(o.scryfallId)) continue;
+    await prisma.poolCard.update({ where: { id: r.id }, data: { scryfallId: o.scryfallId, imageUri: o.imageUri } });
+    taken.delete(r.scryfallId);
+    taken.add(o.scryfallId);
+    changed++;
+  }
+  return changed;
+}

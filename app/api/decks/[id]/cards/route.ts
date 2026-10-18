@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { asOwned, ownedPrintingsFor } from "@/lib/owned-printings";
+import { applyOwnedPrintings, asOwned, ownedPrintingsFor } from "@/lib/owned-printings";
 import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser, viewableDeckByPublicId } from "@/lib/auth";
@@ -16,6 +16,8 @@ export async function GET(
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   // Commander decks always carry their commander on the deck board.
   await ensureCommanderCard(deck);
+  // The owner sees the printings they own, unless they picked one themselves.
+  if (user && deck.userId === user.id) await applyOwnedPrintings(deck.id, user.id).catch(() => 0);
   const cards = await prisma.poolCard.findMany({
     where: { deckId: deck.id },
     orderBy: { addedAt: "asc" },
