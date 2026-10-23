@@ -1700,3 +1700,19 @@ button {
     transform: rotate(360deg);
   }
 }
+
+/* A double-faced card turning over: edge-on at the middle, where the image
+   swaps (components/useCardFlip). */
+@keyframes card-flip {
+  0% { transform: perspective(900px) rotateY(0deg); }
+  50% { transform: perspective(900px) rotateY(90deg); }
+  100% { transform: perspective(900px) rotateY(0deg); }
+}
+.card-flip {
+  animation: card-flip 0.3s ease-in-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-flip {
+    animation: none;
+  }
+}
