@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Check, ExternalLink, Minus, Plus, Trash2, TriangleAlert, X } from "lucide-react";
+import FlippableArt from "@/components/FlippableArt";
 import { ModalShell } from "@/components/deck/ui";
 import { ManaCost, Pip, parseSymbols } from "@/components/mtg";
 import { fetchPrintings, type CardPrinting } from "@/lib/collection-client";
@@ -111,13 +112,7 @@ export default function DeckCardSheet({
           <X size={18} strokeWidth={2.25} />
         </button>
         <div className="coll-card-head" style={{ display: "flex", gap: 22, alignItems: "flex-start" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={card.imageUri || current?.imageUri || ""}
-            alt={card.name}
-            className="coll-card-art"
-            style={{ width: 240, flex: "none", aspectRatio: "5 / 7", borderRadius: "4.8% / 3.5%", objectFit: "cover", background: "rgba(0,0,0,.25)", boxShadow: "0 18px 40px -16px rgba(0,0,0,.6)" }}
-          />
+        <FlippableArt name={card.name} imageUri={card.imageUri || current?.imageUri || ""} width={240} />
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
             <h2 id="deck-card-title" style={{ margin: 0, paddingRight: 44, fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, lineHeight: 1.1, color: "var(--text)" }}>
               {card.name}

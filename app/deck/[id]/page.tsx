@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, Copy, Crown, Dices, Download, Eye, Share2, History,
-  ListChecks, Mountain, Plus, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
+  ListChecks, Mountain, Plus, RefreshCw, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
   type LucideIcon,
 } from "lucide-react";
 import Logo from "@/components/Logo";
@@ -17,6 +17,7 @@ import PlaytestModal from "@/components/deck/PlaytestModal";
 import GameCodeModal from "@/components/deck/GameCodeModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
 import DeckCardSheet, { type OwnedCopy } from "@/components/deck/DeckCardSheet";
+import { useCardFlip } from "@/components/useCardFlip";
 import AssistantScreen from "@/components/assistant/AssistantScreen";
 import { useAssistant, useAssistantFocus, type AssistantFocus } from "@/components/assistant/AssistantProvider";
 import DeckPrimer from "@/components/deck/DeckPrimer";
@@ -2053,6 +2054,8 @@ function DeckCardTile({
   onQty?: (next: number) => void;
 }) {
   const [showWarning, setShowWarning] = useState(false);
+  // A double-faced card can be turned over to its back.
+  const flip = useCardFlip(card.name, card.imageUri);
   return (
     <div
       className="card-tile"
@@ -2061,7 +2064,7 @@ function DeckCardTile({
       style={{ cursor: onOpen ? "pointer" : "default", transition: "transform .16s ease" }}
     >
     <div
-      className="card-tile-face"
+      className={`card-tile-face${flip.turning ? " card-flip" : ""}`}
       style={{
         position: "relative",
         borderRadius: "4.8%/3.5%",
@@ -2076,13 +2079,25 @@ function DeckCardTile({
           fetch, then the gradient placeholder — never a broken-image icon. */}
       <CardArt
         name={card.name}
-        src={card.imageUri || undefined}
+        src={flip.src || undefined}
         prefer="src"
         version="normal"
         loading="lazy"
         radius={0}
         style={{ position: "absolute", inset: 0 }}
       />
+      {flip.canFlip && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); flip.toggle(); }}
+          title={flip.flipped ? "Show the front" : "Turn over"}
+          aria-label={flip.flipped ? `Show the front of ${card.name}` : `Turn ${card.name} over`}
+          aria-pressed={flip.flipped}
+          style={{ position: "absolute", top: "40%", right: 7, width: 30, height: 30, borderRadius: 999, border: "none", background: "rgba(0,0,0,.72)", color: "#fff", display: "grid", placeItems: "center", cursor: "pointer", boxShadow: "0 1px 4px rgba(0,0,0,.35)" }}
+        >
+          <RefreshCw size={15} strokeWidth={2.25} />
+        </button>
+      )}
       {onQty ? (
         <span
           onClick={(e) => e.stopPropagation()}
