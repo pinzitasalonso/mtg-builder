@@ -1529,7 +1529,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 <span style={{ color: "var(--w-3)", marginLeft: 8 }}>· {Math.max(0, target - deckCount)} to go</span>
               </span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div className="deck-controls">
               <div className="id-seg">
                 {([["type", "By type"], ["cost", "By cost"], ["name", "A–Z"]] as const).map(([k, label]) => (
                   <button key={k} type="button" data-on={deckSort === k} onClick={() => setDeckSort(k)}>{label}</button>
@@ -1544,8 +1544,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 </button>
               </div>
               {canEdit && (
-                <button onClick={() => startDeckReview()} disabled={deckCards.length === 0} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }}>
-                  <ListChecks size={14} strokeWidth={2.25} /> Review
+                <button onClick={() => startDeckReview()} disabled={deckCards.length === 0} className="id-ghost deck-review" aria-label="Review" title="Review the deck card by card" style={{ fontSize: 12.5 }}>
+                  <ListChecks size={14} strokeWidth={2.25} /> <span className="deck-review-label">Review</span>
                 </button>
               )}
             </div>

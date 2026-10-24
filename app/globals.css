@@ -1579,6 +1579,33 @@ button {
   }
 }
 
+/* The deck pane's sort, view and Review controls. On a phone they share
+   one line with no room to spare, so the segments tighten and Review shows
+   just its icon. Anything narrower wraps rather than running off the screen. */
+.deck-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.deck-review {
+  padding: 7px 14px;
+}
+@media (max-width: 520px) {
+  .deck-controls {
+    gap: 6px;
+  }
+  .deck-controls .id-seg button {
+    padding: 6px 10px;
+  }
+  .deck-review {
+    padding: 7px 10px;
+  }
+  .deck-review-label {
+    display: none;
+  }
+}
+
 /* Deck list view: one line per card, in as many columns as fit (three at
    most, one on a phone). By type, each section stays whole in its column. */
 .deck-list-cols,
