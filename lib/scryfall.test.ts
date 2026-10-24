@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { naturalToScryfall } from "./scryfall";
+import { combineExclusiveFilters, naturalToScryfall } from "./scryfall";
 
 describe("naturalToScryfall", () => {
   it("maps plain English to Scryfall tokens", () => {
@@ -23,6 +23,48 @@ describe("naturalToScryfall", () => {
   it("handles empty input", () => {
     expect(naturalToScryfall("")).toBe("");
     expect(naturalToScryfall("   ")).toBe("");
+  });
+
+  it("maps the words around a filter chip's token, keeping the token", () => {
+    expect(naturalToScryfall("blue creatures r:rare")).toBe("c:u t:creature r:rare");
+    expect(naturalToScryfall("ramp r:rare")).toBe("ramp r:rare");
+  });
+
+  it("keeps a quoted phrase whole beside plain words", () => {
+    expect(naturalToScryfall('green o:"draw a card"')).toBe('c:g o:"draw a card"');
+  });
+
+  it("leaves a boolean query alone", () => {
+    expect(naturalToScryfall("t:creature or t:artifact blue")).toBe("t:creature or t:artifact blue");
+    expect(naturalToScryfall("(t:elf or t:druid) green")).toBe("(t:elf or t:druid) green");
+  });
+});
+
+describe("combineExclusiveFilters", () => {
+  it("reads two rarities as either", () => {
+    expect(combineExclusiveFilters("id:ub r:rare r:mythic")).toBe("id:ub (r:rare or r:mythic)");
+    expect(combineExclusiveFilters("r:common t:creature r:uncommon")).toBe("(r:common or r:uncommon) t:creature");
+  });
+
+  it("leaves one rarity, or the same one twice, as it is", () => {
+    expect(combineExclusiveFilters("r:rare t:creature")).toBe("r:rare t:creature");
+    expect(combineExclusiveFilters("r:rare r:rare")).toBe("r:rare r:rare");
+    expect(combineExclusiveFilters("-r:common r:rare")).toBe("-r:common r:rare");
+  });
+
+  it("reads mana values that could never hold together as either", () => {
+    expect(combineExclusiveFilters("mv=2 mv=3 t:instant")).toBe("(mv=2 or mv=3) t:instant");
+    expect(combineExclusiveFilters("mv=1 mv>=7")).toBe("(mv=1 or mv>=7)");
+  });
+
+  it("leaves mana values that make sense together alone", () => {
+    expect(combineExclusiveFilters("mv>=2 mv=3")).toBe("mv>=2 mv=3");
+    expect(combineExclusiveFilters("mv>=2 mv<=4")).toBe("mv>=2 mv<=4");
+  });
+
+  it("leaves a boolean query and quoted text alone", () => {
+    expect(combineExclusiveFilters("(r:rare or r:mythic) r:common")).toBe("(r:rare or r:mythic) r:common");
+    expect(combineExclusiveFilters('o:"r:rare r:mythic"')).toBe('o:"r:rare r:mythic"');
   });
 });
 
