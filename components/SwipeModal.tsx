@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, CircleCheck, Info, SkipForward, Sparkles, X, type LucideIcon } from "lucide-react";
+import { Check, CircleCheck, Info, RefreshCw, SkipForward, Sparkles, X, type LucideIcon } from "lucide-react";
 import { ClassicCard } from "@/components/mtg";
+import { useCardFlip } from "@/components/useCardFlip";
 import { fetchUsdPrice } from "@/lib/scryfall";
 
 export interface SwipeCard {
@@ -117,6 +118,10 @@ export default function SwipeModal<T extends SwipeCard>({
   const startX = useRef(0);
 
   const card = cards[i];
+  // A double-faced card can be turned over to read its back.
+  const flip = useCardFlip(card?.name ?? "", card?.imageUri);
+  const flipRef = useRef(flip.toggle);
+  flipRef.current = flip.toggle;
   const done = i >= cards.length;
 
   const act = useCallback(
@@ -169,6 +174,8 @@ export default function SwipeModal<T extends SwipeCard>({
       // Down rather than a letter: it sits with the arrows already driving
       // this, and it reads as "put it back on the pile".
       else if (e.key === "ArrowDown") { e.preventDefault(); skip(); }
+      // Up turns a double-faced card over: the other arrow that decides nothing.
+      else if (e.key === "ArrowUp") { e.preventDefault(); flipRef.current(); }
       else if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", onKey);
@@ -356,7 +363,7 @@ export default function SwipeModal<T extends SwipeCard>({
                 opacity: exit ? 0 : 1,
               }}
             >
-              <CardFace card={card} />
+              <CardFace card={card} src={flip.src} turning={flip.turning} />
               <div
                 style={{
                   position: "absolute",
@@ -401,12 +408,14 @@ export default function SwipeModal<T extends SwipeCard>({
             <span className="sw-narrow-only">{skipBtn()}</span>
             <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
               <SwBtn kind="info" onClick={() => card && onInfo?.(card)} />
+              {flip.canFlip && <SwBtn kind="flip" onClick={flip.toggle} label={flip.flipped ? "Show the front" : "Turn over"} />}
               {copy.hasSkip && <SwBtn kind="later" onClick={skip} />}
             </div>
             <span className="sw-narrow-only">{addBtn()}</span>
           </div>
           <div style={{ fontSize: 13, color: "var(--t3)" }}>
             {copy.hint}
+            {flip.canFlip ? " · ↑ turn over" : ""}
           </div>
         </div>
       )}
@@ -417,13 +426,13 @@ export default function SwipeModal<T extends SwipeCard>({
 /* The card face shown in the swipe stack — matches the card detail screen:
    the real Scryfall scan in a clean white frame, with the readable proxy as a
    fallback when no image is stored. */
-function CardFace({ card }: { card: SwipeCard }) {
+function CardFace({ card, src, turning }: { card: SwipeCard; src?: string; turning?: boolean }) {
   if (card.imageUri) {
     return (
-      <div className="cc-black" style={{ padding: 10 }}>
+      <div className={`cc-black${turning ? " card-flip" : ""}`} style={{ padding: 10 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={card.imageUri}
+          src={src || card.imageUri}
           alt={card.name}
           draggable={false}
           style={{ borderRadius: 8, width: "100%", height: "auto", display: "block", userSelect: "none" }}
@@ -434,13 +443,15 @@ function CardFace({ card }: { card: SwipeCard }) {
   return <ClassicCard card={card} variant="full" />;
 }
 
-function SwBtn({ kind, onClick, size, label }: { kind: "skip" | "info" | "add" | "later"; onClick?: () => void; size?: number; label?: string }) {
+function SwBtn({ kind, onClick, size, label }: { kind: "skip" | "info" | "add" | "later" | "flip"; onClick?: () => void; size?: number; label?: string }) {
   const cfg = {
     skip: { ic: X, color: "#c2402a", size: 58 },
     info: { ic: Info, color: "#9a9aa2", size: 46 },
     // Grey and small, like info: skipping is not a verdict on the card, and a
     // third coloured circle beside Remove and Add would read as one.
     later: { ic: SkipForward, color: "#9a9aa2", size: 46 },
+    // Grey too: turning a card over decides nothing.
+    flip: { ic: RefreshCw, color: "#9a9aa2", size: 46 },
     add: { ic: Check, color: "#0d8a5f", size: 58 },
   }[kind];
   const dim = size ?? cfg.size;
