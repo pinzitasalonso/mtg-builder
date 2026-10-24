@@ -396,7 +396,10 @@ export async function printingsOf(name: string): Promise<ScryfallPrinting[]> {
 // "1 mana blue creatures", which Scryfall 404s on. This maps bare words to the
 // equivalent tokens while leaving anything that already looks like syntax
 // (carries `:`, `=`, `<`, `>`, `!`, or quotes) untouched, so power queries pass
-// through verbatim and casual phrasing still finds cards.
+// through verbatim and casual phrasing still finds cards. The two mix: the
+// filter chips add tokens to whatever was typed, so "blue creatures r:rare"
+// maps its words and keeps its chip. A query with `or` or brackets is a
+// boolean one, and is left alone whole.
 const COLOR_WORDS: Record<string, string> = {
   white: "w", blue: "u", black: "b", red: "r", green: "g", colorless: "c",
 };
@@ -418,16 +421,25 @@ const FILLER_WORDS = new Set([
   "mana", "cost", "costs", "cmc", "cards", "card", "with", "that", "for", "and", "the", "a", "an", "of",
 ]);
 
+// Splits on spaces, keeping a quoted phrase (o:"draw a card") in one piece.
+const queryTokens = (s: string): string[] => s.match(/(?:[^\s"]+|"[^"]*"?)+/g) ?? [];
+const isSyntax = (t: string) => /[:=<>!"]/.test(t);
+const isBoolean = (t: string) => /[()]/.test(t) || /^or$/i.test(t);
+
 export function naturalToScryfall(input: string): string {
   const trimmed = input.trim();
   if (!trimmed) return trimmed;
-  const tokens = trimmed.split(/\s+/);
-  // Already real syntax? Leave it entirely alone.
-  if (tokens.some((t) => /[:=<>!"]/.test(t))) return trimmed;
+  const tokens = queryTokens(trimmed);
+  // All syntax already, or a boolean query? Leave it entirely alone.
+  if (!tokens.some((t) => !isSyntax(t)) || tokens.some(isBoolean)) return trimmed;
 
   const colors: string[] = [];
   const out: string[] = [];
   for (const tok of tokens) {
+    if (isSyntax(tok)) {
+      out.push(tok);
+      continue;
+    }
     const w = tok.toLowerCase();
     if (FILLER_WORDS.has(w)) continue;
     if (w in COLOR_WORDS) {
@@ -449,6 +461,38 @@ export function naturalToScryfall(input: string): string {
   }
   if (colors.length) out.unshift(`c:${colors.join("")}`);
   return out.join(" ") || trimmed;
+}
+
+// A card has one rarity and one mana value, so two rarity chips
+// ("r:rare r:mythic") read the way Scryfall reads any two terms — both at
+// once — match nothing, and the search fails. Two chips mean "either", so
+// they are joined with `or`. Mana value likewise, for the terms that could
+// never hold together (mv=2 mv=3, or mv=3 with mv>=7); "mv>=2 mv=3" means
+// what it says and is left alone.
+export function combineExclusiveFilters(query: string): string {
+  const tokens = queryTokens(query.trim());
+  if (tokens.some(isBoolean)) return query.trim();
+  const groups: string[][] = [];
+
+  const rarity = tokens.filter((t) => /^(r|rarity):[a-z]+$/i.test(t));
+  if (new Set(rarity.map((t) => t.split(":")[1].toLowerCase())).size > 1) groups.push(rarity);
+
+  const mvOf = (t: string) => Number(t.replace(/^\D+/, ""));
+  const eq = tokens.filter((t) => /^(mv|cmc|manavalue)=\d+$/i.test(t));
+  const ge = tokens.filter((t) => /^(mv|cmc|manavalue)>=\d+$/i.test(t));
+  const eqValues = new Set(eq.map(mvOf));
+  if (ge.length === 0 && eqValues.size > 1) groups.push(eq);
+  else if (ge.length === 1 && eq.length > 0 && eq.every((t) => mvOf(t) < mvOf(ge[0]))) groups.push([...eq, ...ge]);
+
+  if (!groups.length) return query.trim();
+  // Each group goes where its first term was.
+  const out: string[] = [];
+  for (const t of tokens) {
+    const g = groups.find((g) => g.includes(t));
+    if (!g) out.push(t);
+    else if (g[0] === t) out.push(`(${g.join(" or ")})`);
+  }
+  return out.join(" ");
 }
 
 export interface ScryfallSearchResult {

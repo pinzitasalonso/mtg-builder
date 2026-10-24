@@ -6,7 +6,7 @@ import { SIGN_IN_FOR_AI_MSG } from "@/lib/ratelimit";
 import { AI_LIMIT_MSG } from "@/lib/limits";
 import { consumeAi } from "@/lib/limits-db";
 import { extractJson, messageText, strArr } from "@/lib/ai";
-import { OutCard, naturalToScryfall, resolveNamed, scryfallSearch } from "@/lib/scryfall";
+import { OutCard, combineExclusiveFilters, naturalToScryfall, resolveNamed, scryfallSearch } from "@/lib/scryfall";
 import {
   AlmostCombo,
   DeckContext,
@@ -82,9 +82,6 @@ export async function POST(req: Request) {
   // Anthropic budget, and an account gives it a daily meter.
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: SIGN_IN_FOR_AI_MSG, code: "sign_in" }, { status: 401 });
-  if (!(await consumeAi(user))) {
-    return NextResponse.json({ error: AI_LIMIT_MSG, code: "ai_limit" }, { status: 429 });
-  }
   const { prompt, filters, mode, currentDeck } = await req.json();
   if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return NextResponse.json({ error: "prompt required" }, { status: 400 });
@@ -96,6 +93,11 @@ export async function POST(req: Request) {
   const deckCtx = parseDeckContext(currentDeck);
   const filterTerms = strArr(filters);
   const useAi = mode !== "scryfall" && Boolean(process.env.ANTHROPIC_API_KEY);
+  // Only an AI search spends the daily AI allowance. A Scryfall search calls
+  // no model; metering it held free players to four card searches a day.
+  if (useAi && !(await consumeAi(user))) {
+    return NextResponse.json({ error: AI_LIMIT_MSG, code: "ai_limit" }, { status: 429 });
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // AI mode: research real recommendations, then resolve them on Scryfall.
@@ -161,6 +163,7 @@ export async function POST(req: Request) {
   // ─────────────────────────────────────────────────────────────────────────
   let query = naturalToScryfall(prompt.trim());
   if (filterTerms.length > 0) query = [query, ...filterTerms].join(" ");
+  query = combineExclusiveFilters(query);
 
   const result = await scryfallSearch(query);
   if ("error" in result) {
