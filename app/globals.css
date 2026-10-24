@@ -1579,6 +1579,97 @@ button {
   }
 }
 
+/* Deck list view: one line per card, in as many columns as fit (three at
+   most, one on a phone). By type, each section stays whole in its column. */
+.deck-list-cols,
+.deck-list-flat {
+  columns: 3 260px;
+  column-gap: 28px;
+}
+.deck-list-section {
+  break-inside: avoid;
+}
+.deck-row {
+  break-inside: avoid;
+  border-radius: 6px;
+  padding: 0 4px 0 6px;
+  cursor: pointer;
+}
+.deck-row-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  min-width: 0;
+}
+.deck-row-qty {
+  flex: none;
+  width: 14px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--w-3);
+}
+.deck-row-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--w-1);
+}
+.deck-row-warn,
+.deck-row-remove {
+  flex: none;
+  display: none;
+  place-items: center;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.deck-row-warn {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  margin: 0 -3px;
+  color: var(--gold);
+}
+.deck-row-remove {
+  width: 24px;
+  height: 24px;
+  margin-right: -2px;
+  border-radius: 6px;
+  color: var(--w-3);
+}
+.deck-row-warning {
+  padding: 0 0 7px 21px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--gold);
+}
+/* The wash and the remove are for a real mouse only. On a touch screen an
+   × on every thin row is a mis-tap waiting to happen; there, the row opens
+   the card sheet, which has Remove. */
+@media (hover: hover) and (pointer: fine) {
+  .deck-row:hover {
+    background: var(--w-fill);
+  }
+  .deck-row .deck-row-remove {
+    display: grid;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .deck-row:hover .deck-row-remove,
+  .deck-row:focus-within .deck-row-remove {
+    opacity: 1;
+  }
+  .deck-row-remove:hover {
+    background: rgba(208, 86, 63, 0.28);
+    color: #ff9c86;
+  }
+}
 /* Swipe review's round buttons: the hover grow is for a real mouse only. */
 @media (hover: hover) and (pointer: fine) {
   .sw-btn:hover {

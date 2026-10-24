@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, Copy, Crown, Dices, Download, Eye, Share2, History,
-  ListChecks, Mountain, Plus, RefreshCw, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
+  LayoutGrid, List, ListChecks, Mountain, Plus, RefreshCw, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
   type LucideIcon,
 } from "lucide-react";
 import Logo from "@/components/Logo";
@@ -253,6 +253,25 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [copied, setCopied] = useState<"" | "link">("");
   // deck-panel sort: by type (grouped), by cost (mv), or A–Z
   const [deckSort, setDeckSort] = useState<"type" | "cost" | "name">("type");
+  // Card images, or a compact one-line-per-card list. Remembered on this
+  // device; read after mount so the server render and the first client
+  // render agree.
+  const [deckView, setDeckView] = useState<"grid" | "list">("grid");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("sp-deck-view") === "list") setDeckView("list");
+    } catch {
+      /* storage off: grid */
+    }
+  }, []);
+  const chooseDeckView = (v: "grid" | "list") => {
+    setDeckView(v);
+    try {
+      localStorage.setItem("sp-deck-view", v);
+    } catch {
+      /* not remembered */
+    }
+  };
 
   // settings modal
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -773,6 +792,19 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // and (for the owner) its printing and moves. The swipe review is still the
   // Review button.
   const openCard = (c: PoolCard) => setSheetId(c.dbId);
+
+  // List view: a mouse resting on a row sees that card beside it. Scrolling
+  // moves the row away from the picture, so it closes.
+  const [rowPreview, setRowPreview] = useState<{ card: PoolCard; rect: DOMRect } | null>(null);
+  useEffect(() => {
+    if (!rowPreview) return;
+    const close = () => setRowPreview(null);
+    window.addEventListener("scroll", close, { capture: true, passive: true });
+    return () => window.removeEventListener("scroll", close, { capture: true });
+  }, [rowPreview]);
+  useEffect(() => {
+    if (deckView !== "list" || pane !== "deck") setRowPreview(null);
+  }, [deckView, pane]);
   const sheetCard = sheetId === null ? null : pool.find((c) => c.dbId === sheetId) ?? null;
 
   // The auto-included commander (commander decks) can't be removed or reviewed out.
@@ -841,6 +873,32 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // pool candidates too sent you looking for cards that aren't on that pane.
   // A card you are only considering is not a legality problem yet.
   const deckWarningCount = deckCards.reduce((n, c) => n + (warningOf(c) ? 1 : 0), 0);
+
+  // A run of deck cards, as image tiles or as list rows. `flat` is the
+  // unsectioned by-cost / A–Z list, which flows into columns on its own.
+  const deckCardsBlock = (cards: PoolCard[], flat = false) =>
+    deckView === "list" ? (
+      <div className={flat ? "deck-list deck-list-flat" : "deck-list"}>
+        {cards.map((c) => (
+          <DeckCardRow
+            key={c.dbId}
+            card={c}
+            owned={ownedSet.has(c.name.toLowerCase())}
+            warning={warningOf(c)}
+            removable={canEdit && !isCommander(c)}
+            onOpen={() => { setRowPreview(null); openCard(c); }}
+            onRemove={() => { setRowPreview(null); removeCard(c.dbId); }}
+            onPreview={(rect) => setRowPreview(rect ? { card: c, rect } : null)}
+          />
+        ))}
+      </div>
+    ) : (
+      <div style={deckTileGrid}>
+        {cards.map((c) => (
+          <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable={canEdit && !isCommander(c)} onOpen={() => openCard(c)} onRemove={() => removeCard(c.dbId)} onQty={!canEdit || isCommander(c) || singletonCapped(deck?.format ?? "commander", c.typeLine) ? undefined : (n) => setCopies(c, n)} />
+        ))}
+      </div>
+    );
 
 
   const groupedFor = (cards: PoolCard[]) =>
@@ -1477,6 +1535,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   <button key={k} type="button" data-on={deckSort === k} onClick={() => setDeckSort(k)}>{label}</button>
                 ))}
               </div>
+              <div className="id-seg" role="group" aria-label="View">
+                <button type="button" data-on={deckView === "grid"} onClick={() => chooseDeckView("grid")} aria-label="Card images" title="Card images">
+                  <LayoutGrid size={14} strokeWidth={2.25} />
+                </button>
+                <button type="button" data-on={deckView === "list"} onClick={() => chooseDeckView("list")} aria-label="List" title="List">
+                  <List size={14} strokeWidth={2.25} />
+                </button>
+              </div>
               {canEdit && (
                 <button onClick={() => startDeckReview()} disabled={deckCards.length === 0} className="id-ghost" style={{ padding: "7px 14px", fontSize: 12.5 }}>
                   <ListChecks size={14} strokeWidth={2.25} /> Review
@@ -1518,45 +1584,27 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               </div>
             </div>
           ) : deckSort === "type" ? (
-            <div>
+            <div className={deckView === "list" ? "deck-list-cols" : undefined}>
               {(() => {
                 const commander = deckCards.find(isCommander);
                 const rest = deckCards.filter((c) => !isCommander(c));
-                return (
-                  <>
-                    {commander && (
-                      <div style={{ marginBottom: 24 }}>
-                        <DeckSectionHead cat="Commander" n={1} />
-                        <div style={deckTileGrid}>
-                          <DeckCardTile card={commander} owned={ownedSet.has(commander.name.toLowerCase())} warning={warningOf(commander)} removable={false} onOpen={() => openCard(commander)} onRemove={() => {}} />
-                        </div>
-                      </div>
-                    )}
-                    {groupedFor(rest)
-                      .map((g) => ({ t: g.t, cards: g.cards.filter(matchesDeckFilter) }))
-                      .filter((g) => g.cards.length)
-                      .map((g) => (
-                        <div key={g.t} style={{ marginBottom: 24 }}>
-                          <DeckSectionHead cat={g.t} n={g.cards.reduce((s, c) => s + c.quantity, 0)} />
-                          <div style={deckTileGrid}>
-                            {g.cards.map((c) => (
-                              <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable={canEdit} onOpen={() => openCard(c)} onRemove={() => removeCard(c.dbId)} onQty={!canEdit || singletonCapped(deck?.format ?? "commander", c.typeLine) ? undefined : (n) => setCopies(c, n)} />
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                  </>
-                );
+                const sections = [
+                  ...(commander ? [{ t: "Commander", cards: [commander] }] : []),
+                  ...groupedFor(rest).map((g) => ({ t: g.t, cards: g.cards.filter(matchesDeckFilter) })),
+                ].filter((g) => g.cards.length);
+                return sections.map((g) => (
+                  <div key={g.t} className="deck-list-section" style={{ marginBottom: deckView === "list" ? 18 : 24 }}>
+                    <DeckSectionHead cat={g.t} n={g.cards.reduce((s, c) => s + c.quantity, 0)} />
+                    {deckCardsBlock(g.cards)}
+                  </div>
+                ));
               })()}
             </div>
           ) : (
-            <div style={deckTileGrid}>
-              {[...deckCards]
-                .sort((a, b) => deckSort === "cost" ? (manaValue(a.manaCost) - manaValue(b.manaCost)) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name))
-                .map((c) => (
-                  <DeckCardTile key={c.dbId} card={c} owned={ownedSet.has(c.name.toLowerCase())} warning={warningOf(c)} removable={canEdit && !isCommander(c)} onOpen={() => openCard(c)} onRemove={() => removeCard(c.dbId)} onQty={!canEdit || isCommander(c) || singletonCapped(deck?.format ?? "commander", c.typeLine) ? undefined : (n) => setCopies(c, n)} />
-                ))}
-            </div>
+            deckCardsBlock(
+              [...deckCards].sort((a, b) => deckSort === "cost" ? (manaValue(a.manaCost) - manaValue(b.manaCost)) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name)),
+              true
+            )
           )}
         </section>
         )}
@@ -1799,6 +1847,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           onClose={() => setSheetId(null)}
         />
       )}
+
+      {rowPreview && <DeckRowPreview card={rowPreview.card} rect={rowPreview.rect} />}
 
       {/* card preview modal */}
       {preview && (
@@ -2171,6 +2221,90 @@ function DeckCardTile({
         )}
         <span style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.25, color: "var(--w-1)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{card.name}</span>
       </div>
+    </div>
+  );
+}
+
+/* The deck's list view: one line per card. Tighter than the pool's rows —
+   no art thumbnail and no type line, just copies, name, the owned and
+   legality marks, and the mana cost. Tap a row for the card sheet; a mouse
+   sees the card on hover and gets an × to remove it (on a touch screen,
+   Remove is in the sheet). */
+function DeckCardRow({
+  card,
+  owned,
+  warning,
+  removable,
+  onOpen,
+  onRemove,
+  onPreview,
+}: {
+  card: PoolCard;
+  owned?: boolean;
+  warning?: string;
+  removable: boolean;
+  onOpen: () => void;
+  onRemove: () => void;
+  onPreview: (rect: DOMRect | null) => void;
+}) {
+  const [showWarning, setShowWarning] = useState(false);
+  return (
+    <div
+      className="deck-row"
+      onClick={onOpen}
+      onPointerEnter={(e) => { if (e.pointerType === "mouse") onPreview(e.currentTarget.getBoundingClientRect()); }}
+      onPointerLeave={(e) => { if (e.pointerType === "mouse") onPreview(null); }}
+    >
+      <div className="deck-row-line">
+        <span className="id-mono deck-row-qty">{card.quantity}</span>
+        <span className="deck-row-name">{card.name}</span>
+        {owned && (
+          <Check size={13} strokeWidth={3} color="#4ecb8f" style={{ flex: "none" }} aria-label="In your collection">
+            <title>In your collection</title>
+          </Check>
+        )}
+        {warning && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowWarning((v) => !v); }}
+            title={warning}
+            aria-label={`Legality warning: ${warning}`}
+            aria-expanded={showWarning}
+            className="deck-row-warn"
+          >
+            <TriangleAlert size={13} strokeWidth={2.25} />
+          </button>
+        )}
+        <span style={{ flex: 1 }} />
+        <ManaCost cost={card.manaCost} size={13} />
+        {removable && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            title="Remove from deck"
+            aria-label={`Remove ${card.name} from deck`}
+            className="deck-row-remove"
+          >
+            <X size={14} strokeWidth={2.5} />
+          </button>
+        )}
+      </div>
+      {warning && showWarning && <div className="deck-row-warning">{warning}</div>}
+    </div>
+  );
+}
+
+/* The card beside a hovered list row: right of it when there is room, else
+   left. It takes no pointer events, so it never steals the hover. */
+function DeckRowPreview({ card, rect }: { card: PoolCard; rect: DOMRect }) {
+  const W = 230;
+  const H = Math.round((W * 7) / 5);
+  const fitsRight = rect.right + W + 16 < window.innerWidth;
+  const left = fitsRight ? rect.right + 12 : Math.max(8, rect.left - W - 12);
+  const top = Math.max(8, Math.min(rect.top + rect.height / 2 - H / 2, window.innerHeight - H - 8));
+  return (
+    <div style={{ position: "fixed", top, left, width: W, height: H, zIndex: 90, pointerEvents: "none", borderRadius: "4.8%/3.5%", overflow: "hidden", boxShadow: "0 18px 40px -12px rgba(0,0,0,.7)", animation: "sp-fade .12s ease" }}>
+      <CardArt name={card.name} src={card.imageUri || undefined} prefer="src" version="normal" radius={0} style={{ position: "absolute", inset: 0 }} />
     </div>
   );
 }
