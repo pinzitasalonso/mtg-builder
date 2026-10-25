@@ -211,21 +211,24 @@ export default function PlaytestModal({
           <span className="pt-turn">Turn {state.turn}</span>
           <LifeCounter label="Opp" value={state.oppLife} onDelta={(d) => act((s) => adjustLife(s, "opp", d))} />
           <LifeCounter label="You" value={state.life} onDelta={(d) => act((s) => adjustLife(s, "you", d))} />
-          <button type="button" className="pt-btn" onClick={() => setOddsOpen(true)}>
+          <button type="button" className="pt-btn pt-wide-only" onClick={() => setOddsOpen(true)}>
             <BarChart3 size={14} strokeWidth={2.25} /> Odds
           </button>
           <button type="button" className="pt-btn" onClick={onClose} aria-label="Close playtest">
-            <X size={14} strokeWidth={2.5} /> Close
+            <X size={14} strokeWidth={2.5} /> <span className="pt-btn-label">Close</span>
           </button>
         </div>
       </header>
 
       <div className="pt-tools">
+        {/* One row that scrolls sideways on a phone; on a wider screen it's
+            invisible and the buttons sit in .pt-tools as before. */}
+        <div className="pt-tools-row">
         <button type="button" className="pt-btn pt-btn-gold" onClick={() => act(newGame)}>
           New game
         </button>
-        <button type="button" className="pt-btn" onClick={undo} disabled={history.length === 0} title="Undo (⌘Z / Ctrl+Z)">
-          <Undo2 size={14} strokeWidth={2.25} /> Undo
+        <button type="button" className="pt-btn" onClick={undo} disabled={history.length === 0} title="Undo (⌘Z / Ctrl+Z)" aria-label="Undo">
+          <Undo2 size={14} strokeWidth={2.25} /> <span className="pt-btn-label">Undo</span>
         </button>
         <button type="button" className="pt-btn" onClick={() => act((s) => mulligan(s))} disabled={state.mulligans >= 6}>
           Mulligan{state.mulligans ? ` (${state.mulligans})` : ""}
@@ -242,7 +245,14 @@ export default function PlaytestModal({
         <button type="button" className="pt-btn" onClick={() => act((s) => shuffleLibrary(s))} disabled={state.library.length < 2}>
           Shuffle
         </button>
-        <span className="pt-status">
+        {/* On a phone the header has room for the life totals and Close only. */}
+        <button type="button" className="pt-btn pt-narrow-only" onClick={() => setOddsOpen(true)}>
+          <BarChart3 size={14} strokeWidth={2.25} /> Odds
+        </button>
+        </div>
+        {/* The hand count is plain to see on a phone, so only the mulligan
+            prompt shows there. */}
+        <span className={state.toBottom > 0 ? "pt-status" : "pt-status pt-status-idle"}>
           {state.toBottom > 0 ? (
             <b style={{ color: "var(--gold)" }}>
               Mulligan — click {state.toBottom} card{state.toBottom === 1 ? "" : "s"} in hand to put on the bottom
@@ -452,7 +462,7 @@ function LifeCounter({ label, value, onDelta }: { label: string; value: number; 
   return (
     <div className="pt-life" title={`${label} life`}>
       <span className="pt-life-label">{label}</span>
-      <button type="button" onClick={() => onDelta(-5)} aria-label={`${label} minus five`}>
+      <button type="button" className="pt-life-5" onClick={() => onDelta(-5)} aria-label={`${label} minus five`}>
         −5
       </button>
       <button type="button" onClick={() => onDelta(-1)} aria-label={`${label} minus one`}>
@@ -462,7 +472,7 @@ function LifeCounter({ label, value, onDelta }: { label: string; value: number; 
       <button type="button" onClick={() => onDelta(1)} aria-label={`${label} plus one`}>
         +
       </button>
-      <button type="button" onClick={() => onDelta(5)} aria-label={`${label} plus five`}>
+      <button type="button" className="pt-life-5" onClick={() => onDelta(5)} aria-label={`${label} plus five`}>
         +5
       </button>
     </div>
