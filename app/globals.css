@@ -1267,9 +1267,13 @@ button {
   transform: rotate(90deg) scale(0.72);
   filter: brightness(0.75);
 }
+/* The ⋯ and 🔍 sit on the art's top corners, just under the name bar: at
+   the card's top corners they hid the mana cost and the start of the name,
+   and the bottom right is power and toughness. 12% of a card's height
+   clears its name bar. */
 .pt-card-btn {
   position: absolute;
-  top: 4px;
+  top: 12%;
   width: 22px;
   height: 22px;
   padding: 0;
