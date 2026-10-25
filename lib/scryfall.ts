@@ -1,8 +1,10 @@
-// Shared Scryfall types + helpers. Isomorphic: plain `fetch`, usable from route
-// handlers and client components alike (browsers silently drop the User-Agent
-// header, which is fine).
+// Shared Scryfall types + helpers. Isomorphic: usable from route handlers and
+// client components alike (browsers silently drop the User-Agent header, which
+// is fine). Requests go through scryfallFetch, which keeps to Scryfall's rate
+// limits.
 
 import { decodePrinting } from "./printing";
+import { scryfallFetch } from "./scryfall-limit";
 
 export interface ScryfallCard {
   id: string;
@@ -70,9 +72,11 @@ export function toOutCard(c: ScryfallCard): OutCard {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// Scryfall asks for ≤10 requests/second and answers bursts with 429. Between
-// batch calls we leave a gap; after a throttle we wait what Retry-After says
-// (or a second) before the single retry.
+// Every request here goes through scryfallFetch, which keeps to Scryfall's
+// rate limits and holds everything back after a 429 (lib/scryfall-limit.ts).
+// The gaps below are older and now only add a little slack. After a failure
+// we wait what Retry-After says (or a second) before the single retry; during
+// a lockout that retry is answered by the limiter, not by Scryfall.
 const COLLECTION_GAP_MS = 100;
 const NAMED_GAP_MS = 120;
 function retryDelayMs(res: Response | null): number {
@@ -127,7 +131,7 @@ export async function lookupCollection(names: string[]): Promise<CollectionLooku
     for (let attempt = 0; attempt < 2 && !data && !rejected; attempt++) {
       let res: Response | null = null;
       try {
-        res = await fetch("https://api.scryfall.com/cards/collection", {
+        res = await scryfallFetch("https://api.scryfall.com/cards/collection", {
           method: "POST",
           headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
           body: JSON.stringify({ identifiers: chunk.map((name) => ({ name })) }),
@@ -193,7 +197,7 @@ export async function lookupPrintings(refs: string[]): Promise<CollectionLookup>
     for (let attempt = 0; attempt < 2 && !data && !rejected; attempt++) {
       let res: Response | null = null;
       try {
-        res = await fetch("https://api.scryfall.com/cards/collection", {
+        res = await scryfallFetch("https://api.scryfall.com/cards/collection", {
           method: "POST",
           headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
           body: JSON.stringify({ identifiers }),
@@ -230,12 +234,30 @@ export type NamedResult =
   | { status: "ok"; card: OutCard }
   | { status: "notfound" | "failed"; card: null };
 
+// Answers kept for a day, as Scryfall asks: a found card, and a name that
+// isn't one (a deck whose commander field holds a typo would otherwise look it
+// up again on every visit). A failed lookup isn't kept.
+const NAMED_TTL_MS = 24 * 60 * 60 * 1000;
+const namedCache = new Map<string, { at: number; result: NamedResult }>();
+
 export async function resolveNamedDetailed(name: string): Promise<NamedResult> {
+  const key = normalizeCardKey(name);
+  const hit = namedCache.get(key);
+  if (hit && Date.now() - hit.at < NAMED_TTL_MS) return hit.result;
+  const result = await fetchNamed(name);
+  if (result.status !== "failed") {
+    if (namedCache.size >= 2000) namedCache.delete(namedCache.keys().next().value!);
+    namedCache.set(key, { at: Date.now(), result });
+  }
+  return result;
+}
+
+async function fetchNamed(name: string): Promise<NamedResult> {
   const url = `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`;
   for (let attempt = 0; attempt < 2; attempt++) {
     let res: Response | null = null;
     try {
-      res = await fetch(url, { headers: SCRYFALL_HEADERS });
+      res = await scryfallFetch(url, { headers: SCRYFALL_HEADERS });
       if (res.ok) {
         const c = (await res.json()) as ScryfallCard;
         return c?.id ? { status: "ok", card: toOutCard(c) } : { status: "notfound", card: null };
@@ -263,7 +285,7 @@ const usdPriceCache = new Map<string, string | null>();
 export async function fetchUsdPrice(scryfallId: string): Promise<string | null> {
   if (usdPriceCache.has(scryfallId)) return usdPriceCache.get(scryfallId)!;
   try {
-    const res = await fetch(`https://api.scryfall.com/cards/${scryfallId}`, { headers: SCRYFALL_HEADERS });
+    const res = await scryfallFetch(`https://api.scryfall.com/cards/${scryfallId}`, { headers: SCRYFALL_HEADERS });
     if (!res.ok) {
       usdPriceCache.set(scryfallId, null);
       return null;
@@ -306,7 +328,7 @@ export async function usdPricesByIds(ids: string[]): Promise<Map<string, string>
   for (let i = 0; i < missing.length; i += 75) {
     const chunk = missing.slice(i, i + 75);
     try {
-      const res = await fetch("https://api.scryfall.com/cards/collection", {
+      const res = await scryfallFetch("https://api.scryfall.com/cards/collection", {
         method: "POST",
         headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
         body: JSON.stringify({ identifiers: chunk.map((id) => ({ id })) }),
@@ -349,7 +371,7 @@ export async function defaultPrintingsByName(names: string[]): Promise<Map<strin
   for (let i = 0; i < names.length; i += 75) {
     const chunk = names.slice(i, i + 75);
     try {
-      const res = await fetch("https://api.scryfall.com/cards/collection", {
+      const res = await scryfallFetch("https://api.scryfall.com/cards/collection", {
         method: "POST",
         headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
         body: JSON.stringify({ identifiers: chunk.map((name) => ({ name })) }),
@@ -376,7 +398,7 @@ export async function defaultPrintingsByName(names: string[]): Promise<Map<strin
 export async function printingsOf(name: string): Promise<ScryfallPrinting[]> {
   try {
     const q = `!"${name}" game:paper`;
-    const res = await fetch(
+    const res = await scryfallFetch(
       `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=released&dir=desc`,
       { headers: SCRYFALL_HEADERS }
     );
@@ -503,20 +525,38 @@ export interface ScryfallSearchResult {
 
 export interface ScryfallSearchError {
   error: unknown;
-  status: 422;
+  status: 422 | 429;
 }
 
-// Direct-syntax Scryfall search. Paginates and returns up to MAX_PAGES * 175 cards.
+// Two pages: 350 cards is more than anyone swipes through, and every page
+// is a request against Scryfall's 2-a-second search limit. It used to be
+// seven (1,225 cards), which tripped that limit on its own.
+const SEARCH_PAGES = 2;
+// Recent searches, so running one again (or the same chip twice) costs no
+// request. Ten minutes, the last thirty queries.
+const SEARCH_TTL_MS = 10 * 60 * 1000;
+const searchCache = new Map<string, { at: number; result: ScryfallSearchResult }>();
+
+// Direct-syntax Scryfall search. Paginates and returns up to SEARCH_PAGES * 175 cards.
 export async function scryfallSearch(query: string): Promise<ScryfallSearchResult | ScryfallSearchError> {
-  const MAX_PAGES = 7; // 7 * 175 = up to 1225 cards
+  const hit = searchCache.get(query);
+  if (hit && Date.now() - hit.at < SEARCH_TTL_MS) return hit.result;
+
   const raw: ScryfallCard[] = [];
   let pageUrl: string | null = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&order=edhrec`;
   let totalCards = 0;
 
-  for (let page = 0; page < MAX_PAGES && pageUrl; page++) {
-    const res: Response = await fetch(pageUrl, { headers: SCRYFALL_HEADERS });
+  for (let page = 0; page < SEARCH_PAGES && pageUrl; page++) {
+    const res: Response = await scryfallFetch(pageUrl, { headers: SCRYFALL_HEADERS });
     if (!res.ok) {
       if (page === 0) {
+        // Scryfall's own 429 text is written for developers ("DO NOT IGNORE
+        // THIS WARNING…"); the player gets a sentence to act on.
+        if (res.status === 429) {
+          const after = Number(res.headers.get("Retry-After"));
+          const wait = Number.isFinite(after) && after > 0 ? `${Math.ceil(after)} seconds` : "a minute";
+          return { error: { details: `Scryfall is busy right now. Try again in ${wait}.` }, status: 429 as const };
+        }
         const err = await res.json().catch(() => ({}));
         return { error: err as unknown, status: 422 as const };
       }
@@ -525,15 +565,13 @@ export async function scryfallSearch(query: string): Promise<ScryfallSearchResul
     const data = await res.json();
     raw.push(...(data.data as ScryfallCard[]));
     totalCards = data.total_cards ?? raw.length;
-    if (data.has_more && data.next_page) {
-      pageUrl = data.next_page as string;
-      await new Promise((r) => setTimeout(r, 100));
-    } else {
-      pageUrl = null;
-    }
+    pageUrl = data.has_more && data.next_page ? (data.next_page as string) : null;
   }
 
-  return { cards: raw.map(toOutCard), totalCards, truncated: Boolean(pageUrl) };
+  const result = { cards: raw.map(toOutCard), totalCards, truncated: Boolean(pageUrl) };
+  if (searchCache.size >= 30) searchCache.delete(searchCache.keys().next().value!);
+  searchCache.set(query, { at: Date.now(), result });
+  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -614,7 +652,7 @@ export async function cardFactsByIds(ids: string[]): Promise<Map<string, CardFac
   for (let i = 0; i < missing.length; i += 75) {
     const chunk = missing.slice(i, i + 75);
     try {
-      const res = await fetch("https://api.scryfall.com/cards/collection", {
+      const res = await scryfallFetch("https://api.scryfall.com/cards/collection", {
         method: "POST",
         headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
         body: JSON.stringify({ identifiers: chunk.map((id) => ({ id })) }),

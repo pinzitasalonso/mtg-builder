@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { scryfallFetch } from "@/lib/scryfall-limit";
 
 /* Commander name field with Scryfall autocomplete. Suggests card names as you
    type (debounced) and lets you pick one with the mouse or arrow keys. Styled
@@ -43,7 +44,7 @@ export default function CommanderInput({
     const ctrl = new AbortController();
     timer.current = setTimeout(async () => {
       try {
-        const res = await fetch(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(q)}`, { signal: ctrl.signal });
+        const res = await scryfallFetch(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(q)}`, { signal: ctrl.signal });
         if (!res.ok) return;
         const data = await res.json();
         const names: string[] = Array.isArray(data?.data) ? data.data.slice(0, 8) : [];

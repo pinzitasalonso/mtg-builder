@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { ArrowDownToLine, ArrowUpToLine, TriangleAlert, X } from "lucide-react";
+import { scryfallTurn } from "../lib/scryfall-limit";
 
 /* ---------- mana / color palette ---------- */
 /* Mana discs: a soft top-lit gradient from `hi` to `bg`, with the glyph in
@@ -250,6 +251,19 @@ function artURL(name: string, version: string) {
   return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=${version}`;
 }
 
+/* The same picture cut from a stored scan: a scan on cards.scryfall.io sits
+   in a folder per size (…/normal/front/…), and the art crop is the same file
+   in …/art_crop/. That host has no rate limit. The name lookup above goes
+   through api.scryfall.com, which allows two a second, and a page of tiles
+   asked it for one each at once. Null when the stored URL isn't a scan. */
+export function scanVersionURL(src: string | undefined, version: string): string | null {
+  const m = src?.match(/^(https:\/\/cards\.scryfall\.io\/)(small|normal|large|png|art_crop|border_crop)(\/.+)$/);
+  if (!m) return null;
+  // PNG scans are the only .png files; every other size is a .jpg.
+  const rest = version === "png" ? m[3].replace(/\.jpg(\?|$)/, ".png$1") : m[3].replace(/\.png(\?|$)/, ".jpg$1");
+  return m[1] + version + rest;
+}
+
 export function CardArt({
   name,
   label: labelText,
@@ -278,13 +292,33 @@ export function CardArt({
   loading?: "lazy" | "eager";
   style?: CSSProperties;
 }) {
-  // art-crop by name gives the clean cropped look the design wants; if that
-  // fails (double-faced names, etc.) fall back to the stored full image.
-  const [stage, setStage] = useState<"art" | "src" | "fallback">(
-    prefer === "src" ? (src ? "src" : name ? "art" : "fallback") : name ? "art" : src ? "src" : "fallback"
+  // The art crop gives the clean cropped look the design wants. It is cut
+  // from the stored scan when there is one ("scan"), else looked up by name
+  // ("art"); if that fails (double-faced names, a stale scan, etc.) the next
+  // step down is the stored full image.
+  const scanArt = prefer === "art" ? scanVersionURL(src, version) : null;
+  const [stage, setStage] = useState<"scan" | "art" | "src" | "fallback">(
+    prefer === "src" ? (src ? "src" : name ? "art" : "fallback") : scanArt ? "scan" : name ? "art" : src ? "src" : "fallback"
   );
   const [loaded, setLoaded] = useState(false);
-  const url = stage === "art" && name ? artURL(name, version) : stage === "src" ? src : null;
+  // The name lookup is an API request the browser makes for the <img>, so it
+  // waits its turn like every other (lib/scryfall-limit): a page of these at
+  // once is over Scryfall's limit. If Scryfall has closed to us, step down.
+  const lookup = stage === "art" && name ? artURL(name, version) : null;
+  const [turnFor, setTurnFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!lookup) return;
+    let live = true;
+    scryfallTurn(lookup).then((ok) => {
+      if (!live) return;
+      if (ok) setTurnFor(lookup);
+      else setStage(src && prefer !== "src" ? "src" : "fallback");
+    });
+    return () => {
+      live = false;
+    };
+  }, [lookup, src, prefer]);
+  const url = stage === "scan" ? scanArt : lookup ? (turnFor === lookup ? lookup : null) : stage === "src" ? src : null;
   const m = MANA[colors[0]] || MANA.C;
   const label = (labelText || name || "—").slice(0, 2);
 
@@ -329,9 +363,11 @@ export function CardArt({
           onLoad={() => setLoaded(true)}
           onError={() => {
             setLoaded(false);
-            // Step down the chain without cycling: whichever of art/src came
-            // first falls back to the other (if available), then the placeholder.
+            // Step down the chain without cycling: a failed scan crop tries the
+            // name; whichever of art/src came first falls back to the other
+            // (if available), then the placeholder.
             setStage((s) => {
+              if (s === "scan") return name ? "art" : src ? "src" : "fallback";
               if (s === "art") return src && prefer !== "src" ? "src" : "fallback";
               return name && prefer === "src" ? "art" : "fallback";
             });

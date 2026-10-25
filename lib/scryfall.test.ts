@@ -70,16 +70,22 @@ describe("combineExclusiveFilters", () => {
 
 import { afterEach, beforeEach, vi } from "vitest";
 import { lookupCollection, resolveNamedDetailed } from "./scryfall";
+import { resetScryfallLimit } from "./scryfall-limit";
 
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
 const card = (name: string) => ({ id: "id-" + name, name, image_uris: { normal: "img" }, type_line: "Instant" });
 
 describe("lookupCollection", () => {
-  beforeEach(() => vi.useFakeTimers());
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetScryfallLimit();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
   const run = async <T,>(p: Promise<T>) => {
     await vi.runAllTimersAsync();
@@ -97,19 +103,20 @@ describe("lookupCollection", () => {
     expect(r.failed).toEqual([]);
   });
 
-  it("files a throttled chunk as failed after one retry, never as not found", async () => {
+  it("files a throttled chunk as failed, never as not found, and sends no retry into the lockout", async () => {
     const fetchMock = vi.fn().mockResolvedValue(json(429, { error: "slow down" }, { "Retry-After": "1" }));
     vi.stubGlobal("fetch", fetchMock);
     const r = await run(lookupCollection(["Sol Ring", "Command Tower"]));
     expect(r.failed).toEqual(["Sol Ring", "Command Tower"]);
     expect(r.notFound).toEqual([]);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // The retry is answered by the limiter: Scryfall locks us out for 30s.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("recovers when the retry succeeds", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(json(429, {}))
+      .mockResolvedValueOnce(json(503, {}))
       .mockResolvedValueOnce(json(200, { data: [card("Sol Ring")], not_found: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const r = await run(lookupCollection(["Sol Ring"]));
@@ -138,10 +145,15 @@ describe("lookupCollection", () => {
 });
 
 describe("resolveNamedDetailed", () => {
-  beforeEach(() => vi.useFakeTimers());
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetScryfallLimit();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("says notfound on a 404 and failed on a persistent 429", async () => {
@@ -155,6 +167,7 @@ describe("resolveNamedDetailed", () => {
     const p2 = resolveNamedDetailed("Sol Ring");
     await vi.runAllTimersAsync();
     expect((await p2).status).toBe("failed");
-    expect(throttled).toHaveBeenCalledTimes(2);
+    // One request: the retry falls inside the lockout the 429 started.
+    expect(throttled).toHaveBeenCalledTimes(1);
   });
 });

@@ -41,6 +41,8 @@ interface Deck {
   _count: { cards: number };
   /** The last scan, summarised; null (or absent, in an older cached list) when never scanned. */
   scan?: ScanSummary | null;
+  /** The commander's stored scan, when the deck holds its commander. */
+  cover?: string | null;
 }
 
 // `aiRemaining` and `deckLimit` are null for pro (no cap) and absent only if
@@ -897,7 +899,7 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
           }}
         >
           <div style={{ position: "relative", height: 132, flexShrink: 0 }}>
-            <CardArt name={commanderArtName(deck.commander)} label={deck.name} colors={colors} version="art_crop" radius={0} style={{ position: "absolute", inset: 0 }} />
+            <CardArt name={commanderArtName(deck.commander)} src={deck.cover ?? undefined} label={deck.name} colors={colors} version="art_crop" radius={0} style={{ position: "absolute", inset: 0 }} />
             <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 30%, ${field.deep}ee)` }} />
             <div style={{ position: "absolute", top: 12, left: 14 }}>
               <ColorPips colors={colors} size={20} />

@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { mapPool } from "@/lib/async";
 import { currentUser } from "@/lib/auth";
 import { SIGN_IN_FOR_AI_MSG } from "@/lib/ratelimit";
 import { AI_LIMIT_MSG } from "@/lib/limits";
 import { consumeAi } from "@/lib/limits-db";
 import { extractJson, messageText, strArr } from "@/lib/ai";
-import { OutCard, combineExclusiveFilters, naturalToScryfall, resolveNamed, scryfallSearch } from "@/lib/scryfall";
+import { OutCard, combineExclusiveFilters, lookupCollection, naturalToScryfall, normalizeCardKey, resolveNamed, scryfallSearch } from "@/lib/scryfall";
 import {
   AlmostCombo,
   DeckContext,
@@ -119,7 +118,15 @@ export async function POST(req: Request) {
         if (candidates.length >= 25) break;
       }
 
-      const resolved = await mapPool(candidates, 6, resolveNamed);
+      // One /cards/collection request for all of them, rather than a fuzzy
+      // lookup each: those are limited to two a second, so 25 of them took
+      // twelve seconds and, run six at a time, tripped the limit. A name the
+      // batch can't match exactly (a typo from the model) gets the fuzzy
+      // lookup, for the first few only.
+      const lookup = await lookupCollection(candidates);
+      const fuzzy = new Map<string, OutCard | null>();
+      for (const name of lookup.notFound.slice(0, 3)) fuzzy.set(name, await resolveNamed(name));
+      const resolved = candidates.map((name) => lookup.found.get(normalizeCardKey(name)) ?? fuzzy.get(name) ?? null);
 
       // Skip unresolved names and dedupe by Scryfall id, cap at 20.
       const seenId = new Set<string>();

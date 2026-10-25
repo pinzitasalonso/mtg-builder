@@ -41,8 +41,17 @@ export async function GET(req: Request) {
   // page — so the home progress bar shows actual progress toward the format.
   const cards = await prisma.poolCard.findMany({
     where: { deckId: { in: decks.map((d) => d.id) } },
-    select: { deckId: true, colorIdentity: true, board: true, quantity: true },
+    select: { deckId: true, colorIdentity: true, board: true, quantity: true, name: true, imageUri: true },
   });
+  // The commander's stored scan, for the tile's art: the tile cuts its art
+  // crop from it on cards.scryfall.io instead of asking Scryfall's API by
+  // name, which allows two lookups a second (a home page of decks went over).
+  const firstCommander = new Map(decks.map((d) => [d.id, (d.commander ?? "").split("+")[0].trim().toLowerCase()]));
+  const coverByDeck = new Map<number, string>();
+  for (const c of cards) {
+    const want = firstCommander.get(c.deckId);
+    if (want && c.imageUri && c.name.toLowerCase() === want && !coverByDeck.has(c.deckId)) coverByDeck.set(c.deckId, c.imageUri);
+  }
   const colorsByDeck = new Map<number, Set<string>>();
   const deckCountByDeck = new Map<number, number>();
   for (const c of cards) {
@@ -64,6 +73,7 @@ export async function GET(req: Request) {
       _count: { cards: deckCountByDeck.get(d.id) ?? 0 },
       colors: ["W", "U", "B", "R", "G"].filter((ch) => colorsByDeck.get(d.id)?.has(ch)),
       scan: scanSummary(analysis),
+      cover: coverByDeck.get(d.id) ?? null,
     }))
   );
 }

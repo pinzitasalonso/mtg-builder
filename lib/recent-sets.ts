@@ -29,6 +29,7 @@
 // Relative, not "@/lib/…": vitest resolves this module directly and does not
 // carry the tsconfig path alias. The tested libs all import this way.
 import { SCRYFALL_HEADERS, resolveNamed } from "./scryfall";
+import { scryfallFetch } from "./scryfall-limit";
 
 /**
  * Scryfall's card shape as this module needs it.
@@ -346,7 +347,7 @@ async function fetchJson(url: string, timeoutMs = 6000): Promise<unknown | null>
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { headers: SCRYFALL_HEADERS, signal: ctl.signal });
+    const res = await scryfallFetch(url, { headers: SCRYFALL_HEADERS, signal: ctl.signal });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -391,12 +392,10 @@ export async function newCards(sets: RecentSet[], identity: string | null): Prom
   const hit = cardsCache.get(key);
   if (hit && Date.now() - hit.at < CARDS_TTL_MS) return hit.value;
 
-  // Staggered rather than a flat Promise.all: Scryfall asks for 50-100ms
-  // between requests, and a stagger honours that while still overlapping the
-  // six round trips instead of paying for them end to end.
+  // Started together; scryfallFetch spaces them to Scryfall's search limit
+  // (two a second), so six sets take about three seconds.
   const work = Promise.all(
-    sets.map(async (s, i) => {
-      await new Promise((r) => setTimeout(r, i * 80));
+    sets.map(async (s) => {
       const query = newCardsQuery(s, identity);
       const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&order=edhrec&unique=cards`;
       // A search with no matches is a 404, which fetchJson turns into null — the
