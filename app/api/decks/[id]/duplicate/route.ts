@@ -2,24 +2,26 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser, viewableDeckByPublicId } from "@/lib/auth";
 import { newPublicId } from "@/lib/deck-id";
-import { DECK_LIMIT_MSG } from "@/lib/limits";
+import { DECK_LIMIT_MSG, SIGN_IN_FOR_DECKS_MSG } from "@/lib/limits";
 import { canCreateDeck } from "@/lib/limits-db";
 import { recordEvent } from "@/lib/analytics";
 
 // Copy a deck (any deck the caller can see — their own or a public one) into a
 // fresh deck they own, cards and all. The copy starts as a new, independent
-// deck: its own publicId, owned by the current user (or public when signed out).
+// deck: its own publicId, owned by the current user. Signed out, there is no
+// one to own it.
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const user = await currentUser();
-  if (user && !(await canCreateDeck(user))) {
+  if (!user) return NextResponse.json({ error: SIGN_IN_FOR_DECKS_MSG, code: "sign_in" }, { status: 401 });
+  if (!(await canCreateDeck(user))) {
     return NextResponse.json({ error: DECK_LIMIT_MSG, code: "deck_limit" }, { status: 403 });
   }
   // You can copy any deck you can see — your own, an ownerless public deck, or
   // one someone shared with you — into a fresh deck you own.
-  const source = await viewableDeckByPublicId((await params).id, user?.id ?? null);
+  const source = await viewableDeckByPublicId((await params).id, user.id);
   if (!source) return NextResponse.json({ error: "deck not found" }, { status: 404 });
 
   const cards = await prisma.poolCard.findMany({ where: { deckId: source.id } });
@@ -30,7 +32,7 @@ export async function POST(
       format: source.format,
       commander: source.commander,
       primer: source.primer,
-      userId: user?.id ?? null,
+      userId: user.id,
       publicId: newPublicId(),
       cards: {
         create: cards.map((c) => ({
