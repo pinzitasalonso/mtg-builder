@@ -18,6 +18,7 @@ import GameCodeModal from "@/components/deck/GameCodeModal";
 import DeckChat, { useDeckChat } from "@/components/deck/DeckChat";
 import DeckCardSheet, { type OwnedCopy } from "@/components/deck/DeckCardSheet";
 import { useCardFlip } from "@/components/useCardFlip";
+import { rememberAfterSignIn } from "@/lib/after-sign-in";
 import AssistantScreen from "@/components/assistant/AssistantScreen";
 import { useAssistant, useAssistantFocus, type AssistantFocus } from "@/components/assistant/AssistantProvider";
 import DeckPrimer from "@/components/deck/DeckPrimer";
@@ -710,6 +711,13 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   async function duplicateThisDeck() {
     setForking(true);
     const res = await fetch(`/api/decks/${deckId}/duplicate`, { method: "POST" });
+    // A copy is a new deck, and decks need an account: sign in, then back
+    // here to copy it.
+    if (res.status === 401) {
+      rememberAfterSignIn(`/deck/${deckId}`);
+      router.push("/login");
+      return;
+    }
     if (res.ok) {
       const copy = await res.json();
       if (copy?.publicId) { router.push(`/deck/${copy.publicId}`); return; }

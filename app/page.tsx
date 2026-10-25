@@ -15,6 +15,7 @@ import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
 import { track } from "@/lib/track";
+import { rememberAfterSignIn, takeAfterSignIn } from "@/lib/after-sign-in";
 import { getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
 import type { ScanSummary } from "@/lib/deck-analysis";
 
@@ -147,6 +148,12 @@ export default function HomePage() {
     }
     setOffline(!reached);
     setMe(user);
+    // Back from signing in for something that needed an account: carry on.
+    if (user && reached) {
+      const next = takeAfterSignIn();
+      if (next === "new") setShowModal(true);
+      else if (next) router.push(next);
+    }
     // Offline, these come from the service worker's last copy; if even that
     // is missing, keep what's on screen rather than blank it.
     const list = (url: string) =>
@@ -186,6 +193,17 @@ export default function HomePage() {
     loadAll();
   }
 
+  // A deck needs an account. Signed out, the way to a new deck is through
+  // signing in, and home opens the form once they're back (lib/after-sign-in).
+  function newDeck() {
+    if (me === null) {
+      rememberAfterSignIn("new");
+      router.push("/login");
+      return;
+    }
+    setShowModal(true);
+  }
+
   async function createDeck(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
@@ -201,6 +219,12 @@ export default function HomePage() {
     });
     const created = await res.json().catch(() => null);
     setCreating(false);
+    // Signed out since the page loaded (an expired session).
+    if (res.status === 401) {
+      rememberAfterSignIn("new");
+      router.push("/login");
+      return;
+    }
     // A free account at its deck limit gets a 403 with the reason. This used to
     // clear the form, close the modal and silently reload, so hitting the cap
     // looked like the button simply not working — the one moment the plan most
@@ -284,7 +308,15 @@ export default function HomePage() {
   }
 
   async function duplicateDeck(id: string) {
+    // A copy is a new deck, so it needs an account too. Back to that deck
+    // after signing in, to copy it from there.
+    const toSignIn = () => {
+      rememberAfterSignIn(`/deck/${id}`);
+      router.push("/login");
+    };
+    if (me === null) return toSignIn();
     const res = await fetch(`/api/decks/${id}/duplicate`, { method: "POST" });
+    if (res.status === 401) return toSignIn();
     // Duplicating is the other way past the deck cap, and it answered a 403 by
     // doing nothing at all. Its own notice rather than the new-deck modal's —
     // opening "Begin a new deck" to explain a failed duplicate is a non sequitur.
@@ -366,7 +398,7 @@ export default function HomePage() {
                 <Link href="/login" className="id-ghost" style={{ padding: "9px 16px" }}>Sign in</Link>
               )
             )}
-            <button onClick={() => setShowModal(true)} className="id-btn" style={{ padding: "10px 18px", whiteSpace: "nowrap" }}>
+            <button onClick={newDeck} className="id-btn" style={{ padding: "10px 18px", whiteSpace: "nowrap" }}>
               <Plus size={16} strokeWidth={2.5} className="home-show" /> New deck
             </button>
           </div>
@@ -396,7 +428,7 @@ export default function HomePage() {
               </p>
             </Reveal>
             <Reveal delay={210} style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
-              <button className="id-btn" style={{ padding: "15px 26px", fontSize: 16 }} onClick={() => setShowModal(true)}>
+              <button className="id-btn" style={{ padding: "15px 26px", fontSize: 16 }} onClick={newDeck}>
                 Start brewing <ArrowRight size={17} strokeWidth={2.25} />
               </button>
               <button className="id-ghost" style={{ padding: "14px 22px" }} onClick={seeSample}>
@@ -458,7 +490,7 @@ export default function HomePage() {
               <ArrowRight size={17} strokeWidth={2.25} style={{ flex: "none" }} />
             </button>
           )}
-          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onPin={pinDeck} onNew={() => setShowModal(true)} showNew={loaded} />
+          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onPin={pinDeck} onNew={newDeck} showNew={loaded} />
           <CollectionBlock unique={collection.unique} total={collection.total} pending={collection.pending} sample={collection.sample} onOpen={() => setShowCollection(true)} />
           <div style={{ height: 64 }} />
         </div>
@@ -560,9 +592,9 @@ export default function HomePage() {
                 Decks the pool is talking about.
               </h2>
             </div>
-            <button className="id-pill-gold" style={{ padding: "11px 20px", background: "#fdf26f", color: "#181228", borderColor: "transparent" }} onClick={() => setShowModal(true)}>New brew <ArrowRight size={15} strokeWidth={2.25} /></button>
+            <button className="id-pill-gold" style={{ padding: "11px 20px", background: "#fdf26f", color: "#181228", borderColor: "transparent" }} onClick={newDeck}>New brew <ArrowRight size={15} strokeWidth={2.25} /></button>
           </div>
-          <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onNew={() => setShowModal(true)} showNew={loaded && !me} />
+          <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onNew={newDeck} showNew={loaded && !me} />
         </div>
       </div>
 
@@ -602,7 +634,7 @@ export default function HomePage() {
           >
             <h2 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700, letterSpacing: "-.02em" }}>Begin a new deck</h2>
             <p style={{ margin: "0 0 18px", fontSize: 14.5, color: "var(--t2)", lineHeight: 1.5 }}>
-              {me ? "Name your brew and choose a format." : "You're brewing as a guest — this deck will be public, and anyone can edit it."}
+              Name your brew and choose a format.
             </p>
             <form onSubmit={createDeck} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               <input placeholder="Deck name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus style={modalInput} />

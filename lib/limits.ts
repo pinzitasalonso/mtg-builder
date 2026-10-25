@@ -11,6 +11,9 @@ export const FREE_SCANS_PER_DAY = 1;
 
 export const DECK_LIMIT_MSG =
   `The free plan holds ${FREE_DECK_LIMIT} decks — delete one to make room. Spellpool Pro, coming soon, lifts the limit.`;
+// Decks need an account: a signed-out visitor used to get a public deck that
+// anybody could edit.
+export const SIGN_IN_FOR_DECKS_MSG = "Sign in to create a deck — it's free.";
 export const AI_LIMIT_MSG =
   `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro, coming soon, lifts the limit.`;
 export const SCAN_LIMIT_MSG =
