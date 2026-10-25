@@ -432,16 +432,35 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     return () => window.removeEventListener("online", sync);
   }, [deckId, loadPool]);
 
+  // The deck itself: name, format, commander, primer.
+  const loadDeck = useCallback(async () => {
+    const r = await fetch(`/api/decks/${deckId}`).catch(() => null);
+    if (!r) return; // offline: keep what's on screen
+    if (r.ok) setDeck((await r.json()) as Deck);
+    else if (r.status === 401) router.replace("/login");
+    else setDeckMissing(true);
+  }, [deckId, router]);
+
+  // Something else may have changed the deck: an AI reply (which can also
+  // set the commander), another device, the iOS app. Both answer 304 when
+  // nothing did.
+  const reloadDeck = useCallback(() => {
+    void loadDeck();
+    void loadPool();
+  }, [loadDeck, loadPool]);
+
+  // Back on the tab (a phone woken, another app left): whatever changed
+  // meanwhile shows without a reload.
   useEffect(() => {
-    fetch(`/api/decks/${deckId}`)
-      .then(async (r) => {
-        if (r.ok) {
-          const d: Deck = await r.json();
-          setDeck(d);
-        } else if (r.status === 401) router.replace("/login");
-        else setDeckMissing(true);
-      })
-      .catch(() => {});
+    const onVisible = () => {
+      if (document.visibilityState === "visible") reloadDeck();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [reloadDeck]);
+
+  useEffect(() => {
+    void loadDeck();
     loadPool();
     // Null when it couldn't be fetched (offline): keep the names we have.
     tryFetchCollection().then((c) => {
@@ -449,7 +468,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       setOwnedNames(c.cards.map((card) => card.name));
       setOwnedCopies(new Map(c.cards.map((card) => [card.name.toLowerCase(), { quantity: card.quantity, imageUri: card.imageUri ?? null }])));
     });
-  }, [deckId, loadPool, router]);
+  }, [deckId, loadDeck, loadPool]);
 
   // Backfill legality data and AI role tags for rows that still lack them.
   // One attempt each per page load — both routes are idempotent.
@@ -931,8 +950,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const assistant = useAssistant();
   const sharedChat = assistant.available === true && !!deck?.canEdit && !deck?.isPublic;
   const assistantFocus = useMemo<AssistantFocus | null>(
-    () => (sharedChat && deck ? { publicId: deckId, name: deck.name, pool, ownedNames, onPoolChanged: loadPool } : null),
-    [sharedChat, deck, deckId, pool, ownedNames, loadPool]
+    () => (sharedChat && deck ? { publicId: deckId, name: deck.name, pool, ownedNames, onPoolChanged: reloadDeck } : null),
+    [sharedChat, deck, deckId, pool, ownedNames, reloadDeck]
   );
   useAssistantFocus(assistantFocus);
   const chat = useDeckChat({

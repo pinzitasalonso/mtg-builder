@@ -101,6 +101,15 @@ export default function AssistantProvider({ children }: { children: React.ReactN
   openRef.current = isOpen;
 
   const running = messages.some((m) => m.role === "assistant" && m.status === "running");
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+
+  // A reply changed a deck, or may have: the deck on screen reloads its
+  // cards, and home its list. Cheap when nothing changed (both answer 304).
+  const refreshDecks = useCallback(() => {
+    focusRef.current?.onPoolChanged();
+    window.dispatchEvent(new Event(DECKS_CHANGED_EVENT));
+  }, []);
 
   // ── Following a running reply. One follower at a time; it reconnects from
   // where it got to if the connection drops, until the reply ends.
@@ -116,6 +125,10 @@ export default function AssistantProvider({ children }: { children: React.ReactN
       if (!abort.signal.aborted) setMessages((prev) => prev.map((m) => (m.id === id ? fn(m) : m)));
     };
     let got = from;
+    // Whether the connection dropped at some point (a phone sleeping, a
+    // network blip). A reply that finished in that gap comes back as stored
+    // text and its end, with no word of the decks it changed.
+    let dropped = false;
 
     void (async () => {
       let tries = 0;
@@ -144,13 +157,11 @@ export default function AssistantProvider({ children }: { children: React.ReactN
                 const t = ev.t;
                 setMsg((m) => ({ ...m, content: m.content + t }));
               }
-              if (ev.decks) {
-                focusRef.current?.onPoolChanged();
-                window.dispatchEvent(new Event(DECKS_CHANGED_EVENT));
-              }
+              if (ev.decks) refreshDecks();
               if (ev.end) {
                 const end = ev.end;
                 ended = true;
+                if (dropped) refreshDecks();
                 setMsg((m) => ({ ...m, status: end }));
                 if (!openRef.current) setUnseen(true);
               }
@@ -162,13 +173,14 @@ export default function AssistantProvider({ children }: { children: React.ReactN
           if (abort.signal.aborted) break;
           // Dropped (a network blip, the phone sleeping): try again, backing
           // off, from what arrived. The reply carries on on the server.
+          dropped = true;
           tries++;
           await new Promise((r) => setTimeout(r, Math.min(15000, 1000 * 2 ** Math.min(tries, 4))));
         }
       }
       if (followRef.current?.abort === abort) followRef.current = null;
     })();
-  }, []);
+  }, [refreshDecks]);
 
   // ── Loading the thread: on first mount, and again when the tab comes back
   // (a phone may have frozen it mid-reply).
@@ -190,10 +202,15 @@ export default function AssistantProvider({ children }: { children: React.ReactN
     // end of it (replacing any follower, whose offset no longer matches).
     followRef.current?.abort.abort();
     followRef.current = null;
+    // A reply this page last saw running that has since finished, while the
+    // page was asleep: its follower never heard the end, so any deck it
+    // changed is stale on screen.
+    const wasRunning = new Set(messagesRef.current.filter((m) => m.role === "assistant" && m.status === "running").map((m) => m.id));
     setMessages(data.messages);
+    if (data.messages.some((m) => wasRunning.has(m.id) && m.status !== "running")) refreshDecks();
     const live = data.messages.find((m) => m.role === "assistant" && m.status === "running");
     if (live) follow(live.id, live.content.length);
-  }, [follow]);
+  }, [follow, refreshDecks]);
 
   useEffect(() => {
     void load();
