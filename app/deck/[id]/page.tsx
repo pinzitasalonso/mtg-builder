@@ -928,10 +928,12 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     );
 
 
+  // Cards by type, A–Z within each type. The deck pane and both reviews read
+  // this, so the swipe order matches what's on screen.
   const groupedFor = (cards: PoolCard[]) =>
     TYPE_ORDER.map((t) => ({
       t,
-      cards: cards.filter((c) => categoryOf(c.typeLine) === t),
+      cards: cards.filter((c) => categoryOf(c.typeLine) === t).sort((a, b) => a.name.localeCompare(b.name)),
     })).filter((g) => g.cards.length);
 
   // Does a card match the active hover filter? Mana-value buckets mirror the
