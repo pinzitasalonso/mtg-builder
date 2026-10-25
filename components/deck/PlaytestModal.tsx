@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { BarChart3, Crown, Dices, Ellipsis, RotateCw, Undo2, X, ZoomIn } from "lucide-react";
+import { BarChart3, Crown, Dices, Ellipsis, RefreshCw, RotateCw, Undo2, X, ZoomIn } from "lucide-react";
 import { CardArt } from "@/components/mtg";
+import { hasKnownBack, useVerifiedBack } from "@/components/useCardFlip";
 import { PoolEntry } from "@/lib/pool-client";
 import { hypergeometric, hypergeometricAtLeast } from "@/lib/probability";
 import {
@@ -22,6 +23,7 @@ import {
   shuffleLibrary,
   startGame,
   toggleTap,
+  turnOver,
   untapAll,
 } from "@/lib/playtest";
 
@@ -178,6 +180,9 @@ export default function PlaytestModal({
     if (zone === "hand") out.push({ label: resolvesToGraveyard(card.typeLine) ? "Cast — to graveyard" : "Play", step: (s) => play(s, card.iid) });
     if (zone === "command") out.push({ label: "Cast", step: (s) => play(s, card.iid) });
     if (zone === "battlefield") out.push({ label: card.tapped ? "Untap" : "Tap", step: (s) => toggleTap(s, card.iid) });
+    if (zone !== "library" && hasKnownBack(card.name, card.imageUri)) {
+      out.push({ label: card.flipped ? "Turn to the front" : "Turn over", step: (s) => turnOver(s, card.iid) });
+    }
     if (zone !== "battlefield" && (zone !== "hand" || resolvesToGraveyard(card.typeLine))) out.push({ label: "Put onto battlefield", step: to("battlefield") });
     if (zone !== "hand") out.push({ label: "Return to hand", step: to("hand") });
     if (zone !== "graveyard") out.push({ label: zone === "hand" ? "Discard" : "Graveyard", step: to("graveyard") });
@@ -188,7 +193,8 @@ export default function PlaytestModal({
     return out;
   };
 
-  const cardProps = { onPrimary, onMenu: openMenu, onZoom };
+  const onTurn = (card: PlayCard) => act((s) => turnOver(s, card.iid));
+  const cardProps = { onPrimary, onMenu: openMenu, onZoom, onTurn };
   const pileCards =
     pile === "graveyard"
       ? [...state.graveyard].reverse()
@@ -377,13 +383,36 @@ function PtCard({
   onPrimary,
   onMenu,
   onZoom,
+  onTurn,
 }: {
   card: PlayCard;
   zone: Zone;
   onPrimary: (card: PlayCard, zone: Zone, anchor: DOMRect) => void;
   onMenu: (anchor: DOMRect, card: PlayCard, zone: Zone) => void;
   onZoom: (card: PlayCard | null, zone?: Zone, anchor?: DOMRect) => void;
+  onTurn: (card: PlayCard) => void;
 }) {
+  // A double-faced card shows the face the game says. The new face swaps in
+  // halfway through a quick turn, on a layer of its own so the turn doesn't
+  // fight the tapped card's rotation.
+  const back = useVerifiedBack(card.name, card.imageUri);
+  const flipped = !!card.flipped;
+  const [shown, setShown] = useState(flipped);
+  const [turning, setTurning] = useState(false);
+  const was = useRef(flipped);
+  useEffect(() => {
+    if (flipped === was.current) return;
+    was.current = flipped;
+    setTurning(true);
+    const swap = setTimeout(() => setShown(flipped), 140);
+    const done = setTimeout(() => setTurning(false), 300);
+    return () => {
+      clearTimeout(swap);
+      clearTimeout(done);
+    };
+  }, [flipped]);
+  const src = shown && back ? back : card.imageUri || undefined;
+
   return (
     <div
       className="pt-card"
@@ -401,7 +430,9 @@ function PtCard({
       }}
     >
       <div className="pt-card-inner">
-        <CardArt name={card.name} src={card.imageUri || undefined} prefer="src" version="normal" loading="lazy" radius={0} style={{ position: "absolute", inset: 0 }} />
+        <div className={`pt-card-face${turning ? " card-flip" : ""}`}>
+          <CardArt name={card.name} src={src} prefer="src" version="normal" loading="lazy" radius={0} style={{ position: "absolute", inset: 0 }} />
+        </div>
       </div>
       {card.commander && (
         <span className="pt-cmdr" title="Commander" aria-label="Commander">
@@ -430,6 +461,21 @@ function PtCard({
       >
         <ZoomIn size={15} strokeWidth={2.25} />
       </button>
+      {back && zone !== "library" && (
+        <button
+          type="button"
+          className="pt-card-btn pt-card-turn"
+          aria-label={flipped ? `Show the front of ${card.name}` : `Turn ${card.name} over`}
+          aria-pressed={flipped}
+          title={flipped ? "Show the front" : "Turn over"}
+          onClick={(e) => {
+            e.stopPropagation();
+            onTurn(card);
+          }}
+        >
+          <RefreshCw size={13} strokeWidth={2.5} />
+        </button>
+      )}
     </div>
   );
 }
@@ -528,11 +574,14 @@ function ZoomPreview({ zoom, onDismiss }: { zoom: Zoom; onDismiss: () => void })
         ? a.left - 12 - W
         : Math.round((window.innerWidth - W) / 2);
   const top = Math.max(8, Math.min(a.top + a.height / 2 - H / 2, window.innerHeight - H - 8));
+  // The face that's up.
+  const back = useVerifiedBack(zoom.card.name, zoom.card.imageUri);
+  const src = zoom.card.flipped && back ? back : zoom.card.imageUri || undefined;
   return (
     <>
       <div className="pt-zoom-backdrop" onClick={onDismiss} style={{ position: "fixed", inset: 0, zIndex: 91 }} />
       <div style={{ position: "fixed", top, left, width: W, height: H, zIndex: 92, pointerEvents: "none", animation: "sp-fade .12s ease", borderRadius: "4.8%/3.5%", overflow: "hidden", boxShadow: "0 24px 60px -18px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.14)", background: "#000" }}>
-        <CardArt name={zoom.card.name} src={zoom.card.imageUri || undefined} prefer="src" version="normal" loading="eager" radius={0} style={{ position: "absolute", inset: 0 }} />
+        <CardArt name={zoom.card.name} src={src} prefer="src" version="normal" loading="eager" radius={0} style={{ position: "absolute", inset: 0 }} />
       </div>
     </>
   );

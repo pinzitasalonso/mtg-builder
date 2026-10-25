@@ -22,6 +22,8 @@ export interface PlayCard {
   typeLine: string | null;
   tapped: boolean;
   commander: boolean;
+  /** A double-faced card showing its back. */
+  flipped?: boolean;
 }
 
 export interface PlaytestState {
@@ -65,7 +67,7 @@ export function startGame(
   for (const c of cards) {
     const n = Math.max(1, Math.floor(c.quantity ?? 1));
     for (let i = 0; i < n; i++) {
-      all.push({ iid: iid++, name: c.name, imageUri: c.imageUri, typeLine: c.typeLine, tapped: false, commander: false });
+      all.push({ iid: iid++, name: c.name, imageUri: c.imageUri, typeLine: c.typeLine, tapped: false, commander: false, flipped: false });
     }
   }
   const command: PlayCard[] = [];
@@ -119,7 +121,9 @@ export function zoneOf(state: PlaytestState, iid: number): Zone | null {
   return null;
 }
 
-/** Move a card to any zone. It arrives untapped; the library takes it on top unless told the bottom. */
+/** Move a card to any zone. It arrives untapped; the library takes it on top unless told the bottom.
+    A card turned over keeps that face onto the battlefield (the back of a
+    modal card is how it's cast); anywhere else it goes back to its front. */
 export function moveCard(
   state: PlaytestState,
   iid: number,
@@ -128,7 +132,8 @@ export function moveCard(
 ): PlaytestState {
   const from = zoneOf(state, iid);
   if (!from) return state;
-  const card = { ...state[from].find((c) => c.iid === iid)!, tapped: false };
+  const found = state[from].find((c) => c.iid === iid)!;
+  const card = { ...found, tapped: false, flipped: to === "battlefield" ? !!found.flipped : false };
   const next = { ...state, [from]: state[from].filter((c) => c.iid !== iid) } as PlaytestState;
   const target = [...next[to]];
   if (to === "library" && opts.position !== "bottom") target.unshift(card);
@@ -155,6 +160,13 @@ export function play(state: PlaytestState, iid: number): PlaytestState {
 export function toggleTap(state: PlaytestState, iid: number): PlaytestState {
   if (!state.battlefield.some((c) => c.iid === iid)) return state;
   return { ...state, battlefield: state.battlefield.map((c) => (c.iid === iid ? { ...c, tapped: !c.tapped } : c)) };
+}
+
+/** Turn a double-faced card over, in any zone but the library (face down). */
+export function turnOver(state: PlaytestState, iid: number): PlaytestState {
+  const zone = zoneOf(state, iid);
+  if (!zone || zone === "library") return state;
+  return { ...state, [zone]: state[zone].map((c) => (c.iid === iid ? { ...c, flipped: !c.flipped } : c)) } as PlaytestState;
 }
 
 export function untapAll(state: PlaytestState): PlaytestState {
