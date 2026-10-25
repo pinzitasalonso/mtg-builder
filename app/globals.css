@@ -1068,6 +1068,12 @@ button {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.7);
 }
+.pt-tools-row {
+  display: contents;
+}
+.pt-btn.pt-narrow-only {
+  display: none;
+}
 .pt-btn {
   display: inline-flex;
   align-items: center;
@@ -1431,9 +1437,79 @@ button {
   color: rgba(255, 255, 255, 0.65);
 }
 @media (max-width: 760px) {
+  /* Cards you can read: three across the battlefield, and a hand that
+     scrolls sideways rather than shrinking seven cards to fit. */
   .pt-root {
-    --pt-card: clamp(64px, 17vw, 96px);
-    --pt-hand-max: clamp(76px, 21vw, 112px);
+    --pt-card: clamp(80px, 25vw, 124px);
+    --pt-hand-max: clamp(88px, 27vw, 132px);
+  }
+  .pt-hand {
+    --pt-hand: var(--pt-hand-max) !important;
+  }
+  /* The header and the tools took a third of the screen: one line each.
+     The title goes, the life counters keep − and +, and Odds, Close and
+     Undo keep their icons. */
+  .pt-top {
+    padding: 8px 12px;
+  }
+  .pt-title {
+    display: none;
+  }
+  .pt-top-right {
+    width: 100%;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .pt-turn {
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  .pt-life {
+    padding: 2px 3px 2px 8px;
+  }
+  .pt-life-5,
+  .pt-btn-label,
+  .pt-wide-only {
+    display: none;
+  }
+  .pt-tools-row .pt-narrow-only {
+    display: inline-flex;
+  }
+  .pt-life-value {
+    min-width: 26px;
+    font-size: 15px;
+  }
+  .pt-life button {
+    min-width: 24px;
+    height: 24px;
+  }
+  .pt-top .pt-btn {
+    padding: 7px 9px;
+  }
+  .pt-tools {
+    padding: 6px 0;
+  }
+  .pt-tools-row {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 0 12px;
+  }
+  .pt-tools-row::-webkit-scrollbar {
+    display: none;
+  }
+  .pt-tools-row .pt-btn {
+    flex: none;
+    padding: 6px 11px;
+  }
+  .pt-status {
+    padding: 0 12px;
+  }
+  .pt-status-idle {
+    display: none;
   }
   .pt-main {
     grid-template-columns: 1fr;
@@ -1453,7 +1529,8 @@ button {
     overflow-y: hidden;
     padding-right: 0;
     padding-bottom: 2px;
-    --pt-pile: var(--pt-card);
+    /* The piles are a glance, not a place you read cards. */
+    --pt-pile: calc(var(--pt-card) * 0.6);
   }
   .pt-hand {
     padding: 8px 12px 12px;
