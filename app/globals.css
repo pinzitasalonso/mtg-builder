@@ -1289,14 +1289,27 @@ button {
   justify-content: center;
   z-index: 2;
 }
-.pt-card-menu {
+.pt-card-menu,
+.pt-card-turn {
   right: 4px;
   opacity: 0;
   transition: opacity 0.12s;
 }
+/* Turn over (double-faced cards only), under the ⋯. */
+.pt-card-turn {
+  top: calc(12% + 26px);
+}
 .pt-card:hover .pt-card-menu,
-.pt-card:focus-within .pt-card-menu {
+.pt-card:focus-within .pt-card-menu,
+.pt-card:hover .pt-card-turn,
+.pt-card:focus-within .pt-card-turn {
   opacity: 1;
+}
+/* The face, inside the card: it turns over on its own layer, so the turn
+   and the tapped rotation (on .pt-card-inner) don't overwrite each other. */
+.pt-card-face {
+  position: absolute;
+  inset: 0;
 }
 /* Touch has no hover: the menu is always there and 🔍 stands in for it. */
 .pt-card-zoom {
@@ -1307,7 +1320,8 @@ button {
   display: none;
 }
 @media (any-pointer: coarse) {
-  .pt-card-menu {
+  .pt-card-menu,
+  .pt-card-turn {
     opacity: 1;
   }
   .pt-card-zoom {

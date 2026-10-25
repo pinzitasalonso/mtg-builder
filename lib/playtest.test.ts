@@ -11,6 +11,7 @@ import {
   shuffleLibrary,
   startGame,
   toggleTap,
+  turnOver,
   untapAll,
   zoneOf,
   type CardLike,
@@ -179,6 +180,27 @@ describe("moveCard", () => {
   it("ignores an unknown card", () => {
     const s = startGame(deck(), { shuffle: keep });
     expect(moveCard(s, 999, "hand")).toBe(s);
+  });
+});
+
+describe("turnOver", () => {
+  it("turns a card over in hand, keeps that face onto the battlefield, and resets it on leaving", () => {
+    const s0 = startGame(deck(), { shuffle: keep });
+    const c = s0.hand[0]!;
+    expect(c.flipped).toBe(false);
+    const s1 = turnOver(s0, c.iid);
+    expect(s1.hand[0]!.flipped).toBe(true);
+    const s2 = moveCard(s1, c.iid, "battlefield");
+    expect(s2.battlefield[0]!.flipped).toBe(true);
+    expect(turnOver(s2, c.iid).battlefield[0]!.flipped).toBe(false);
+    const s3 = moveCard(s2, c.iid, "graveyard");
+    expect(s3.graveyard[0]!.flipped).toBe(false);
+  });
+
+  it("leaves a face-down library card, and an unknown one, alone", () => {
+    const s = startGame(deck(), { shuffle: keep });
+    expect(turnOver(s, s.library[0]!.iid)).toBe(s);
+    expect(turnOver(s, 999)).toBe(s);
   });
 });
 
