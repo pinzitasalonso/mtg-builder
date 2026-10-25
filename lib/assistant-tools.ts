@@ -8,6 +8,7 @@ import { DECK_LIMIT_MSG, type TierFields } from "@/lib/limits";
 import { canCreateDeck } from "@/lib/limits-db";
 import { snapshotDeck } from "@/lib/deck-versions";
 import { lookupCollection, NAMED_GAP_MS, normalizeCardKey, resolveNamedDetailed, SCRYFALL_HEADERS, type OutCard } from "@/lib/scryfall";
+import { scryfallFetch } from "@/lib/scryfall-limit";
 
 // The home assistant's tools: look cards up on Scryfall, and act on the
 // player's decks — create one, change one, save a version of one. Every
@@ -170,7 +171,7 @@ const MAX_PRICE_SEARCHES = 10;
 async function cheapestUsd(name: string): Promise<string | null> {
   const q = `!"${name.split(" // ")[0].replace(/"/g, "")}" usd>0 game:paper`;
   try {
-    const res = await fetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=usd&dir=asc`, { headers: SCRYFALL_HEADERS });
+    const res = await scryfallFetch(`https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&unique=prints&order=usd&dir=asc`, { headers: SCRYFALL_HEADERS });
     if (!res.ok) return null;
     const data = (await res.json()) as { data?: RawCard[] };
     return data.data?.[0]?.prices?.usd ?? null;
@@ -187,7 +188,7 @@ async function fetchRaw(names: string[]): Promise<{ cards: RawCard[]; missing: s
     let data: { data?: RawCard[]; not_found?: { name?: string }[] } | null = null;
     for (let attempt = 0; attempt < 2 && !data; attempt++) {
       try {
-        const res = await fetch("https://api.scryfall.com/cards/collection", {
+        const res = await scryfallFetch("https://api.scryfall.com/cards/collection", {
           method: "POST",
           headers: { ...SCRYFALL_HEADERS, "Content-Type": "application/json" },
           body: JSON.stringify({ identifiers: chunk.map((name) => ({ name })) }),

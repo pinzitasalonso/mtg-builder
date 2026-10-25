@@ -28,6 +28,7 @@ Next.js 16 (App Router, Turbopack) + Prisma 7 on better-sqlite3. **Railway auto-
 - Tailwind v4 (lightningcss) **mangles `color-mix()`** in globals.css — compute mixes in JS and set CSS vars (that's why `--panel` exists).
 - Railway env-var edits stage until Deploy is clicked.
 - JSX collapses the space after an inline closing tag (`</b> text`) — use `{" "}`.
+- **Scryfall rate limits:** every `api.scryfall.com` request goes through `scryfallFetch` (`lib/scryfall-limit.ts`). It keeps search, named, random and collection to 2 a second, and everything else to 10. A 429 stops all requests for 30 seconds, because ignoring one risks a ban. Card art comes from the stored scans on `cards.scryfall.io`, which has no limit (`scanVersionURL` in `components/mtg.tsx`), not from API lookups by name. A guard test fails on a direct `fetch` of an API URL.
 - RevenueCat v1 subscriber reads work with the **public `appl_` key**; V2 `sk_` keys fail those endpoints and must never be committed or handled.
 
 ## Conventions

@@ -7,6 +7,7 @@
 // fetch.
 
 import { SCRYFALL_HEADERS } from "./scryfall";
+import { scryfallFetch } from "./scryfall-limit";
 
 const TTL_MS = 24 * 60 * 60_000;
 
@@ -36,7 +37,7 @@ export async function gameChangerNames(): Promise<string[]> {
     // Paginated, but the list is a few dozen cards — this is one page today and
     // the loop is here so it stays correct when Wizards adds to it.
     for (let page = 0; page < 5 && url; page++) {
-      const res: Response = await fetch(url, { headers: SCRYFALL_HEADERS });
+      const res: Response = await scryfallFetch(url, { headers: SCRYFALL_HEADERS });
       if (!res.ok) break;
       const body = await res.json();
       for (const card of body.data ?? []) {

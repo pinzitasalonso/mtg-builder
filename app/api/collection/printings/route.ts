@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { SCRYFALL_HEADERS } from "@/lib/scryfall";
+import { scryfallFetch } from "@/lib/scryfall-limit";
 
 export const runtime = "nodejs";
 
@@ -56,7 +57,7 @@ export async function GET(req: Request) {
   for (let page = 0; url && page < 2; page++) {
     let res: Response;
     try {
-      res = await fetch(url, { headers: SCRYFALL_HEADERS });
+      res = await scryfallFetch(url, { headers: SCRYFALL_HEADERS });
     } catch {
       return NextResponse.json({ error: "Couldn’t reach Scryfall." }, { status: 502 });
     }
