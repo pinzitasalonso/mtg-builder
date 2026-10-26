@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Check, Minus, Plus, X } from "lucide-react";
+import CardInDecks from "@/components/CardInDecks";
 import FlippableArt from "@/components/FlippableArt";
 import { ModalShell } from "@/components/deck/ui";
 import { ManaCost } from "@/components/mtg";
@@ -108,6 +109,7 @@ export default function CollectionCardModal({
               </button>
             </div>
           </div>
+          <CardInDecks name={card.name} />
         </div>
       </div>
 
