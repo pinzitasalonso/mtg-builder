@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Check, ExternalLink, Minus, Plus, Trash2, TriangleAlert, X } from "lucide-react";
+import CardInDecks from "@/components/CardInDecks";
 import FlippableArt from "@/components/FlippableArt";
 import { ModalShell } from "@/components/deck/ui";
 import { ManaCost, Pip, parseSymbols } from "@/components/mtg";
@@ -149,6 +150,7 @@ export default function DeckCardSheet({
                 {warning}
               </div>
             )}
+            <CardInDecks name={card.name} currentDeckId={deckId} />
 
             {canEdit && (
               <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 4 }}>
