@@ -3,6 +3,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { ArrowDownToLine, ArrowUpToLine, TriangleAlert, X } from "lucide-react";
 import { scryfallTurn } from "../lib/scryfall-limit";
+import { scanVersionURL } from "../lib/scan-url";
 
 /* ---------- mana / color palette ---------- */
 /* Mana discs: a soft top-lit gradient from `hi` to `bg`, with the glyph in
@@ -251,18 +252,10 @@ function artURL(name: string, version: string) {
   return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=${version}`;
 }
 
-/* The same picture cut from a stored scan: a scan on cards.scryfall.io sits
-   in a folder per size (…/normal/front/…), and the art crop is the same file
-   in …/art_crop/. That host has no rate limit. The name lookup above goes
-   through api.scryfall.com, which allows two a second, and a page of tiles
-   asked it for one each at once. Null when the stored URL isn't a scan. */
-export function scanVersionURL(src: string | undefined, version: string): string | null {
-  const m = src?.match(/^(https:\/\/cards\.scryfall\.io\/)(small|normal|large|png|art_crop|border_crop)(\/.+)$/);
-  if (!m) return null;
-  // PNG scans are the only .png files; every other size is a .jpg.
-  const rest = version === "png" ? m[3].replace(/\.jpg(\?|$)/, ".png$1") : m[3].replace(/\.png(\?|$)/, ".jpg$1");
-  return m[1] + version + rest;
-}
+/* scanVersionURL (the same picture in another size, from a stored scan)
+   lives in lib/scan-url so server code can use it too; re-exported here for
+   the components that already import it from this file. */
+export { scanVersionURL } from "../lib/scan-url";
 
 export function CardArt({
   name,

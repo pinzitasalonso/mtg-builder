@@ -17,7 +17,7 @@ export async function publicDeckSummary(publicId: string): Promise<PublicDeckSum
         name: true,
         format: true,
         commander: true,
-        cards: { where: { board: "deck" }, select: { name: true, quantity: true, typeLine: true, colorIdentity: true } },
+        cards: { where: { board: "deck" }, select: { name: true, quantity: true, typeLine: true, colorIdentity: true, imageUri: true } },
       },
     })
     .catch(() => null);
@@ -28,6 +28,11 @@ export async function publicDeckSummary(publicId: string): Promise<PublicDeckSum
     .filter((c) => !c.typeLine?.includes("Land") && c.name !== deck.commander)
     .slice(0, 4)
     .map((c) => c.name);
+  // The deck's face: its (first) commander, else its first non-land card.
+  const head = (deck.commander ?? "").split("+")[0].trim().toLowerCase();
+  const cover =
+    (head && deck.cards.find((c) => c.name.toLowerCase() === head && c.imageUri)) ||
+    deck.cards.find((c) => c.imageUri && !c.typeLine?.includes("Land"));
   return {
     publicId: deck.publicId,
     name: deck.name,
@@ -36,5 +41,6 @@ export async function publicDeckSummary(publicId: string): Promise<PublicDeckSum
     count: deck.cards.reduce((n, c) => n + c.quantity, 0),
     colors: "WUBRG".split("").filter((l) => colors.has(l)).join(""),
     highlights,
+    coverImage: cover ? cover.imageUri : null,
   };
 }

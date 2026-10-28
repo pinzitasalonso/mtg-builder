@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { laneOf, resetScryfallLimit, scryfallClosedFor, scryfallFetch } from "./scryfall-limit";
-import { scanVersionURL } from "../components/mtg";
+import { scanVersionURL } from "./scan-url";
 
 const ok = () => new Response("{}", { status: 200 });
 const throttled = (retryAfter?: string) =>

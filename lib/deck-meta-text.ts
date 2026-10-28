@@ -9,6 +9,9 @@ export interface PublicDeckSummary {
   count: number;
   colors: string; // WUBRG letters, "" = colorless
   highlights: string[]; // a few non-land cards, for the description
+  /** The stored scan of the deck's face card (the commander, else its first
+      non-land card), for the share image's art. */
+  coverImage: string | null;
 }
 
 const COLOR_WORD: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };

@@ -4,11 +4,11 @@ import { deckDescription, formatName } from "./deck-meta-text";
 describe("deck metadata", () => {
   it("describes a deck in one sentence with its colors, format and commander", () => {
     expect(
-      deckDescription({ publicId: "x", name: "Kaito", format: "commander", commander: "Kaito, Bane of Nightmares", count: 100, colors: "UB", highlights: ["Rhystic Study", "Sol Ring"] })
+      deckDescription({ publicId: "x", name: "Kaito", format: "commander", commander: "Kaito, Bane of Nightmares", count: 100, colors: "UB", highlights: ["Rhystic Study", "Sol Ring"], coverImage: null })
     ).toBe(
       "A 100-card blue-black Commander deck led by Kaito, Bane of Nightmares, built on Spellpool. Featuring Rhystic Study, Sol Ring. See the list, curve, combos and Deck Score."
     );
-    expect(deckDescription({ publicId: "x", name: "Affinity", format: "modern", commander: null, count: 60, colors: "", highlights: [] })).toBe(
+    expect(deckDescription({ publicId: "x", name: "Affinity", format: "modern", commander: null, count: 60, colors: "", highlights: [], coverImage: null })).toBe(
       "A 60-card colorless Modern deck, built on Spellpool. See the list, curve, combos and Deck Score."
     );
   });
