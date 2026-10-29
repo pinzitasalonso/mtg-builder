@@ -258,7 +258,8 @@ export async function POST(req: Request) {
         "the deck is a 60-card constructed format (Standard, Pioneer, Modern, Pauper) where what's good right " +
         "now is the whole question; the answer turns on what is legal or banned today; or the player mentions " +
         "a recent release, a tournament result, or a price. Scryfall is the authority on card text and " +
-        "legality. START WRITING FIRST: open with your verdict or short take straight away, and only then " +
+        "legality. MTGTop8 (mtgtop8.com) is the source for tournament results and the competitive metagame: " +
+        "use the tournament_meta tool when you have it, and otherwise search mtgtop8.com. START WRITING FIRST: open with your verdict or short take straight away, and only then " +
         "go and search, before you commit to specific cards. The player is watching a blank screen until " +
         "your first words arrive, so searching before you have written anything is the one thing that " +
         "actually costs them. Never narrate the search, paste raw URLs, or hedge about your knowledge " +
