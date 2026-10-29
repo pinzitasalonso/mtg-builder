@@ -9,9 +9,11 @@ import { canCreateDeck } from "@/lib/limits-db";
 import { snapshotDeck } from "@/lib/deck-versions";
 import { lookupCollection, NAMED_GAP_MS, normalizeCardKey, resolveNamedDetailed, SCRYFALL_HEADERS, type OutCard } from "@/lib/scryfall";
 import { scryfallFetch } from "@/lib/scryfall-limit";
+import { MTGTOP8_FORMATS, bestFinishes, deckUrl, fetchArchetypeDecks, fetchDecklist, fetchMetagame, findArchetype } from "@/lib/mtgtop8";
 
-// The home assistant's tools: look cards up on Scryfall, and act on the
-// player's decks — create one, change one, save a version of one. Every
+// The home assistant's tools: look cards up on Scryfall, read tournament
+// results on MTGTop8, and act on the player's decks — create one, change
+// one, save a version of one. Every
 // change to an existing deck saves a version first, so anything the
 // assistant does can be undone from the deck's Versions.
 
@@ -35,6 +37,24 @@ const qty = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > 
 const str = (v: unknown, max = 120) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
+  {
+    name: "tournament_meta",
+    description:
+      "Competitive tournament results from MTGTop8 (mtgtop8.com). With just a format: its metagame over the " +
+      "last two months — each archetype's share of the top-finishing decks (for cEDH, the most played " +
+      "commanders). With an archetype (or, for cEDH, a commander): its best recent finishes, each with the " +
+      "player, event, placing, date and the full decklist. Use it for competitive questions: what's in the " +
+      "metagame, what to expect at a tournament, how a tuned list of an archetype looks, or how a deck " +
+      "compares with what's winning. Not for casual Commander — that's EDHREC's ground.",
+    input_schema: {
+      type: "object",
+      properties: {
+        format: { type: "string", enum: Object.keys(MTGTOP8_FORMATS) },
+        archetype: { type: "string", description: "An archetype name as the metagame lists it (e.g. 'Rakdos Aggro'), or a cEDH commander. Omit for the metagame." },
+      },
+      required: ["format"],
+    },
+  },
   {
     name: "card_details",
     description:
@@ -221,6 +241,43 @@ function describe(c: RawCard): string {
     `Price: ${c.prices?.usd ? `$${c.prices.usd}` : "no USD price"}${c.prices?.usd_foil ? `, foil $${c.prices.usd_foil}` : ""}${c.prices?.eur ? `, €${c.prices.eur}` : ""}` +
       (c.cheapest ? ` · cheapest printing $${c.cheapest}` : ""),
   ].join("\n");
+}
+
+// What MTGTop8 says about a format, or one archetype of it. Read-only.
+async function tournamentMeta(input: Record<string, unknown>): Promise<ToolOutcome> {
+  const format = str(input.format, 20).toLowerCase();
+  const f = MTGTOP8_FORMATS[format];
+  if (!f) return { result: `MTGTop8 covers ${Object.keys(MTGTOP8_FORMATS).join(", ")}.`, isError: true };
+  const got = await fetchMetagame(format);
+  if (!got || !got.meta.archetypes.length) return { result: "MTGTop8 didn't answer just now.", isError: true };
+  const { period, meta, url } = got;
+  const pct = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1)}%`;
+  const asked = str(input.archetype, 80);
+
+  if (!asked) {
+    const lines = [
+      `MTGTop8 — ${f.label} metagame, ${period.label.toLowerCase()}` + (meta.decks ? `, from ${meta.decks} top-finishing decks.` : "."),
+      meta.groups.length ? `By style: ${meta.groups.map((g) => `${g.label.toLowerCase()} ${pct(g.share)}`).join(", ")}.` : "",
+      `${f.code === "cEDH" ? "Commanders" : "Archetypes"} by share:`,
+      ...meta.archetypes.slice(0, 25).map((a) => `- ${a.name} ${pct(a.share)}${a.group ? ` (${a.group})` : ""}`),
+      `Source: ${url}`,
+    ];
+    return { result: lines.filter(Boolean).join("\n") };
+  }
+
+  const arch = findArchetype(meta.archetypes, asked);
+  if (!arch) return { result: `No ${f.label} archetype on MTGTop8 matches "${asked}". Ask without one for the list.`, isError: true };
+  const rows = await fetchArchetypeDecks(format, arch.id, period.id);
+  if (!rows?.length) return { result: `MTGTop8 has no recent ${arch.name} decks in ${f.label}.` };
+  const parts = [`MTGTop8 — ${arch.name} in ${f.label} (${pct(arch.share)} of the metagame, ${period.label.toLowerCase()}). Best recent finishes:`];
+  for (const r of bestFinishes(rows, 2)) {
+    const list = await fetchDecklist(r.deckId);
+    const placing = /^\d+$/.test(r.rank) ? (r.rank === "1" ? "won" : `finished #${r.rank} at`) : `top ${r.rank.split("-")[1] ?? r.rank} at`;
+    parts.push(
+      `\n"${r.name}" — ${r.player} ${placing} ${r.event} (${r.date}) · ${deckUrl(format, r)}` + (list ? `\n${list}` : "\n(decklist unavailable)")
+    );
+  }
+  return { result: parts.join("\n") };
 }
 
 async function cardDetails(input: Record<string, unknown>): Promise<ToolOutcome> {
@@ -534,6 +591,8 @@ export async function runAssistantTool(
   const args = input && typeof input === "object" ? (input as Record<string, unknown>) : {};
   try {
     switch (name) {
+      case "tournament_meta":
+        return await tournamentMeta(args);
       case "card_details":
         return await cardDetails(args);
       case "create_deck":
