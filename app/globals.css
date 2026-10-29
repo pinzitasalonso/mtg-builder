@@ -1455,14 +1455,24 @@ button {
   color: rgba(255, 255, 255, 0.65);
 }
 @media (max-width: 760px) {
-  /* Cards you can read: three across the battlefield, and a hand that
-     scrolls sideways rather than shrinking seven cards to fit. */
+  /* Cards you can read: a hand of big cards that scrolls sideways rather
+     than shrinking seven to fit; on the battlefield, two permanents to a
+     row and three lands (a land reads at a glance); and two to a row when
+     searching the library or opening the graveyard or exile. The piles
+     beside the field stay small, being a glance. */
   .pt-root {
     --pt-card: clamp(80px, 25vw, 124px);
-    --pt-hand-max: clamp(88px, 27vw, 132px);
+    --pt-hand-max: clamp(110px, 38vw, 180px);
   }
   .pt-hand {
     --pt-hand: var(--pt-hand-max) !important;
+  }
+  .pt-field .pt-row-perms .pt-card,
+  .pt-panel .pt-row .pt-card {
+    width: calc(50% - 4px);
+  }
+  .pt-field .pt-row-lands .pt-card {
+    width: calc((100% - 16px) / 3);
   }
   /* The header and the tools took a third of the screen: one line each.
      The title goes, the life counters keep − and +, and Odds, Close and
