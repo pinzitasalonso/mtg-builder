@@ -24,6 +24,18 @@ export interface PlayCard {
   commander: boolean;
   /** A double-faced card showing its back. */
   flipped?: boolean;
+  // ── Practice games (lib/practice) only; all cleared when the card leaves
+  // the battlefield. ──
+  /** The game turn it came onto the battlefield (summoning sickness). */
+  enteredTurn?: number;
+  /** Damage marked this turn. */
+  damage?: number;
+  /** +1/+1 counters. */
+  counters?: number;
+  /** Until end of turn. */
+  pump?: { power: number; toughness: number };
+  /** A token: its own stats. It ceases to exist off the battlefield. */
+  token?: { power: number; toughness: number; keywords: string[] };
 }
 
 export interface PlaytestState {
@@ -133,7 +145,13 @@ export function moveCard(
   const from = zoneOf(state, iid);
   if (!from) return state;
   const found = state[from].find((c) => c.iid === iid)!;
-  const card = { ...found, tapped: false, flipped: to === "battlefield" ? !!found.flipped : false };
+  const card: PlayCard = { ...found, tapped: false, flipped: to === "battlefield" ? !!found.flipped : false };
+  if (from === "battlefield" && to !== "battlefield") {
+    delete card.enteredTurn;
+    delete card.damage;
+    delete card.counters;
+    delete card.pump;
+  }
   const next = { ...state, [from]: state[from].filter((c) => c.iid !== iid) } as PlaytestState;
   const target = [...next[to]];
   if (to === "library" && opts.position !== "bottom") target.unshift(card);
