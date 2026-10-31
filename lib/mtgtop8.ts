@@ -233,3 +233,22 @@ export async function fetchDecklist(deckId: string): Promise<string | null> {
 }
 
 export const deckUrl = (format: string, r: DeckRow) => `${MTGTOP8}/event?e=${r.eventId}&d=${r.deckId}&f=${MTGTOP8_FORMATS[format]?.code ?? ""}`;
+
+/** A plain-text list ("4 Lightning Bolt" lines, then "Sideboard") as main
+    and sideboard. In a cEDH list the sideboard is the commander. */
+export function parseMtgoList(text: string): { main: { name: string; quantity: number }[]; side: { name: string; quantity: number }[] } {
+  const main: { name: string; quantity: number }[] = [];
+  const side: { name: string; quantity: number }[] = [];
+  let into = main;
+  for (const raw of text.split(/\r?\n/)) {
+    const lineText = raw.trim();
+    if (!lineText) continue;
+    if (/^sideboard\b/i.test(lineText)) {
+      into = side;
+      continue;
+    }
+    const m = /^(\d+)\s+(.+)$/.exec(lineText);
+    if (m) into.push({ quantity: Number(m[1]), name: m[2]!.trim() });
+  }
+  return { main, side };
+}

@@ -8,6 +8,11 @@ export const FREE_AI_PER_DAY = 4;
 // Deck scans — the Score plus the AI's written analysis — are dearer than a
 // chat turn, so they have their own meter: one a day free, unlimited on Pro.
 export const FREE_SCANS_PER_DAY = 1;
+// Practice games against the AI: a few a day free, unlimited on Pro. Each
+// game allows this many AI turns, after which the opponent plays on its
+// built-in planner.
+export const FREE_PRACTICE_PER_DAY = 2;
+export const PRACTICE_AI_TURNS = 40;
 
 export const DECK_LIMIT_MSG =
   `The free plan holds ${FREE_DECK_LIMIT} decks — delete one to make room. Spellpool Pro, coming soon, lifts the limit.`;
@@ -16,6 +21,8 @@ export const DECK_LIMIT_MSG =
 export const SIGN_IN_FOR_DECKS_MSG = "Sign in to create a deck — it's free.";
 export const AI_LIMIT_MSG =
   `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro, coming soon, lifts the limit.`;
+export const PRACTICE_LIMIT_MSG =
+  `You've played today's ${FREE_PRACTICE_PER_DAY} free practice games — they reset at midnight UTC. Spellpool Pro, coming soon, makes them unlimited.`;
 export const SCAN_LIMIT_MSG =
   `You've used today's free deck scan — it resets at midnight UTC. Spellpool Pro, coming soon, makes scans unlimited.`;
 

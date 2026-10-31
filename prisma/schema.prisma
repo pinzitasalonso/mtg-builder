@@ -55,6 +55,7 @@ model User {
   collection   CollectionCard[]
   playCodes    PlayCode[]
   assistantThreads AssistantThread[]
+  practiceGames    PracticeGame[]
 }
 
 // A card the user physically owns, for "do I have this?" checks across their
@@ -320,4 +321,23 @@ model AssistantMessage {
   createdAt DateTime        @default(now())
 
   @@index([threadId])
+}
+
+// A practice game against the AI (docs/practice-vs-ai.md). Started games are
+// what the free daily limit counts, and each one has a cap on AI turns, so a
+// game can't run up the bill.
+model PracticeGame {
+  id        String   @id
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  // The opponent as the player picked it ("Rakdos Aggro · MTGTop8").
+  label     String
+  // JSON: both card books and the AI's decklist — what every turn's prompt is
+  // built from, so the browser never supplies card text to the model.
+  setup     String
+  // AI turns taken.
+  turns     Int      @default(0)
+
+  @@index([userId, createdAt])
 }
