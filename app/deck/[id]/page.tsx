@@ -1843,6 +1843,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           sourceLabel={statsOnDeck ? "the deck" : "the whole pool"}
           commander={deck?.commander}
           format={deck?.format}
+          deckId={deckId}
+          aiAvailable={assistant.available === true}
           onClose={() => setPlaytestOpen(false)}
         />
       )}

@@ -15,10 +15,12 @@ export function isCreature(book: CardBook, card: PlayCard): boolean {
 
 export const isLand = (card: PlayCard) => isLandCard(card.typeLine);
 
-/** Power and toughness now: printed (or the token's), plus counters and pumps. */
+/** Power and toughness now: printed (or the token's), plus counters and
+    pumps. Unknown stats (Scryfall's facts missing) count as 1/1, so a
+    creature doesn't die the moment it lands for want of data. */
 export function stats(book: CardBook, card: PlayCard): { power: number; toughness: number } {
   const info = infoOf(book, card);
-  const base = card.token ?? { power: info?.power ?? 0, toughness: info?.toughness ?? 0 };
+  const base = card.token ?? { power: info?.power ?? 1, toughness: info?.toughness ?? 1 };
   const plus = card.counters ?? 0;
   return {
     power: base.power + plus + (card.pump?.power ?? 0),
