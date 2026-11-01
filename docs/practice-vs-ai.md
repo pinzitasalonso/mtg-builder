@@ -109,6 +109,20 @@ side does.
    You can act on the opponent's cards from their ⋯ menu (destroy, exile,
    return to hand, tap) to resolve your own spells.
 
+   Where there's room (a wide screen, or a phone held sideways) a column
+   beside the board shows **Last played**, the latest spells cast by
+   either side, like the stack (a tap shows the card large), and the
+   **History**. The log lines carry the card they're about for this.
+
+   A modal card with a land on its back (Shatterskull Smashing) is played
+   by the face that's up, on both sides: clicked, it's cast; turned over
+   first, it's your land. The AI can do either, and its land goes in land
+   side up.
+
+   When the built-in planner plays a turn, the note says why in a few words
+   ("the AI took too long", "AI error 529", "no answer in time"), so a
+   player can report it.
+
    **Phones play it sideways**, like the solo table (the `.pt-table`
    landscape block in `app/globals.css`). One bar on top; each side is one
    row of cards that scrolls sideways, with its counts in a column to its

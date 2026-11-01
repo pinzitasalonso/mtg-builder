@@ -28,6 +28,9 @@ export type CardBook = Record<string, CardInfo>;
 export interface LogLine {
   seat: Seat | null;
   text: string;
+  /** The card a cast (or counter) line is about: the table shows the last
+      few as "Last played", like the stack. */
+  card?: { iid: number; name: string; imageUri: string };
 }
 
 export interface Combat {

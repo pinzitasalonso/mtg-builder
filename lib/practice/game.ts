@@ -8,9 +8,9 @@
 // refused. The AI's moves are checked: a spell it can't pay for, or a target
 // that isn't there, is skipped and logged.
 
-import { draw, moveCard, resolvesToGraveyard, type PlayCard, type PlaytestState, type Shuffle, type Zone } from "../playtest";
+import { draw, faceUpType, moveCard, resolvesToGraveyard, type PlayCard, type PlaytestState, type Shuffle, type Zone } from "../playtest";
 import { shuffled } from "../probability";
-import { counterOf, entersTapped, fetchOf, has, infoOf, isBlue, isCreature, isLand, isSick, manaOutput, shockLife, stats } from "./cards";
+import { canPlayAsLand, counterOf, entersTapped, fetchOf, has, infoOf, isBlue, isCreature, isLand, isSick, manaOutput, shockLife, stats } from "./cards";
 import { manaSources, parseCost, payCost, poolSources, type Source } from "./mana";
 import { other, type CardBook, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
@@ -84,8 +84,8 @@ export function newGame(input: {
 
 // ── Internals: these mutate a game that the exported move has cloned. ──
 
-function say(g: PracticeGame, seat: Seat | null, text: string) {
-  g.log.push({ seat, text });
+function say(g: PracticeGame, seat: Seat | null, text: string, card?: PlayCard) {
+  g.log.push(card ? { seat, text, card: { iid: card.iid, name: card.name, imageUri: card.imageUri } } : { seat, text });
   if (g.log.length > LOG_CAP) g.log.splice(0, g.log.length - LOG_CAP);
 }
 
@@ -281,13 +281,14 @@ export function playerPlay(g0: PracticeGame, iid: number): PracticeGame {
   const g = structuredClone(g0);
   const card = at.card;
   if (at.zone === "command") g.tax.you += 1;
+  // The face that's up is what's played (turn a modal card over for its land).
   if (isLand(card) && at.zone === "hand") g.landPlayed = true;
-  if (resolvesToGraveyard(card.typeLine)) {
+  if (resolvesToGraveyard(faceUpType(card))) {
     moveTo(g, iid, "graveyard");
-    say(g, "you", `You cast ${card.name}.`);
+    say(g, "you", `You cast ${card.name}.`, card);
   } else {
     moveTo(g, iid, "battlefield");
-    say(g, "you", `You ${isLand(card) ? "play" : "cast"} ${card.name}.`);
+    say(g, "you", `You ${isLand(card) ? "play" : "cast"} ${card.name}.`, isLand(card) ? undefined : card);
   }
   return g;
 }
@@ -359,10 +360,13 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   const info = infoOf(book, card);
 
   if (action.kind === "land") {
-    if (at.zone !== "hand" || !isLand(card)) return fail(`(The opponent tried to play ${card.name} as a land.)`);
+    if (at.zone !== "hand" || !canPlayAsLand(card)) return fail(`(The opponent tried to play ${card.name} as a land.)`);
     if (g.landPlayed) return fail(`(The opponent already played a land this turn.)`);
     g.landPlayed = true;
-    say(g, seat, `${who(seat)} plays ${card.name}.`);
+    // A modal card played as a land goes in land side up.
+    const turned = !isLand(card);
+    if (turned) update(g, card.iid, (c) => ({ ...c, flipped: true }));
+    say(g, seat, `${who(seat)} plays ${turned ? `${card.name.split(" // ")[1] ?? card.name} (the land side of ${card.name.split(" // ")[0]})` : card.name}.`);
     aiLandEnters(g, seat, card, book);
     return { game: g, ok: true };
   }
@@ -379,7 +383,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     if (paid.life) g.sides[seat] = { ...g.sides[seat], life: g.sides[seat].life - paid.life };
     if (at.zone === "command") g.tax[seat] += 1;
     const x = cost.xCount ? ` (X = ${action.x ?? 0})` : "";
-    say(g, seat, `${who(seat)} casts ${card.name}${x}.`);
+    say(g, seat, `${who(seat)} casts ${card.name}${x}.`, card);
     if (resolvesToGraveyard(card.typeLine)) {
       applyEffects(g, seat, action.effects, book, card.name);
       moveTo(g, card.iid, "graveyard");
@@ -407,7 +411,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   if (action.tap_card) update(g, card.iid, (c) => ({ ...c, tapped: true }));
   if (paid.life) g.sides[seat] = { ...g.sides[seat], life: g.sides[seat].life - paid.life };
   if (action.sacrifice_card) moveTo(g, card.iid, "graveyard");
-  say(g, seat, `${who(seat)} ${action.sacrifice_card ? "sacrifices" : "activates"} ${card.name}.`);
+  say(g, seat, `${who(seat)} ${action.sacrifice_card ? "sacrifices" : "activates"} ${card.name}.`, card);
   applyEffects(g, seat, action.effects, book, card.name);
   checkState(g, book);
   return { game: g, ok: true };
@@ -459,7 +463,7 @@ export function aiResponds(g0: PracticeGame, iid: number, book: CardBook): Pract
     moveTo(g, c.iid, "graveyard");
     moveTo(g, iid, at.card.commander ? "command" : "graveyard");
     const how = pitched ? ` (exiling ${pitched.name})` : free === "commander" ? " (free: its commander is out)" : "";
-    say(g, "opp", `The opponent counters ${at.card.name} with ${c.name}${how}.`);
+    say(g, "opp", `The opponent counters ${at.card.name} with ${c.name}${how}.`, c);
     if (k.rider) say(g, "opp", `Resolve: ${k.rider}`);
     checkState(g, book);
     return g;

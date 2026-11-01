@@ -3,7 +3,7 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { BASIC_COLOR, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, stats } from "./cards";
+import { BASIC_COLOR, canPlayAsLand, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, stats } from "./cards";
 import { canAttack, canBlock, cardId, castable } from "./game";
 import { manaSources, parseCost, payCost } from "./mana";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
@@ -142,7 +142,7 @@ function drawOnly(book: CardBook, c: PlayCard): number {
 export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"): TurnPlan {
   const side = g.sides[seat];
   const main: PlanAction[] = [];
-  const lands = side.hand.filter(isLand);
+  const lands = side.hand.filter(canPlayAsLand);
   if (!g.landPlayed && lands.length) {
     // Prefer a land of a colour the hand (or the commander) is missing,
     // then one that enters untapped.
@@ -150,7 +150,9 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     const missing = new Set(
       [...side.hand.filter((c) => !isLand(c)), ...side.command].flatMap((c) => parseCost(infoOf(book, c)?.manaCost ?? null).pips.flat()).filter((c) => !have.has(c))
     );
-    const score = (l: PlayCard) => landColors(book, l).filter((c) => missing.has(c)).length * 10 + (entersTapped(infoOf(book, l)) ? 0 : 5) + landColors(book, l).length;
+    // A modal card with a land back is a spell first: a real land goes before it.
+    const score = (l: PlayCard) =>
+      landColors(book, l).filter((c) => missing.has(c)).length * 10 + (entersTapped(infoOf(book, l)) ? 0 : 5) + landColors(book, l).length - (isLand(l) ? 0 : 8);
     const pickLand = lands.reduce((a, b) => (score(b) > score(a) ? b : a));
     main.push(blankAction("land", pickLand.iid));
   }

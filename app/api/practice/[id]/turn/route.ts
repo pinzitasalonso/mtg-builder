@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { extractJson } from "@/lib/ai";
 import { recordEvent } from "@/lib/analytics";
 import { currentUser } from "@/lib/auth";
 import { PRACTICE_AI_TURNS } from "@/lib/limits";
@@ -52,11 +53,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!game) return NextResponse.json({ error: "game required" }, { status: 400 });
   const setup = JSON.parse(row.setup) as Setup;
 
-  // Counted, so admin shows how often the model is reached (and the logs say why not).
+  // Counted, so admin shows how often the model is reached. The note says
+  // why in a few words, so a player can tell us (and the log has the rest).
   const fallback = (note: string) => {
     void recordEvent("practice_fallback_turn");
     return NextResponse.json({ plan: fallbackPlan(game, setup.book), source: "fallback", note });
   };
+  const instinct = (why: string) => fallback(`The opponent played on instinct this turn (${why}).`);
 
   // One more AI turn, if the game has any left.
   const spent = await prisma.practiceGame.updateMany({ where: { id, userId: user.id, turns: { lt: PRACTICE_AI_TURNS } }, data: { turns: { increment: 1 } } });
@@ -82,7 +85,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         ],
         messages: [{ role: "user", content: brief }],
       },
-      { timeout: 90_000, maxRetries: 1 }
+      // One try, under the table's 115-second wait: a slow answer becomes
+      // the built-in planner's turn here, with the reason, not a silent
+      // give-up in the browser.
+      { timeout: 100_000, maxRetries: 0 }
     );
     const u = res.usage;
     console.log(
@@ -91,15 +97,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
     if (res.stop_reason !== "end_turn") {
       console.error(`[practice] turn stopped: ${res.stop_reason}`);
-      return fallback("The opponent played on instinct this turn.");
+      return instinct(res.stop_reason === "max_tokens" ? "the AI ran out of room" : res.stop_reason === "refusal" ? "the AI declined" : `the AI stopped: ${res.stop_reason}`);
     }
     const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-    const plan: TurnPlan | null = cleanPlan(JSON.parse(text));
-    if (!plan) return fallback("The opponent played on instinct this turn.");
+    const plan: TurnPlan | null = cleanPlan(extractJson(text));
+    if (!plan) {
+      console.error(`[practice] unreadable plan: ${text.slice(0, 300)}`);
+      return instinct("the AI's answer didn't fit");
+    }
     void recordEvent("practice_ai_turn");
     return NextResponse.json({ plan, source: "ai" });
   } catch (e) {
     console.error("[practice] turn failed", e instanceof Error ? e.message : e);
-    return fallback("The opponent played on instinct this turn.");
+    if (e instanceof Anthropic.APIConnectionTimeoutError) return instinct("the AI took too long");
+    if (e instanceof Anthropic.APIError && e.status) return instinct(`AI error ${e.status}`);
+    return instinct("the AI couldn't be reached");
   }
 }

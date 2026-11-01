@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bot, Loader2, Swords, Undo2, X } from "lucide-react";
 import CommanderInput from "@/components/CommanderInput";
+import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
@@ -92,6 +93,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const [handUp, setHandUp] = useState(false);
   const lastOpponent = useRef<OpponentOption | null>(null);
   const afterCombatPlan = useRef<PlanAction[]>([]);
+  const sideLog = useRef<HTMLOListElement>(null);
   const alive = useRef(true);
   useEffect(() => () => void (alive.current = false), []);
   const book = setup?.book ?? {};
@@ -122,6 +124,13 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   useEffect(() => {
     if (game?.winner) setMode("over");
   }, [game?.winner]);
+
+  // The history beside the board follows the newest line.
+  const logLength = game?.log.length ?? 0;
+  useEffect(() => {
+    const el = sideLog.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [logLength]);
 
   /** Does EDHREC have decks for this commander, and at which brackets?
       The one matching your deck's Score bracket is picked first. */
@@ -237,15 +246,16 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ game: g }),
-        signal: AbortSignal.timeout(120_000),
+        signal: AbortSignal.timeout(115_000),
       });
-      const data = await res.json();
-      if (!res.ok || !data?.plan) throw new Error(String(res.status));
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.plan) throw new Error(`server ${res.status}`);
       plan = data.plan as TurnPlan;
       if (data.note) setAiNote(data.note);
-    } catch {
+    } catch (e) {
       plan = fallbackPlan(g, setup.book);
-      setAiNote("The opponent played on instinct this turn.");
+      const why = e instanceof DOMException && e.name === "TimeoutError" ? "no answer in time" : e instanceof Error && e.message.startsWith("server") ? e.message : "offline";
+      setAiNote(`The opponent played on instinct this turn (${why}).`);
     }
     if (!alive.current) return;
     if (plan.say) setSay(plan.say);
@@ -569,6 +579,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const yourTurn = game.active === "you";
   const row = (cards: PlayCard[], seat: Seat) => cards.map((c) => <PtCard key={c.iid} {...cardProps(seat)(c, "battlefield")} />);
   const lastLines = game.log.slice(-3);
+  const recent = game.log.filter((l) => l.card).slice(-4).reverse();
   const blockCount = Object.values(blocks).reduce((n, b) => n + b.length, 0);
   const zoomLive = zoom !== null && !!findCard(game, zoom.card.iid);
   const pileCards = pile ? [...game.sides[pile.seat][pile.zone]].reverse() : [];
@@ -761,6 +772,44 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
             </div>
           </div>
         </section>
+
+        {/* Beside the board, where there's room (a wide screen, a phone held
+            sideways): the last spells cast, like the stack, and the game so far. */}
+        <aside className="pt-side" aria-label="Last played, and the game so far">
+          <div className="pt-zone-label">Last played</div>
+          {recent.length ? (
+            <div className="pt-side-stack">
+              {recent.map((l, i) => {
+                const at = findCard(game, l.card!.iid);
+                return (
+                  <button
+                    key={`${game.log.length}-${i}`}
+                    type="button"
+                    className="pt-side-card"
+                    data-seat={l.seat ?? undefined}
+                    data-new={i === 0 ? "true" : undefined}
+                    title={l.text}
+                    aria-label={l.text}
+                    onClick={(e) => at && onZoom(at.card, at.zone, e.currentTarget.getBoundingClientRect())}
+                  >
+                    <CardArt name={l.card!.name} src={l.card!.imageUri || undefined} prefer="src" version="normal" loading="lazy" radius={0} style={{ position: "absolute", inset: 0 }} />
+                    <span className="pt-side-who">{/counters/.test(l.text) ? "Counter" : l.seat === "you" ? "You" : "Opp"}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="pt-side-empty">Spells show here as they&apos;re cast.</p>
+          )}
+          <div className="pt-zone-label">History</div>
+          <ol className="pt-side-log" ref={sideLog}>
+            {game.log.slice(-40).map((l, i) => (
+              <li key={`${game.log.length}-${i}`} className={l.seat === "opp" ? "pt-logline-opp" : undefined}>
+                {l.text}
+              </li>
+            ))}
+          </ol>
+        </aside>
       </div>
 
       <footer className="pt-hand" style={{ ["--pt-hand" as string]: "var(--pt-hand-max)" }} data-up={handUp || mode === "mulligan" ? "true" : undefined}>

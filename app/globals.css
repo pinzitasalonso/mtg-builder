@@ -1679,6 +1679,86 @@ button {
 .pt-logline-opp {
   color: #ffd9cf;
 }
+/* Beside the board in a practice game (wide screens, and a phone held
+   sideways): the last spells cast, like the stack, and the history. */
+.pt-side {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.pt-side-stack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  flex: none;
+}
+.pt-side-card {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  padding: 0;
+  border: 0;
+  border-radius: 4.8% / 3.5%;
+  overflow: hidden;
+  background: #000;
+  cursor: zoom-in;
+}
+.pt-side-card[data-new] {
+  box-shadow: 0 0 0 2px var(--gold);
+}
+.pt-side-who {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  z-index: 2;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 9.5px;
+  font-weight: 800;
+}
+.pt-side-card[data-seat="opp"] .pt-side-who {
+  background: #d0563f;
+}
+.pt-side-empty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.5);
+}
+.pt-side-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.82);
+}
+@media (min-width: 1100px) {
+  .pt-vs .pt-main {
+    grid-template-columns: auto minmax(0, 1fr) 210px;
+  }
+  .pt-vs .pt-side {
+    display: flex;
+  }
+  /* The history is beside the board now; the middle keeps the table talk. */
+  .pt-vs .pt-mid > .pt-logline {
+    display: none;
+  }
+}
 .pt-log {
   margin: 0;
   padding-left: 22px;
@@ -2100,7 +2180,21 @@ button {
 
   /* A practice game: each side in one row. */
   .pt-table.pt-vs .pt-main {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) 176px;
+  }
+  .pt-table.pt-vs .pt-side {
+    display: flex;
+    gap: 4px;
+    padding: 6px 8px;
+    border-radius: 12px;
+  }
+  /* The two latest spells, big enough to read; the history fills the rest. */
+  .pt-table .pt-side-card:nth-child(n + 3) {
+    display: none;
+  }
+  .pt-table .pt-side-log {
+    font-size: 11px;
+    padding-left: 14px;
   }
   .pt-table.pt-vs .pt-zones {
     display: none;
@@ -2190,7 +2284,7 @@ button {
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .pt-table .pt-mid > .pt-logline:not(:last-child) {
+  .pt-table.pt-vs .pt-mid > .pt-logline {
     display: none;
   }
   .pt-table .pt-say {
