@@ -1254,19 +1254,22 @@ button {
 .pt-hand .pt-card {
   width: var(--pt-hand);
 }
-.pt-hand .pt-card:hover {
-  transform: translateY(-6px);
-}
-/* A strip under the lifted card keeps the pointer on it: without it, a
-   pointer near the bottom edge falls off the lifted card, the card drops
-   back under it, lifts again, and the big preview flashes on and off. */
-.pt-hand .pt-card:hover::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 100%;
-  height: 8px;
+/* Only with a real mouse: a phone keeps :hover on the last thing tapped. */
+@media (hover: hover) and (pointer: fine) {
+  .pt-hand .pt-card:hover {
+    transform: translateY(-6px);
+  }
+  /* A strip under the lifted card keeps the pointer on it: without it, a
+     pointer near the bottom edge falls off the lifted card, the card drops
+     back under it, lifts again, and the big preview flashes on and off. */
+  .pt-hand .pt-card:hover::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 8px;
+  }
 }
 .pt-card-inner {
   position: absolute;

@@ -378,7 +378,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const at = game && findCard(game, card.iid);
     if (at) setMenu({ card, zone, anchor, seat: at.seat });
   };
-  const onZoom = (card: PlayCard | null, zone?: Zone, anchor?: DOMRect) => setZoom(card && zone && anchor ? { card, zone, anchor } : null);
+  // The mouse leaving a card closes only a preview the mouse opened.
+  const onZoom = (card: PlayCard | null, zone?: Zone, anchor?: DOMRect, hover?: boolean) =>
+    setZoom((z) => (card && zone && anchor ? { card, zone, anchor, hover } : hover ? (z?.hover ? null : z) : null));
   const onTurn = (card: PlayCard) => act((g) => (findCard(g, card.iid)?.seat === "you" ? withYourSide(g, (s) => turnOver(s, card.iid)) : g));
 
   const optionsFor = (card: PlayCard, zone: Zone, seat: Seat): { label: string; step: Step }[] => {

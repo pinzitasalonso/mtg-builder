@@ -188,8 +188,9 @@ function SoloTable({
     else setMenu({ card, zone, anchor }); // a pile card: the menu is the move
   };
   const openMenu = (anchor: DOMRect, card: PlayCard, zone: Zone) => setMenu({ card, zone, anchor });
-  const onZoom = (card: PlayCard | null, zone?: Zone, anchor?: DOMRect) =>
-    setZoom(card && zone && anchor ? { card, zone, anchor } : null);
+  // The mouse leaving a card closes only a preview the mouse opened.
+  const onZoom = (card: PlayCard | null, zone?: Zone, anchor?: DOMRect, hover?: boolean) =>
+    setZoom((z) => (card && zone && anchor ? { card, zone, anchor, hover } : hover ? (z?.hover ? null : z) : null));
   const zoomLive = zoom !== null && state[zoom.zone].some((c) => c.iid === zoom.card.iid);
 
   // Everything a card can do from where it is. The primary click is listed
