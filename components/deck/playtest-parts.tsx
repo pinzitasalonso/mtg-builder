@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Crown, Ellipsis, RefreshCw, ZoomIn } from "lucide-react";
+import { ChevronDown, Crown, Ellipsis, RefreshCw, Smartphone, X, ZoomIn } from "lucide-react";
 import { CardArt } from "@/components/mtg";
 import { useVerifiedBack } from "@/components/useCardFlip";
 import type { PlayCard, Zone } from "@/lib/playtest";
@@ -209,13 +209,22 @@ export function ActionMenu<S>({
 }) {
   const W = 236;
   const a = menu.anchor;
-  const up = a.bottom > window.innerHeight - 320;
+  // Open toward the more room, and scroll if even that is short (a phone
+  // held sideways is about 340px tall).
+  const above = a.top - 14;
+  const below = window.innerHeight - a.bottom - 14;
+  const up = below < 320 && above > below;
   const left = Math.max(8, Math.min(a.left, window.innerWidth - W - 8));
-  const place: React.CSSProperties = up ? { bottom: window.innerHeight - a.top + 6 } : { top: a.bottom + 6 };
+  const place: React.CSSProperties =
+    Math.max(above, below) < 180
+      ? { top: 8, maxHeight: window.innerHeight - 16 }
+      : up
+        ? { bottom: window.innerHeight - a.top + 6, maxHeight: above }
+        : { top: a.bottom + 6, maxHeight: below };
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 89 }} />
-      <div className="pt-menu" style={{ position: "fixed", left, width: W, zIndex: 90, ...place }} role="menu">
+      <div className="pt-menu" style={{ position: "fixed", left, width: W, zIndex: 90, overflowY: "auto", ...place }} role="menu">
         <div className="pt-menu-title">{menu.card.name}</div>
         {options.map((o) => (
           <button key={o.label} type="button" role="menuitem" onClick={() => onPick(o.step)}>
@@ -233,7 +242,8 @@ export function ActionMenu<S>({
    the pointer: if it ever overlapped the hovered card it would otherwise
    steal the hover, close, and reopen in a flicker. */
 export function ZoomPreview({ zoom, onDismiss }: { zoom: Zoom; onDismiss: () => void }) {
-  const W = Math.min(300, window.innerWidth - 24);
+  // As big as fits: a phone held sideways is short, not narrow.
+  const W = Math.round(Math.min(300, window.innerWidth - 24, (window.innerHeight - 16) / 1.4));
   const H = Math.round(W * 1.4);
   const a = zoom.anchor;
   const left =
@@ -271,5 +281,65 @@ export function Panel({ title, onClose, children }: { title: string; onClose: ()
         <div className="pt-panel-body">{children}</div>
       </div>
     </div>
+  );
+}
+
+/* Phones play the table sideways. A web page can't turn an iPhone's screen,
+   so held upright the table asks for it (CSS shows this only on a phone in
+   portrait); Android can, from fullscreen, which useLandscapeLock asks for. */
+export function RotateHint({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="pt-rotate" role="alert">
+      <Smartphone size={44} strokeWidth={1.75} className="pt-rotate-icon" aria-hidden />
+      <div className="id-display" style={{ fontSize: 24, color: "#fff" }}>
+        Turn your phone sideways
+      </div>
+      <p>The table is laid out for landscape. If the screen doesn&apos;t turn, check that rotation lock is off.</p>
+      <button type="button" className="pt-btn" onClick={onClose}>
+        <X size={14} strokeWidth={2.5} /> Close
+      </button>
+    </div>
+  );
+}
+
+/** On a phone, open the playtest fullscreen and locked to landscape where
+    the browser allows it (Android Chrome; never an iPhone). It runs as the
+    table opens, so it still counts as the tap that opened it. Undone on
+    close. */
+export function useLandscapeLock() {
+  useEffect(() => {
+    const phone = window.matchMedia("(pointer: coarse)").matches && Math.min(window.screen.width, window.screen.height) < 500;
+    const el = document.documentElement;
+    const orientation = window.screen.orientation as (ScreenOrientation & { lock?: (o: string) => Promise<void> }) | undefined;
+    if (!phone || !document.fullscreenEnabled || typeof el.requestFullscreen !== "function" || typeof orientation?.lock !== "function") return;
+    let live = true;
+    let locked = false;
+    el.requestFullscreen({ navigationUI: "hide" })
+      .then(() => (live ? orientation.lock!("landscape") : undefined))
+      .then(() => void (locked = live))
+      .catch(() => {});
+    return () => {
+      live = false;
+      try {
+        if (locked) orientation.unlock();
+      } catch {
+        /* not locked after all */
+      }
+      if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    };
+  }, []);
+}
+
+/* On a phone held sideways the hand is a strip of card tops along the
+   bottom. A tap raises it over the board (the cover takes that first tap,
+   so it can't play a card you haven't seen), and it drops again after a
+   play or with Hide. Both buttons are hidden everywhere else. */
+export function HandToggle({ up, count, onToggle }: { up: boolean; count: number; onToggle: (up: boolean) => void }) {
+  return up ? (
+    <button type="button" className="pt-btn pt-hand-handle" onClick={() => onToggle(false)}>
+      <ChevronDown size={14} strokeWidth={2.5} /> Hide hand
+    </button>
+  ) : (
+    <button type="button" className="pt-hand-cover" aria-label={`Show your hand (${count} card${count === 1 ? "" : "s"})`} onClick={() => onToggle(true)} />
   );
 }

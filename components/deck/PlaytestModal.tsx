@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart3, Bot, Dices, RotateCw, Undo2, X } from "lucide-react";
 import { hasKnownBack } from "@/components/useCardFlip";
-import { ActionMenu, LifeCounter, Panel, PileZone, PtCard, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ZoomPreview, useLandscapeLock, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import PracticeTable from "@/components/deck/PracticeTable";
 import { PoolEntry } from "@/lib/pool-client";
 import { hypergeometric, hypergeometricAtLeast } from "@/lib/probability";
@@ -66,6 +66,8 @@ export default function PlaytestModal({
   onClose: () => void;
 }) {
   const [vsAi, setVsAi] = useState(false);
+  // A phone plays sideways: fullscreen and locked where the browser allows.
+  useLandscapeLock();
   if (vsAi && deckId) return <PracticeTable deckId={deckId} onClose={onClose} onSolo={() => setVsAi(false)} />;
   return <SoloTable cards={cards} sourceLabel={sourceLabel} commander={commander} format={format} onClose={onClose} onVsAi={aiAvailable && deckId ? () => setVsAi(true) : undefined} />;
 }
@@ -96,6 +98,8 @@ function SoloTable({
   const [pile, setPile] = useState<Pile | null>(null);
   const [oddsOpen, setOddsOpen] = useState(false);
   const [zoom, setZoom] = useState<Zoom | null>(null);
+  // A phone held sideways: whether the hand is raised over the board.
+  const [handUp, setHandUp] = useState(false);
 
   // The page behind must not scroll while the table is up.
   useEffect(() => {
@@ -176,8 +180,10 @@ function SoloTable({
   } as React.CSSProperties;
 
   const onPrimary = (card: PlayCard, zone: Zone, anchor: DOMRect) => {
-    if (zone === "hand") act((s) => (s.toBottom > 0 ? bottomCard(s, card.iid) : play(s, card.iid)));
-    else if (zone === "battlefield") act((s) => toggleTap(s, card.iid));
+    if (zone === "hand") {
+      if (state.toBottom === 0) setHandUp(false);
+      act((s) => (s.toBottom > 0 ? bottomCard(s, card.iid) : play(s, card.iid)));
+    } else if (zone === "battlefield") act((s) => toggleTap(s, card.iid));
     else if (zone === "command") act((s) => play(s, card.iid));
     else setMenu({ card, zone, anchor }); // a pile card: the menu is the move
   };
@@ -219,7 +225,8 @@ function SoloTable({
           : [];
 
   return (
-    <div className="pt-root" role="dialog" aria-label="Playtest">
+    <div className="pt-root pt-table" role="dialog" aria-label="Playtest">
+      <RotateHint onClose={onClose} />
       <header className="pt-top">
         <div className="pt-title">
           <span className="id-display" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 22, color: "#fff" }}><Dices size={21} strokeWidth={2} /> Playtest</span>
@@ -348,12 +355,15 @@ function SoloTable({
         </section>
       </div>
 
-      <footer className="pt-hand" style={handVars}>
-        {state.hand.length === 0 ? (
-          <div className="pt-empty">No cards in hand.</div>
-        ) : (
-          state.hand.map((c) => <PtCard key={c.iid} card={c} zone="hand" {...cardProps} />)
-        )}
+      <footer className="pt-hand" style={handVars} data-up={handUp || state.toBottom > 0 ? "true" : undefined}>
+        {state.toBottom === 0 && <HandToggle up={handUp} count={state.hand.length} onToggle={setHandUp} />}
+        <div className="pt-hand-cards">
+          {state.hand.length === 0 ? (
+            <div className="pt-empty">No cards in hand.</div>
+          ) : (
+            state.hand.map((c) => <PtCard key={c.iid} card={c} zone="hand" {...cardProps} />)
+          )}
+        </div>
       </footer>
 
       {menu &&
