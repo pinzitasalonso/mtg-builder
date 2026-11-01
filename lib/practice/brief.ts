@@ -1,0 +1,228 @@
+// What the model sees and answers when it plays the AI's turn
+// (docs/practice-vs-ai.md): the rules of the table and its decklist (the
+// cached prefix), the board this turn (the brief), the JSON schema its plan
+// must follow, and the clean-up of that plan. Pure, for tests.
+
+import { isLandCard, type PlayCard } from "../playtest";
+import { infoOf, isCreature, isLand, isSick, stats } from "./cards";
+import { castable, cardId } from "./game";
+import { manaSources, manaSummary } from "./mana";
+import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
+
+const EFFECT_TYPES: EffectType[] = ["damage", "life", "destroy", "exile", "bounce", "tap", "untap", "draw", "discard", "mill", "token", "counters", "pump", "search", "note"];
+
+const nullable = (type: string) => ({ type: [type, "null"] });
+const EFFECT_SCHEMA = {
+  type: "object",
+  properties: {
+    type: { type: "string", enum: EFFECT_TYPES },
+    target: nullable("string"),
+    player: { type: ["string", "null"], enum: ["ai", "player", null] },
+    amount: nullable("integer"),
+    name: nullable("string"),
+    power: nullable("integer"),
+    toughness: nullable("integer"),
+    keywords: { type: "array", items: { type: "string" } },
+    to: { type: ["string", "null"], enum: ["battlefield", "hand", null] },
+    tapped: nullable("boolean"),
+    text: nullable("string"),
+  },
+  required: ["type", "target", "player", "amount", "name", "power", "toughness", "keywords", "to", "tapped", "text"],
+  additionalProperties: false,
+};
+const ACTION_SCHEMA = {
+  type: "object",
+  properties: {
+    kind: { type: "string", enum: ["land", "cast", "activate"] },
+    card: { type: "string" },
+    x: nullable("integer"),
+    tap_card: nullable("boolean"),
+    sacrifice_card: nullable("boolean"),
+    mana: nullable("string"),
+    life: nullable("integer"),
+    effects: { type: "array", items: EFFECT_SCHEMA },
+  },
+  required: ["kind", "card", "x", "tap_card", "sacrifice_card", "mana", "life", "effects"],
+  additionalProperties: false,
+};
+/** The plan's shape, enforced by the API's structured outputs. */
+export const PLAN_SCHEMA = {
+  type: "object",
+  properties: {
+    main: { type: "array", items: ACTION_SCHEMA },
+    attack: { type: "array", items: { type: "string" } },
+    after_combat: { type: "array", items: ACTION_SCHEMA },
+    say: { type: "string" },
+  },
+  required: ["main", "attack", "after_combat", "say"],
+  additionalProperties: false,
+};
+
+const RULES = `You are the opponent in a practice game of Magic: The Gathering on Spellpool. You pilot the deck below against the player, who is practising with their own deck. Play to win, like a strong and fair player: make your land drops, spend your mana, use removal on the biggest threats, attack when it's good, keep blockers back when you need them. Play the deck the way it wants to be played.
+
+HOW THIS TABLE WORKS
+- Each of your turns you get a brief: your hand, your mana right now, both battlefields, life totals and what happened since your last turn. Cards are named by id, like c10023.
+- You answer with your plan for the whole turn: "main" (actions before combat, in order), "attack" (ids of your creatures that attack the player), "after_combat" (actions after combat, in order) and "say" (one short line of table talk in character, at most 12 words, or "").
+- The app checks every action. One land per turn. A spell or ability has to be paid from your untapped mana: the brief says what each card costs and whether you can pay for it now. Actions are paid in order, so put first what you most want to cast. Don't plan more than your mana allows.
+- You only act on your own turn. You don't respond to the player's spells. The app blocks for you.
+- Don't activate mana abilities: the app taps your lands and mana sources when you cast.
+- Creatures that are summoning sick (marked in the brief) can't attack.
+
+ACTIONS
+- {"kind":"land","card":"<id>"}: play a land from your hand.
+- {"kind":"cast","card":"<id>","x":<n or null>,"effects":[...]}: cast a card from your hand or command zone. A permanent enters the battlefield; an instant or sorcery resolves and goes to your graveyard. "effects" is what the spell does, or what the permanent's enters-the-battlefield ability does, right now.
+- {"kind":"activate","card":"<id>","tap_card":<bool>,"sacrifice_card":<bool>,"mana":"{2}{G}" or null,"life":<n or null>,"effects":[...]}: an activated ability of a permanent you control, with its costs. A fetch land is tap_card true, sacrifice_card true, life 1, and a search effect.
+Every field is always present; set the ones an action doesn't use to null (effects to []).
+
+EFFECTS (every field present: unused ones null, keywords [] when unused)
+- damage: target is a card id, "player" or "ai"; amount.
+- life: player is "ai" or "player"; amount (negative to lose life).
+- destroy, exile, bounce (return to its owner's hand), tap, untap: target is a card id on the battlefield.
+- draw, discard, mill: player and amount. Your own discards pick themselves; the player chooses theirs.
+- token: name, power, toughness, amount (how many), keywords, tapped, and player (whose; null means yours).
+- counters: target and amount (+1/+1 counters; negative for -1/-1).
+- pump: target, power and toughness, until end of turn.
+- search: name (an exact card name from your deck still in your library), to ("battlefield" or "hand"), tapped.
+- note: text, for anything else the card does. The player resolves it by hand, so make it short and concrete ("The player sacrifices a creature").
+Turn each card's text into these effects faithfully. Never invent an effect a card doesn't have. Target only cards the brief shows, by id.`;
+
+export interface DeckLine {
+  name: string;
+  quantity: number;
+}
+
+const line = (book: CardBook, name: string) => {
+  const info = book[name.toLowerCase()];
+  if (!info) return name;
+  const text = (info.oracleText ?? "").replace(/\s*\n\s*/g, " ").slice(0, 600);
+  const pt = info.power !== null && info.toughness !== null ? ` ${info.power}/${info.toughness}` : "";
+  return `${info.name} ${info.manaCost ?? ""} — ${info.typeLine ?? ""}${pt}${text ? ` — ${text}` : ""}`;
+};
+
+/** The cached prefix: the rules, then the AI's deck with each card's text. */
+export function systemPrompt(deck: DeckLine[], book: CardBook, commander: string | null): { rules: string; deck: string } {
+  const lines = [...deck].sort((a, b) => a.name.localeCompare(b.name)).map((d) => `- ${d.quantity}× ${line(book, d.name)}`);
+  return {
+    rules: RULES,
+    deck: `YOUR DECK${commander ? ` (commander: ${commander})` : ""}\n${lines.join("\n")}`,
+  };
+}
+
+const describe = (g: PracticeGame, book: CardBook, c: PlayCard, opts: { text?: boolean } = {}) => {
+  const bits: string[] = [];
+  if (isCreature(book, c)) {
+    const s = stats(book, c);
+    bits.push(`${s.power}/${s.toughness}`);
+    if (c.damage) bits.push(`${c.damage} damage marked`);
+  }
+  const kw = c.token ? c.token.keywords : (infoOf(book, c)?.keywords ?? []);
+  if (kw.length) bits.push(kw.join(", "));
+  bits.push(c.tapped ? "tapped" : "untapped");
+  if (isCreature(book, c) && isSick(book, c, g.turn) && g.active === "opp") bits.push("summoning sick");
+  if (c.counters) bits.push(`${c.counters > 0 ? "+" : ""}${c.counters} counters`);
+  if (c.commander) bits.push("commander");
+  const kind = c.token ? "token" : isLand(c) ? "land" : (infoOf(book, c)?.typeLine ?? c.typeLine ?? "").split(" — ")[0];
+  const text = opts.text && !c.token ? (infoOf(book, c)?.oracleText ?? "").replace(/\s*\n\s*/g, " ").slice(0, 300) : "";
+  return `- ${cardId(c.iid)} ${c.name.slice(0, 80)} (${kind}) ${bits.join(", ")}${text ? ` — ${text}` : ""}`;
+};
+
+/** The board this turn, from the AI's side of the table. */
+export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[]): string {
+  const me = g.sides.opp;
+  const them = g.sides.you;
+  const sources = manaSources(me, book, g.turn);
+  const hand = me.hand.map((c) => {
+    const info = infoOf(book, c);
+    if (isLandCard(c.typeLine)) return `- ${cardId(c.iid)} ${c.name} (land)${g.landPlayed ? "" : " — you can play it"}`;
+    const can = castable(g, "opp", c, book, "hand");
+    return `- ${cardId(c.iid)} ${c.name} ${info?.manaCost ?? ""} (${(info?.typeLine ?? "").split(" — ")[0]}) — ${can ? "you can pay for it now" : "can't pay for it yet"}`;
+  });
+  const command = me.command.map((c) => {
+    const info = infoOf(book, c);
+    const can = castable(g, "opp", c, book, "command");
+    return `- ${cardId(c.iid)} ${c.name} ${info?.manaCost ?? ""}${g.tax.opp ? ` +{${2 * g.tax.opp}} tax` : ""} — ${can ? "you can pay for it now" : "can't pay for it yet"}`;
+  });
+  const field = (cards: PlayCard[], text: boolean) => (cards.length ? cards.map((c) => describe(g, book, c, { text })).join("\n") : "(nothing)");
+  const grave = (cards: PlayCard[]) => (cards.length ? cards.slice(-8).map((c) => c.name).join(", ") : "empty");
+  return [
+    `Turn ${g.turn}: your turn. Life: you ${me.life}, the player ${them.life}.` +
+      (g.commanderGame ? ` Commander damage taken: you ${g.cmdDamage.opp}, the player ${g.cmdDamage.you}.` : ""),
+    `Your library: ${me.library.length} cards. The player has ${them.hand.length} cards in hand and ${them.library.length} in library.`,
+    `Land drop: ${g.landPlayed ? "already used this turn" : "available"}.`,
+    `YOUR MANA RIGHT NOW: ${manaSummary(sources)}.`,
+    sinceLast.length ? `SINCE YOUR LAST TURN:\n${sinceLast.map((t) => `- ${t}`).join("\n")}` : "",
+    `YOUR HAND:\n${hand.join("\n") || "(empty)"}`,
+    command.length ? `YOUR COMMAND ZONE:\n${command.join("\n")}` : "",
+    `YOUR BATTLEFIELD:\n${field(me.battlefield, false)}`,
+    `THE PLAYER'S BATTLEFIELD:\n${field(them.battlefield, true)}`,
+    `GRAVEYARDS: yours: ${grave(me.graveyard)}. The player's: ${grave(them.graveyard)}.`,
+    `Plan your turn.`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/** What happened since the AI's last turn: the player's turn, from the log
+    (the AI's own turn-start line excluded). */
+export function sinceLastTurn(g: PracticeGame): string[] {
+  const texts = g.log.map((l) => l.text);
+  const at = texts.lastIndexOf(`Turn ${g.turn - 1} — your turn.`);
+  return texts
+    .slice(at >= 0 ? at : Math.max(0, texts.length - 15))
+    .filter((t) => t !== `Turn ${g.turn} — the opponent's turn.`)
+    .slice(-20);
+}
+
+const int = (v: unknown, lo: number, hi: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : null);
+const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : null);
+const bool = (v: unknown) => (typeof v === "boolean" ? v : null);
+
+function cleanEffect(raw: unknown): Effect | null {
+  if (!raw || typeof raw !== "object") return null;
+  const e = raw as Record<string, unknown>;
+  if (!EFFECT_TYPES.includes(e.type as EffectType)) return null;
+  return {
+    type: e.type as EffectType,
+    target: text(e.target, 20),
+    player: e.player === "ai" || e.player === "player" ? e.player : null,
+    amount: int(e.amount, -99, 99),
+    name: text(e.name, 80),
+    power: int(e.power, -20, 99),
+    toughness: int(e.toughness, -20, 99),
+    keywords: Array.isArray(e.keywords) ? e.keywords.filter((k): k is string => typeof k === "string").slice(0, 6).map((k) => k.slice(0, 30)) : [],
+    to: e.to === "battlefield" || e.to === "hand" ? e.to : null,
+    tapped: bool(e.tapped),
+    text: text(e.text, 200),
+  };
+}
+
+function cleanAction(raw: unknown): PlanAction | null {
+  if (!raw || typeof raw !== "object") return null;
+  const a = raw as Record<string, unknown>;
+  if (a.kind !== "land" && a.kind !== "cast" && a.kind !== "activate") return null;
+  const card = text(a.card, 20);
+  if (!card || !/^c\d+$/.test(card)) return null;
+  return {
+    kind: a.kind,
+    card,
+    x: int(a.x, 0, 30),
+    tap_card: bool(a.tap_card),
+    sacrifice_card: bool(a.sacrifice_card),
+    mana: text(a.mana, 40),
+    life: int(a.life, 0, 20),
+    effects: (Array.isArray(a.effects) ? a.effects : []).map(cleanEffect).filter((e): e is Effect => !!e).slice(0, 12),
+  };
+}
+
+/** The model's plan, bounded: known shapes only, at most 12 actions a phase. */
+export function cleanPlan(raw: unknown): TurnPlan | null {
+  if (!raw || typeof raw !== "object") return null;
+  const p = raw as Record<string, unknown>;
+  const actions = (v: unknown) => (Array.isArray(v) ? v : []).map(cleanAction).filter((a): a is PlanAction => !!a).slice(0, 12);
+  return {
+    main: actions(p.main),
+    attack: (Array.isArray(p.attack) ? p.attack : []).filter((x): x is string => typeof x === "string" && /^c\d+$/.test(x)).slice(0, 30),
+    after_combat: actions(p.after_combat),
+    say: (text(p.say, 120) ?? "").trim(),
+  };
+}

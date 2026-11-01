@@ -5,6 +5,7 @@ import {
   fetchDecklist,
   fetchMetagame,
   findArchetype,
+  parseMtgoList,
   parseCedhMetagame,
   parseDeckRows,
   parseMetagame,
@@ -151,5 +152,14 @@ describe("fetching MTGTop8", () => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(url.includes("d=1") ? "4 Lightning Bolt\nSideboard\n2 Blood Moon\n" : "<html>Not found</html>")));
     expect(await fetchDecklist("1")).toBe("4 Lightning Bolt\nSideboard\n2 Blood Moon");
     expect(await fetchDecklist("2")).toBeNull();
+  });
+});
+
+describe("parseMtgoList", () => {
+  it("splits a list into main and sideboard (a cEDH list's commander)", () => {
+    expect(parseMtgoList("1 Badgermole Cub\r\n4 Lightning Bolt\nSideboard\n1 Kinnan, Bonder Prodigy\n\n")).toEqual({
+      main: [{ name: "Badgermole Cub", quantity: 1 }, { name: "Lightning Bolt", quantity: 4 }],
+      side: [{ name: "Kinnan, Bonder Prodigy", quantity: 1 }],
+    });
   });
 });

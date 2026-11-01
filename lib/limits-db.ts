@@ -1,7 +1,7 @@
 // Plan limits — the DB half. Server-only (imports Prisma).
 
 import prisma from "@/lib/prisma";
-import { FREE_AI_PER_DAY, FREE_DECK_LIMIT, FREE_SCANS_PER_DAY, isPro, utcDay, type TierFields } from "@/lib/limits";
+import { FREE_AI_PER_DAY, FREE_DECK_LIMIT, FREE_PRACTICE_PER_DAY, FREE_SCANS_PER_DAY, isPro, utcDay, type TierFields } from "@/lib/limits";
 
 /* Spend one AI call from the user's daily budget. Returns false when the
    budget is exhausted (free tier only — pro never runs out). Each UPDATE's
@@ -56,4 +56,13 @@ export async function refundScan(user: { id: number } & TierFields): Promise<voi
     where: { id: user.id, scanDay: utcDay(), scanCount: { gt: 0 } },
     data: { scanCount: { decrement: 1 } },
   });
+}
+
+/* Whether the user may start another practice game today: the games they
+   started since midnight UTC, against the free allowance. */
+export async function canStartPractice(user: { id: number } & TierFields): Promise<boolean> {
+  if (isPro(user)) return true;
+  const since = new Date(`${utcDay()}T00:00:00.000Z`);
+  const started = await prisma.practiceGame.count({ where: { userId: user.id, createdAt: { gte: since } } });
+  return started < FREE_PRACTICE_PER_DAY;
 }

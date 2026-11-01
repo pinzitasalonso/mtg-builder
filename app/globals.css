@@ -1454,6 +1454,238 @@ button {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.65);
 }
+/* ── Practice games against the AI (components/deck/PracticeTable). ── */
+.spin {
+  animation: spin 1s linear infinite;
+}
+.pt-btn-ai {
+  border-color: rgba(253, 242, 111, 0.45);
+}
+.pt-pick {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px clamp(16px, 4vw, 40px) 32px;
+  max-width: 880px;
+  width: 100%;
+  margin: 0 auto;
+}
+.pt-pick-note {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.7);
+}
+.pt-pick-error {
+  margin: 0 0 14px;
+  font-size: 14px;
+  color: #ff9c86;
+}
+.pt-pick-wait {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+}
+.pt-pick-group {
+  margin-bottom: 18px;
+}
+.pt-pick-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.pt-pick-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  text-align: left;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+.pt-pick-option:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+.pt-pick-label {
+  font-size: 14.5px;
+  font-weight: 700;
+}
+.pt-pick-detail {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.pt-thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+}
+.pt-field-vs {
+  gap: 8px;
+}
+.pt-opp {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.pt-opp-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pt-opp-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+.pt-opp-meta {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.65);
+}
+.pt-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--gold);
+  font: inherit;
+  cursor: pointer;
+}
+.pt-opp .pt-card {
+  width: calc(var(--pt-card) * 0.8);
+}
+.pt-opp-row:empty {
+  display: none;
+}
+.pt-you-head,
+.pt-you-command {
+  display: none;
+}
+.pt-mid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 0 8px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.14);
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.pt-say {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  color: #fff;
+}
+.pt-say em {
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+.pt-logline-opp {
+  color: #ffd9cf;
+}
+.pt-log {
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.85);
+}
+.pt-badge,
+.pt-stat {
+  position: absolute;
+  z-index: 3;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.pt-badge {
+  left: 50%;
+  bottom: 30%;
+  transform: translateX(-50%);
+  max-width: 96%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: #d0563f;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.pt-stat {
+  right: 4px;
+  bottom: 4px;
+  background: rgba(0, 0, 0, 0.82);
+  color: #fff;
+}
+.pt-card[data-selected="true"] .pt-card-inner {
+  outline: 3px solid var(--gold);
+  outline-offset: 1px;
+}
+.pt-card[data-selected="true"] {
+  transform: translateY(-4px);
+}
+.pt-token {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px;
+  text-align: center;
+  background: radial-gradient(120% 90% at 50% 20%, #4a3f6b, #1b1528);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+}
+.pt-token-kind {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.pt-over {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  z-index: 60;
+  padding: 18px 26px;
+  border-radius: 18px;
+  background: rgba(13, 10, 22, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), 0 30px 70px -20px rgba(0, 0, 0, 0.9);
+  text-align: center;
+  pointer-events: none;
+  max-width: min(420px, 90vw);
+}
+.pt-over .id-display {
+  font-size: 30px;
+  color: var(--gold);
+}
+.pt-over p {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
 @media (max-width: 760px) {
   /* Cards you can read: a hand of big cards that scrolls sideways rather
      than shrinking seven to fit; on the battlefield, two permanents to a
@@ -1473,6 +1705,36 @@ button {
   }
   .pt-field .pt-row-lands .pt-card {
     width: calc((100% - 16px) / 3);
+  }
+  .pt-opp .pt-card {
+    width: calc((100% - 24px) / 4);
+  }
+  /* A practice game puts both boards in the field, so on a phone the cards
+     there are smaller than on the solo table, the piles become a line of
+     links, and the hand gives up a little height. */
+  .pt-vs .pt-zones {
+    display: none;
+  }
+  .pt-vs .pt-you-head {
+    display: block;
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.65);
+  }
+  .pt-vs .pt-you-command {
+    display: flex;
+  }
+  .pt-vs .pt-you-command .pt-card {
+    width: calc((100% - 24px) / 4);
+  }
+  .pt-vs .pt-field .pt-row-perms .pt-card {
+    width: calc((100% - 16px) / 3);
+  }
+  .pt-vs .pt-field .pt-row-lands .pt-card,
+  .pt-vs .pt-opp-lands .pt-card {
+    width: calc((100% - 32px) / 5);
+  }
+  .pt-vs {
+    --pt-hand-max: clamp(96px, 30vw, 150px);
   }
   /* The header and the tools took a third of the screen: one line each.
      The title goes, the life counters keep − and +, and Odds, Close and

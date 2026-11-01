@@ -161,6 +161,9 @@ export async function lookupCollection(names: string[]): Promise<CollectionLooku
     const cards = (data.data ?? []).filter((c) => c?.id);
     cards.forEach((c, i) => {
       const card = toOutCard(c);
+      // The same response has the card's facts (stats, keywords, mana): keep
+      // them, so cardFactsByIds on these cards asks Scryfall nothing more.
+      factsCache.set(c.id, { at: Date.now(), facts: toCardFacts(c) });
       const keys = asked.length === cards.length ? [normalizeCardKey(asked[i]!), ...nameKeys(c.name)] : nameKeys(c.name);
       for (const k of keys) if (!found.has(k)) found.set(k, card);
     });

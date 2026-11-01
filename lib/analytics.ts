@@ -11,6 +11,7 @@ export const EVENT_TYPES = [
   "deck_viewed",
   "ai_message",
   "card_search",
+  "practice_game",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

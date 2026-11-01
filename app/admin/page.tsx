@@ -40,6 +40,7 @@ const LABELS: Record<string, string> = {
   deck_viewed: "Deck views",
   ai_message: "AI messages",
   card_search: "Card searches",
+  practice_game: "Practice games",
 };
 
 const SECTIONS = [
