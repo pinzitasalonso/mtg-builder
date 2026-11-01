@@ -3,8 +3,8 @@
 // cached prefix), the board this turn (the brief), the JSON schema its plan
 // must follow, and the clean-up of that plan. Pure, for tests.
 
-import { isLandCard, type PlayCard } from "../playtest";
-import { counterOf, infoOf, isCreature, isLand, isSick, stats } from "./cards";
+import type { PlayCard } from "../playtest";
+import { canPlayAsLand, counterOf, infoOf, isCreature, isLand, isSick, stats } from "./cards";
 import { availableMana, castable, cardId } from "./game";
 import { manaSummary } from "./mana";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
@@ -79,7 +79,7 @@ HOW TO PLAY WELL
 - Attack when the player can't block well; keep blockers back when their board threatens lethal.
 
 ACTIONS
-- {"kind":"land","card":"<id>"}: play a land from your hand.
+- {"kind":"land","card":"<id>"}: play a land from your hand. A modal card with a land on its back (marked in your hand) can be cast as its front, or played as your land this way.
 - {"kind":"cast","card":"<id>","x":<n or null>,"effects":[...]}: cast a card from your hand or command zone. A permanent enters the battlefield; an instant or sorcery resolves and goes to your graveyard. "effects" is what the spell does, or what the permanent's enters-the-battlefield ability does, right now.
 - {"kind":"activate","card":"<id>","tap_card":<bool>,"sacrifice_card":<bool>,"mana":"{2}{G}" or null,"life":<n or null>,"effects":[...]}: an activated ability of a permanent you control, with its costs.
 Every field is always present; set the ones an action doesn't use to null (effects to []).
@@ -144,10 +144,11 @@ export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[]):
   const sources = availableMana(g, "opp", book);
   const hand = me.hand.map((c) => {
     const info = infoOf(book, c);
-    if (isLandCard(c.typeLine)) return `- ${cardId(c.iid)} ${c.name} (land)${g.landPlayed ? "" : " — you can play it"}`;
+    if (isLand(c)) return `- ${cardId(c.iid)} ${c.name} (land)${g.landPlayed ? "" : " — you can play it"}`;
     const can = castable(g, "opp", c, book, "hand");
     const counter = counterOf(info) ? " — counterspell: leave its mana untapped and the app casts it on the player's turn" : "";
-    return `- ${cardId(c.iid)} ${c.name} ${info?.manaCost ?? ""} (${(info?.typeLine ?? "").split(" — ")[0]}) — ${can ? "you can pay for it now" : "can't pay for it yet"}${counter}`;
+    const land = canPlayAsLand(c) ? ` — or play it as your land (its back face)${g.landPlayed ? ", but your land drop is used" : ""}` : "";
+    return `- ${cardId(c.iid)} ${c.name} ${info?.manaCost ?? ""} (${(info?.typeLine ?? "").split(" — ")[0]}) — ${can ? "you can pay for it now" : "can't pay for it yet"}${counter}${land}`;
   });
   const command = me.command.map((c) => {
     const info = infoOf(book, c);

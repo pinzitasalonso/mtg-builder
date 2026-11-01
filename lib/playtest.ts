@@ -65,6 +65,14 @@ export const isLandCard = (typeLine: string | null) => /\bLand\b/.test(typeLine 
 /** Instants and sorceries don't stay: cast from hand, they resolve to the graveyard. */
 export const resolvesToGraveyard = (typeLine: string | null) => /\b(Instant|Sorcery)\b/.test(frontFace(typeLine));
 
+/** The type line of the face that's up: a turned-over card shows its back.
+    A modal card with a land back (Shatterskull Smashing) is a sorcery face
+    up, and a land turned over. */
+export const faceUpType = (card: { typeLine: string | null; flipped?: boolean }): string => {
+  const faces = (card.typeLine ?? "").split(" // ");
+  return (card.flipped && faces[1] ? faces[1] : faces[0]) ?? "";
+};
+
 /**
  * Deal a new game: expand quantities into individual cards, seat the commander
  * (or each partner of an "A + B" pair) in the command zone, shuffle, draw seven.
@@ -169,7 +177,8 @@ export function play(state: PlaytestState, iid: number): PlaytestState {
   const from = zoneOf(state, iid);
   if (from === "hand") {
     const card = state.hand.find((c) => c.iid === iid)!;
-    return moveCard(state, iid, resolvesToGraveyard(card.typeLine) ? "graveyard" : "battlefield");
+    // The face that's up is what's played: turn a modal card over to play its land.
+    return moveCard(state, iid, resolvesToGraveyard(faceUpType(card)) ? "graveyard" : "battlefield");
   }
   if (from === "command") return moveCard(state, iid, "battlefield");
   return state;

@@ -65,6 +65,13 @@ const BOOK: CardBook = Object.fromEntries(
     info("Pyroblast", { typeLine: "Instant", manaCost: "{R}", manaValue: 1, oracleText: "Choose one —\n• Counter target spell if it's blue.\n• Destroy target permanent if it's blue." }),
     info("Brainstorm", { typeLine: "Instant", manaCost: "{U}", manaValue: 1, oracleText: "Draw three cards, then put two cards from your hand on top of your library in any order." }),
     info("Divination", { typeLine: "Sorcery", manaCost: "{2}{U}", manaValue: 3, oracleText: "Draw two cards." }),
+    info("Shatterskull Smashing // Shatterskull, the Shattered", {
+      typeLine: "Sorcery // Land",
+      manaCost: "{X}{R}{R} // ",
+      manaValue: 2,
+      producedMana: ["R"],
+      oracleText: "Shatterskull Smashing deals X damage divided as you choose among up to two target creatures and/or planeswalkers.\n//\nAs Shatterskull, the Shattered enters the battlefield, you may pay 3 life. If you don't, it enters the battlefield tapped.\n{T}: Add {R}.",
+    }),
   ].map((c) => [c.name.toLowerCase(), c])
 );
 const deck = (...names: string[]): DeckCard[] => names.map((name) => ({ name, imageUri: "", typeLine: BOOK[name.toLowerCase()]!.typeLine }));
@@ -497,5 +504,44 @@ describe("counterspells on your turn", () => {
     g = cast(t, "Divination");
     expect(g.sides.opp.graveyard.map((c) => c.name)).toEqual(["Fierce Guardianship"]);
     expect(g.log.at(-1)!.text).toMatch(/free: its commander is out/);
+  });
+});
+
+describe("modal cards with a land back", () => {
+  const SKULL = "Shatterskull Smashing // Shatterskull, the Shattered";
+
+  it("the AI can play one as its land: it goes in land side up and makes mana", () => {
+    const g0 = table({ oppHand: [SKULL] });
+    const g = applyAction(g0, "opp", action("land", iidOf(g0, "opp", SKULL, "hand")), BOOK).game;
+    const card = g.sides.opp.battlefield.find((c) => c.name === SKULL)!;
+    expect(card.flipped).toBe(true);
+    expect(g.log.at(-1)!.text).toBe("The opponent plays Shatterskull, the Shattered (the land side of Shatterskull Smashing).");
+    expect(manaSources(g.sides.opp, BOOK, g.turn).map((s) => s.colors)).toEqual([["R"]]);
+  });
+
+  it("…or cast its front: a sorcery goes to the graveyard, and the land drop is still there", () => {
+    const g0 = table({ oppHand: [SKULL], oppField: ["Mountain", "Mountain"] });
+    const step = applyAction(g0, "opp", action("cast", iidOf(g0, "opp", SKULL, "hand"), { x: 0 }), BOOK);
+    expect(step.ok).toBe(true);
+    expect(step.game.sides.opp.graveyard.map((c) => c.name)).toEqual([SKULL]);
+    expect(step.game.landPlayed).toBe(false);
+  });
+
+  it("your side: clicked, it's cast; turned over first, it's your land", () => {
+    const g0 = { ...table({ youHand: [SKULL] }), active: "you" as const };
+    const iid = iidOf(g0, "you", SKULL, "hand");
+    const cast = playerPlay(g0, iid);
+    expect(cast.sides.you.graveyard.map((c) => c.name)).toEqual([SKULL]);
+    expect(cast.landPlayed).toBe(false);
+    const turned = { ...g0, sides: { ...g0.sides, you: { ...g0.sides.you, hand: g0.sides.you.hand.map((c) => (c.iid === iid ? { ...c, flipped: true } : c)) } } };
+    const land = playerPlay(turned, iid);
+    expect(land.sides.you.battlefield.map((c) => c.name)).toEqual([SKULL]);
+    expect(land.landPlayed).toBe(true);
+  });
+
+  it("the fallback plays a real land before a modal card", () => {
+    const g0 = table({ oppHand: [SKULL, "Mountain"] });
+    const plan = fallbackPlan(g0, BOOK);
+    expect(plan.main[0]).toMatchObject({ kind: "land", card: cardId(iidOf(g0, "opp", "Mountain", "hand")) });
   });
 });

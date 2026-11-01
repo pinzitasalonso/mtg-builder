@@ -1,7 +1,7 @@
 // What a card on the table can do: its stats now, its keywords, the mana it
 // makes. Read from Scryfall's card data (CardInfo); tokens carry their own.
 
-import { isLandCard, type PlayCard } from "../playtest";
+import { faceUpType, isLandCard, type PlayCard } from "../playtest";
 import type { CardBook, CardInfo } from "./types";
 
 export const infoOf = (book: CardBook, card: PlayCard): CardInfo | undefined => book[card.name.toLowerCase()];
@@ -13,7 +13,12 @@ export function isCreature(book: CardBook, card: PlayCard): boolean {
   return /\bCreature\b/.test(frontType(infoOf(book, card)?.typeLine ?? card.typeLine));
 }
 
-export const isLand = (card: PlayCard) => isLandCard(card.typeLine);
+/** A land now: the face that's up is a land. A modal card with a land back
+    (Shatterskull Smashing) is a spell in hand, and a land once played as one. */
+export const isLand = (card: PlayCard) => /\bLand\b/.test(faceUpType(card));
+
+/** Can be the turn's land: a land, or a modal card with a land on its back. */
+export const canPlayAsLand = (card: PlayCard) => isLandCard(card.typeLine);
 
 /** Power and toughness now: printed (or the token's), plus counters and
     pumps. Unknown stats (Scryfall's facts missing) count as 1/1, so a
