@@ -115,10 +115,17 @@ side does.
    the stack; a tap shows the card large) and the **History**. Nothing sits
    between the boards then. The log lines carry the card they're about.
 
-   Each side's counts sit in a column at its left, with a commander still
-   in the command zone shown small and dimmed beside them (with its tax)
-   rather than taking a row. The opponent's half has a slightly warmer
-   ground than yours.
+   Both halves are laid out the same: each side is one line, its
+   permanents and then its lands, the lands in piles (the same land mostly
+   under the one before; past four lands, each overlaps the last a little).
+   A crowded line shrinks its cards to fit, down to 70% (CSS container units
+   on `.pt-side-cards`, with `--pt-slots` from the table), before it wraps
+   or, on a phone, scrolls. The opponent's half has a slightly warmer
+   ground. Its graveyard and commander sit in the column of piles at the
+   left, above yours, with its hand, library and exile as counts; where
+   that column is hidden (a narrow screen, a phone held sideways) each side
+   has a head of counts at its left instead. A commander in the command
+   zone is dimmed until it's cast, and shows its tax.
 
    A modal card with a land on its back (Shatterskull Smashing) is played
    by the face that's up, on both sides: clicked, it's cast; turned over

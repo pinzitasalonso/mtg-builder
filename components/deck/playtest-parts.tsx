@@ -36,6 +36,7 @@ export function PtCard({
   selected,
   badge,
   stat,
+  stack,
 }: {
   card: PlayCard;
   zone: Zone;
@@ -49,6 +50,9 @@ export function PtCard({
   badge?: string;
   /** Practice games: power/toughness now, when it isn't the printed one. */
   stat?: string | null;
+  /** Practice games, lands: overlapping the card before. "same": on a pile of
+      the same land; "tight": the row is long. */
+  stack?: "same" | "tight";
 }) {
   // A double-faced card shows the face the game says. The new face swaps in
   // halfway through a quick turn, on a layer of its own so the turn doesn't
@@ -80,6 +84,7 @@ export function PtCard({
       className="pt-card"
       data-tapped={card.tapped ? "true" : undefined}
       data-selected={selected ? "true" : undefined}
+      data-stacked={stack}
       aria-label={card.name}
       onClick={(e) => {
         e.stopPropagation();
