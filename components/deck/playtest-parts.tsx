@@ -22,7 +22,17 @@ export interface Zoom {
       and an unmounted element never fires pointerleave to clear the hover. */
   zone: Zone;
   anchor: DOMRect;
+  /** Opened by a mouse resting on the card (it closes when the mouse
+      leaves), not by 🔍 (it closes with a tap anywhere, on a backdrop). */
+  hover?: boolean;
 }
+
+/* Only a device that can really hover gets previews on hover. A phone fires
+   "mouse" pointer events of its own after a tap, at the spot tapped: when the
+   next card in hand slid under that spot its preview opened, its backdrop
+   came up under the "mouse", the card lost it, the preview closed, and round
+   again until you tapped somewhere else. */
+const canHover = () => typeof window !== "undefined" && window.matchMedia("(any-hover: hover) and (any-pointer: fine)").matches;
 
 /* One card on the table. The primary click is the zone's natural move; ⋯
    opens the full menu; hover (mouse) or 🔍 (touch) shows it large. */
@@ -42,7 +52,9 @@ export function PtCard({
   zone: Zone;
   onPrimary: (card: PlayCard, zone: Zone, anchor: DOMRect) => void;
   onMenu: (anchor: DOMRect, card: PlayCard, zone: Zone) => void;
-  onZoom: (card: PlayCard | null, zone?: Zone, anchor?: DOMRect) => void;
+  /** Open the preview; null closes it. hover: the mouse arrived (or left:
+      then only a preview it opened closes). */
+  onZoom: (card: PlayCard | null, zone?: Zone, anchor?: DOMRect, hover?: boolean) => void;
   onTurn: (card: PlayCard) => void;
   /** Practice games: picked (as an attacker, or a blocker being placed). */
   selected?: boolean;
@@ -91,10 +103,10 @@ export function PtCard({
         onPrimary(card, zone, e.currentTarget.getBoundingClientRect());
       }}
       onPointerEnter={(e) => {
-        if (e.pointerType === "mouse") onZoom(card, zone, e.currentTarget.getBoundingClientRect());
+        if (e.pointerType === "mouse" && canHover()) onZoom(card, zone, e.currentTarget.getBoundingClientRect(), true);
       }}
       onPointerLeave={(e) => {
-        if (e.pointerType === "mouse") onZoom(null);
+        if (e.pointerType === "mouse" && canHover()) onZoom(null, undefined, undefined, true);
       }}
     >
       <div className="pt-card-inner">
@@ -269,7 +281,10 @@ export function ZoomPreview({ zoom, onDismiss }: { zoom: Zoom; onDismiss: () => 
   const src = zoom.card.flipped ? (back ?? backImageOf(zoom.card.name, zoom.card.imageUri) ?? zoom.card.imageUri) || undefined : zoom.card.imageUri || undefined;
   return (
     <>
-      <div className="pt-zoom-backdrop" onClick={onDismiss} style={{ position: "fixed", inset: 0, zIndex: 91 }} />
+      {/* A preview opened by 🔍 closes with a tap anywhere; one opened by the
+          mouse closes when it leaves the card, and needs no backdrop (which
+          would take the mouse off the card and close it at once). */}
+      {!zoom.hover && <div className="pt-zoom-backdrop" onClick={onDismiss} style={{ position: "fixed", inset: 0, zIndex: 91 }} />}
       <div style={{ position: "fixed", top, left, width: W, height: H, zIndex: 92, pointerEvents: "none", animation: "sp-fade .12s ease", borderRadius: "4.8%/3.5%", overflow: "hidden", boxShadow: "0 24px 60px -18px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.14)", background: "#000" }}>
         <CardArt key={src} name={zoom.card.name} src={src} prefer="src" version="normal" loading="eager" radius={0} style={{ position: "absolute", inset: 0 }} />
       </div>
