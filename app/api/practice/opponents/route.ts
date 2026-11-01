@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { fetchMetagame, MTGTOP8_FORMATS } from "@/lib/mtgtop8";
+import { scanSummary } from "@/lib/deck-analysis";
 import { mtgtop8FormatFor } from "@/lib/practice/decks";
 
 export const runtime = "nodejs";
@@ -18,14 +19,16 @@ export interface OpponentOption {
 
 // Who a deck can practise against: the format's top tournament archetypes
 // on MTGTop8 (for Commander, cEDH's most played commanders), a mirror
-// match, and the player's other decks of the same format.
+// match, and the player's other decks of the same format. A Commander deck
+// can also face any commander (/api/practice/commander); its Score bracket,
+// when it has been scanned, picks the matching power level first.
 export async function GET(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Sign in to play against the AI." }, { status: 401 });
   const publicId = new URL(req.url).searchParams.get("deck") ?? "";
   const deck = await prisma.deck.findFirst({
     where: { publicId, OR: [{ userId: user.id }, { userId: null }, { shared: true }] },
-    select: { publicId: true, name: true, format: true },
+    select: { publicId: true, name: true, format: true, analysis: true },
   });
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
 
@@ -55,5 +58,6 @@ export async function GET(req: Request) {
     ...mine.filter((d) => d.publicId && d.publicId !== deck.publicId).map((d): OpponentOption => ({ kind: "deck", deck: d.publicId!, label: d.name, detail: "Your deck" })),
   ];
   groups.push({ title: "Your decks", options: own });
-  return NextResponse.json({ format: deck.format, groups });
+  const commanderGame = deck.format.toLowerCase() === "commander";
+  return NextResponse.json({ format: deck.format, groups, commanderGame, bracket: commanderGame ? (scanSummary(deck.analysis)?.bracket ?? null) : null });
 }

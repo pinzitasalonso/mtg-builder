@@ -5,7 +5,8 @@ import { currentUser } from "@/lib/auth";
 import { recordEvent } from "@/lib/analytics";
 import { PRACTICE_AI_TURNS, PRACTICE_LIMIT_MSG } from "@/lib/limits";
 import { canStartPractice } from "@/lib/limits-db";
-import { deckFromDb, deckFromMtgtop8 } from "@/lib/practice/decks";
+import { isEdhrecLevel } from "@/lib/edhrec";
+import { deckFromDb, deckFromEdhrec, deckFromMtgtop8 } from "@/lib/practice/decks";
 
 export const runtime = "nodejs";
 
@@ -17,7 +18,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Sign in to play against the AI." }, { status: 401 });
   const body = (await req.json().catch(() => null)) as {
     deck?: unknown;
-    opponent?: { kind?: unknown; format?: unknown; archetype?: unknown; deck?: unknown };
+    opponent?: { kind?: unknown; format?: unknown; archetype?: unknown; deck?: unknown; commander?: unknown; level?: unknown };
   } | null;
   const deckId = typeof body?.deck === "string" ? body.deck : "";
   const o = body?.opponent;
@@ -31,7 +32,9 @@ export async function POST(req: Request) {
       ? await deckFromDb(o.deck, user.id)
       : o.kind === "mtgtop8" && typeof o.format === "string" && typeof o.archetype === "string"
         ? await deckFromMtgtop8(o.format, o.archetype)
-        : null;
+        : o.kind === "edhrec" && typeof o.commander === "string" && o.commander.trim() && o.commander.length <= 200
+          ? await deckFromEdhrec(o.commander.trim(), isEdhrecLevel(o.level) ? o.level : null)
+          : null;
   if (!opp) return NextResponse.json({ error: "Couldn't load that opponent's deck. Try another." }, { status: 502 });
 
   const book = { ...you.book, ...opp.book };

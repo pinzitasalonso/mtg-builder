@@ -9,8 +9,8 @@ side does.
 ## What it is, and what it isn't
 
 - **It is**: two players, two decks, a real opponent deck (a recent
-  tournament list from MTGTop8, a cEDH commander's list, or one of your own
-  decks), and an opponent that plays lands, casts spells it can pay for,
+  tournament list from MTGTop8, a cEDH commander's list, EDHREC's average
+  deck for any commander, or one of your own decks), and an opponent that plays lands, casts spells it can pay for,
   targets your things, attacks and blocks.
 - **It isn't**: a full rules engine. The opponent acts on its own turn and
   when blocking. It does not respond at instant speed on your turn. Card
@@ -64,8 +64,11 @@ side does.
 4. **Opponents** (`/api/practice/opponents`):
    - a constructed deck: the format's top archetypes on MTGTop8 (their best
      recent list);
-   - a Commander deck: cEDH's most played commanders, and your own other
-     Commander decks;
+   - a Commander deck: any commander you search for, playing EDHREC's
+     average deck for it (`lib/edhrec.ts`, `/api/practice/commander`),
+     overall or for one bracket. The bracket your deck scanned at is picked
+     first, and a bracket with no decks falls back to the overall average.
+     Also cEDH's most played commanders, and your own other Commander decks;
    - any deck: a mirror match, and your other decks of the same format.
 
 5. **Limits**: AI routes need an account. Starting a game counts: free

@@ -9,6 +9,7 @@ import { scryfallFetch } from "@/lib/scryfall-limit";
 export default function CommanderInput({
   value,
   onChange,
+  onPick,
   placeholder,
   style,
   className,
@@ -16,6 +17,8 @@ export default function CommanderInput({
 }: {
   value: string;
   onChange: (v: string) => void;
+  /** A suggestion was chosen, or Enter pressed on a typed name. */
+  onPick?: (v: string) => void;
   placeholder?: string;
   style?: React.CSSProperties;
   className?: string;
@@ -75,6 +78,7 @@ export default function CommanderInput({
     setOpen(false);
     setSuggestions([]);
     setActive(-1);
+    onPick?.(name);
   }
 
   return (
@@ -88,6 +92,11 @@ export default function CommanderInput({
         }}
         onFocus={() => suggestions.length > 0 && setOpen(true)}
         onKeyDown={(e) => {
+          if (e.key === "Enter" && onPick && (!open || active < 0) && value.trim()) {
+            e.preventDefault();
+            pick(value.trim());
+            return;
+          }
           if (!open || suggestions.length === 0) return;
           if (e.key === "ArrowDown") {
             e.preventDefault();
