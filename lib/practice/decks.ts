@@ -3,6 +3,7 @@
 // own, or one anyone may open) or a recent tournament list from MTGTop8.
 
 import prisma from "@/lib/prisma";
+import { EDHREC_LEVELS, fetchAverageDeck, type EdhrecLevel } from "@/lib/edhrec";
 import { bestFinishes, fetchArchetypeDecks, fetchDecklist, fetchMetagame, MTGTOP8_FORMATS, parseMtgoList } from "@/lib/mtgtop8";
 import { cardFactsByIds, lookupCollection, normalizeCardKey, type CardFacts } from "@/lib/scryfall";
 import type { DeckCard } from "./game";
@@ -94,6 +95,43 @@ export async function deckFromMtgtop8(format: string, archetypeId: string): Prom
     detail: `${best.player} ${placing} ${best.event} (${best.date}) · MTGTop8`,
     cards,
     commander,
+    book,
+  };
+}
+
+/** Any commander, with EDHREC's average deck for it: overall, or for one
+    bracket. A bracket nobody has registered a deck at falls back to the
+    overall average, and the detail line says so. */
+export async function deckFromEdhrec(commander: string, level: EdhrecLevel | null): Promise<PracticeDeck | null> {
+  let avg = level ? await fetchAverageDeck(commander, level) : null;
+  const fellBack = !!level && !avg;
+  if (!avg) avg = await fetchAverageDeck(commander, null);
+  if (!avg) return null;
+  const lines = [...avg.commanders.map((name) => ({ name, quantity: 1 })), ...avg.cards];
+  const lookup = await lookupCollection([...new Set(lines.map((l) => l.name))]);
+  const outs = lines.map((l) => ({ line: l, out: lookup.found.get(normalizeCardKey(l.name)) }));
+  const facts = await cardFactsByIds(outs.flatMap((o) => (o.out ? [o.out.id] : [])));
+  const book: CardBook = {};
+  const cards: PracticeDeck["cards"] = [];
+  for (const { line, out } of outs) {
+    if (!out) continue;
+    book[out.name.toLowerCase()] = infoFrom(facts.get(out.id), out);
+    const have = cards.find((c) => c.name === out.name);
+    if (have) have.quantity += line.quantity;
+    else cards.push({ name: out.name, imageUri: out.imageUri, typeLine: out.typeLine, quantity: line.quantity });
+  }
+  const commanders = avg.commanders.flatMap((name) => {
+    const out = lookup.found.get(normalizeCardKey(name));
+    return out ? [out.name] : [];
+  });
+  if (!commanders.length || cards.length < 30) return null;
+  const at = level && !fellBack ? `Bracket ${EDHREC_LEVELS[level].bracket} (${EDHREC_LEVELS[level].label}) average` : "Average";
+  const of = avg.decks ? ` of ${avg.decks.toLocaleString("en-US")} decks` : "";
+  return {
+    label: commanders.join(" + "),
+    detail: `${at} deck${of} · EDHREC${fellBack ? ` · no ${EDHREC_LEVELS[level!].label} decks yet` : ""}`,
+    cards,
+    commander: commanders.join(" + "),
     book,
   };
 }
