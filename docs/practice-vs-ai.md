@@ -116,9 +116,10 @@ side does.
    between the boards then. The log lines carry the card they're about.
 
    Both halves are laid out the same: each side is one line, its
-   permanents and then its lands, the lands in piles (the same land mostly
-   under the one before; past four lands, each overlaps the last a little).
-   A crowded line shrinks its cards to fit, down to 70% (CSS container units
+   permanents and then its lands, the lands in one pile (each on top of the
+   one before, a thin strip of the one below showing), so they take about a
+   card's width however many there are. A crowded line shrinks its cards a
+   little to fit, down to 85% (CSS container units
    on `.pt-side-cards`, with `--pt-slots` from the table), before it wraps
    or, on a phone, scrolls. The opponent's half has a slightly warmer
    ground. Its graveyard and commander sit in the column of piles at the

@@ -1663,15 +1663,16 @@ button {
 .pt-vs .pt-mine {
   display: block;
 }
-/* A side's line fits its cards: they shrink as the side fills (to 70% of
-   full size, then the line wraps, or scrolls on a phone held sideways).
+/* A side's line fits its cards: they shrink a little as the side fills (to
+   85% of full size, then the line wraps, or scrolls on a phone held
+   sideways). The lands pile up, so they hardly add to it.
    The table sets how many card widths the line needs (--pt-slots, a pile's
    lands counting for less) and the fixed gaps (--pt-fixed). */
 .pt-vs .pt-side-cards {
   container-type: inline-size;
 }
 .pt-vs .pt-side-cards > .pt-row {
-  --pt-card: max(calc(var(--pt-card-full) * 0.7), min(var(--pt-card-full), calc((100cqi - var(--pt-fixed, 0px)) / var(--pt-slots, 1))));
+  --pt-card: max(calc(var(--pt-card-full) * 0.85), min(var(--pt-card-full), calc((100cqi - var(--pt-fixed, 0px)) / var(--pt-slots, 1))));
 }
 .pt-vs .pt-side-cards > .pt-row {
   flex: 0 1 auto;
@@ -1685,13 +1686,18 @@ button {
   padding-left: 12px;
   border-left: 1px dashed rgba(255, 255, 255, 0.14);
 }
-/* Lands in piles: one of the same name sits mostly under the one before;
-   past four lands, every land overlaps the one before a little. */
+/* A side's lands are one pile, each on top of the one before: a thin strip
+   of the land below shows (a little more when it's a different land). */
 .pt-card[data-stacked="same"] {
-  margin-left: calc(var(--pt-card) * -0.72);
+  margin-left: calc(var(--pt-card) * -0.82);
 }
-.pt-card[data-stacked="tight"] {
-  margin-left: calc(var(--pt-card) * -0.4);
+.pt-card[data-stacked="other"] {
+  margin-left: calc(var(--pt-card) * -0.7);
+}
+/* A land under a copy of itself keeps no buttons: the copy on top has them,
+   and a row of them on the thin strips was clutter. */
+.pt-card:has(+ .pt-card[data-stacked="same"]) .pt-card-btn {
+  display: none;
 }
 /* The column of piles: the opponent's group, then yours. */
 .pt-vs {
