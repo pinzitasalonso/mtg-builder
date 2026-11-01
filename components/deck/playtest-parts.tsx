@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Crown, Ellipsis, RefreshCw, Smartphone, X, ZoomIn } from "lucide-react";
 import { CardArt } from "@/components/mtg";
-import { useVerifiedBack } from "@/components/useCardFlip";
+import { backImageOf, useVerifiedBack } from "@/components/useCardFlip";
 import type { PlayCard, Zone } from "@/lib/playtest";
 
 /* The pieces of a playtest table, shared by the solo table (PlaytestModal)
@@ -69,7 +69,11 @@ export function PtCard({
       clearTimeout(done);
     };
   }, [flipped]);
-  const src = shown && back ? back : card.imageUri || undefined;
+  // A card that's already turned over (a modal land the AI played land side
+  // up) shows its back at once: waiting for the check would flash the front
+  // first. Its back exists, or it couldn't have been turned.
+  const backSrc = back ?? (card.flipped ? backImageOf(card.name, card.imageUri) : null);
+  const src = shown && backSrc ? backSrc : card.imageUri || undefined;
 
   return (
     <div
@@ -255,12 +259,14 @@ export function ZoomPreview({ zoom, onDismiss }: { zoom: Zoom; onDismiss: () => 
   const top = Math.max(8, Math.min(a.top + a.height / 2 - H / 2, window.innerHeight - H - 8));
   // The face that's up.
   const back = useVerifiedBack(zoom.card.name, zoom.card.imageUri);
-  const src = zoom.card.flipped && back ? back : zoom.card.imageUri || undefined;
+  // The face that's up, at once: the back of a turned card without waiting
+  // for its check, which would show the front for a moment (a flash).
+  const src = zoom.card.flipped ? (back ?? backImageOf(zoom.card.name, zoom.card.imageUri) ?? zoom.card.imageUri) || undefined : zoom.card.imageUri || undefined;
   return (
     <>
       <div className="pt-zoom-backdrop" onClick={onDismiss} style={{ position: "fixed", inset: 0, zIndex: 91 }} />
       <div style={{ position: "fixed", top, left, width: W, height: H, zIndex: 92, pointerEvents: "none", animation: "sp-fade .12s ease", borderRadius: "4.8%/3.5%", overflow: "hidden", boxShadow: "0 24px 60px -18px rgba(0,0,0,.9), 0 0 0 1px rgba(255,255,255,.14)", background: "#000" }}>
-        <CardArt name={zoom.card.name} src={src} prefer="src" version="normal" loading="eager" radius={0} style={{ position: "absolute", inset: 0 }} />
+        <CardArt key={src} name={zoom.card.name} src={src} prefer="src" version="normal" loading="eager" radius={0} style={{ position: "absolute", inset: 0 }} />
       </div>
     </>
   );
