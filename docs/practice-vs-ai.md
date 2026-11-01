@@ -88,6 +88,15 @@ side does.
    You can act on the opponent's cards from their ⋯ menu (destroy, exile,
    return to hand, tap) to resolve your own spells.
 
+   **Phones play it sideways**, like the solo table (the `.pt-table`
+   landscape block in `app/globals.css`). One bar on top; each side is one
+   row of cards that scrolls sideways, with its counts in a column to its
+   left; the hand is a strip of card tops that a tap raises over the board
+   (`HandToggle`). A web page can't turn an iPhone's screen, so held upright
+   the table shows "Turn your phone sideways" (`RotateHint`); on Android the
+   playtest opens fullscreen and locked to landscape (`useLandscapeLock`).
+   The opponent picker works either way.
+
 ## Order of work
 
 1. Engine, with tests.

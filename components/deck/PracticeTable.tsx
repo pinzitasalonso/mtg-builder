@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bot, Loader2, Swords, Undo2, X } from "lucide-react";
 import CommanderInput from "@/components/CommanderInput";
-import { ActionMenu, LifeCounter, Panel, PileZone, PtCard, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { infoOf, isCreature, isLand, stats } from "@/lib/practice/cards";
@@ -87,6 +87,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const [zoom, setZoom] = useState<Zoom | null>(null);
   const [pile, setPile] = useState<{ seat: Seat; zone: "graveyard" | "exile" | "library" } | null>(null);
   const [logOpen, setLogOpen] = useState(false);
+  // A phone held sideways: whether the hand is raised over the board.
+  const [handUp, setHandUp] = useState(false);
   const lastOpponent = useRef<OpponentOption | null>(null);
   const afterCombatPlan = useRef<PlanAction[]>([]);
   const alive = useRef(true);
@@ -313,7 +315,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const seat = at.seat;
     if (seat === "you" && zone === "hand") {
       if (mode === "mulligan" && game.sides.you.toBottom > 0) act((g) => withYourSide(g, (s) => bottomCard(s, card.iid)));
-      else if (mode === "main") act((g) => playerPlay(g, card.iid));
+      else if (mode === "main") {
+        setHandUp(false);
+        act((g) => playerPlay(g, card.iid));
+      }
       return;
     }
     if (seat === "you" && zone === "command" && mode === "main") return act((g) => playerPlay(g, card.iid));
@@ -575,7 +580,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                 : `Your turn · land drop ${game.landPlayed ? "used" : "available"}`;
 
   return (
-    <div className="pt-root pt-vs" role="dialog" aria-label="Practice game against the AI">
+    <div className="pt-root pt-vs pt-table" role="dialog" aria-label="Practice game against the AI">
+      <RotateHint onClose={onClose} />
       {header}
 
       <div className="pt-tools">
@@ -674,25 +680,30 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           <div className="pt-opp">
             <div className="pt-opp-head">
               <span className="pt-opp-name">{setup.opp.label}</span>
-              <span className="pt-opp-meta">
-                Hand {opp.hand.length} · Library {opp.library.length} ·{" "}
-                <button type="button" className="pt-link" onClick={() => setPile({ seat: "opp", zone: "graveyard" })}>
-                  Graveyard {opp.graveyard.length}
-                </button>
+              <span className="pt-opp-meta pt-meta">
+                <span>Hand {opp.hand.length}</span>
+                <span>Library {opp.library.length}</span>
+                <span>
+                  <button type="button" className="pt-link" onClick={() => setPile({ seat: "opp", zone: "graveyard" })}>
+                    Graveyard {opp.graveyard.length}
+                  </button>
+                </span>
                 {opp.exile.length > 0 && (
-                  <>
-                    {" · "}
+                  <span>
                     <button type="button" className="pt-link" onClick={() => setPile({ seat: "opp", zone: "exile" })}>
                       Exile {opp.exile.length}
                     </button>
-                  </>
+                  </span>
                 )}
-                {game.commanderGame && ` · Commander damage to you ${game.cmdDamage.you}`}
+                {game.commanderGame && <span>Commander damage to you {game.cmdDamage.you}</span>}
               </span>
             </div>
-            {opp.command.length > 0 && <div className="pt-row pt-opp-row">{opp.command.map((c) => <PtCard key={c.iid} {...cardProps("opp")(c, "command")} />)}</div>}
-            <div className="pt-row pt-opp-row">{row(opp.battlefield.filter((c) => !isLand(c)), "opp")}</div>
-            {opp.battlefield.some(isLand) && <div className="pt-row pt-opp-row pt-opp-lands">{row(opp.battlefield.filter(isLand), "opp")}</div>}
+            {/* Its cards: rows down the board, or one sideways row on a phone held sideways. */}
+            <div className="pt-side-cards">
+              {opp.command.length > 0 && <div className="pt-row pt-opp-row">{opp.command.map((c) => <PtCard key={c.iid} {...cardProps("opp")(c, "command")} />)}</div>}
+              <div className="pt-row pt-opp-row">{row(opp.battlefield.filter((c) => !isLand(c)), "opp")}</div>
+              {opp.battlefield.some(isLand) && <div className="pt-row pt-opp-row pt-opp-lands">{row(opp.battlefield.filter(isLand), "opp")}</div>}
+            </div>
           </div>
 
           <div className="pt-mid" aria-live="polite">
@@ -708,29 +719,40 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
             ))}
           </div>
 
-          {/* On a phone the piles beside the board give way to this line. */}
-          <div className="pt-you-head">
-            <button type="button" className="pt-link" onClick={() => setPile({ seat: "you", zone: "library" })}>
-              Library {you.library.length}
-            </button>
-            {" · "}
-            <button type="button" className="pt-link" onClick={() => setPile({ seat: "you", zone: "graveyard" })}>
-              Graveyard {you.graveyard.length}
-            </button>
-            {" · "}
-            <button type="button" className="pt-link" onClick={() => setPile({ seat: "you", zone: "exile" })}>
-              Exile {you.exile.length}
-            </button>
-            {game.commanderGame && ` · Commander damage to the opponent ${game.cmdDamage.opp}`}
+          <div className="pt-mine">
+            {/* On a phone the piles beside the board give way to this line. */}
+            <div className="pt-you-head pt-meta">
+              <span>
+                <button type="button" className="pt-link" onClick={() => setPile({ seat: "you", zone: "library" })}>
+                  Library {you.library.length}
+                </button>
+              </span>
+              <span>
+                <button type="button" className="pt-link" onClick={() => setPile({ seat: "you", zone: "graveyard" })}>
+                  Graveyard {you.graveyard.length}
+                </button>
+              </span>
+              <span>
+                <button type="button" className="pt-link" onClick={() => setPile({ seat: "you", zone: "exile" })}>
+                  Exile {you.exile.length}
+                </button>
+              </span>
+              {game.commanderGame && <span>Commander damage to the opponent {game.cmdDamage.opp}</span>}
+            </div>
+            <div className="pt-side-cards">
+              {you.command.length > 0 && <div className="pt-row pt-you-command">{you.command.map((c) => <PtCard key={c.iid} {...cardProps("you")(c, "command")} />)}</div>}
+              <div className="pt-row pt-row-perms">{row(you.battlefield.filter((c) => !isLand(c)), "you")}</div>
+              {you.battlefield.some(isLand) && <div className="pt-row pt-row-lands">{row(you.battlefield.filter(isLand), "you")}</div>}
+            </div>
           </div>
-          {you.command.length > 0 && <div className="pt-row pt-you-command">{you.command.map((c) => <PtCard key={c.iid} {...cardProps("you")(c, "command")} />)}</div>}
-          <div className="pt-row pt-row-perms">{row(you.battlefield.filter((c) => !isLand(c)), "you")}</div>
-          {you.battlefield.some(isLand) && <div className="pt-row pt-row-lands">{row(you.battlefield.filter(isLand), "you")}</div>}
         </section>
       </div>
 
-      <footer className="pt-hand" style={{ ["--pt-hand" as string]: "var(--pt-hand-max)" }}>
-        {you.hand.length === 0 ? <div className="pt-empty">No cards in hand.</div> : you.hand.map((c) => <PtCard key={c.iid} {...cardProps("you")(c, "hand")} />)}
+      <footer className="pt-hand" style={{ ["--pt-hand" as string]: "var(--pt-hand-max)" }} data-up={handUp || mode === "mulligan" ? "true" : undefined}>
+        {mode !== "mulligan" && <HandToggle up={handUp} count={you.hand.length} onToggle={setHandUp} />}
+        <div className="pt-hand-cards">
+          {you.hand.length === 0 ? <div className="pt-empty">No cards in hand.</div> : you.hand.map((c) => <PtCard key={c.iid} {...cardProps("you")(c, "hand")} />)}
+        </div>
       </footer>
 
       {menu &&
