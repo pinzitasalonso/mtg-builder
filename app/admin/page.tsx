@@ -146,13 +146,13 @@ export default function AdminPage() {
         )}
         {status === "error" && <p style={{ color: "var(--danger)" }}>Couldn&apos;t load the numbers.</p>}
 
-        {status === "ok" && events && acc && <Dashboard events={events} acc={acc} />}
+        {status === "ok" && events && acc && <Dashboard events={events} acc={acc} onAccountsChanged={load} />}
       </div>
     </main>
   );
 }
 
-function Dashboard({ events, acc }: { events: Events; acc: Accounts }) {
+function Dashboard({ events, acc, onAccountsChanged }: { events: Events; acc: Accounts; onAccountsChanged: () => void }) {
   const s = acc.summary;
   const pct = (n: number, of: number) => (of ? Math.round((n / of) * 100) : 0);
   const decks7 = sum(acc.deckDays.slice(-7).map((d) => d.count));
@@ -222,7 +222,7 @@ function Dashboard({ events, acc }: { events: Events; acc: Accounts }) {
 
       {/* ── ACCOUNTS ── */}
       <Section id="accounts" title="Accounts" note="Everyone who signed up. Click a row for their decks.">
-        <AccountsTable rows={acc.accounts} />
+        <AccountsTable rows={acc.accounts} onChanged={onAccountsChanged} />
       </Section>
 
       {/* ── EVENTS ── */}
@@ -504,9 +504,11 @@ function TopAskers({ rows }: { rows: AccountRow[] }) {
 
 /* ───────────────────────── accounts ───────────────────────── */
 
-type SortKey = "email" | "createdAt" | "lastActive" | "decks" | "cards" | "collection" | "aiQuestions" | "scans" | "games";
+type SortKey = "email" | "id" | "createdAt" | "lastActive" | "decks" | "cards" | "collection" | "aiQuestions" | "scans" | "games";
 const COLS: { key: SortKey; label: string; num?: boolean }[] = [
   { key: "email", label: "Account" },
+  // The account's id: RevenueCat's customer id for it (app_user_id).
+  { key: "id", label: "ID", num: true },
   { key: "createdAt", label: "Joined" },
   { key: "lastActive", label: "Last active" },
   { key: "decks", label: "Decks", num: true },
@@ -548,7 +550,7 @@ function toCsv(rows: AccountRow[]): string {
   return [head.join(","), ...lines].join("\n");
 }
 
-function AccountsTable({ rows }: { rows: AccountRow[] }) {
+function AccountsTable({ rows, onChanged }: { rows: AccountRow[]; onChanged: () => void }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const [all, setAll] = useState(false);
@@ -558,7 +560,7 @@ function AccountsTable({ rows }: { rows: AccountRow[] }) {
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const f = FILTERS.find((x) => x.id === filter)!;
-    const list = rows.filter((r) => f.test(r) && (!needle || r.email.toLowerCase().includes(needle) || (r.name ?? "").toLowerCase().includes(needle)));
+    const list = rows.filter((r) => f.test(r) && (!needle || r.email.toLowerCase().includes(needle) || (r.name ?? "").toLowerCase().includes(needle) || String(r.id) === needle));
     const dir = sort.desc ? -1 : 1;
     return list.sort((a, b) => {
       const x = a[sort.key];
@@ -588,8 +590,8 @@ function AccountsTable({ rows }: { rows: AccountRow[] }) {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search email"
-            aria-label="Search accounts by email"
+            placeholder="Search email or ID"
+            aria-label="Search accounts by email or ID"
             style={{ flex: "1 1 220px", padding: "9px 12px", borderRadius: 10, border: "1px solid var(--w-line)", background: "rgba(255,255,255,.08)", color: "var(--w-1)", fontSize: 16, minWidth: 0 }}
           />
           <button type="button" onClick={download} style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 14px", borderRadius: 10, border: "1px solid var(--w-line)", background: "transparent", color: "var(--w-1)", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
@@ -654,6 +656,9 @@ function AccountsTable({ rows }: { rows: AccountRow[] }) {
                       </div>
                     </div>
                   </td>
+                  <td style={{ ...td, textAlign: "right", fontFamily: "var(--font-mono)", userSelect: "all" }} onClick={(e) => e.stopPropagation()} title="RevenueCat customer id">
+                    {r.id}
+                  </td>
                   <td style={td} title={r.createdAt}>{ago(r.createdAt)}</td>
                   <td style={td} title={r.lastActive}>{ago(r.lastActive)}</td>
                   <td style={{ ...td, textAlign: "right" }}>
@@ -672,7 +677,7 @@ function AccountsTable({ rows }: { rows: AccountRow[] }) {
                 {open === r.id && (
                   <tr>
                     <td colSpan={COLS.length} style={{ padding: "4px 14px 16px 34px", borderBottom: "1px solid var(--w-line)", background: "rgba(255,255,255,.03)" }}>
-                      <AccountDetail r={r} />
+                      <AccountDetail r={r} onChanged={onChanged} />
                     </td>
                   </tr>
                 )}
@@ -703,10 +708,40 @@ function AccountsTable({ rows }: { rows: AccountRow[] }) {
   );
 }
 
-function AccountDetail({ r }: { r: AccountRow }) {
+/* Ask RevenueCat about this account now and update its plan, as the iOS app
+   does on sign-in. For a web-only account (nothing else re-checks it): grant
+   Pro in RevenueCat to customer <id>, then press this. */
+function RecheckPro({ r, onChanged }: { r: AccountRow; onChanged: () => void }) {
+  const [state, setState] = useState<{ busy: boolean; msg: string; bad?: boolean }>({ busy: false, msg: "" });
+  const run = async () => {
+    setState({ busy: true, msg: "" });
+    const res = await fetch(`/api/analytics/accounts/${r.id}/pro`, { method: "POST" }).catch(() => null);
+    const data = (res ? await res.json().catch(() => null) : null) as { tier?: string; was?: string; error?: string } | null;
+    if (!res?.ok || !data?.tier) {
+      setState({ busy: false, msg: data?.error ?? "Couldn't reach the server.", bad: true });
+      return;
+    }
+    const name = (t?: string) => (t === "pro" ? "Pro" : "free");
+    setState({ busy: false, msg: data.tier === data.was ? `RevenueCat says ${name(data.tier)}. Nothing changed.` : `Now ${name(data.tier)} (was ${name(data.was)}).` });
+    if (data.tier !== data.was) onChanged();
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 12.5, whiteSpace: "normal" }}>
+      <button type="button" className="id-ghost" onClick={() => void run()} disabled={state.busy} style={{ padding: "6px 12px", fontSize: 12.5 }}>
+        {state.busy ? "Checking…" : "Re-check Pro"}
+      </button>
+      <span style={{ color: state.bad ? "#ffb4a3" : "var(--w-3)" }}>
+        {state.msg || `Plan: ${r.tier === "pro" ? "Pro" : "free"}. Asks RevenueCat (customer ${r.id}) and updates it.`}
+      </span>
+    </div>
+  );
+}
+
+function AccountDetail({ r, onChanged }: { r: AccountRow; onChanged: () => void }) {
   const decks = r.deckList ?? [];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 8 }}>
+      <RecheckPro r={r} onChanged={onChanged} />
       <div style={{ fontSize: 12.5, color: "var(--w-3)", whiteSpace: "normal" }}>
         Joined {new Date(r.createdAt).toLocaleString()} · last active {new Date(r.lastActive).toLocaleString()} · {r.versions} saved version{r.versions === 1 ? "" : "s"}
         {r.name ? ` · ${r.name}` : ""}
