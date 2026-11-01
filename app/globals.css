@@ -1011,7 +1011,10 @@ button {
     radial-gradient(120% 70% at 50% -10%, rgba(255, 255, 255, 0.07), transparent 60%),
     linear-gradient(180deg, #181327, #0d0a16);
   color: #fff;
-  --pt-card: clamp(80px, 9vw, 140px);
+  /* A card on the table at full size; a practice game shrinks a crowded
+     side's cards below it (.pt-side-cards). */
+  --pt-card-full: clamp(80px, 9vw, 140px);
+  --pt-card: var(--pt-card-full);
   --pt-hand-max: clamp(96px, 11vw, 168px);
   /* Piles are smaller than cards in play: four of them (plus the command
      zone) have to fit beside the battlefield as a 2×2 grid. */
@@ -1611,13 +1614,15 @@ button {
 .pt-field-vs {
   gap: 8px;
 }
-/* The opponent's half: its counts and waiting commander in a column at the
-   left, its cards beside them, on a slightly warmer ground than yours. */
+/* The opponent's half: laid out like yours, mirrored across the table (its
+   lands at the far edge), on a slightly warmer ground. Its piles and
+   commander are in the column of piles at the left, above yours; where that
+   column is hidden (a narrow screen, a phone held sideways) they're in its
+   head instead. */
 .pt-opp {
-  display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 10px 12px;
   border-radius: 12px;
   background: rgba(208, 86, 63, 0.07);
@@ -1630,6 +1635,9 @@ button {
   gap: 4px;
   min-width: 0;
 }
+.pt-vs .pt-opp-head {
+  display: none;
+}
 .pt-opp-head .pt-meta {
   display: flex;
   flex-direction: column;
@@ -1638,11 +1646,90 @@ button {
 .pt-opp-head .pt-meta > span + span::before {
   content: none;
 }
-.pt-opp > .pt-side-cards {
+/* Each side on one line where there's room: its permanents, then its lands
+   beside them (wrapping when it's full), so both sides fit the screen at
+   full size. Your side is laid out the same. */
+.pt-opp > .pt-side-cards,
+.pt-vs .pt-mine > .pt-side-cards {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 14px;
+  min-width: 0;
+}
+.pt-vs .pt-mine {
+  display: block;
+}
+/* A side's line fits its cards: they shrink as the side fills (to 70% of
+   full size, then the line wraps, or scrolls on a phone held sideways).
+   The table sets how many card widths the line needs (--pt-slots, a pile's
+   lands counting for less) and the fixed gaps (--pt-fixed). */
+.pt-vs .pt-side-cards {
+  container-type: inline-size;
+}
+.pt-vs .pt-side-cards > .pt-row {
+  --pt-card: max(calc(var(--pt-card-full) * 0.7), min(var(--pt-card-full), calc((100cqi - var(--pt-fixed, 0px)) / var(--pt-slots, 1))));
+}
+.pt-vs .pt-side-cards > .pt-row {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.pt-vs .pt-side-cards > .pt-row-lands,
+.pt-vs .pt-side-cards > .pt-opp-lands {
+  flex: 0 1 auto;
+  border-top: 0;
+  padding-top: 0;
+  padding-left: 12px;
+  border-left: 1px dashed rgba(255, 255, 255, 0.14);
+}
+/* Lands in piles: one of the same name sits mostly under the one before;
+   past four lands, every land overlaps the one before a little. */
+.pt-card[data-stacked="same"] {
+  margin-left: calc(var(--pt-card) * -0.72);
+}
+.pt-card[data-stacked="tight"] {
+  margin-left: calc(var(--pt-card) * -0.4);
+}
+/* The column of piles: the opponent's group, then yours. */
+.pt-vs {
+  --pt-pile: calc(var(--pt-card) * 0.6);
+}
+.pt-zones-title {
+  grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 1px;
   min-width: 0;
+  max-width: calc(var(--pt-pile) * 2 + 8px);
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.6);
+}
+.pt-zones-title b {
+  font-size: 12.5px;
+  color: #fff;
+  overflow-wrap: anywhere;
+}
+.pt-zones-title-opp {
+  margin-top: 0;
+  padding-left: 7px;
+  border-left: 2px solid rgba(208, 86, 63, 0.7);
+}
+.pt-pile-theirs {
+  cursor: default;
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0 6px, rgba(255, 255, 255, 0.012) 6px 12px),
+    #3a1f22;
+  box-shadow: inset 0 0 0 3px rgba(208, 86, 63, 0.28), inset 0 0 0 4px #3a1f22;
+}
+/* A commander in the command zone is dimmed until it's cast. */
+.pt-zone-command .pt-card-inner {
+  filter: grayscale(0.45) brightness(0.7);
+  transition: filter 0.15s ease;
+}
+.pt-zone-command .pt-card:hover .pt-card-inner {
+  filter: none;
 }
 .pt-opp-name {
   font-weight: 700;
@@ -1697,9 +1784,6 @@ button {
   color: var(--gold);
   font: inherit;
   cursor: pointer;
-}
-.pt-opp .pt-card {
-  width: calc(var(--pt-card) * 0.8);
 }
 .pt-opp-row:empty {
   display: none;
@@ -1964,7 +2048,8 @@ button {
      searching the library or opening the graveyard or exile. The piles
      beside the field stay small, being a glance. */
   .pt-root {
-    --pt-card: clamp(80px, 25vw, 124px);
+    --pt-card-full: clamp(80px, 25vw, 124px);
+    --pt-card: var(--pt-card-full);
     --pt-hand-max: clamp(110px, 38vw, 180px);
   }
   .pt-hand {
@@ -2002,6 +2087,26 @@ button {
   .pt-opp {
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
+  }
+  .pt-vs .pt-opp-head {
+    display: flex;
+  }
+  .pt-card[data-stacked] {
+    margin-left: 0;
+  }
+  .pt-opp > .pt-side-cards,
+  .pt-vs .pt-mine > .pt-side-cards {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+  .pt-vs .pt-side-cards > .pt-row,
+  .pt-vs .pt-side-cards > .pt-row-lands,
+  .pt-vs .pt-side-cards > .pt-opp-lands {
+    --pt-card: var(--pt-card-full);
+    flex: none;
+    width: 100%;
+    padding-left: 0;
+    border-left: 0;
   }
   .pt-opp-head,
   .pt-opp-head .pt-meta {
@@ -2177,7 +2282,8 @@ button {
       "main main"
       "hand hand";
     /* Two rows of cards fit what's left between the bar and the hand strip. */
-    --pt-card: max(48px, calc((100dvh - 160px) / 2.8));
+    --pt-card-full: max(48px, calc((100dvh - 160px) / 2.8));
+    --pt-card: var(--pt-card-full);
     --pt-pile: calc(var(--pt-card) * 0.62);
   }
   .pt-table .pt-top {
@@ -2415,6 +2521,7 @@ button {
   .pt-table .pt-side-cards {
     display: flex;
     flex-direction: row;
+    flex-wrap: nowrap;
     align-items: flex-start;
     gap: 8px;
     min-width: 0;

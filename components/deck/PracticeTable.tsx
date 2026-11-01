@@ -578,6 +578,38 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const opp = game.sides.opp;
   const yourTurn = game.active === "you";
   const row = (cards: PlayCard[], seat: Seat) => cards.map((c) => <PtCard key={c.iid} {...cardProps(seat)(c, "battlefield")} />);
+  // Lands in piles: the same land together (untapped first) on one pile, and
+  // past four lands every land overlaps the one before a little.
+  const landRow = (cards: PlayCard[], seat: Seat) =>
+    [...cards]
+      .sort((a, b) => a.name.localeCompare(b.name) || Number(a.tapped) - Number(b.tapped))
+      .map((c, i, all) => (
+        <PtCard key={c.iid} {...cardProps(seat)(c, "battlefield")} stack={i === 0 ? undefined : all[i - 1]!.name === c.name ? "same" : all.length > 4 ? "tight" : undefined} />
+      ));
+  // How many card widths a side's line needs, so its cards can shrink to fit
+  // (CSS: .pt-side-cards). A land on a pile shows 28% of itself, one in a
+  // long row 60%; every card brings an 8px gap, and the lands their divider.
+  const lineFit = (cards: PlayCard[]): React.CSSProperties => {
+    const perms = cards.filter((c) => !isLand(c));
+    const lands = [...cards.filter(isLand)].sort((a, b) => a.name.localeCompare(b.name));
+    const landSlots = lands.reduce((n, c, i) => n + (i === 0 ? 1 : lands[i - 1]!.name === c.name ? 0.28 : lands.length > 4 ? 0.6 : 1), 0);
+    const fixed = cards.length * 8 + (perms.length && lands.length ? 30 : 0);
+    return { ["--pt-slots" as string]: Math.max(1, perms.length + landSlots), ["--pt-fixed" as string]: `${fixed}px` };
+  };
+  // A side's command zone in the column of piles: dimmed until it's cast.
+  const commandPile = (seat: Seat) =>
+    (game.commanderGame || game.sides[seat].command.length > 0) && (
+      <div className="pt-zone pt-zone-command">
+        <div className="pt-zone-label">
+          Command {game.tax[seat] ? <span>+{2 * game.tax[seat]}</span> : null}
+        </div>
+        {game.sides[seat].command.length ? (
+          game.sides[seat].command.map((c) => <PtCard key={c.iid} {...cardProps(seat)(c, "command")} />)
+        ) : (
+          <div className="pt-pile pt-pile-empty">—</div>
+        )}
+      </div>
+    );
   const lastLines = game.log.slice(-3);
   const recent = game.log.filter((l) => l.card).slice(-4).reverse();
   // A commander waiting in the command zone: small and dimmed beside its
@@ -703,6 +735,28 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         <div className="pt-play">
           <div className="pt-main">
             <aside className="pt-zones">
+              {/* The opponent's piles and commander, then yours, as each side of the table. */}
+              <div className="pt-zones-title pt-zones-title-opp">
+                <b>{setup.opp.label}</b>
+                <span>
+                  Hand {opp.hand.length} · Library {opp.library.length}
+                  {opp.exile.length > 0 && (
+                    <>
+                      {" · "}
+                      <button type="button" className="pt-link" onClick={() => setPile({ seat: "opp", zone: "exile" })}>
+                        Exile {opp.exile.length}
+                      </button>
+                    </>
+                  )}
+                  {game.commanderGame ? ` · Cmdr → you ${game.cmdDamage.you}` : ""}
+                </span>
+              </div>
+              <PileZone label="Graveyard" cards={opp.graveyard} top={opp.graveyard[opp.graveyard.length - 1]} onOpen={() => setPile({ seat: "opp", zone: "graveyard" })} />
+              {commandPile("opp")}
+              <div className="pt-zones-title">
+                <b>You</b>
+                {game.commanderGame && <span>Cmdr → opp {game.cmdDamage.opp}</span>}
+              </div>
               <div className="pt-zone">
                 <div className="pt-zone-label">
                   Library <span>{you.library.length}</span>
@@ -713,12 +767,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               </div>
               <PileZone label="Graveyard" cards={you.graveyard} top={you.graveyard[you.graveyard.length - 1]} onOpen={() => setPile({ seat: "you", zone: "graveyard" })} />
               <PileZone label="Exile" cards={you.exile} top={you.exile[you.exile.length - 1]} onOpen={() => setPile({ seat: "you", zone: "exile" })} />
-              {(game.commanderGame || you.command.length > 0) && (
-                <div className="pt-zone">
-                  <div className="pt-zone-label">Command</div>
-                  {you.command.length ? you.command.map((c) => <PtCard key={c.iid} {...cardProps("you")(c, "command")} />) : <div className="pt-pile pt-pile-empty">—</div>}
-                </div>
-              )}
+              {commandPile("you")}
             </aside>
 
             <section className="pt-field pt-field-vs" onClick={() => setMenu(null)}>
@@ -750,9 +799,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                   {commandZone("opp")}
                 </div>
                 {/* Its cards: rows down the board, or one sideways row on a phone held sideways. */}
-                <div className="pt-side-cards">
+                <div className="pt-side-cards" style={lineFit(opp.battlefield)}>
                   <div className="pt-row pt-opp-row">{row(opp.battlefield.filter((c) => !isLand(c)), "opp")}</div>
-                  {opp.battlefield.some(isLand) && <div className="pt-row pt-opp-row pt-opp-lands">{row(opp.battlefield.filter(isLand), "opp")}</div>}
+                  {opp.battlefield.some(isLand) && <div className="pt-row pt-opp-row pt-opp-lands">{landRow(opp.battlefield.filter(isLand), "opp")}</div>}
                 </div>
               </div>
 
@@ -797,9 +846,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                   </span>
                   {commandZone("you")}
                 </div>
-                <div className="pt-side-cards">
+                <div className="pt-side-cards" style={lineFit(you.battlefield)}>
                   <div className="pt-row pt-row-perms">{row(you.battlefield.filter((c) => !isLand(c)), "you")}</div>
-                  {you.battlefield.some(isLand) && <div className="pt-row pt-row-lands">{row(you.battlefield.filter(isLand), "you")}</div>}
+                  {you.battlefield.some(isLand) && <div className="pt-row pt-row-lands">{landRow(you.battlefield.filter(isLand), "you")}</div>}
                 </div>
               </div>
             </section>

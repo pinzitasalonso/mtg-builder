@@ -248,6 +248,12 @@ export function commanderArtName(commander?: string | null): string | undefined 
 }
 
 /* ---------- card art (prefer stored image; fall back to Scryfall art-crop) ---------- */
+// Images this page has already shown. One of them shows at once when it
+// mounts again (a card moving to the battlefield, its big preview), with no
+// placeholder and no fade: Safari can hand back even a cached image a moment
+// late, and the placeholder then flashed before the card faded in.
+const shownImages = new Set<string>();
+
 function artURL(name: string, version: string) {
   return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=${version}`;
 }
@@ -293,7 +299,12 @@ export function CardArt({
   const [stage, setStage] = useState<"scan" | "art" | "src" | "fallback">(
     prefer === "src" ? (src ? "src" : name ? "art" : "fallback") : scanArt ? "scan" : name ? "art" : src ? "src" : "fallback"
   );
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(() => {
+    const first = stage === "scan" ? scanArt : stage === "src" ? src : null;
+    return !!first && shownImages.has(first);
+  });
+  // Fade in only an image that wasn't already on screen.
+  const [fade] = useState(!loaded);
   // The name lookup is an API request the browser makes for the <img>, so it
   // waits its turn like every other (lib/scryfall-limit): a page of these at
   // once is over Scryfall's limit. If Scryfall has closed to us, step down.
@@ -350,10 +361,16 @@ export function CardArt({
           alt={name || ""}
           ref={(el) => {
             // Cached images can complete before React attaches onLoad.
-            if (el && el.complete && el.naturalWidth > 0) setLoaded(true);
+            if (el && el.complete && el.naturalWidth > 0) {
+              shownImages.add(url);
+              setLoaded(true);
+            }
           }}
           loading={loading}
-          onLoad={() => setLoaded(true)}
+          onLoad={() => {
+            shownImages.add(url);
+            setLoaded(true);
+          }}
           onError={() => {
             setLoaded(false);
             // Step down the chain without cycling: a failed scan crop tries the
@@ -373,7 +390,7 @@ export function CardArt({
             objectFit: "cover",
             objectPosition: "center 22%",
             opacity: loaded ? 1 : 0,
-            transition: "opacity .4s ease",
+            transition: fade ? "opacity .4s ease" : "none",
           }}
         />
       )}
