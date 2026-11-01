@@ -42,7 +42,7 @@ side does.
      an empty library.
 
 2. **The opponent's brain** (`/api/practice/<id>/turn`). One model call per
-   opponent turn, `claude-opus-5-5` at low effort for speed. The engine
+   opponent turn, at low effort for speed. The engine
    does the counting first, so the model only decides:
    - the prompt lists the opponent's hand with what's castable and its mana
      right now, both boards with power/toughness and keywords, life totals
