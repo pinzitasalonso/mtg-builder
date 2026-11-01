@@ -62,9 +62,10 @@ export function PtCard({
   badge?: string;
   /** Practice games: power/toughness now, when it isn't the printed one. */
   stat?: string | null;
-  /** Practice games, lands: overlapping the card before. "same": on a pile of
-      the same land; "tight": the row is long. */
-  stack?: "same" | "tight";
+  /** Practice games, lands: on the pile, on top of the card before. "same":
+      the same land (a thin strip of the one below shows); "other": a
+      different land (a little more shows, to tell them apart). */
+  stack?: "same" | "other";
 }) {
   // A double-faced card shows the face the game says. The new face swaps in
   // halfway through a quick turn, on a layer of its own so the turn doesn't

@@ -580,21 +580,23 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const opp = game.sides.opp;
   const yourTurn = game.active === "you";
   const row = (cards: PlayCard[], seat: Seat) => cards.map((c) => <PtCard key={c.iid} {...cardProps(seat)(c, "battlefield")} />);
-  // Lands in piles: the same land together (untapped first) on one pile, and
-  // past four lands every land overlaps the one before a little.
+  // A side's lands in one pile, each on top of the one before: the same land
+  // together, untapped first. However many there are, they take about one
+  // card's width, so the cards beside them keep their size.
   const landRow = (cards: PlayCard[], seat: Seat) =>
     [...cards]
       .sort((a, b) => a.name.localeCompare(b.name) || Number(a.tapped) - Number(b.tapped))
       .map((c, i, all) => (
-        <PtCard key={c.iid} {...cardProps(seat)(c, "battlefield")} stack={i === 0 ? undefined : all[i - 1]!.name === c.name ? "same" : all.length > 4 ? "tight" : undefined} />
+        <PtCard key={c.iid} {...cardProps(seat)(c, "battlefield")} stack={i === 0 ? undefined : all[i - 1]!.name === c.name ? "same" : "other"} />
       ));
   // How many card widths a side's line needs, so its cards can shrink to fit
-  // (CSS: .pt-side-cards). A land on a pile shows 28% of itself, one in a
-  // long row 60%; every card brings an 8px gap, and the lands their divider.
+  // (CSS: .pt-side-cards). A land on the pile shows 18% of itself over the
+  // same land, 30% over another; every card brings an 8px gap, and the lands
+  // their divider.
   const lineFit = (cards: PlayCard[]): React.CSSProperties => {
     const perms = cards.filter((c) => !isLand(c));
     const lands = [...cards.filter(isLand)].sort((a, b) => a.name.localeCompare(b.name));
-    const landSlots = lands.reduce((n, c, i) => n + (i === 0 ? 1 : lands[i - 1]!.name === c.name ? 0.28 : lands.length > 4 ? 0.6 : 1), 0);
+    const landSlots = lands.reduce((n, c, i) => n + (i === 0 ? 1 : lands[i - 1]!.name === c.name ? 0.18 : 0.3), 0);
     const fixed = cards.length * 8 + (perms.length && lands.length ? 30 : 0);
     return { ["--pt-slots" as string]: Math.max(1, perms.length + landSlots), ["--pt-fixed" as string]: `${fixed}px` };
   };
