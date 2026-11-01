@@ -12,6 +12,8 @@ export const EVENT_TYPES = [
   "ai_message",
   "card_search",
   "practice_game",
+  "practice_ai_turn",
+  "practice_fallback_turn",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

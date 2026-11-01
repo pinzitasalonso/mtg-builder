@@ -12,8 +12,9 @@ side does.
   tournament list from MTGTop8, a cEDH commander's list, EDHREC's average
   deck for any commander, or one of your own decks), and an opponent that plays lands, casts spells it can pay for,
   targets your things, attacks and blocks.
-- **It isn't**: a full rules engine. The opponent acts on its own turn and
-  when blocking. It does not respond at instant speed on your turn. Card
+- **It isn't**: a full rules engine. On your turn the opponent only blocks
+  and answers your spells with its hard counterspells (below); nothing
+  else of its happens at instant speed. Card
   text the app can't model becomes a note for you to resolve ("Resolve:
   each player sacrifices a creature"), as you would at a real table.
 
@@ -42,8 +43,8 @@ side does.
      an empty library.
 
 2. **The opponent's brain** (`/api/practice/<id>/turn`). One model call per
-   opponent turn, at low effort for speed. The engine
-   does the counting first, so the model only decides:
+   opponent turn, at medium effort (the model's default: it thinks the turn
+   through). The engine does the counting first, so the model only decides:
    - the prompt lists the opponent's hand with what's castable and its mana
      right now, both boards with power/toughness and keywords, life totals
      and the turn;
@@ -54,8 +55,28 @@ side does.
      prefix, so only the board is new each turn.
 
    If the model fails, refuses or is slow, a built-in planner takes the
-   turn: a land, the most expensive permanents it can pay for, and safe
-   attacks. The game never stalls.
+   turn: a land (the colour the hand needs, untapped), the most expensive
+   permanents it can pay for, spells that only draw, and safe attacks. The
+   game never stalls. Admin counts both kinds of turn ("Practice turns by
+   the AI" / "by the fallback"); the server log says why a turn fell back.
+
+   **Mana the engine handles for the AI**, so the model never has to:
+   - fetch lands crack the moment they're played, for the land that suits
+     the hand best (the colours it's missing, untapped); shock lands enter
+     untapped for 2 life while the AI is above 6;
+   - one-shot sources (Lotus Petal) are tapped last and sacrificed;
+   - a ritual's mana is a `mana` effect: it floats until the end of the
+     phase and is spent before any land is tapped.
+
+   **Counterspells.** A hard counter in the AI's hand (`counterOf`: "counter
+   target … spell", not "unless its controller pays") answers your spell
+   the moment you cast it (`aiResponds`), if it can hit that spell, the
+   spell is worth a card (mana value 2 or more, your commander, or exactly
+   what the counter was made for, like Mental Misstep on a one-drop), and
+   the AI left the mana open. Free versions count: Fierce Guardianship with
+   its commander out, Force of Will pitching a blue card at a spell of 4 or
+   more. A countered commander goes back to the command zone. The brief
+   marks counterspells so the model knows to hold mana for them.
 
 3. **Blocking** is decided by the app, not the model. It's instant and
    free. The opponent blocks to survive, blocks when its creature kills the

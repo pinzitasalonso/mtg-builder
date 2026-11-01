@@ -10,6 +10,7 @@ import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { infoOf, isCreature, isLand, stats } from "@/lib/practice/cards";
 import {
   adjustLife,
+  aiResponds,
   applyAction,
   canAttack,
   canBlock,
@@ -187,6 +188,20 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     setHistory((h) => [...h.slice(-49), game]);
     setGame(next);
   };
+  /** You cast a card: the AI may counter it on the spot. */
+  const castStep =
+    (iid: number): Step =>
+    (g) => {
+      const played = playerPlay(g, iid);
+      if (played === g) return g;
+      const answered = aiResponds(played, iid, book);
+      if (answered !== played) {
+        setSay("Not so fast.");
+        setAiNote("");
+      }
+      return answered;
+    };
+  const cast = (iid: number) => act(castStep(iid));
   const undo = () => {
     if (!history.length) return;
     setGame(history[history.length - 1]!);
@@ -222,7 +237,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ game: g }),
-        signal: AbortSignal.timeout(80_000),
+        signal: AbortSignal.timeout(120_000),
       });
       const data = await res.json();
       if (!res.ok || !data?.plan) throw new Error(String(res.status));
@@ -317,11 +332,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       if (mode === "mulligan" && game.sides.you.toBottom > 0) act((g) => withYourSide(g, (s) => bottomCard(s, card.iid)));
       else if (mode === "main") {
         setHandUp(false);
-        act((g) => playerPlay(g, card.iid));
+        cast(card.iid);
       }
       return;
     }
-    if (seat === "you" && zone === "command" && mode === "main") return act((g) => playerPlay(g, card.iid));
+    if (seat === "you" && zone === "command" && mode === "main") return cast(card.iid);
     if (seat === "you" && zone === "battlefield") {
       if (mode === "attack") {
         if (canAttack(game, "you", card, setup.book)) setPicked((p) => (p.includes(card.iid) ? p.filter((x) => x !== card.iid) : [...p, card.iid]));
@@ -368,7 +383,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       ];
     }
     const out: { label: string; step: Step }[] = [];
-    if (zone === "hand" || zone === "command") out.push({ label: "Play", step: (g) => playerPlay(g, card.iid) });
+    if (zone === "hand" || zone === "command") out.push({ label: "Play", step: castStep(card.iid) });
     if (zone === "battlefield") out.push({ label: card.tapped ? "Untap" : "Tap", step: (g) => tapToggle(g, card.iid) });
     if (zone !== "battlefield" && zone !== "hand") out.push({ label: "Put onto battlefield", step: to("battlefield") });
     if (zone !== "hand") out.push({ label: "Return to hand", step: to("hand") });

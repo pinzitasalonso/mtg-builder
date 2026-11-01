@@ -57,6 +57,10 @@ export interface PracticeGame {
   commanderGame: boolean;
   /** The next free iid, for tokens. */
   nextIid: number;
+  /** Mana added by a spell or ability (a ritual), spent before any source
+      is tapped and emptied at the end of each phase: one colour letter a
+      unit (W U B R G C). Missing in games started before it existed. */
+  pool?: Record<Seat, string[]>;
 }
 
 // ── The AI's plan, as the model writes it (and the fallback planner). ──
@@ -78,6 +82,7 @@ export type EffectType =
   | "counters"
   | "pump"
   | "search"
+  | "mana"
   | "note";
 
 export interface Effect {

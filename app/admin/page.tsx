@@ -41,6 +41,8 @@ const LABELS: Record<string, string> = {
   ai_message: "AI messages",
   card_search: "Card searches",
   practice_game: "Practice games",
+  practice_ai_turn: "Practice turns by the AI",
+  practice_fallback_turn: "Practice turns by the fallback",
 };
 
 const SECTIONS = [

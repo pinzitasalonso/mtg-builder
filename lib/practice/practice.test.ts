@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { chooseBlocks, aiMulligan, fallbackPlan } from "./ai";
-import { manaOutput } from "./cards";
+import { counterOf, fetchOf, manaOutput } from "./cards";
 import {
+  aiResponds,
   applyAction,
   cardId,
   declareAttackers,
@@ -47,6 +48,23 @@ const BOOK: CardBook = Object.fromEntries(
     info("Commander Guy", { typeLine: "Legendary Creature — Elf", manaCost: "{G}", manaValue: 1, power: 2, toughness: 2 }),
     info("Fireball", { typeLine: "Sorcery", manaCost: "{X}{R}", manaValue: 1 }),
     info("Gitaxian Probe", { typeLine: "Sorcery", manaCost: "{U/P}", manaValue: 1 }),
+    info("Mountain", { typeLine: "Basic Land — Mountain", producedMana: ["R"] }),
+    info("Scalding Tarn", { typeLine: "Land", oracleText: "{T}, Pay 1 life, Sacrifice Scalding Tarn: Search your library for an Island or Mountain card, put it onto the battlefield, then shuffle." }),
+    info("Evolving Wilds", { typeLine: "Land", oracleText: "{T}, Sacrifice Evolving Wilds: Search your library for a basic land card, put it onto the battlefield tapped, then shuffle." }),
+    info("Steam Vents", { typeLine: "Land — Island Mountain", producedMana: ["U", "R"], oracleText: "({T}: Add {U} or {R}.)\nAs Steam Vents enters the battlefield, you may pay 2 life. If you don't, it enters the battlefield tapped." }),
+    info("Thran Portal", { typeLine: "Land — Gate", oracleText: "Thran Portal enters the battlefield tapped unless you control two or fewer other lands.\nAs Thran Portal enters the battlefield, choose a basic land type.\nThran Portal is the chosen type in addition to its other types." }),
+    info("Lotus Petal", { typeLine: "Artifact", manaCost: "{0}", producedMana: ["W", "U", "B", "R", "G"], oracleText: "{T}, Sacrifice Lotus Petal: Add one mana of any color." }),
+    info("Rite of Flame", { typeLine: "Sorcery", manaCost: "{R}", manaValue: 1, oracleText: "Add {R}{R}, then add {R} for each card named Rite of Flame in each graveyard." }),
+    info("Vivi Ornitier", { typeLine: "Legendary Creature — Wizard", manaCost: "{1}{U}{R}", manaValue: 3, power: 0, toughness: 3 }),
+    info("Counterspell", { typeLine: "Instant", manaCost: "{U}{U}", manaValue: 2, oracleText: "Counter target spell." }),
+    info("Swan Song", { typeLine: "Instant", manaCost: "{U}", manaValue: 1, oracleText: "Counter target enchantment, instant, or sorcery spell. Its controller creates a 2/2 blue Bird creature token with flying." }),
+    info("Force of Will", { typeLine: "Instant", manaCost: "{3}{U}{U}", manaValue: 5, oracleText: "You may pay 1 life and exile a blue card from your hand rather than pay this spell's mana cost.\nCounter target spell." }),
+    info("Fierce Guardianship", { typeLine: "Instant", manaCost: "{2}{U}", manaValue: 3, oracleText: "If you control a commander, you may cast this spell without paying its mana cost.\nCounter target noncreature spell." }),
+    info("Mental Misstep", { typeLine: "Instant", manaCost: "{U/P}", manaValue: 1, oracleText: "Counter target spell with mana value 1." }),
+    info("Daze", { typeLine: "Instant", manaCost: "{1}{U}", manaValue: 2, oracleText: "You may return an Island you control to its owner's hand rather than pay this spell's mana cost.\nCounter target spell unless its controller pays {1}." }),
+    info("Pyroblast", { typeLine: "Instant", manaCost: "{R}", manaValue: 1, oracleText: "Choose one —\n• Counter target spell if it's blue.\n• Destroy target permanent if it's blue." }),
+    info("Brainstorm", { typeLine: "Instant", manaCost: "{U}", manaValue: 1, oracleText: "Draw three cards, then put two cards from your hand on top of your library in any order." }),
+    info("Divination", { typeLine: "Sorcery", manaCost: "{2}{U}", manaValue: 3, oracleText: "Draw two cards." }),
   ].map((c) => [c.name.toLowerCase(), c])
 );
 const deck = (...names: string[]): DeckCard[] => names.map((name) => ({ name, imageUri: "", typeLine: BOOK[name.toLowerCase()]!.typeLine }));
@@ -56,9 +74,9 @@ const action = (kind: PlanAction["kind"], iid: number, o: Partial<PlanAction> = 
 
 /** A game with chosen cards: the AI (opp) holds `oppHand`, its battlefield
     `oppField`; yours `youField`. It's the opponent's turn 3. */
-function table(o: { oppHand?: string[]; oppField?: string[]; youField?: string[]; oppLibrary?: string[]; commanderGame?: boolean; oppCommander?: string } = {}): PracticeGame {
+function table(o: { oppHand?: string[]; oppField?: string[]; youField?: string[]; youHand?: string[]; oppLibrary?: string[]; commanderGame?: boolean; oppCommander?: string } = {}): PracticeGame {
   let g = newGame({
-    you: { cards: deck(...(o.youField ?? []), ...Array(10).fill("Forest")) },
+    you: { cards: deck(...(o.youField ?? []), ...(o.youHand ?? []), ...Array(10).fill("Forest")) },
     opp: { cards: deck(...(o.oppHand ?? []), ...(o.oppField ?? []), ...(o.oppLibrary ?? []), ...Array(10).fill("Island"), ...(o.oppCommander ? [o.oppCommander] : [])), commander: o.oppCommander },
     commanderGame: !!o.commanderGame,
     first: "opp",
@@ -79,6 +97,7 @@ function table(o: { oppHand?: string[]; oppField?: string[]; youField?: string[]
   deal("opp", o.oppHand ?? [], "hand");
   deal("opp", o.oppField ?? [], "battlefield");
   deal("you", o.youField ?? [], "battlefield");
+  deal("you", o.youHand ?? [], "hand");
   g = { ...g, turn: 3, active: "opp" };
   return g;
 }
@@ -95,8 +114,8 @@ describe("mana", () => {
   });
 
   it("knows what a permanent makes: Sol Ring two, a basic its colour", () => {
-    expect(manaOutput(BOOK["sol ring"], "Artifact")).toEqual({ colors: ["C"], amount: 2 });
-    expect(manaOutput(info("Snow Forest", { typeLine: "Basic Snow Land — Forest" }), "Basic Snow Land — Forest")).toEqual({ colors: ["G"], amount: 1 });
+    expect(manaOutput(BOOK["sol ring"], "Artifact")).toEqual({ colors: ["C"], amount: 2, sacrifice: false });
+    expect(manaOutput(info("Snow Forest", { typeLine: "Basic Snow Land — Forest" }), "Basic Snow Land — Forest")).toEqual({ colors: ["G"], amount: 1, sacrifice: false });
     expect(manaOutput(BOOK["misty rainforest"], "Land")).toBeNull();
   });
 
@@ -371,5 +390,112 @@ describe("the AI's judgement without a model", () => {
     const side = aiMulligan(g.sides.opp, BOOK);
     expect(side.mulligans).toBe(1);
     expect(side.hand).toHaveLength(6);
+  });
+});
+
+describe("lands and fast mana", () => {
+  it("reads one-shot sources, chosen-type lands and fetches", () => {
+    expect(manaOutput(BOOK["lotus petal"], "Artifact")?.sacrifice).toBe(true);
+    expect(manaOutput(BOOK["thran portal"], "Land — Gate")?.colors).toEqual(["W", "U", "B", "R", "G"]);
+    expect(manaOutput(BOOK["scalding tarn"], "Land")).toBeNull();
+    expect(fetchOf(BOOK["scalding tarn"])).toEqual({ types: ["island", "mountain"], basic: false, tapped: false, life: 1 });
+    expect(fetchOf(BOOK["evolving wilds"])).toEqual({ types: ["land"], basic: true, tapped: true, life: 0 });
+  });
+
+  it("cracks a fetch land at once, for the land the hand needs", () => {
+    const g0 = table({ oppHand: ["Scalding Tarn", "Vivi Ornitier"], oppField: ["Island", "Island"], oppLibrary: ["Mountain", "Steam Vents"] });
+    const g = applyAction(g0, "opp", action("land", iidOf(g0, "opp", "Scalding Tarn", "hand")), BOOK).game;
+    const field = g.sides.opp.battlefield.map((c) => c.name);
+    // Steam Vents (red, the missing colour, and blue) over a Mountain; untapped for 2 life, plus 1 for the fetch.
+    expect(field).toEqual(["Island", "Island", "Steam Vents"]);
+    expect(g.sides.opp.battlefield.find((c) => c.name === "Steam Vents")!.tapped).toBe(false);
+    expect(g.sides.opp.graveyard.map((c) => c.name)).toEqual(["Scalding Tarn"]);
+    expect(g.sides.opp.life).toBe(17);
+    // And now Vivi is castable.
+    const vivi = applyAction(g, "opp", action("cast", iidOf(g, "opp", "Vivi Ornitier", "hand")), BOOK);
+    expect(vivi.ok).toBe(true);
+  });
+
+  it("a ritual's mana floats for the next spell, and is gone at the end of the turn", () => {
+    const g0 = table({ oppHand: ["Rite of Flame", "Vivi Ornitier"], oppField: ["Mountain", "Island"] });
+    let g = applyAction(g0, "opp", action("cast", iidOf(g0, "opp", "Rite of Flame", "hand"), { effects: [effect({ type: "mana", text: "{R}{R}" })] }), BOOK).game;
+    expect(g.pool?.opp).toEqual(["R", "R"]);
+    const step = applyAction(g, "opp", action("cast", iidOf(g, "opp", "Vivi Ornitier", "hand")), BOOK);
+    expect(step.ok).toBe(true);
+    expect(step.game.pool?.opp).toEqual([]);
+    expect(step.game.sides.opp.battlefield.find((c) => c.name === "Island")!.tapped).toBe(true);
+    g = applyAction(g0, "opp", action("cast", iidOf(g0, "opp", "Rite of Flame", "hand"), { effects: [effect({ type: "mana", text: "{R}{R}" })] }), BOOK).game;
+    expect(endTurn(g).pool?.opp).toEqual([]);
+  });
+
+  it("uses a land before a one-shot source, and sacrifices the one-shot when it must", () => {
+    const g0 = table({ oppHand: ["Raging Goblin", "Lightning Bolt"], oppField: ["Mountain", "Lotus Petal"] });
+    let g = applyAction(g0, "opp", action("cast", iidOf(g0, "opp", "Raging Goblin", "hand")), BOOK).game;
+    expect(g.sides.opp.battlefield.find((c) => c.name === "Lotus Petal")!.tapped).toBe(false);
+    g = applyAction(g, "opp", action("cast", iidOf(g, "opp", "Lightning Bolt", "hand")), BOOK).game;
+    expect(g.sides.opp.graveyard.map((c) => c.name)).toContain("Lotus Petal");
+  });
+});
+
+describe("counterspells on your turn", () => {
+  it("reads what a counter can hit", () => {
+    const creature = { typeLine: "Creature — Giant", manaValue: 4, blue: false };
+    const sorcery = { typeLine: "Sorcery", manaValue: 3, blue: true };
+    expect(counterOf(BOOK["counterspell"])!.hits(creature)).toBe(true);
+    expect(counterOf(BOOK["swan song"])!.hits(creature)).toBe(false);
+    expect(counterOf(BOOK["swan song"])!.hits(sorcery)).toBe(true);
+    expect(counterOf(BOOK["swan song"])!.rider).toMatch(/^Its controller creates a 2\/2 blue Bird/);
+    expect(counterOf(BOOK["fierce guardianship"])!.hits(creature)).toBe(false);
+    expect(counterOf(BOOK["fierce guardianship"])!.free).toBe("commander");
+    expect(counterOf(BOOK["force of will"])!.free).toBe("exile-blue");
+    expect(counterOf(BOOK["mental misstep"])!.hits({ ...creature, manaValue: 1 })).toBe(true);
+    expect(counterOf(BOOK["mental misstep"])!.hits(creature)).toBe(false);
+    expect(counterOf(BOOK["pyroblast"])!.hits(creature)).toBe(false);
+    expect(counterOf(BOOK["pyroblast"])!.hits(sorcery)).toBe(true);
+    expect(counterOf(BOOK["daze"])).toBeNull();
+    expect(counterOf(BOOK["brainstorm"])).toBeNull();
+  });
+
+  const yourTurn = (g: PracticeGame): PracticeGame => ({ ...g, active: "you" });
+  const cast = (g: PracticeGame, name: string) => {
+    const iid = iidOf(g, "you", name, "hand");
+    return aiResponds(playerPlay(g, iid), iid, BOOK);
+  };
+
+  it("counters a spell worth it with open mana", () => {
+    const g0 = yourTurn(table({ youHand: ["Hill Giant"], oppHand: ["Counterspell"], oppField: ["Island", "Island"] }));
+    const g = cast(g0, "Hill Giant");
+    expect(g.sides.you.battlefield.map((c) => c.name)).not.toContain("Hill Giant");
+    expect(g.sides.you.graveyard.map((c) => c.name)).toContain("Hill Giant");
+    expect(g.sides.opp.graveyard.map((c) => c.name)).toEqual(["Counterspell"]);
+    expect(g.sides.opp.battlefield.every((c) => c.tapped)).toBe(true);
+    expect(g.log.at(-1)!.text).toBe("The opponent counters Hill Giant with Counterspell.");
+  });
+
+  it("lets it be: the wrong kind of spell, a one-drop, or no mana", () => {
+    expect(cast(yourTurn(table({ youHand: ["Hill Giant"], oppHand: ["Swan Song"], oppField: ["Island"] })), "Hill Giant").sides.you.battlefield.map((c) => c.name)).toContain("Hill Giant");
+    expect(cast(yourTurn(table({ youHand: ["Raging Goblin"], oppHand: ["Counterspell"], oppField: ["Island", "Island"] })), "Raging Goblin").sides.you.battlefield.map((c) => c.name)).toContain("Raging Goblin");
+    expect(cast(yourTurn(table({ youHand: ["Hill Giant"], oppHand: ["Counterspell"], oppField: ["Island"] })), "Hill Giant").sides.you.battlefield.map((c) => c.name)).toContain("Hill Giant");
+  });
+
+  it("Mental Misstep is for one-drops", () => {
+    const g = cast(yourTurn(table({ youHand: ["Raging Goblin"], oppHand: ["Mental Misstep"], oppField: ["Island"] })), "Raging Goblin");
+    expect(g.sides.you.graveyard.map((c) => c.name)).toContain("Raging Goblin");
+  });
+
+  it("free counters: Force of Will pitches a blue card at a big spell; Fierce Guardianship is free with the commander out", () => {
+    let g = cast(yourTurn(table({ youHand: ["Craw Wurm"], oppHand: ["Force of Will", "Brainstorm"] })), "Craw Wurm");
+    expect(g.sides.you.graveyard.map((c) => c.name)).toContain("Craw Wurm");
+    expect(g.sides.opp.exile.map((c) => c.name)).toEqual(["Brainstorm"]);
+    expect(g.sides.opp.life).toBe(19);
+    // Not for a small spell.
+    g = cast(yourTurn(table({ youHand: ["Grizzly Bears"], oppHand: ["Force of Will", "Brainstorm"] })), "Grizzly Bears");
+    expect(g.sides.you.battlefield.map((c) => c.name)).toContain("Grizzly Bears");
+    // Fierce Guardianship, with its commander on the battlefield.
+    let t = yourTurn(table({ youHand: ["Divination"], oppHand: ["Fierce Guardianship"], oppField: ["Commander Guy"] }));
+    t = { ...t, sides: { ...t.sides, opp: { ...t.sides.opp, battlefield: t.sides.opp.battlefield.map((c) => ({ ...c, commander: true })) } } };
+    g = cast(t, "Divination");
+    expect(g.sides.opp.graveyard.map((c) => c.name)).toEqual(["Fierce Guardianship"]);
+    expect(g.log.at(-1)!.text).toMatch(/free: its commander is out/);
   });
 });

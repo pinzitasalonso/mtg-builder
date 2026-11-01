@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { recordEvent } from "@/lib/analytics";
 import { currentUser } from "@/lib/auth";
 import { PRACTICE_AI_TURNS } from "@/lib/limits";
 import { fallbackPlan } from "@/lib/practice/ai";
@@ -51,7 +52,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!game) return NextResponse.json({ error: "game required" }, { status: 400 });
   const setup = JSON.parse(row.setup) as Setup;
 
-  const fallback = (note: string) => NextResponse.json({ plan: fallbackPlan(game, setup.book), source: "fallback", note });
+  // Counted, so admin shows how often the model is reached (and the logs say why not).
+  const fallback = (note: string) => {
+    void recordEvent("practice_fallback_turn");
+    return NextResponse.json({ plan: fallbackPlan(game, setup.book), source: "fallback", note });
+  };
 
   // One more AI turn, if the game has any left.
   const spent = await prisma.practiceGame.updateMany({ where: { id, userId: user.id, turns: { lt: PRACTICE_AI_TURNS } }, data: { turns: { increment: 1 } } });
@@ -65,11 +70,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const res = await anthropic.messages.create(
       {
         model: MODEL,
-        max_tokens: 8000,
-        // Low effort: the engine has already done the counting (what's
-        // castable, the mana), so the model only decides, and the player is
-        // waiting on it.
-        output_config: { effort: "low", format: { type: "json_schema", schema: PLAN_SCHEMA } },
+        max_tokens: 16000,
+        // Medium effort (the model's default): it thinks through the turn —
+        // sequencing fast mana, what to hold up, what to attack with. The
+        // engine has already done the counting (what's castable, the mana).
+        output_config: { effort: "medium", format: { type: "json_schema", schema: PLAN_SCHEMA } },
         // The rules and this deck's card text are the same every turn: cached.
         system: [
           { type: "text", text: rules },
@@ -77,17 +82,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         ],
         messages: [{ role: "user", content: brief }],
       },
-      { timeout: 60_000, maxRetries: 1 }
+      { timeout: 90_000, maxRetries: 1 }
     );
     const u = res.usage;
     console.log(
       `[practice] game=${id} turn=${game.turn} stop=${res.stop_reason} fresh=${u.input_tokens} ` +
         `cache_write=${u.cache_creation_input_tokens ?? 0} cache_read=${u.cache_read_input_tokens ?? 0} out=${u.output_tokens}`
     );
-    if (res.stop_reason !== "end_turn") return fallback("The opponent played on instinct this turn.");
+    if (res.stop_reason !== "end_turn") {
+      console.error(`[practice] turn stopped: ${res.stop_reason}`);
+      return fallback("The opponent played on instinct this turn.");
+    }
     const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
     const plan: TurnPlan | null = cleanPlan(JSON.parse(text));
     if (!plan) return fallback("The opponent played on instinct this turn.");
+    void recordEvent("practice_ai_turn");
     return NextResponse.json({ plan, source: "ai" });
   } catch (e) {
     console.error("[practice] turn failed", e instanceof Error ? e.message : e);
