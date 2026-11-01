@@ -110,9 +110,15 @@ side does.
    return to hand, tap) to resolve your own spells.
 
    Where there's room (a wide screen, or a phone held sideways) a column
-   beside the board shows **Last played**, the latest spells cast by
-   either side, like the stack (a tap shows the card large), and the
-   **History**. The log lines carry the card they're about for this.
+   runs the full height beside the board and the hand: the opponent's
+   table talk, **Last played** (the latest spells cast by either side, like
+   the stack; a tap shows the card large) and the **History**. Nothing sits
+   between the boards then. The log lines carry the card they're about.
+
+   Each side's counts sit in a column at its left, with a commander still
+   in the command zone shown small and dimmed beside them (with its tax)
+   rather than taking a row. The opponent's half has a slightly warmer
+   ground than yours.
 
    A modal card with a land on its back (Shatterskull Smashing) is played
    by the face that's up, on both sides: clicked, it's cast; turned over
