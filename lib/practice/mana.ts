@@ -37,10 +37,13 @@ export function parseCost(manaCost: string | null | undefined): Cost {
 export const totalOf = (cost: Cost, x = 0) => cost.generic + cost.pips.length + cost.phyrexian.length + cost.xCount * x;
 
 export interface Source {
+  /** The permanent; negative for a unit of floating mana (poolSources). */
   iid: number;
   name: string;
   colors: string[];
   amount: number;
+  /** Used up when it's used (Lotus Petal). */
+  sacrifice?: boolean;
 }
 
 /** Untapped permanents that can tap for mana now (creatures not summoning sick). */
@@ -52,28 +55,35 @@ export function manaSources(side: PlaytestState, book: CardBook, turn: number, e
     const made = manaOutput(info, c.typeLine);
     if (!made) continue;
     if (isCreature(book, c) && isSick(book, c, turn)) continue;
-    out.push({ iid: c.iid, name: c.name, colors: made.colors, amount: made.amount });
+    // Lion's Eye Diamond costs the hand: not a source to pay with.
+    if (made.sacrifice && /discard your hand/i.test(info?.oracleText ?? "")) continue;
+    out.push({ iid: c.iid, name: c.name, colors: made.colors, amount: made.amount, sacrifice: made.sacrifice || undefined });
   }
   return out;
 }
+
+/** Floating mana as sources: unit i is iid -(i + 1). */
+export const poolSources = (pool: string[] | undefined): Source[] =>
+  (pool ?? []).map((c, i) => ({ iid: -(i + 1), name: "floating mana", colors: [c], amount: 1 }));
 
 export const manaTotal = (sources: Source[]) => sources.reduce((n, s) => n + s.amount, 0);
 
 /** The sources to tap to pay a cost, and the life it costs; null when it
     can't be paid. Generic "2" in a {2/W} pip pays with any two. */
 export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?: number } = {}): { tap: number[]; life: number } | null {
-  const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors })));
+  const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors, sacrifice: !!s.sacrifice })));
   const used = new Set<number>();
   const take = (i: number) => used.add(i);
   const pick = (ok: (colors: string[]) => boolean) => {
-    // Prefer a unit of a source already tapped for this payment, then the
-    // one that can do the fewest other things.
+    // Floating mana first (it's gone at the end of the phase), then a unit
+    // of a source already tapped for this payment, then the one that can
+    // do the fewest other things; a source used up by using it last.
     let best = -1;
     let bestScore = Infinity;
     units.forEach((u, i) => {
       if (used.has(i) || !ok(u.colors)) return;
-      const tappedAlready = [...used].some((j) => units[j]!.iid === u.iid);
-      const score = (tappedAlready ? 0 : 100) + u.colors.length;
+      const tappedAlready = u.iid < 0 || [...used].some((j) => units[j]!.iid === u.iid);
+      const score = (u.iid < 0 ? -100 : 0) + (tappedAlready ? 0 : 100) + (u.sacrifice ? 50 : 0) + u.colors.length;
       if (score < bestScore) {
         best = i;
         bestScore = score;
@@ -108,6 +118,9 @@ export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?
 /** "5 mana: G G U C C" — for the AI's brief. */
 export function manaSummary(sources: Source[]): string {
   if (!sources.length) return "no mana";
-  const parts = sources.map((s) => (s.amount > 1 ? `${s.amount}×${s.colors.join("/")}` : s.colors.join("/")));
+  const parts = sources.map((s) => {
+    const kind = s.amount > 1 ? `${s.amount}×${s.colors.join("/")}` : s.colors.join("/");
+    return s.iid < 0 ? `${kind} floating` : s.sacrifice ? `${kind} (${s.name}, used up)` : kind;
+  });
   return `${manaTotal(sources)} mana: ${parts.join(", ")}`;
 }

@@ -10,8 +10,8 @@
 
 import { draw, moveCard, resolvesToGraveyard, type PlayCard, type PlaytestState, type Shuffle, type Zone } from "../playtest";
 import { shuffled } from "../probability";
-import { entersTapped, has, infoOf, isCreature, isLand, isSick, stats } from "./cards";
-import { manaSources, parseCost, payCost } from "./mana";
+import { counterOf, entersTapped, fetchOf, has, infoOf, isBlue, isCreature, isLand, isSick, manaOutput, shockLife, stats } from "./cards";
+import { manaSources, parseCost, payCost, poolSources, type Source } from "./mana";
 import { other, type CardBook, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
@@ -166,6 +166,79 @@ function checkState(g: PracticeGame, book: CardBook) {
 
 const who = (seat: Seat) => (seat === "you" ? "You" : "The opponent");
 
+// ── Mana ───────────────────────────────────────────────────────────────
+
+/** What a seat can pay with now: its floating mana, then its untapped
+    sources. */
+export function availableMana(g: PracticeGame, seat: Seat, book: CardBook, exclude: number[] = []): Source[] {
+  return [...poolSources(g.pool?.[seat]), ...manaSources(g.sides[seat], book, g.turn, exclude)];
+}
+
+/** Pay: tap the sources (sacrificing the one-shot ones) and spend the
+    floating mana that was used. */
+function spend(g: PracticeGame, seat: Seat, tap: number[], sources: Source[]) {
+  const floating = new Set(tap.filter((t) => t < 0).map((t) => -t - 1));
+  if (floating.size && g.pool) g.pool[seat] = g.pool[seat].filter((_, i) => !floating.has(i));
+  for (const t of tap) {
+    if (t < 0) continue;
+    if (sources.find((x) => x.iid === t)?.sacrifice) {
+      const name = findCard(g, t)?.card.name;
+      moveTo(g, t, "graveyard");
+      say(g, seat, `${who(seat)} sacrifice${seat === "you" ? "" : "s"} ${name} for mana.`);
+    } else update(g, t, (c) => ({ ...c, tapped: true }));
+  }
+}
+
+const emptyPool = (g: PracticeGame, seat?: Seat) => {
+  if (!g.pool) g.pool = { you: [], opp: [] };
+  if (seat) g.pool[seat] = [];
+  else g.pool = { you: [], opp: [] };
+};
+
+/** A land the AI plays: a shock land enters untapped for 2 life while
+    that's affordable; a fetch land cracks at once for the land that best
+    fits the hand. */
+function aiLandEnters(g: PracticeGame, seat: Seat, land: PlayCard, book: CardBook) {
+  const info = infoOf(book, land);
+  const shock = shockLife(info);
+  const untappedShock = shock > 0 && g.sides[seat].life > 6;
+  moveTo(g, land.iid, "battlefield", { tapped: shock > 0 ? !untappedShock : entersTapped(info) });
+  if (untappedShock) {
+    g.sides[seat] = { ...g.sides[seat], life: g.sides[seat].life - shock };
+    say(g, seat, `${who(seat)} pay${seat === "you" ? "" : "s"} ${shock} life for ${land.name} to enter untapped.`);
+  }
+  const fetch = fetchOf(info);
+  if (!fetch) return;
+  const side = g.sides[seat];
+  const fits = side.library.filter((c) => {
+    if (!isLand(c)) return false;
+    const t = (infoOf(book, c)?.typeLine ?? c.typeLine ?? "").toLowerCase();
+    if (fetch.basic && !t.includes("basic")) return false;
+    return fetch.types.some((w) => w === "land" || t.includes(w));
+  });
+  if (!fits.length) return;
+  const have = new Set(manaSources(side, book, g.turn).flatMap((x) => x.colors));
+  const need = new Set(side.hand.filter((c) => !isLand(c)).flatMap((c) => parseCost(infoOf(book, c)?.manaCost ?? null).pips.flat()));
+  for (const c of side.command) for (const pip of parseCost(infoOf(book, c)?.manaCost ?? null).pips.flat()) need.add(pip);
+  const score = (c: PlayCard) => {
+    const colors = manaOutput(infoOf(book, c), c.typeLine)?.colors ?? [];
+    return colors.filter((x) => need.has(x) && !have.has(x)).length * 10 + colors.length - (entersTapped(infoOf(book, c)) ? 5 : 0);
+  };
+  const pick = fits.reduce((a, b) => (score(b) > score(a) ? b : a));
+  if (fetch.life) g.sides[seat] = { ...g.sides[seat], life: g.sides[seat].life - fetch.life };
+  moveTo(g, land.iid, "graveyard");
+  say(g, seat, `${who(seat)} crack${seat === "you" ? "" : "s"} ${land.name} for ${pick.name}.`);
+  const pickInfo = infoOf(book, pick);
+  const pickShock = shockLife(pickInfo);
+  const pickUntapped = !fetch.tapped && (pickShock ? g.sides[seat].life > 6 : !entersTapped(pickInfo));
+  moveTo(g, pick.iid, "battlefield", { tapped: !pickUntapped });
+  if (pickShock && pickUntapped) {
+    g.sides[seat] = { ...g.sides[seat], life: g.sides[seat].life - pickShock };
+    say(g, seat, `${who(seat)} pay${seat === "you" ? "" : "s"} ${pickShock} life for ${pick.name} to enter untapped.`);
+  }
+  g.sides[seat] = { ...g.sides[seat], library: shuffled(g.sides[seat].library) };
+}
+
 // ── Turns ──────────────────────────────────────────────────────────────
 
 /** The active player's turn begins: untap, and draw (not the first player
@@ -191,6 +264,7 @@ export function endTurn(g0: PracticeGame): PracticeGame {
     g.sides[seat] = { ...side, battlefield: side.battlefield.map(({ damage: _d, pump: _p, ...c }) => c) };
   }
   g.combat = null;
+  emptyPool(g);
   g.active = other(g.active);
   g.turn += 1;
   return startTurn(g);
@@ -268,7 +342,7 @@ export function castable(g: PracticeGame, seat: Seat, card: PlayCard, book: Card
   const info = infoOf(book, card);
   const cost = parseCost(info?.manaCost ?? null);
   if (zone === "command") cost.generic += 2 * g.tax[seat];
-  return payCost(cost, manaSources(g.sides[seat], book, g.turn)) !== null;
+  return payCost(cost, availableMana(g, seat, book)) !== null;
 }
 
 export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, book: CardBook): Step {
@@ -288,8 +362,8 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     if (at.zone !== "hand" || !isLand(card)) return fail(`(The opponent tried to play ${card.name} as a land.)`);
     if (g.landPlayed) return fail(`(The opponent already played a land this turn.)`);
     g.landPlayed = true;
-    moveTo(g, card.iid, "battlefield", { tapped: entersTapped(info) });
     say(g, seat, `${who(seat)} plays ${card.name}.`);
+    aiLandEnters(g, seat, card, book);
     return { game: g, ok: true };
   }
 
@@ -298,9 +372,10 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     if (isLand(card)) return fail(`(The opponent tried to cast the land ${card.name}.)`);
     const cost = parseCost(info?.manaCost ?? null);
     if (at.zone === "command") cost.generic += 2 * g.tax[seat];
-    const paid = payCost(cost, manaSources(g.sides[seat], book, g.turn), { x: action.x ?? 0 });
+    const sources = availableMana(g, seat, book);
+    const paid = payCost(cost, sources, { x: action.x ?? 0 });
     if (!paid) return fail(`The opponent can't pay for ${card.name} yet.`);
-    for (const t of paid.tap) update(g, t, (c) => ({ ...c, tapped: true }));
+    spend(g, seat, paid.tap, sources);
     if (paid.life) g.sides[seat] = { ...g.sides[seat], life: g.sides[seat].life - paid.life };
     if (at.zone === "command") g.tax[seat] += 1;
     const x = cost.xCount ? ` (X = ${action.x ?? 0})` : "";
@@ -317,15 +392,18 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   }
 
   // activate
+  // A fetch land already cracked itself when it was played.
+  if (at.zone === "graveyard" && fetchOf(info)) return { game: g0, ok: true };
   if (at.zone !== "battlefield") return fail(`(The opponent tried to use ${card.name}, which isn't in play.)`);
   if (action.tap_card) {
     if (card.tapped) return fail(`(${card.name} is already tapped.)`);
     if (isCreature(book, card) && isSick(book, card, g.turn)) return fail(`(${card.name} can't tap the turn it arrived.)`);
   }
   const cost = parseCost(action.mana);
-  const paid = payCost(cost, manaSources(g.sides[seat], book, g.turn, action.tap_card ? [card.iid] : []), { life: action.life ?? 0 });
+  const sources = availableMana(g, seat, book, action.tap_card ? [card.iid] : []);
+  const paid = payCost(cost, sources, { life: action.life ?? 0 });
   if (!paid) return fail(`The opponent can't pay for ${card.name}'s ability.`);
-  for (const t of paid.tap) update(g, t, (c) => ({ ...c, tapped: true }));
+  spend(g, seat, paid.tap, sources);
   if (action.tap_card) update(g, card.iid, (c) => ({ ...c, tapped: true }));
   if (paid.life) g.sides[seat] = { ...g.sides[seat], life: g.sides[seat].life - paid.life };
   if (action.sacrifice_card) moveTo(g, card.iid, "graveyard");
@@ -333,6 +411,60 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   applyEffects(g, seat, action.effects, book, card.name);
   checkState(g, book);
   return { game: g, ok: true };
+}
+
+/** The AI answers a spell the player has just cast: a hard counterspell
+    from its hand, paid from its untapped mana (or its free alternative, for
+    a big spell), when the spell is worth a card. A countered commander goes
+    back to the command zone. Returns the game unchanged when it lets the
+    spell be. */
+export function aiResponds(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
+  if (g0.winner) return g0;
+  const at = findCard(g0, iid);
+  if (!at || at.seat !== "you" || isLand(at.card)) return g0;
+  const info = infoOf(book, at.card);
+  const spell = { typeLine: info?.typeLine ?? at.card.typeLine ?? "", manaValue: info?.manaValue ?? 0, blue: isBlue(info) };
+  const opp = g0.sides.opp;
+  const options = opp.hand
+    .map((c) => ({ c, k: counterOf(infoOf(book, c)) }))
+    .filter((o): o is { c: PlayCard; k: NonNullable<typeof o.k> } => !!o.k && o.k.hits(spell))
+    .sort((a, b) => (infoOf(book, a.c)?.manaValue ?? 0) - (infoOf(book, b.c)?.manaValue ?? 0));
+  if (!options.length) return g0;
+  const big = spell.manaValue >= 4 || at.card.commander;
+  const commanderOut = opp.battlefield.some((c) => c.commander);
+  for (const { c, k } of options) {
+    // Worth a card: two mana or more, the commander, or the one spell this
+    // counter was made for (Mental Misstep on a one-drop).
+    const exact = !k.hits({ ...spell, manaValue: spell.manaValue + 1 });
+    if (spell.manaValue < 2 && !at.card.commander && !exact) continue;
+    const sources = availableMana(g0, "opp", book);
+    const paid = payCost(parseCost(infoOf(book, c)?.manaCost ?? null), sources, { x: k.xIsValue ? spell.manaValue : 0 });
+    let free: "commander" | "exile-blue" | null = null;
+    let pitched: PlayCard | null = null;
+    if (!paid && k.free === "commander" && commanderOut) free = "commander";
+    if (!paid && !free && k.free === "exile-blue" && big) {
+      pitched = opp.hand.find((x) => x.iid !== c.iid && !isLand(x) && isBlue(infoOf(book, x))) ?? null;
+      if (pitched) free = "exile-blue";
+    }
+    if (!paid && !free) continue;
+    const g = structuredClone(g0);
+    if (paid) {
+      spend(g, "opp", paid.tap, sources);
+      if (paid.life) g.sides.opp = { ...g.sides.opp, life: g.sides.opp.life - paid.life };
+    }
+    if (pitched) {
+      moveTo(g, pitched.iid, "exile");
+      if (k.freeLife) g.sides.opp = { ...g.sides.opp, life: g.sides.opp.life - k.freeLife };
+    }
+    moveTo(g, c.iid, "graveyard");
+    moveTo(g, iid, at.card.commander ? "command" : "graveyard");
+    const how = pitched ? ` (exiling ${pitched.name})` : free === "commander" ? " (free: its commander is out)" : "";
+    say(g, "opp", `The opponent counters ${at.card.name} with ${c.name}${how}.`);
+    if (k.rider) say(g, "opp", `Resolve: ${k.rider}`);
+    checkState(g, book);
+    return g;
+  }
+  return g0;
 }
 
 const seatOf = (caster: Seat, p: "ai" | "player" | null): Seat => (p === "player" ? "you" : p === "ai" ? "opp" : caster);
@@ -456,6 +588,15 @@ function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: Ca
         say(g, caster, `${source} finds ${found.name}${e.to === "hand" ? " (to hand)" : ""}.`);
         break;
       }
+      case "mana": {
+        // "{R}{R}{R}" (or "RRR"): floating until the end of the phase.
+        const units = [...(e.text ?? "").toUpperCase().matchAll(/[WUBRGC]/g)].map((m) => m[0]).slice(0, 20);
+        if (!units.length) break;
+        if (!g.pool) g.pool = { you: [], opp: [] };
+        g.pool[caster] = [...g.pool[caster], ...units];
+        say(g, caster, `${source} adds ${units.map((u) => `{${u}}`).join("")}.`);
+        break;
+      }
       case "note": {
         if (e.text) say(g, caster, `Resolve: ${e.text.slice(0, 200)}`);
         break;
@@ -487,6 +628,8 @@ export function canBlock(book: CardBook, blocker: PlayCard, attacker: PlayCard):
 export function declareAttackers(g0: PracticeGame, seat: Seat, iids: number[], book: CardBook): PracticeGame {
   if (g0.winner || g0.active !== seat) return g0;
   const g = structuredClone(g0);
+  // Mana empties between phases.
+  if (g.pool) g.pool[seat] = [];
   const attackers: number[] = [];
   for (const iid of [...new Set(iids)]) {
     const card = g.sides[seat].battlefield.find((c) => c.iid === iid);

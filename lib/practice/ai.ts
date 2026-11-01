@@ -3,10 +3,10 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { has, infoOf, isCreature, isLand, stats } from "./cards";
+import { BASIC_COLOR, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, stats } from "./cards";
 import { canAttack, canBlock, cardId, castable } from "./game";
 import { manaSources, parseCost, payCost } from "./mana";
-import { other, type CardBook, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
+import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
 
 const value = (book: CardBook, c: PlayCard) => (c.token ? 1 : (infoOf(book, c)?.manaValue ?? 0));
 
@@ -95,6 +95,20 @@ export function safeAttackers(g: PracticeGame, seat: Seat, book: CardBook): Play
   return able.filter((a) => !blockers.some((b) => canBlock(book, b, a) && exchange(book, a, b).kills && !exchange(book, a, b).dies));
 }
 
+const drawEffect = (amount: number): Effect => ({
+  type: "draw",
+  target: null,
+  player: "ai",
+  amount,
+  name: null,
+  power: null,
+  toughness: null,
+  keywords: [],
+  to: null,
+  tapped: null,
+  text: null,
+});
+
 const blankAction = (kind: PlanAction["kind"], iid: number): PlanAction => ({
   kind,
   card: cardId(iid),
@@ -106,16 +120,38 @@ const blankAction = (kind: PlanAction["kind"], iid: number): PlanAction => ({
   effects: [],
 });
 
+/** The colours a land gives: its own, or (a fetch) what it can find. */
+function landColors(book: CardBook, land: PlayCard): string[] {
+  const own = manaOutput(infoOf(book, land), land.typeLine)?.colors;
+  if (own?.length) return own;
+  const f = fetchOf(infoOf(book, land));
+  if (!f) return [];
+  return f.types.includes("land") ? ["W", "U", "B", "R", "G"] : f.types.flatMap((t) => (BASIC_COLOR[t] ? [BASIC_COLOR[t]!] : []));
+}
+
+const NUMBER: Record<string, number> = { a: 1, one: 1, two: 2, three: 3, four: 4 };
+/** A spell that only draws ("Draw two cards."): safe to cast without judgement. */
+function drawOnly(book: CardBook, c: PlayCard): number {
+  const m = /^draw (a|one|two|three|four) cards?\.$/i.exec((infoOf(book, c)?.oracleText ?? "").trim());
+  return m ? NUMBER[m[1]!.toLowerCase()]! : 0;
+}
+
 /** The turn without the model: a land (the one that unlocks the most), then
-    the biggest permanents it can pay for, then safe attacks. */
+    the biggest permanents it can pay for, then spells that only draw, then
+    safe attacks. */
 export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"): TurnPlan {
   const side = g.sides[seat];
   const main: PlanAction[] = [];
   const lands = side.hand.filter(isLand);
   if (!g.landPlayed && lands.length) {
-    // Prefer a land of a colour the hand is missing.
-    const missing = new Set(side.hand.filter((c) => !isLand(c)).flatMap((c) => parseCost(infoOf(book, c)?.manaCost ?? null).pips.flat()));
-    const pickLand = lands.find((l) => (infoOf(book, l)?.producedMana ?? []).some((c) => missing.has(c))) ?? lands[0]!;
+    // Prefer a land of a colour the hand (or the commander) is missing,
+    // then one that enters untapped.
+    const have = new Set(side.battlefield.flatMap((c) => landColors(book, c)));
+    const missing = new Set(
+      [...side.hand.filter((c) => !isLand(c)), ...side.command].flatMap((c) => parseCost(infoOf(book, c)?.manaCost ?? null).pips.flat()).filter((c) => !have.has(c))
+    );
+    const score = (l: PlayCard) => landColors(book, l).filter((c) => missing.has(c)).length * 10 + (entersTapped(infoOf(book, l)) ? 0 : 5) + landColors(book, l).length;
+    const pickLand = lands.reduce((a, b) => (score(b) > score(a) ? b : a));
     main.push(blankAction("land", pickLand.iid));
   }
   // Spend the mana: permanents, biggest first, while it can still pay.
@@ -130,8 +166,9 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     ...sim.sides[seat].hand.map((c) => ({ c, zone: "hand" as const })),
     ...sim.sides[seat].command.map((c) => ({ c, zone: "command" as const })),
   ]
-    .filter(({ c }) => !isLand(c) && !/\b(Instant|Sorcery)\b/.test((c.typeLine ?? "").split(" // ")[0]!))
-    .sort((a, b) => value(book, b.c) - value(book, a.c));
+    .filter(({ c }) => !isLand(c) && (!/\b(Instant|Sorcery)\b/.test((c.typeLine ?? "").split(" // ")[0]!) || drawOnly(book, c) > 0))
+    // Permanents first, biggest first; then the draw spells.
+    .sort((a, b) => (drawOnly(book, a.c) ? 1 : 0) - (drawOnly(book, b.c) ? 1 : 0) || value(book, b.c) - value(book, a.c));
   for (const { c, zone } of candidates) {
     if (!castable(sim, seat, c, book, zone)) continue;
     const cost = parseCost(infoOf(book, c)?.manaCost ?? null);
@@ -143,7 +180,8 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
       ...sim.sides[seat],
       battlefield: sim.sides[seat].battlefield.map((x) => (paid.tap.includes(x.iid) ? { ...x, tapped: true } : x)),
     };
-    main.push(blankAction("cast", c.iid));
+    const draws = drawOnly(book, c);
+    main.push(draws ? { ...blankAction("cast", c.iid), effects: [drawEffect(draws)] } : blankAction("cast", c.iid));
   }
   return {
     main,

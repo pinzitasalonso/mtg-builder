@@ -4,26 +4,28 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import { isLandCard, type PlayCard } from "../playtest";
-import { infoOf, isCreature, isLand, isSick, stats } from "./cards";
-import { castable, cardId } from "./game";
-import { manaSources, manaSummary } from "./mana";
+import { counterOf, infoOf, isCreature, isLand, isSick, stats } from "./cards";
+import { availableMana, castable, cardId } from "./game";
+import { manaSummary } from "./mana";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
-const EFFECT_TYPES: EffectType[] = ["damage", "life", "destroy", "exile", "bounce", "tap", "untap", "draw", "discard", "mill", "token", "counters", "pump", "search", "note"];
+const EFFECT_TYPES: EffectType[] = ["damage", "life", "destroy", "exile", "bounce", "tap", "untap", "draw", "discard", "mill", "token", "counters", "pump", "search", "mana", "note"];
 
-const nullable = (type: string) => ({ type: [type, "null"] });
+// Nullable fields as anyOf: the form structured outputs documents.
+const nullable = (type: string) => ({ anyOf: [{ type }, { type: "null" }] });
+const nullableEnum = (values: string[]) => ({ anyOf: [{ type: "string", enum: values }, { type: "null" }] });
 const EFFECT_SCHEMA = {
   type: "object",
   properties: {
     type: { type: "string", enum: EFFECT_TYPES },
     target: nullable("string"),
-    player: { type: ["string", "null"], enum: ["ai", "player", null] },
+    player: nullableEnum(["ai", "player"]),
     amount: nullable("integer"),
     name: nullable("string"),
     power: nullable("integer"),
     toughness: nullable("integer"),
     keywords: { type: "array", items: { type: "string" } },
-    to: { type: ["string", "null"], enum: ["battlefield", "hand", null] },
+    to: nullableEnum(["battlefield", "hand"]),
     tapped: nullable("boolean"),
     text: nullable("string"),
   },
@@ -64,14 +66,22 @@ HOW THIS TABLE WORKS
 - Each of your turns you get a brief: your hand, your mana right now, both battlefields, life totals and what happened since your last turn. Cards are named by id, like c10023.
 - You answer with your plan for the whole turn: "main" (actions before combat, in order), "attack" (ids of your creatures that attack the player), "after_combat" (actions after combat, in order) and "say" (one short line of table talk in character, at most 12 words, or "").
 - The app checks every action. One land per turn. A spell or ability has to be paid from your untapped mana: the brief says what each card costs and whether you can pay for it now. Actions are paid in order, so put first what you most want to cast. Don't plan more than your mana allows.
-- You only act on your own turn. You don't respond to the player's spells. The app blocks for you.
-- Don't activate mana abilities: the app taps your lands and mana sources when you cast.
+- Don't activate mana abilities: the app taps your lands and mana sources when you cast, and uses up one-shot sources (Lotus Petal) last.
+- Fetch lands crack themselves when you play them: the app finds the land that suits your hand. Shock lands enter untapped for 2 life while you can afford it.
+- On the player's turn the app plays for you. It blocks, and it casts your hard counterspells (marked "counterspell" in your hand) at the player's spells that are worth it, if you left their mana untapped. Nothing else of yours is cast on their turn, so cards that only work in response (protection, redirecting a spell, combat tricks) are rarely worth casting on your own turn.
 - Creatures that are summoning sick (marked in the brief) can't attack.
+
+HOW TO PLAY WELL
+- Use your mana every turn. A turn where you only play a land is a wasted turn, unless you're holding mana open on purpose for a counterspell.
+- Develop first: mana rocks and ramp, your commander when it's good to cast, card draw and engines, then threats. Spend spare mana on cheap card draw, cantrips and tutors.
+- Rituals and fast mana: cast them when the mana lets you cast something more this turn. Mana a spell adds floats only until the end of the phase.
+- Keep mana open for a counterspell only when you hold one and have nothing better to do with that mana.
+- Attack when the player can't block well; keep blockers back when their board threatens lethal.
 
 ACTIONS
 - {"kind":"land","card":"<id>"}: play a land from your hand.
 - {"kind":"cast","card":"<id>","x":<n or null>,"effects":[...]}: cast a card from your hand or command zone. A permanent enters the battlefield; an instant or sorcery resolves and goes to your graveyard. "effects" is what the spell does, or what the permanent's enters-the-battlefield ability does, right now.
-- {"kind":"activate","card":"<id>","tap_card":<bool>,"sacrifice_card":<bool>,"mana":"{2}{G}" or null,"life":<n or null>,"effects":[...]}: an activated ability of a permanent you control, with its costs. A fetch land is tap_card true, sacrifice_card true, life 1, and a search effect.
+- {"kind":"activate","card":"<id>","tap_card":<bool>,"sacrifice_card":<bool>,"mana":"{2}{G}" or null,"life":<n or null>,"effects":[...]}: an activated ability of a permanent you control, with its costs.
 Every field is always present; set the ones an action doesn't use to null (effects to []).
 
 EFFECTS (every field present: unused ones null, keywords [] when unused)
@@ -83,6 +93,7 @@ EFFECTS (every field present: unused ones null, keywords [] when unused)
 - counters: target and amount (+1/+1 counters; negative for -1/-1).
 - pump: target, power and toughness, until end of turn.
 - search: name (an exact card name from your deck still in your library), to ("battlefield" or "hand"), tapped.
+- mana: text is the mana it adds, like "{R}{R}{R}" (a ritual, or "three mana of any one color": pick the colour). Your next actions spend it first.
 - note: text, for anything else the card does. The player resolves it by hand, so make it short and concrete ("The player sacrifices a creature").
 Turn each card's text into these effects faithfully. Never invent an effect a card doesn't have. Target only cards the brief shows, by id.`;
 
@@ -130,12 +141,13 @@ const describe = (g: PracticeGame, book: CardBook, c: PlayCard, opts: { text?: b
 export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[]): string {
   const me = g.sides.opp;
   const them = g.sides.you;
-  const sources = manaSources(me, book, g.turn);
+  const sources = availableMana(g, "opp", book);
   const hand = me.hand.map((c) => {
     const info = infoOf(book, c);
     if (isLandCard(c.typeLine)) return `- ${cardId(c.iid)} ${c.name} (land)${g.landPlayed ? "" : " — you can play it"}`;
     const can = castable(g, "opp", c, book, "hand");
-    return `- ${cardId(c.iid)} ${c.name} ${info?.manaCost ?? ""} (${(info?.typeLine ?? "").split(" — ")[0]}) — ${can ? "you can pay for it now" : "can't pay for it yet"}`;
+    const counter = counterOf(info) ? " — counterspell: leave its mana untapped and the app casts it on the player's turn" : "";
+    return `- ${cardId(c.iid)} ${c.name} ${info?.manaCost ?? ""} (${(info?.typeLine ?? "").split(" — ")[0]}) — ${can ? "you can pay for it now" : "can't pay for it yet"}${counter}`;
   });
   const command = me.command.map((c) => {
     const info = infoOf(book, c);
