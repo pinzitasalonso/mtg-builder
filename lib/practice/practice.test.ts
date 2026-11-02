@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { chooseBlocks, aiMulligan, fallbackPlan } from "./ai";
-import { counterOf, fetchOf, isCreature, manaOutput, searchAbility, searchOnCast } from "./cards";
+import { counterOf, fetchOf, isCreature, isInstantSpeed, manaOutput, removalOf, searchAbility, searchOnCast } from "./cards";
 import {
   addCounters,
+  aiRemovalAction,
   aiResponds,
   applyAction,
   createTokens,
@@ -70,6 +71,11 @@ const BOOK: CardBook = Object.fromEntries(
     info("Pyroblast", { typeLine: "Instant", manaCost: "{R}", manaValue: 1, oracleText: "Choose one —\n• Counter target spell if it's blue.\n• Destroy target permanent if it's blue." }),
     info("Brainstorm", { typeLine: "Instant", manaCost: "{U}", manaValue: 1, oracleText: "Draw three cards, then put two cards from your hand on top of your library in any order." }),
     info("Divination", { typeLine: "Sorcery", manaCost: "{2}{U}", manaValue: 3, oracleText: "Draw two cards." }),
+    info("Swords to Plowshares", { typeLine: "Instant", manaCost: "{W}", manaValue: 1, oracleText: "Exile target creature. Its controller gains life equal to its power." }),
+    info("Doom Blade", { typeLine: "Instant", manaCost: "{1}{B}", manaValue: 2, oracleText: "Destroy target nonblack creature." }),
+    info("Into the Roil", { typeLine: "Instant", manaCost: "{1}{U}", manaValue: 2, oracleText: "Kicker {1}{U}\nReturn target nonland permanent to its owner's hand. If this spell was kicked, draw a card." }),
+    info("Plains", { typeLine: "Basic Land — Plains", producedMana: ["W"] }),
+    info("Swamp", { typeLine: "Basic Land — Swamp", producedMana: ["B"] }),
     info("Shatterskull Smashing // Shatterskull, the Shattered", {
       typeLine: "Sorcery // Land",
       manaCost: "{X}{R}{R} // ",
@@ -670,5 +676,62 @@ describe("searches", () => {
     g = finishSearch(g, [top]);
     expect(g.sides.you.library[0]!.iid).toBe(top);
     expect(g.log.at(-1)!.text).toBe("You shuffle your library.");
+  });
+});
+
+describe("answering on the other's turn", () => {
+  it("reads instant removal: what it does, what it can't hit, and what else", () => {
+    expect(removalOf(BOOK["swords to plowshares"])).toMatchObject({ kind: "exile", rider: "Its controller gains life equal to its power." });
+    expect(removalOf(BOOK["lightning bolt"])).toMatchObject({ kind: "damage", amount: 3 });
+    expect(removalOf(BOOK["doom blade"])).toMatchObject({ kind: "destroy", notColor: "B" });
+    expect(removalOf(BOOK["into the roil"])).toMatchObject({ kind: "bounce" });
+    expect(removalOf(BOOK["counterspell"])).toBeNull();
+    expect(removalOf(BOOK["rite of flame"])).toBeNull();
+    expect(isInstantSpeed(BOOK, { iid: 1, name: "Counterspell", imageUri: "", typeLine: "Instant", tapped: false, commander: false })).toBe(true);
+    expect(isInstantSpeed(BOOK, { iid: 1, name: "Grizzly Bears", imageUri: "", typeLine: "Creature — Bear", tapped: false, commander: false })).toBe(false);
+  });
+
+  it("the AI bolts a big attacker, not a small one, and not what it can't kill", () => {
+    const attackWith = (names: string[], hand = ["Lightning Bolt"], field = ["Mountain"]) => {
+      let g: PracticeGame = { ...table({ youField: names, oppHand: hand, oppField: field }), active: "you", turn: 4 };
+      g = declareAttackers(g, "you", g.sides.you.battlefield.map((c) => c.iid), BOOK);
+      return g;
+    };
+    let g = attackWith(["Hill Giant", "Grizzly Bears"]);
+    const bolt = aiRemovalAction(g, BOOK, g.combat!.attackers, "attack")!;
+    expect(bolt.card).toBe(cardId(iidOf(g, "opp", "Lightning Bolt", "hand")));
+    expect(bolt.effects[0]).toMatchObject({ type: "damage", target: cardId(iidOf(g, "you", "Hill Giant")), amount: 3 });
+    expect(aiRemovalAction(attackWith(["Grizzly Bears"]), BOOK, attackWith(["Grizzly Bears"]).combat!.attackers, "attack")).toBeNull();
+    g = attackWith(["Serra Angel"]);
+    expect(aiRemovalAction(g, BOOK, g.combat!.attackers, "attack")).toBeNull();
+    g = attackWith(["Vampire Nighthawk", "Serra Angel"], ["Doom Blade"], ["Swamp", "Swamp"]);
+    const blade = aiRemovalAction(g, BOOK, g.combat!.attackers, "attack")!;
+    expect(blade.effects[0]!.target).toBe(cardId(iidOf(g, "you", "Serra Angel")));
+    g = attackWith(["Serra Angel"], ["Swords to Plowshares"], []);
+    expect(aiRemovalAction(g, BOOK, g.combat!.attackers, "attack")).toBeNull();
+  });
+
+  it("at the end of your turn, the AI answers a real threat only", () => {
+    const g0 = { ...table({ youField: ["Hill Giant", "Serra Angel"], oppHand: ["Swords to Plowshares"], oppField: ["Plains"] }), active: "you" as const };
+    const swords = aiRemovalAction(g0, BOOK, g0.sides.you.battlefield.map((c) => c.iid), "end")!;
+    expect(swords.effects[0]).toMatchObject({ type: "exile", target: cardId(iidOf(g0, "you", "Serra Angel")) });
+    expect(swords.effects[1]).toMatchObject({ type: "note", text: "Its controller gains life equal to its power." });
+    const small = { ...table({ youField: ["Hill Giant"], oppHand: ["Swords to Plowshares"], oppField: ["Plains"] }), active: "you" as const };
+    expect(aiRemovalAction(small, BOOK, small.sides.you.battlefield.map((c) => c.iid), "end")).toBeNull();
+  });
+
+  it("an AI cast in stages: paid and announced, then countered, or resolved", () => {
+    const g0 = table({ oppHand: ["Hill Giant"], oppField: ["Mountain", "Mountain", "Mountain", "Mountain"] });
+    const a = action("cast", iidOf(g0, "opp", "Hill Giant", "hand"));
+    const paid = applyAction(g0, "opp", a, BOOK, { stage: "pay" }).game;
+    expect(paid.sides.opp.battlefield.filter((c) => c.tapped)).toHaveLength(4);
+    expect(paid.sides.opp.hand.map((c) => c.name)).toEqual(["Hill Giant"]);
+    expect(paid.log.at(-1)!.text).toBe("The opponent casts Hill Giant.");
+    const countered = applyAction(paid, "opp", a, BOOK, { stage: "counter", by: "Counterspell" }).game;
+    expect(countered.sides.opp.graveyard.map((c) => c.name)).toEqual(["Hill Giant"]);
+    expect(countered.log.at(-1)!.text).toBe("Counterspell counters Hill Giant.");
+    const resolved = applyAction(paid, "opp", a, BOOK, { stage: "resolve" }).game;
+    expect(resolved.sides.opp.battlefield.map((c) => c.name)).toContain("Hill Giant");
+    expect(resolved.sides.opp.battlefield.filter((c) => c.tapped)).toHaveLength(4);
   });
 });

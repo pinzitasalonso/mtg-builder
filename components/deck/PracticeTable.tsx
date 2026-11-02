@@ -8,10 +8,12 @@ import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
-import { infoOf, isCreature, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
+import { counterOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
+import { parseCost, payCost } from "@/lib/practice/mana";
 import {
   addCounters,
   adjustLife,
+  aiRemovalAction,
   aiResponds,
   createTokens,
   finishSearch,
@@ -20,6 +22,7 @@ import {
   playerUseSearch,
   type TokenSpec,
   applyAction,
+  availableMana,
   canAttack,
   canBlock,
   declareAttackers,
@@ -66,7 +69,9 @@ interface Setup {
   you: { label: string; cards: DeckCard[]; commander: string | null };
   opp: { label: string; detail: string; cards: DeckCard[]; commander: string | null };
 }
-type Mode = "pick" | "loading" | "mulligan" | "main" | "attack" | "combat" | "ai" | "block" | "over";
+// "respond": the opponent has cast a spell and waits for your answer.
+type Mode = "pick" | "loading" | "mulligan" | "main" | "attack" | "combat" | "ai" | "block" | "respond" | "over";
+type Answer = { kind: "resolve" | "counter"; g: PracticeGame };
 type Step = (g: PracticeGame) => PracticeGame;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -93,7 +98,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const [aiNote, setAiNote] = useState("");
   const [menu, setMenu] = useState<(MenuState & { seat: Seat }) | null>(null);
   const [zoom, setZoom] = useState<Zoom | null>(null);
-  const [pile, setPile] = useState<{ seat: Seat; zone: "graveyard" | "exile" | "library" } | null>(null);
+  const [pile, setPile] = useState<{ seat: Seat; zone: "graveyard" | "exile" | "library" | "hand" } | null>(null);
+  // The opponent's spell waiting for your answer, and how to give it.
+  const [pending, setPending] = useState<{ action: PlanAction; card: PlayCard; target?: string } | null>(null);
+  const answerRef = useRef<((a: Answer) => void) | null>(null);
+  // "Don't ask again": the opponent's spells resolve without a pause, this game.
+  const noAsk = useRef(false);
   const [logOpen, setLogOpen] = useState(false);
   const [tokenOpen, setTokenOpen] = useState(false);
   // A search of your library under way (a tutor you cast, a fetch you
@@ -180,6 +190,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       return;
     }
     lastOpponent.current = option;
+    noAsk.current = false;
     const s = data as Setup;
     let g = newGame({
       you: { cards: s.you.cards, commander: s.you.commander },
@@ -242,12 +253,83 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     else setMode("main");
   }
 
-  function endMyTurn() {
-    if (!game) return;
-    const g = endTurn(game);
+  async function endMyTurn() {
+    if (!game || !setup) return;
+    let g = game;
+    // At the end of your turn the AI may answer your biggest threat.
+    const removal = aiRemovalAction(g, setup.book, g.sides.you.battlefield.map((c) => c.iid), "end");
+    if (removal) {
+      setMode("ai");
+      setHistory([]);
+      g = await aiCast(g, removal, "ai");
+      if (!alive.current || g.winner) return setMode(g.winner ? "over" : "main");
+    }
+    g = endTurn(g);
     setGame(g);
     if (!g.winner) void runAi(g);
   }
+
+  /** The opponent casts a spell. If you hold something you could answer
+      with (an instant, a card with flash), it waits: paid for and on the
+      table's log, until you counter it, cast your own instants, or let it
+      resolve. Returns the game after. */
+  async function aiCast(g0: PracticeGame, a: PlanAction, back: Mode): Promise<PracticeGame> {
+    if (!setup) return g0;
+    const card = findCard(g0, parseCardId(a.card) ?? -1)?.card;
+    // Only when you could cast something now: an instant (or flash) you can
+    // pay for with your untapped mana, or one with another way to cast it.
+    const mana = availableMana(g0, "you", setup.book);
+    const canAnswer =
+      !noAsk.current &&
+      !!card &&
+      !isLand(card) &&
+      g0.sides.you.hand.some((c) => {
+        if (!isInstantSpeed(setup.book, c)) return false;
+        const info = infoOf(setup.book, c);
+        return hasAltCost(info) || payCost(parseCost(info?.manaCost ?? null), mana) !== null;
+      });
+    if (!canAnswer) {
+      const g = applyAction(g0, "opp", a, setup.book).game;
+      setGame(g);
+      await sleep(BEAT);
+      return g;
+    }
+    const paid = applyAction(g0, "opp", a, setup.book, { stage: "pay" });
+    setGame(paid.game);
+    if (!paid.ok) {
+      await sleep(BEAT);
+      return paid.game;
+    }
+    const targetIid = a.effects.map((e) => parseCardId(e.target)).find((t) => t !== null);
+    const target = targetIid !== undefined && targetIid !== null ? findCard(paid.game, targetIid)?.card.name : undefined;
+    setPending({ action: a, card: card!, target });
+    setMode("respond");
+    const answer = await new Promise<Answer>((resolve) => (answerRef.current = resolve));
+    answerRef.current = null;
+    setPending(null);
+    setMode(back);
+    const g = answer.kind === "counter" ? answer.g : applyAction(answer.g, "opp", a, setup.book, { stage: "resolve" }).game;
+    setGame(g);
+    await sleep(BEAT);
+    return g;
+  }
+
+  /** Your answer to the opponent's spell: counter it with a counterspell
+      from your hand (cast as any spell, so the AI may counter that), or let
+      it resolve. */
+  const counterWith = (iid: number) => {
+    if (!game || !setup || !pending || !answerRef.current) return;
+    const name = findCard(game, iid)?.card.name ?? "A counterspell";
+    const cast = playerCast(game, iid, setup.book);
+    const answered = aiResponds(cast, iid, setup.book);
+    if (answered !== cast) {
+      setSay("Not so fast.");
+      answerRef.current({ kind: "resolve", g: answered });
+      return;
+    }
+    answerRef.current({ kind: "counter", g: applyAction(answered, "opp", pending.action, setup.book, { stage: "counter", by: name }).game });
+  };
+  const letResolve = () => game && answerRef.current?.({ kind: "resolve", g: game });
 
   async function runAi(g0: PracticeGame) {
     if (!setup) return;
@@ -276,9 +358,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!alive.current) return;
     if (plan.say) setSay(plan.say);
     for (const a of plan.main) {
-      g = applyAction(g, "opp", a, setup.book).game;
-      setGame(g);
-      await sleep(BEAT);
+      if (a.kind === "cast") g = await aiCast(g, a, "ai");
+      else {
+        g = applyAction(g, "opp", a, setup.book).game;
+        setGame(g);
+        await sleep(BEAT);
+      }
       if (!alive.current || g.winner) return;
     }
     const attackers = plan.attack.map(parseCardId).filter((n): n is number => n !== null);
@@ -313,9 +398,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!setup) return;
     let g = g0;
     for (const a of actions) {
-      g = applyAction(g, "opp", a, setup.book).game;
-      setGame(g);
-      await sleep(BEAT);
+      if (a.kind === "cast") g = await aiCast(g, a, "ai");
+      else {
+        g = applyAction(g, "opp", a, setup.book).game;
+        setGame(g);
+        await sleep(BEAT);
+      }
       if (!alive.current || g.winner) return;
     }
     g = endTurn(g);
@@ -334,6 +422,19 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!g.combat) {
       setMode("main");
       return;
+    }
+    setHistory([]);
+    // The AI may answer an attacker with instant removal before it blocks.
+    const removal = aiRemovalAction(g, setup.book, g.combat.attackers, "attack");
+    if (removal) {
+      setGame(g);
+      setMode("combat");
+      await sleep(BEAT);
+      setSay("Not that one.");
+      g = await aiCast(g, removal, "combat");
+      if (!alive.current || g.winner) return;
+      if (!g.combat) return setMode("main");
+      g = { ...g, combat: { ...g.combat, attackers: g.combat.attackers.filter((iid) => g.sides.you.battlefield.some((c) => c.iid === iid)) } };
     }
     g = setBlocks(g, chooseBlocks(g, setup.book), setup.book);
     setGame(g);
@@ -356,7 +457,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const seat = at.seat;
     if (seat === "you" && zone === "hand") {
       if (mode === "mulligan" && game.sides.you.toBottom > 0) act((g) => withYourSide(g, (s) => bottomCard(s, card.iid)));
-      else if (mode === "main") {
+      else if (mode === "main" || ((mode === "respond" || mode === "block") && isInstantSpeed(setup.book, card))) {
         setHandUp(false);
         cast(card.iid);
       }
@@ -683,7 +784,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           ? blocker === null
             ? "Tap one of your creatures, then the attacker it blocks."
             : "Now tap the attacker it blocks."
-          : mode === "ai"
+          : mode === "respond" && pending
+            ? `The opponent casts ${pending.card.name}${pending.target ? ` on ${pending.target}` : ""}. Answer with an instant, or let it resolve.`
+            : mode === "ai"
             ? "The opponent is playing…"
             : mode === "combat"
               ? "Combat…"
@@ -715,7 +818,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               <button type="button" className="pt-btn pt-btn-gold" onClick={() => setMode("attack")} disabled={!you.battlefield.some((c) => canAttack(game, "you", c, book))}>
                 <Swords size={14} strokeWidth={2.25} /> Attack
               </button>
-              <button type="button" className="pt-btn" onClick={endMyTurn}>
+              <button type="button" className="pt-btn" onClick={() => void endMyTurn()}>
                 End turn
               </button>
               <button type="button" className="pt-btn" onClick={undo} disabled={!history.length} aria-label="Undo">
@@ -748,11 +851,47 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               )}
             </>
           )}
+          {mode === "respond" && pending && (
+            <>
+              {you.hand
+                .filter((c, i, all) => {
+                  // One button per counterspell, however many copies you hold.
+                  if (all.findIndex((x) => x.name === c.name) !== i) return false;
+                  const k = counterOf(infoOf(book, c));
+                  const info = infoOf(book, pending.card);
+                  return !!k && k.hits({ typeLine: info?.typeLine ?? pending.card.typeLine ?? "", manaValue: info?.manaValue ?? 0, blue: isBlue(info) });
+                })
+                .map((c) => (
+                  <button key={c.iid} type="button" className="pt-btn pt-btn-gold" onClick={counterWith.bind(null, c.iid)}>
+                    Counter with {c.name}
+                  </button>
+                ))}
+              <button type="button" className="pt-btn" onClick={letResolve}>
+                Let it resolve
+              </button>
+              <button
+                type="button"
+                className="pt-btn"
+                title="The opponent's spells resolve without asking, for the rest of this game"
+                onClick={() => {
+                  noAsk.current = true;
+                  letResolve();
+                }}
+              >
+                Don&apos;t ask again
+              </button>
+            </>
+          )}
           {mode === "over" && (
             <>
               <button type="button" className="pt-btn pt-btn-gold" onClick={() => lastOpponent.current && void start(lastOpponent.current)}>
                 Play again
               </button>
+              {opp.hand.length > 0 && (
+                <button type="button" className="pt-btn" onClick={() => setPile({ seat: "opp", zone: "hand" })}>
+                  Its hand ({opp.hand.length})
+                </button>
+              )}
               <button type="button" className="pt-btn" onClick={() => (setGame(null), setSetup(null), setMode("pick"))}>
                 Another opponent
               </button>
@@ -1055,6 +1194,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         <div className="pt-over">
           <div className="id-display">{game.winner === "you" ? "You win!" : "The opponent wins"}</div>
           <p>{game.log.at(-1)?.text}</p>
+          {opp.hand.length > 0 && <p className="pt-over-hand">It was holding {opp.hand.map((c) => c.name).join(", ")}.</p>}
         </div>
       )}
     </div>
