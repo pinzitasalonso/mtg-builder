@@ -10,7 +10,7 @@
 
 import { draw, faceUpType, moveCard, resolvesToGraveyard, type PlayCard, type PlaytestState, type Shuffle, type Zone } from "../playtest";
 import { shuffled } from "../probability";
-import { canPlayAsLand, counterOf, entersTapped, fetchOf, has, hasAltCost, infoOf, isBlue, isCreature, isLand, isSick, manaOutput, shockLife, stats, type SearchAbility } from "./cards";
+import { canPlayAsLand, counterOf, entersTapped, fetchOf, has, hasAltCost, infoOf, isBlue, isCreature, isLand, isSick, manaOutput, removalOf, shockLife, stats, type SearchAbility } from "./cards";
 import { manaSources, parseCost, payCost, poolSources, totalOf, type Source } from "./mana";
 import { other, type CardBook, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
@@ -346,7 +346,17 @@ export function castable(g: PracticeGame, seat: Seat, card: PlayCard, book: Card
   return payCost(cost, availableMana(g, seat, book)) !== null;
 }
 
-export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, book: CardBook): Step {
+/** A cast in stages, so the player can answer it: "pay" pays and announces
+    it (the card waits where it is), then "resolve" carries it out or
+    "counter" sends it to the graveyard (a commander to the command zone).
+    Without a stage, a cast does both at once. */
+export interface CastStage {
+  stage?: "pay" | "resolve" | "counter";
+  /** "counter": what countered it, for the log. */
+  by?: string;
+}
+
+export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, book: CardBook, opts: CastStage = {}): Step {
   if (g0.winner) return { game: g0, ok: false };
   const iid = parseCardId(action.card);
   const at = iid === null ? null : findCard(g0, iid);
@@ -374,6 +384,15 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   if (action.kind === "cast") {
     if (at.zone !== "hand" && at.zone !== "command") return fail(`(The opponent tried to cast ${card.name} from its ${at.zone}.)`);
     if (isLand(card)) return fail(`(The opponent tried to cast the land ${card.name}.)`);
+    if (opts.stage === "counter") {
+      moveTo(g, card.iid, card.commander ? "command" : "graveyard");
+      say(g, other(seat), `${opts.by ?? "A counterspell"} counters ${card.name}.`);
+      return { game: g, ok: true };
+    }
+    if (opts.stage === "resolve") {
+      resolveCast(g, seat, card, action, book);
+      return { game: g, ok: true };
+    }
     const cost = parseCost(info?.manaCost ?? null);
     if (at.zone === "command") cost.generic += 2 * g.tax[seat];
     const sources = availableMana(g, seat, book);
@@ -383,15 +402,11 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     if (paid.life) g.sides[seat] = { ...g.sides[seat], life: g.sides[seat].life - paid.life };
     if (at.zone === "command") g.tax[seat] += 1;
     const x = cost.xCount ? ` (X = ${action.x ?? 0})` : "";
-    say(g, seat, `${who(seat)} casts ${card.name}${x}.`, card);
-    if (resolvesToGraveyard(card.typeLine)) {
-      applyEffects(g, seat, action.effects, book, card.name);
-      moveTo(g, card.iid, "graveyard");
-    } else {
-      moveTo(g, card.iid, "battlefield");
-      applyEffects(g, seat, action.effects, book, card.name);
-    }
-    checkState(g, book);
+    const target = action.effects.map((e) => parseCardId(e.target)).find((t) => t !== null);
+    const on = target !== undefined && target !== null ? findCard(g, target)?.card.name : undefined;
+    say(g, seat, `${who(seat)} casts ${card.name}${x}${on ? ` on ${on}` : ""}.`, card);
+    if (opts.stage === "pay") return { game: g, ok: true };
+    resolveCast(g, seat, card, action, book);
     return { game: g, ok: true };
   }
 
@@ -592,6 +607,61 @@ export function playerUseSearch(g0: PracticeGame, iid: number, ability: SearchAb
   if (ability.sacrifice) moveTo(g, iid, "graveyard");
   say(g, "you", `You ${ability.sacrifice ? "sacrifice" : "use"} ${at.card.name}${ability.life ? ` and pay ${ability.life} life` : ""} to search your library.`);
   return g;
+}
+
+/** A paid-for cast takes effect: a permanent enters, a spell resolves. */
+function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAction, book: CardBook) {
+  if (resolvesToGraveyard(card.typeLine)) {
+    applyEffects(g, seat, action.effects, book, card.name);
+    moveTo(g, card.iid, "graveyard");
+  } else {
+    moveTo(g, card.iid, "battlefield");
+    applyEffects(g, seat, action.effects, book, card.name);
+  }
+  checkState(g, book);
+}
+
+/** On your turn, the AI may answer one of your creatures with an instant
+    from its hand (Swords to Plowshares, Lightning Bolt, Into the Roil):
+    an attacker when you attack, or your biggest threat at the end of your
+    turn. Returns the cast, as an action for the table to play out (and for
+    you to answer), or null when nothing is worth it or payable. */
+export function aiRemovalAction(g: PracticeGame, book: CardBook, targets: number[], when: "attack" | "end"): PlanAction | null {
+  const opp = g.sides.opp;
+  const options = opp.hand.flatMap((c) => {
+    const r = removalOf(infoOf(book, c));
+    return r ? [{ c, r }] : [];
+  });
+  if (!options.length) return null;
+  const sources = availableMana(g, "opp", book);
+  const affordable = options
+    .filter(({ c }) => payCost(parseCost(infoOf(book, c)?.manaCost ?? null), sources) !== null)
+    .sort((a, b) => (infoOf(book, a.c)?.manaValue ?? 0) - (infoOf(book, b.c)?.manaValue ?? 0));
+  if (!affordable.length) return null;
+  const attacking = new Set(g.combat?.attackers ?? []);
+  const creatures = targets
+    .map((iid) => g.sides.you.battlefield.find((c) => c.iid === iid))
+    .filter((c): c is PlayCard => !!c && isCreature(book, c));
+  const incoming = when === "attack" ? creatures.reduce((n, c) => n + stats(book, c).power, 0) : 0;
+  const worth = (c: PlayCard) => stats(book, c).power >= (when === "attack" ? 3 : 4) || c.commander || (when === "attack" && incoming >= opp.life);
+  const ranked = creatures.filter(worth).sort((a, b) => stats(book, b).power - stats(book, a).power || (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0));
+  for (const target of ranked) {
+    const s = stats(book, target);
+    const tInfo = infoOf(book, target);
+    const fit = affordable.find(({ r }) => {
+      if (r.attackingOnly && !attacking.has(target.iid)) return false;
+      if (r.notColor && new RegExp(`\\{[^}]*${r.notColor}[^}]*\\}`).test(tInfo?.manaCost ?? "")) return false;
+      if (r.notType && new RegExp(`\\b${r.notType}\\b`, "i").test(tInfo?.typeLine ?? target.typeLine ?? "")) return false;
+      if (r.kind === "destroy" && has(book, target, "Indestructible")) return false;
+      if (r.kind === "damage" && (has(book, target, "Indestructible") || r.amount < s.toughness - (target.damage ?? 0))) return false;
+      return true;
+    });
+    if (!fit) continue;
+    const effect: Effect = { type: fit.r.kind === "damage" ? "damage" : fit.r.kind, target: cardId(target.iid), player: null, amount: fit.r.amount || null, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: null };
+    const rider: Effect[] = fit.r.rider ? [{ ...effect, type: "note", target: null, amount: null, text: fit.r.rider }] : [];
+    return { kind: "cast", card: cardId(fit.c.iid), x: null, tap_card: null, sacrifice_card: null, mana: null, life: null, effects: [effect, ...rider] };
+  }
+  return null;
 }
 
 const seatOf = (caster: Seat, p: "ai" | "player" | null): Seat => (p === "player" ? "you" : p === "ai" ? "opp" : caster);

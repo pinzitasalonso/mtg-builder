@@ -122,6 +122,20 @@ side does.
    - Token makes Treasures, Food, Clues and creature tokens (a Treasure pays
      mana); any creature's ⋯ menu adds +1/+1 or -1/-1 counters.
 
+   **Answering each other.** The opponent's casts are staged (`applyAction`
+   with `stage`: "pay", then "resolve" or "counter"). When it casts a spell
+   and you could answer (an instant or flash card you can pay for, or one
+   with another way to cast it), the table pauses: "Counter with X" for each
+   counterspell in your hand that can hit it, your other instants castable
+   from your hand, or "Let it resolve"; "Don't ask again" stops the pauses
+   for the game. On your turn the AI answers too, beyond counters
+   (`aiRemovalAction`): instant removal (destroy, exile, return to hand,
+   damage: `removalOf`) at your biggest attacker (power 3+, or everything
+   when the attack is lethal) before it blocks, and at your biggest threat
+   (power 4+, or your commander) at the end of your turn; you can answer
+   that the same way. When the game ends, the banner names what it held and
+   "Its hand" shows the cards.
+
    Where there's room (a wide screen, or a phone held sideways) a column
    runs the full height beside the board and the hand: the opponent's
    table talk, **Last played** (the latest spells cast by either side, like

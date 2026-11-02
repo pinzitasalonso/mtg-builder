@@ -268,5 +268,44 @@ export function searchAbility(info: CardInfo | undefined): SearchAbility | null 
   return null;
 }
 
+/** Can be cast on the other player's turn: an instant, or a card with flash. */
+export function isInstantSpeed(book: CardBook, card: PlayCard): boolean {
+  if (card.token || isLand(card)) return false;
+  const info = infoOf(book, card);
+  return /\bInstant\b/.test(frontType(info?.typeLine ?? card.typeLine)) || !!info?.keywords.some((k) => k.toLowerCase() === "flash");
+}
+
+/** An instant that removes a creature: destroy, exile, return to hand, or
+    damage. What it may target, and what else it does (for the log). */
+export interface Removal {
+  kind: "destroy" | "exile" | "bounce" | "damage";
+  amount: number;
+  attackingOnly: boolean;
+  /** "nonblack": not this colour; "nonartifact": not this type. */
+  notColor: string | null;
+  notType: string | null;
+  rider: string;
+}
+export function removalOf(info: CardInfo | undefined): Removal | null {
+  if (!info || !/\bInstant\b/.test(frontType(info.typeLine))) return null;
+  const text = frontText(info);
+  const kill = /\b(destroy|exile) target (attacking |tapped )?(?:non(\w+) )?creature\b(?! card)/i.exec(text);
+  const burn = /\bdeals? (\d+) damage to (any target|target creature|target attacking creature|target creature or planeswalker)\b/i.exec(text);
+  const bounce = /\breturn target (attacking )?(?:creature|nonland permanent|permanent) to its owner's hand\b/i.exec(text);
+  const m = kill ?? burn ?? bounce;
+  if (!m) return null;
+  const not = kill?.[3]?.toLowerCase() ?? null;
+  const pip = not ? COLOR_PIP[not] : undefined;
+  const after = text.slice(m.index + m[0].length).replace(/^[^.]*\.\s*/, "");
+  return {
+    kind: kill ? (kill[1]!.toLowerCase() as "destroy" | "exile") : burn ? "damage" : "bounce",
+    amount: burn ? Number(burn[1]) : 0,
+    attackingOnly: /attacking/i.test((kill?.[2] ?? "") + (burn?.[2] ?? "") + (bounce?.[1] ?? "")),
+    notColor: pip ?? null,
+    notType: not && !pip ? not : null,
+    rider: /^its controller\b/i.test(after) ? after.split(/(?<=\.)\s/)[0]! : "",
+  };
+}
+
 /** Blue, by its mana cost (hybrid and phyrexian count). */
 export const isBlue = (info: CardInfo | undefined) => /\{[^}]*U[^}]*\}/.test(info?.manaCost ?? "");
