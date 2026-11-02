@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { chooseBlocks, aiMulligan, fallbackPlan } from "./ai";
-import { counterOf, fetchOf, manaOutput } from "./cards";
+import { counterOf, fetchOf, isCreature, manaOutput, searchAbility, searchOnCast } from "./cards";
 import {
+  addCounters,
   aiResponds,
   applyAction,
+  createTokens,
+  finishSearch,
+  playerCast,
+  playerFind,
   cardId,
   declareAttackers,
   endTurn,
@@ -543,5 +548,127 @@ describe("modal cards with a land back", () => {
     const g0 = table({ oppHand: [SKULL, "Mountain"] });
     const plan = fallbackPlan(g0, BOOK);
     expect(plan.main[0]).toMatchObject({ kind: "land", card: cardId(iidOf(g0, "opp", "Mountain", "hand")) });
+  });
+});
+
+describe("tokens and counters by hand", () => {
+  it("makes a Treasure: an artifact, not a creature, that pays one mana of any colour and is used up", () => {
+    const g0 = { ...table({ youHand: ["Hill Giant"] }), active: "you" as const };
+    const g = createTokens(g0, "you", { name: "Treasure", power: 0, toughness: 0, keywords: [], kind: "artifact" }, 2);
+    const treasures = g.sides.you.battlefield.filter((c) => c.name === "Treasure");
+    expect(treasures).toHaveLength(2);
+    expect(isCreature(BOOK, treasures[0]!)).toBe(false);
+    expect(g.log.at(-1)!.text).toBe("You create 2 Treasure tokens.");
+    expect(manaSources(g.sides.you, BOOK, g.turn).map((s) => s.sacrifice)).toEqual([true, true]);
+  });
+
+  it("makes creature tokens with their stats", () => {
+    const g = createTokens(table(), "you", { name: "Spirit", power: 1, toughness: 1, keywords: ["Flying"], kind: "creature" });
+    const t = g.sides.you.battlefield.find((c) => c.name === "Spirit")!;
+    expect(isCreature(BOOK, t)).toBe(true);
+    expect(g.log.at(-1)!.text).toBe("You create a Spirit token (1/1).");
+  });
+
+  it("puts +1/+1 and -1/-1 counters on a creature; at 0 toughness it dies", () => {
+    const g0 = table({ youField: ["Grizzly Bears"] });
+    const bear = iidOf(g0, "you", "Grizzly Bears");
+    let g = addCounters(g0, bear, 2, BOOK);
+    expect(g.sides.you.battlefield.find((c) => c.iid === bear)!.counters).toBe(2);
+    expect(g.log.at(-1)!.text).toBe("Grizzly Bears gets 2 +1/+1 counters.");
+    g = addCounters(g0, bear, -2, BOOK);
+    expect(g.sides.you.graveyard.map((c) => c.name)).toContain("Grizzly Bears");
+  });
+});
+
+describe("your casts are tapped for", () => {
+  const yours = (o: Parameters<typeof table>[0]) => ({ ...table(o), active: "you" as const });
+
+  it("taps the lands a spell needs, and only those", () => {
+    const g0 = yours({ youHand: ["Grizzly Bears"], youField: ["Forest", "Forest", "Forest"] });
+    const g = playerCast(g0, iidOf(g0, "you", "Grizzly Bears", "hand"), BOOK);
+    expect(g.sides.you.battlefield.filter((c) => c.name === "Forest" && c.tapped)).toHaveLength(2);
+    expect(g.sides.you.battlefield.map((c) => c.name)).toContain("Grizzly Bears");
+    expect(g.log.map((l) => l.text)).toContain("You tap Forest, Forest for Grizzly Bears.");
+  });
+
+  it("uses a land before a Treasure, and the Treasure when it must", () => {
+    let g0: PracticeGame = yours({ youHand: ["Hill Giant"], youField: ["Forest", "Forest", "Forest"] });
+    g0 = createTokens(g0, "you", { name: "Treasure", power: 0, toughness: 0, keywords: [], kind: "artifact" });
+    const g = playerCast(g0, iidOf(g0, "you", "Hill Giant", "hand"), BOOK);
+    expect(g.sides.you.battlefield.some((c) => c.name === "Treasure")).toBe(false);
+    expect(g.sides.you.battlefield.filter((c) => c.name === "Forest" && c.tapped)).toHaveLength(3);
+    expect(g.log.map((l) => l.text)).toEqual(expect.arrayContaining(["You tap Forest, Forest, Forest for Hill Giant.", "You sacrifice Treasure for mana."]));
+  });
+
+  it("leaves it to you when you can't pay, or the card has another way to be cast", () => {
+    let g0: PracticeGame = yours({ youHand: ["Hill Giant"], youField: ["Forest"] });
+    let g = playerCast(g0, iidOf(g0, "you", "Hill Giant", "hand"), BOOK);
+    expect(g.sides.you.battlefield.find((c) => c.name === "Forest")!.tapped).toBe(false);
+    expect(g.log.map((l) => l.text)).toContain("(Not enough untapped mana for Hill Giant: tap what you use by hand.)");
+    g0 = yours({ youHand: ["Force of Will"], youField: ["Island", "Island", "Island", "Island", "Island"] });
+    g = playerCast(g0, iidOf(g0, "you", "Force of Will", "hand"), BOOK);
+    expect(g.sides.you.battlefield.every((c) => !c.tapped)).toBe(true);
+  });
+
+  it("counts commander tax from the command zone", () => {
+    let g0 = newGame({ you: { cards: deck("Commander Guy", ...Array(10).fill("Forest")), commander: "Commander Guy" }, opp: { cards: deck(...Array(10).fill("Island")) }, commanderGame: true, first: "you", shuffle: keep });
+    const forests = g0.sides.you.hand.filter((c) => c.name === "Forest").slice(0, 3);
+    g0 = { ...g0, tax: { you: 1, opp: 0 }, sides: { ...g0.sides, you: { ...g0.sides.you, hand: g0.sides.you.hand.filter((c) => !forests.includes(c)), battlefield: forests } } };
+    const g = playerCast(g0, iidOf(g0, "you", "Commander Guy", "command"), BOOK);
+    expect(g.sides.you.battlefield.filter((c) => c.name === "Forest" && c.tapped)).toHaveLength(3);
+  });
+});
+
+describe("searches", () => {
+  const card = (name: string, typeLine: string, manaCost: string, oracleText: string, o: Partial<CardInfo> = {}) => info(name, { typeLine, manaCost, oracleText, ...o });
+
+  it("reads tutors: what they find and where it goes", () => {
+    const demonic = searchOnCast(card("Demonic Tutor", "Sorcery", "{1}{B}", "Search your library for a card, put that card into your hand, then shuffle."))!;
+    expect(demonic).toMatchObject({ count: 1, what: "card", to: [{ zone: "hand" }] });
+    expect(demonic.test("Creature — Elf", undefined)).toBe(true);
+    const mystical = searchOnCast(card("Mystical Tutor", "Instant", "{U}", "Search your library for an instant or sorcery card, reveal it, then shuffle and put that card on top."))!;
+    expect(mystical.to).toEqual([{ zone: "top" }]);
+    expect(mystical.test("Sorcery", undefined)).toBe(true);
+    expect(mystical.test("Creature — Elf", undefined)).toBe(false);
+    const growth = searchOnCast(card("Rampant Growth", "Sorcery", "{1}{G}", "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle."))!;
+    expect(growth.to).toEqual([{ zone: "battlefield", tapped: true }]);
+    expect(growth.test("Basic Land — Forest", undefined)).toBe(true);
+    expect(growth.test("Land — Forest Island", undefined)).toBe(false);
+    const cultivate = searchOnCast(card("Cultivate", "Sorcery", "{2}{G}", "Search your library for up to two basic land cards, reveal those cards, put one onto the battlefield tapped and the other into your hand, then shuffle."))!;
+    expect(cultivate).toMatchObject({ count: 2, to: [{ zone: "battlefield", tapped: true }, { zone: "hand" }] });
+    const farseek = searchOnCast(card("Farseek", "Sorcery", "{1}{G}", "Search your library for a Plains, Island, Swamp, or Mountain card, put it onto the battlefield tapped, then shuffle."))!;
+    expect(farseek.test("Land — Island Mountain", undefined)).toBe(true);
+    expect(farseek.test("Basic Land — Forest", undefined)).toBe(false);
+    const scroll = searchOnCast(card("Merchant Scroll", "Sorcery", "{1}{U}", "Search your library for a blue instant card, reveal that card, put it into your hand, then shuffle."))!;
+    expect(scroll.test("Instant", BOOK["counterspell"])).toBe(true);
+    expect(scroll.test("Instant", BOOK["lightning bolt"])).toBe(false);
+  });
+
+  it("a creature's search when it enters, with a limit; not an activated ability, nor someone else's library", () => {
+    const recruiter = searchOnCast(card("Imperial Recruiter", "Creature — Human Advisor", "{2}{R}", "When Imperial Recruiter enters, search your library for a creature card with power 2 or less, reveal it, put it into your hand, then shuffle."))!;
+    expect(recruiter.test("Creature — Bear", info("Grizzly Bears", { power: 2 }))).toBe(true);
+    expect(recruiter.test("Creature — Giant", info("Hill Giant", { power: 3 }))).toBe(false);
+    const elder = card("Sakura-Tribe Elder", "Creature — Snake Shaman", "{1}{G}", "Sacrifice Sakura-Tribe Elder: Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle.");
+    expect(searchOnCast(elder)).toBeNull();
+    expect(searchAbility(elder)).toMatchObject({ sacrifice: true, tap: false, life: 0, to: [{ zone: "battlefield", tapped: true }] });
+    expect(searchOnCast(card("Path to Exile", "Instant", "{W}", "Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle."))).toBeNull();
+  });
+
+  it("reads a fetch land as an ability: tap, 1 life, sacrifice", () => {
+    const tarn = searchAbility(BOOK["scalding tarn"])!;
+    expect(tarn).toMatchObject({ tap: true, sacrifice: true, life: 1, mana: null, to: [{ zone: "battlefield", tapped: false }] });
+    expect(tarn.test("Land — Island Mountain", undefined)).toBe(true);
+    expect(tarn.test("Basic Land — Forest", undefined)).toBe(false);
+  });
+
+  it("finds to your hand, then shuffles and puts what goes on top there", () => {
+    const g0 = { ...table({ youField: ["Forest"] }), active: "you" as const };
+    const lib = g0.sides.you.library;
+    let g = playerFind(g0, lib[0]!.iid, "hand");
+    expect(g.sides.you.hand.map((c) => c.iid)).toContain(lib[0]!.iid);
+    const top = g.sides.you.library[3]!.iid;
+    g = finishSearch(g, [top]);
+    expect(g.sides.you.library[0]!.iid).toBe(top);
+    expect(g.log.at(-1)!.text).toBe("You shuffle your library.");
   });
 });

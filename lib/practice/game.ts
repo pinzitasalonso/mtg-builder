@@ -10,8 +10,8 @@
 
 import { draw, faceUpType, moveCard, resolvesToGraveyard, type PlayCard, type PlaytestState, type Shuffle, type Zone } from "../playtest";
 import { shuffled } from "../probability";
-import { canPlayAsLand, counterOf, entersTapped, fetchOf, has, infoOf, isBlue, isCreature, isLand, isSick, manaOutput, shockLife, stats } from "./cards";
-import { manaSources, parseCost, payCost, poolSources, type Source } from "./mana";
+import { canPlayAsLand, counterOf, entersTapped, fetchOf, has, hasAltCost, infoOf, isBlue, isCreature, isLand, isSick, manaOutput, shockLife, stats, type SearchAbility } from "./cards";
+import { manaSources, parseCost, payCost, poolSources, totalOf, type Source } from "./mana";
 import { other, type CardBook, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
@@ -471,6 +471,129 @@ export function aiResponds(g0: PracticeGame, iid: number, book: CardBook): Pract
   return g0;
 }
 
+// ── Tokens and counters (either side, from the table's menus) ──────────
+
+/** Tokens that are artifacts, not creatures. */
+const ARTIFACT_TOKENS = /^(treasure|food|clue|gold|blood|map|powerstone|junk|shard|incubator)$/i;
+
+export interface TokenSpec {
+  name: string;
+  power: number;
+  toughness: number;
+  keywords: string[];
+  kind: "creature" | "artifact";
+  tapped?: boolean;
+}
+
+function addTokens(g: PracticeGame, seat: Seat, spec: TokenSpec, count: number) {
+  for (let i = 0; i < Math.max(1, Math.min(20, count)); i++) {
+    const token: PlayCard = {
+      iid: g.nextIid++,
+      name: spec.name.slice(0, 40) || "Token",
+      imageUri: "",
+      typeLine: spec.kind === "artifact" ? `Token Artifact — ${spec.name}` : `Token Creature — ${spec.name}`,
+      tapped: !!spec.tapped,
+      commander: false,
+      enteredTurn: g.turn,
+      token: {
+        power: Math.max(0, Math.min(99, Math.floor(spec.power))),
+        toughness: Math.max(spec.kind === "artifact" ? 0 : 1, Math.min(99, Math.floor(spec.toughness))),
+        keywords: spec.keywords.slice(0, 6).map((k) => k.slice(0, 30)),
+        kind: spec.kind,
+      },
+    };
+    g.sides[seat] = { ...g.sides[seat], battlefield: [...g.sides[seat].battlefield, token] };
+  }
+}
+
+/** Tokens a player makes by hand (a Treasure, a 1/1 Soldier…). */
+export function createTokens(g0: PracticeGame, seat: Seat, spec: TokenSpec, count = 1): PracticeGame {
+  const g = structuredClone(g0);
+  const n = Math.max(1, Math.min(20, Math.floor(count)));
+  addTokens(g, seat, spec, n);
+  const stats = spec.kind === "artifact" ? "" : ` (${spec.power}/${spec.toughness})`;
+  say(g, seat, `${seat === "you" ? "You create" : "The opponent creates"} ${n === 1 ? "a" : n} ${spec.name} token${n === 1 ? "" : "s"}${stats}.`);
+  return g;
+}
+
+/** Put counters on a creature: +1/+1 (n > 0) or -1/-1 (n < 0). */
+export function addCounters(g0: PracticeGame, iid: number, n: number, book: CardBook): PracticeGame {
+  const at = findCard(g0, iid);
+  if (!at || at.zone !== "battlefield" || !n) return g0;
+  const g = structuredClone(g0);
+  update(g, iid, (c) => ({ ...c, counters: (c.counters ?? 0) + n }));
+  say(g, at.seat, `${at.card.name} gets ${Math.abs(n) === 1 ? "a" : Math.abs(n)} ${n > 0 ? "+1/+1" : "-1/-1"} counter${Math.abs(n) === 1 ? "" : "s"}.`);
+  checkState(g, book);
+  return g;
+}
+
+// ── Your casts, paid for you; your searches ─────────────────────────────
+
+/** You cast a card: the mana it needs is tapped for you first (lands, then
+    one-shot sources like a Treasure), then it's played as by hand. A card
+    with another way to cast it (Force of Will) isn't tapped for, nor one you
+    can't pay for (tap by hand); X is left to you. Undo puts it all back. */
+export function playerCast(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
+  const at = findCard(g0, iid);
+  if (!at || at.seat !== "you" || (at.zone !== "hand" && at.zone !== "command")) return g0;
+  if (isLand(at.card) || g0.winner) return playerPlay(g0, iid);
+  const info = infoOf(book, at.card);
+  const cost = parseCost(info?.manaCost ?? null);
+  if (at.zone === "command") cost.generic += 2 * g0.tax.you;
+  if (hasAltCost(info) || totalOf(cost) === 0) return playerPlay(g0, iid);
+  const g = structuredClone(g0);
+  const sources = availableMana(g, "you", book);
+  const paid = payCost(cost, sources, { x: 0 });
+  if (!paid) {
+    say(g, "you", `(Not enough untapped mana for ${at.card.name}: tap what you use by hand.)`);
+    return playerPlay(g, iid);
+  }
+  // The tapped ones by name; a one-shot source (a Treasure) logs its own sacrifice.
+  const names = paid.tap.filter((t) => t > 0 && !sources.find((x) => x.iid === t)?.sacrifice).map((t) => findCard(g, t)?.card.name ?? "");
+  if (names.length || paid.life) say(g, "you", `You ${names.length ? `tap ${names.join(", ")}` : ""}${names.length && paid.life ? " and " : ""}${paid.life ? `pay ${paid.life} life` : ""} for ${at.card.name}${cost.xCount ? " (tap for X by hand)" : ""}.`);
+  spend(g, "you", paid.tap, sources);
+  if (paid.life) g.sides.you = { ...g.sides.you, life: g.sides.you.life - paid.life };
+  return playerPlay(g, iid);
+}
+
+/** One find of a search: from your library to your hand or the
+    battlefield. ("On top" waits for finishSearch, after the shuffle.) */
+export function playerFind(g0: PracticeGame, iid: number, to: "hand" | "battlefield", tapped = false): PracticeGame {
+  const at = findCard(g0, iid);
+  if (!at || at.seat !== "you" || at.zone !== "library") return g0;
+  const g = structuredClone(g0);
+  moveTo(g, iid, to, { tapped });
+  say(g, "you", `You find ${at.card.name}${to === "hand" ? " (to your hand)" : ""}.`);
+  return g;
+}
+
+/** The end of a search: shuffle your library, then put what goes on top there. */
+export function finishSearch(g0: PracticeGame, onTop: number[] = []): PracticeGame {
+  const g = structuredClone(g0);
+  g.sides.you = { ...g.sides.you, library: shuffled(g.sides.you.library) };
+  for (const iid of onTop) {
+    const at = findCard(g, iid);
+    if (!at || at.zone !== "library") continue;
+    g.sides.you = { ...g.sides.you, library: [at.card, ...g.sides.you.library.filter((c) => c.iid !== iid)] };
+    say(g, "you", `You put ${at.card.name} on top of your library.`);
+  }
+  say(g, "you", `You shuffle your library.`);
+  return g;
+}
+
+/** Use a permanent's search ability (crack a fetch land): its tap, life and
+    sacrifice are paid here; a mana cost you pay by hand. The search follows. */
+export function playerUseSearch(g0: PracticeGame, iid: number, ability: SearchAbility): PracticeGame {
+  const at = findCard(g0, iid);
+  if (!at || at.seat !== "you" || at.zone !== "battlefield") return g0;
+  const g = structuredClone(g0);
+  if (ability.tap) update(g, iid, (c) => ({ ...c, tapped: true }));
+  if (ability.life) g.sides.you = { ...g.sides.you, life: g.sides.you.life - ability.life };
+  if (ability.sacrifice) moveTo(g, iid, "graveyard");
+  say(g, "you", `You ${ability.sacrifice ? "sacrifice" : "use"} ${at.card.name}${ability.life ? ` and pay ${ability.life} life` : ""} to search your library.`);
+  return g;
+}
+
 const seatOf = (caster: Seat, p: "ai" | "player" | null): Seat => (p === "player" ? "you" : p === "ai" ? "opp" : caster);
 
 function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: CardBook, source: string) {
@@ -548,20 +671,9 @@ function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: Ca
         const s = seatOf(caster, e.player);
         const count = Math.max(1, Math.min(10, Math.floor(e.amount ?? 1)));
         const name = (e.name ?? "Token").slice(0, 40);
-        for (let i = 0; i < count; i++) {
-          const token: PlayCard = {
-            iid: g.nextIid++,
-            name,
-            imageUri: "",
-            typeLine: "Token Creature",
-            tapped: !!e.tapped,
-            commander: false,
-            enteredTurn: g.turn,
-            token: { power: Math.max(0, e.power ?? 1), toughness: Math.max(1, e.toughness ?? 1), keywords: e.keywords.slice(0, 6) },
-          };
-          g.sides[s] = { ...g.sides[s], battlefield: [...g.sides[s].battlefield, token] };
-        }
-        say(g, caster, `${source} makes ${count} ${name} token${count === 1 ? "" : "s"} (${e.power ?? 1}/${e.toughness ?? 1}).`);
+        const artifact = ARTIFACT_TOKENS.test(name) || (e.power === null && e.toughness === null);
+        addTokens(g, s, { name, power: e.power ?? 1, toughness: e.toughness ?? 1, keywords: e.keywords, kind: artifact ? "artifact" : "creature", tapped: !!e.tapped }, count);
+        say(g, caster, `${source} makes ${count} ${name} token${count === 1 ? "" : "s"}${artifact ? "" : ` (${e.power ?? 1}/${e.toughness ?? 1})`}.`);
         break;
       }
       case "counters": {

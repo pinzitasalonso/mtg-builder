@@ -2,16 +2,23 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bot, Loader2, Swords, Undo2, X } from "lucide-react";
+import { Bot, Loader2, Plus, Swords, Undo2, X } from "lucide-react";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
-import { infoOf, isCreature, isLand, stats } from "@/lib/practice/cards";
+import { infoOf, isCreature, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
 import {
+  addCounters,
   adjustLife,
   aiResponds,
+  createTokens,
+  finishSearch,
+  playerCast,
+  playerFind,
+  playerUseSearch,
+  type TokenSpec,
   applyAction,
   canAttack,
   canBlock,
@@ -21,7 +28,6 @@ import {
   moveAnyCard,
   newGame,
   parseCardId,
-  playerPlay,
   resolveCombat,
   setBlocks,
   startTurn,
@@ -89,6 +95,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const [zoom, setZoom] = useState<Zoom | null>(null);
   const [pile, setPile] = useState<{ seat: Seat; zone: "graveyard" | "exile" | "library" } | null>(null);
   const [logOpen, setLogOpen] = useState(false);
+  const [tokenOpen, setTokenOpen] = useState(false);
+  // A search of your library under way (a tutor you cast, a fetch you
+  // cracked): what it may find, how many found, and what goes on top.
+  const [search, setSearch] = useState<{ source: string; spec: Search; found: number; top: number[] } | null>(null);
   // A phone held sideways: whether the hand is raised over the board.
   const [handUp, setHandUp] = useState(false);
   const lastOpponent = useRef<OpponentOption | null>(null);
@@ -201,13 +211,19 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const castStep =
     (iid: number): Step =>
     (g) => {
-      const played = playerPlay(g, iid);
-      if (played === g) return g;
+      const card = findCard(g, iid)?.card;
+      // The mana it needs is tapped for you (Undo puts it back).
+      const played = playerCast(g, iid, book);
+      if (played === g || !card) return g;
       const answered = aiResponds(played, iid, book);
       if (answered !== played) {
         setSay("Not so fast.");
         setAiNote("");
+        return answered;
       }
+      // A tutor, or a creature that searches as it enters: the search opens.
+      const spec = searchOnCast(infoOf(book, card));
+      if (spec) setSearch({ source: card.name, spec, found: 0, top: [] });
       return answered;
     };
   const cast = (iid: number) => act(castStep(iid));
@@ -385,9 +401,17 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
 
   const optionsFor = (card: PlayCard, zone: Zone, seat: Seat): { label: string; step: Step }[] => {
     const to = (z: Zone, bottom = false): Step => (g) => moveAnyCard(g, card.iid, z, { bottom });
+    const counters: { label: string; step: Step }[] =
+      zone === "battlefield" && isCreature(book, card)
+        ? [
+            { label: "+1/+1 counter", step: (g) => addCounters(g, card.iid, 1, book) },
+            { label: "−1/−1 counter", step: (g) => addCounters(g, card.iid, -1, book) },
+          ]
+        : [];
     if (seat === "opp") {
       if (zone !== "battlefield") return [];
       return [
+        ...counters,
         { label: card.tapped ? "Untap" : "Tap", step: (g) => tapToggle(g, card.iid) },
         { label: "Destroy", step: to("graveyard") },
         { label: "Exile", step: to("exile") },
@@ -397,6 +421,18 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const out: { label: string; step: Step }[] = [];
     if (zone === "hand" || zone === "command") out.push({ label: "Play", step: castStep(card.iid) });
     if (zone === "battlefield") out.push({ label: card.tapped ? "Untap" : "Tap", step: (g) => tapToggle(g, card.iid) });
+    out.push(...counters);
+    // A search it can do (crack a fetch land, Evolving Wilds, Sakura-Tribe Elder).
+    const ability = zone === "battlefield" ? searchAbility(infoOf(book, card)) : null;
+    if (ability && !(ability.tap && card.tapped)) {
+      out.unshift({
+        label: `Search for ${/^[aeiou]/i.test(ability.what) ? "an" : "a"} ${ability.what}${ability.mana ? ` (pay ${ability.mana})` : ""}`,
+        step: (g) => {
+          setSearch({ source: card.name, spec: ability, found: 0, top: [] });
+          return playerUseSearch(g, card.iid, ability);
+        },
+      });
+    }
     if (zone !== "battlefield" && zone !== "hand") out.push({ label: "Put onto battlefield", step: to("battlefield") });
     if (zone !== "hand") out.push({ label: "Return to hand", step: to("hand") });
     if (zone !== "graveyard") out.push({ label: zone === "hand" ? "Discard" : "Graveyard", step: to("graveyard") });
@@ -727,6 +763,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               <Loader2 size={14} className="spin" /> {mode === "ai" ? "Opponent's turn" : "Combat"}
             </span>
           )}
+          {(mode === "main" || mode === "block") && (
+            <button type="button" className="pt-btn" onClick={() => setTokenOpen(true)}>
+              <Plus size={14} strokeWidth={2.5} /> Token
+            </button>
+          )}
           <button type="button" className="pt-btn" onClick={() => setLogOpen(true)}>
             Log
           </button>
@@ -940,6 +981,64 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         </Panel>
       )}
 
+      {tokenOpen && (
+        <Panel title="Create a token" onClose={() => setTokenOpen(false)}>
+          <TokenMaker
+            onCreate={(spec, count) => {
+              act((g) => createTokens(g, "you", spec, count));
+              setTokenOpen(false);
+            }}
+          />
+        </Panel>
+      )}
+
+      {search &&
+        (() => {
+          const { spec } = search;
+          const left = spec.count - search.found;
+          const dest = spec.to[Math.min(search.found, spec.to.length - 1)]!;
+          const where = dest.zone === "hand" ? "into your hand" : dest.zone === "top" ? "on top of your library, after the shuffle" : `onto the battlefield${dest.tapped ? " tapped" : ""}`;
+          const matches = you.library
+            .filter((c) => !search.top.includes(c.iid) && spec.test(c.typeLine, infoOf(book, c)))
+            .sort((a, b) => a.name.localeCompare(b.name));
+          const finish = (top = search.top) => {
+            act((g) => finishSearch(g, top));
+            setSearch(null);
+          };
+          // One move per pick, the shuffle included when it's the last:
+          // two moves from one click would both start from the same game.
+          const pick = (c: PlayCard) => {
+            const top = dest.zone === "top" ? [...search.top, c.iid] : search.top;
+            const last = search.found + 1 >= spec.count;
+            act((g) => {
+              const found = dest.zone === "top" ? g : playerFind(g, c.iid, dest.zone as "hand" | "battlefield", !!dest.tapped);
+              return last ? finishSearch(found, top) : found;
+            });
+            setSearch(last ? null : { ...search, found: search.found + 1, top });
+          };
+          return (
+            <Panel title={`Search your library · ${search.source}`} onClose={() => finish()}>
+              <p className="pt-panel-note">
+                {left > 1 ? `Pick up to ${left} more: ` : "Pick "}
+                {spec.count === 1 ? (/^[aeiou]/i.test(spec.what) ? "an " : "a ") : ""}
+                {spec.what}. {left > 1 ? "This one goes" : "It goes"} {where}. {matches.length} in your library.
+                <button type="button" className="pt-btn" style={{ marginLeft: 10 }} onClick={() => finish()}>
+                  {search.found ? "Done" : "Find nothing"}
+                </button>
+              </p>
+              {matches.length === 0 ? (
+                <div className="pt-empty">Nothing in your library matches.</div>
+              ) : (
+                <div className="pt-row">
+                  {matches.map((c) => (
+                    <PtCard key={c.iid} {...cardProps("you")(c, "library")} onPrimary={() => pick(c)} />
+                  ))}
+                </div>
+              )}
+            </Panel>
+          );
+        })()}
+
       {logOpen && (
         <Panel title="Game log" onClose={() => setLogOpen(false)}>
           <ol className="pt-log">
@@ -958,6 +1057,70 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           <p>{game.log.at(-1)?.text}</p>
         </div>
       )}
+    </div>
+  );
+}
+
+/* The tokens players make most, and any other. */
+const TOKEN_PRESETS: TokenSpec[] = [
+  { name: "Treasure", power: 0, toughness: 0, keywords: [], kind: "artifact" },
+  { name: "Food", power: 0, toughness: 0, keywords: [], kind: "artifact" },
+  { name: "Clue", power: 0, toughness: 0, keywords: [], kind: "artifact" },
+  { name: "Soldier", power: 1, toughness: 1, keywords: [], kind: "creature" },
+  { name: "Goblin", power: 1, toughness: 1, keywords: [], kind: "creature" },
+  { name: "Spirit", power: 1, toughness: 1, keywords: ["Flying"], kind: "creature" },
+  { name: "Zombie", power: 2, toughness: 2, keywords: [], kind: "creature" },
+  { name: "Wolf", power: 2, toughness: 2, keywords: [], kind: "creature" },
+  { name: "Beast", power: 3, toughness: 3, keywords: [], kind: "creature" },
+  { name: "Angel", power: 4, toughness: 4, keywords: ["Flying"], kind: "creature" },
+];
+
+function TokenMaker({ onCreate }: { onCreate: (spec: TokenSpec, count: number) => void }) {
+  const [count, setCount] = useState(1);
+  const [name, setName] = useState("");
+  const [power, setPower] = useState(1);
+  const [toughness, setToughness] = useState(1);
+  const [keywords, setKeywords] = useState("");
+  const custom: TokenSpec = {
+    name: name.trim() || "Token",
+    power,
+    toughness,
+    keywords: keywords
+      .split(",")
+      .map((k) => k.trim())
+      .filter(Boolean)
+      .map((k) => k[0]!.toUpperCase() + k.slice(1)),
+    kind: "creature",
+  };
+  return (
+    <div className="pt-tokens">
+      <label className="pt-tokens-count">
+        How many
+        <input type="number" min={1} max={20} value={count} onChange={(e) => setCount(Math.max(1, Math.min(20, Number(e.target.value) || 1)))} />
+      </label>
+      <div className="pt-tokens-grid">
+        {TOKEN_PRESETS.map((t) => (
+          <button key={t.name} type="button" className="pt-pick-option" onClick={() => onCreate(t, count)}>
+            <span className="pt-pick-label">{t.name}</span>
+            <span className="pt-pick-detail">
+              {t.kind === "artifact" ? (t.name === "Treasure" ? "Artifact · pays one mana of any colour" : "Artifact") : `${t.power}/${t.toughness}${t.keywords.length ? ` · ${t.keywords.join(", ")}` : ""}`}
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className="pt-zone-label" style={{ marginTop: 14 }}>
+        Another creature
+      </div>
+      <div className="pt-tokens-custom">
+        <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} aria-label="Token name" />
+        <input type="number" min={0} max={99} value={power} onChange={(e) => setPower(Number(e.target.value) || 0)} aria-label="Power" />
+        <span>/</span>
+        <input type="number" min={1} max={99} value={toughness} onChange={(e) => setToughness(Math.max(1, Number(e.target.value) || 1))} aria-label="Toughness" />
+        <input placeholder="Keywords: flying, haste" value={keywords} onChange={(e) => setKeywords(e.target.value)} aria-label="Keywords" />
+        <button type="button" className="pt-btn pt-btn-gold" onClick={() => onCreate(custom, count)}>
+          Create
+        </button>
+      </div>
     </div>
   );
 }

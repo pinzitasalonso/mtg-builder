@@ -9,7 +9,7 @@ export const infoOf = (book: CardBook, card: PlayCard): CardInfo | undefined => 
 const frontType = (typeLine: string | null | undefined) => (typeLine ?? "").split(" // ")[0]!;
 
 export function isCreature(book: CardBook, card: PlayCard): boolean {
-  if (card.token) return true;
+  if (card.token) return card.token.kind !== "artifact";
   return /\bCreature\b/.test(frontType(infoOf(book, card)?.typeLine ?? card.typeLine));
 }
 
@@ -160,6 +160,112 @@ export function counterOf(info: CardInfo | undefined): Counter | null {
     xIsValue: /mana value is x\b/i.test(text),
     rider: /^its controller\b/i.test(rest) ? rest.split(/(?<=\.)\s/)[0]! : "",
   };
+}
+
+/** "rather than pay this spell's mana cost", "without paying its mana cost":
+    a card that may be cast some other way. The player's casts of these
+    aren't tapped for automatically. */
+export const hasAltCost = (info: CardInfo | undefined) =>
+  /rather than pay (?:this spell's|its) mana cost|without paying (?:its|this spell's) mana cost/i.test(frontText(info));
+
+/** A search of your library: how many cards, which ones, and where each goes. */
+export interface Search {
+  count: number;
+  /** "a creature card", for the prompt. */
+  what: string;
+  /** Where each find goes, in order; the last repeats. */
+  to: { zone: "hand" | "battlefield" | "top"; tapped?: boolean }[];
+  test: (typeLine: string | null, info: CardInfo | undefined) => boolean;
+}
+/** An activated ability that searches (a fetch land, Evolving Wilds,
+    Sakura-Tribe Elder), with its costs. */
+export interface SearchAbility extends Search {
+  tap: boolean;
+  sacrifice: boolean;
+  life: number;
+  /** Its mana cost, if any ("{1}"): the player pays that by hand. */
+  mana: string | null;
+}
+
+const WORD_NUMBER: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
+const COLOR_PIP: Record<string, string> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
+
+/** One "Search your library for …" sentence. */
+function parseSearch(line: string): Search | null {
+  const m = /search your library(?: and\/or graveyard)? for (up to (\w+) |an? |any number of )?(.*?) ?cards?\b( with [^,.]+?)?(?=[,.]| and | then |$)/i.exec(line);
+  if (!m) return null;
+  const count = /^up to/i.test(m[1] ?? "") ? (WORD_NUMBER[(m[2] ?? "").toLowerCase()] ?? 1) : /any number/i.test(m[1] ?? "") ? 99 : 1;
+  const desc = (m[3] ?? "").trim().toLowerCase();
+  const alts = desc
+    ? desc
+        .split(/,\s*(?:or\s+)?|\s+or\s+/)
+        .map((a) => a.trim().split(/\s+/).filter(Boolean))
+        .filter((a) => a.length)
+    : [];
+  const rule = (m[4] ?? "").toLowerCase();
+  const power = /power (\d+) or less/.exec(rule);
+  const valueMax = /mana value (\d+) or less/.exec(rule);
+  const valueMin = /mana value (\d+) or greater/.exec(rule);
+  const rest = line.slice(m.index + m[0].length);
+  const split = /put one onto the battlefield( tapped)? and the other into your hand/i.exec(rest);
+  const dest = /\bput (?:it|that card|the card|them|those cards|one of them)\b[^.]*?(into your hand|onto the battlefield( tapped)?|on top)/i.exec(rest);
+  const to: Search["to"] = split
+    ? [{ zone: "battlefield", tapped: !!split[1] }, { zone: "hand" }]
+    : dest
+      ? [/hand/i.test(dest[1]!) ? { zone: "hand" } : /top/i.test(dest[1]!) ? { zone: "top" } : { zone: "battlefield", tapped: !!dest[2] }]
+      : [{ zone: "hand" }];
+  const word = (w: string, t: string, info: CardInfo | undefined) => {
+    if (COLOR_PIP[w]) return new RegExp(`\\{[^}]*${COLOR_PIP[w]}[^}]*\\}`).test(info?.manaCost ?? "");
+    if (w === "colorless") return !/\{[^}]*[WUBRG][^}]*\}/.test(info?.manaCost ?? "");
+    if (w.startsWith("non")) return !new RegExp(`\\b${w.slice(3)}\\b`).test(t);
+    return new RegExp(`\\b${w.replace(/s$/, "")}s?\\b`).test(t);
+  };
+  return {
+    count,
+    what: `${desc ? `${desc} ` : ""}card${count > 1 ? "s" : ""}`,
+    to,
+    test: (typeLine, info) => {
+      const t = (info?.typeLine ?? typeLine ?? "").split(" // ")[0]!.toLowerCase();
+      if (alts.length && !alts.some((words) => words.every((w) => word(w, t, info)))) return false;
+      if (power && (info?.power ?? 99) > Number(power[1])) return false;
+      if (valueMax && (info?.manaValue ?? 0) > Number(valueMax[1])) return false;
+      if (valueMin && (info?.manaValue ?? 0) < Number(valueMin[1])) return false;
+      return true;
+    },
+  };
+}
+
+/** What casting this card searches for: a tutor's spell text, or a
+    permanent's "when it enters" search. Activated abilities are left to
+    searchAbility. */
+export function searchOnCast(info: CardInfo | undefined): Search | null {
+  const spell = /\b(Instant|Sorcery)\b/.test(frontType(info?.typeLine));
+  for (const line of frontText(info).split("\n")) {
+    const at = line.toLowerCase().indexOf("search your library");
+    if (at < 0) continue;
+    const colon = line.indexOf(":");
+    if (colon >= 0 && colon < at) continue;
+    if (!spell && !/\benters\b/i.test(line)) continue;
+    const s = parseSearch(line);
+    if (s) return s;
+  }
+  return null;
+}
+
+/** A permanent's activated ability that searches, with its costs. */
+export function searchAbility(info: CardInfo | undefined): SearchAbility | null {
+  for (const line of frontText(info).split("\n")) {
+    const at = line.toLowerCase().indexOf("search your library");
+    const colon = line.indexOf(":");
+    if (at < 0 || colon < 0 || colon > at) continue;
+    const s = parseSearch(line.slice(colon + 1));
+    if (!s) continue;
+    const cost = line.slice(0, colon);
+    const life = /pay (\d+) life/i.exec(cost);
+    const mana = (cost.match(/\{(?!T\})[^}]+\}/g) ?? []).join("");
+    return { ...s, tap: /\{T\}/.test(cost), sacrifice: /sacrifice/i.test(cost), life: life ? Number(life[1]) : 0, mana: mana || null };
+  }
+  return null;
 }
 
 /** Blue, by its mana cost (hybrid and phyrexian count). */
