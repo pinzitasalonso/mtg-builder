@@ -1606,6 +1606,49 @@ button {
   border-color: rgba(253, 242, 111, 0.85);
   background: rgba(253, 242, 111, 0.12);
 }
+/* Making a token (practice games). */
+.pt-tokens-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.pt-tokens-count input,
+.pt-tokens-custom input {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 16px;
+}
+.pt-tokens-count input,
+.pt-tokens-custom input[type="number"] {
+  width: 64px;
+}
+.pt-tokens-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+}
+.pt-tokens-custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pt-tokens-custom input:not([type="number"]) {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.pt-tokens-custom span {
+  color: rgba(255, 255, 255, 0.6);
+}
 .pt-thinking {
   display: inline-flex;
   align-items: center;

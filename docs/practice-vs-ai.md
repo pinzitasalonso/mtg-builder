@@ -109,6 +109,19 @@ side does.
    You can act on the opponent's cards from their ⋯ menu (destroy, exile,
    return to hand, tap) to resolve your own spells.
 
+   **Your side's helpers** (you're still the rules; Undo takes any of it back):
+   - your casts are tapped for (`playerCast`): the lands a spell needs, then
+     a Treasure; not a card with another way to be cast (Force of Will), nor
+     one you can't pay for, and X is left to you;
+   - a tutor you cast, or a creature that searches as it enters
+     (`searchOnCast`), opens a search of your library showing only what it can
+     find, and each pick goes where the card says (hand, battlefield tapped,
+     or on top after the shuffle); a permanent's search ability (a fetch
+     land, Evolving Wilds: `searchAbility`) is in its ⋯ menu, with its tap,
+     life and sacrifice paid;
+   - Token makes Treasures, Food, Clues and creature tokens (a Treasure pays
+     mana); any creature's ⋯ menu adds +1/+1 or -1/-1 counters.
+
    Where there's room (a wide screen, or a phone held sideways) a column
    runs the full height beside the board and the hand: the opponent's
    table talk, **Last played** (the latest spells cast by either side, like

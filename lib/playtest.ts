@@ -35,7 +35,9 @@ export interface PlayCard {
   /** Until end of turn. */
   pump?: { power: number; toughness: number };
   /** A token: its own stats. It ceases to exist off the battlefield. */
-  token?: { power: number; toughness: number; keywords: string[] };
+  /** A token: its stats, and whether it's an artifact (Treasure, Food,
+      Clue) rather than a creature. */
+  token?: { power: number; toughness: number; keywords: string[]; kind?: "creature" | "artifact" };
 }
 
 export interface PlaytestState {

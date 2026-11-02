@@ -116,7 +116,7 @@ export function PtCard({
             // A token has no scan (and no card to look up by name).
             <div className="pt-token">
               <span>{card.name}</span>
-              <span className="pt-token-kind">Token</span>
+              <span className="pt-token-kind">{card.token.kind === "artifact" ? "Artifact token" : "Token"}</span>
             </div>
           ) : (
             <CardArt name={card.name} src={src} prefer="src" version="normal" loading="lazy" radius={0} style={{ position: "absolute", inset: 0 }} />

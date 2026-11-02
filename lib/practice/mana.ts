@@ -50,7 +50,12 @@ export interface Source {
 export function manaSources(side: PlaytestState, book: CardBook, turn: number, exclude: number[] = []): Source[] {
   const out: Source[] = [];
   for (const c of side.battlefield) {
-    if (c.tapped || exclude.includes(c.iid) || c.token) continue;
+    if (c.tapped || exclude.includes(c.iid)) continue;
+    // A Treasure is one mana of any colour, used up when it's spent.
+    if (c.token) {
+      if (c.token.kind === "artifact" && /^treasure$/i.test(c.name)) out.push({ iid: c.iid, name: c.name, colors: ["W", "U", "B", "R", "G"], amount: 1, sacrifice: true });
+      continue;
+    }
     const info = infoOf(book, c);
     const made = manaOutput(info, c.typeLine);
     if (!made) continue;
