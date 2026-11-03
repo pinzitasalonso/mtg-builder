@@ -1671,8 +1671,35 @@ button {
   background: #000;
   box-shadow: 0 0 0 2px rgba(208, 86, 63, 0.85), 0 30px 80px -20px rgba(0, 0, 0, 0.95);
 }
-.pt-spot-caption {
+/* With your answer under it, the card gives up a little height. */
+.pt-spot[data-asking] .pt-spot-card {
+  height: min(40vh, 340px);
+}
+.pt-spot-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   max-width: 90%;
+}
+/* Your answer, right under the spell; the rest of the overlay lets clicks through. */
+.pt-spot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+.pt-spot-actions .pt-btn {
+  padding: 9px 16px;
+  font-size: 14px;
+  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.8);
+}
+.pt-spot-actions .pt-btn:not(.pt-btn-gold) {
+  background: rgba(13, 10, 22, 0.94);
+}
+.pt-spot-caption {
+  max-width: 100%;
   padding: 6px 14px;
   border-radius: 999px;
   background: rgba(13, 10, 22, 0.94);
@@ -2718,6 +2745,26 @@ button {
   /* The table talk and the history are in the column beside the board. */
   .pt-table.pt-vs .pt-mid {
     display: none;
+  }
+  /* The spell shown big: its caption and your answer beside it, not under. */
+  .pt-table .pt-spot {
+    flex-direction: row;
+    gap: 14px;
+  }
+  .pt-table .pt-spot-card {
+    height: min(62vh, 240px);
+  }
+  .pt-table .pt-spot-side {
+    align-items: flex-start;
+    max-width: 46%;
+  }
+  .pt-table .pt-spot-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .pt-table .pt-spot-caption {
+    text-align: left;
+    border-radius: 12px;
   }
 
   /* The hand: a strip of card tops, raised over the board by a tap. */

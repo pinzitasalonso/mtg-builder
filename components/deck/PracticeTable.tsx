@@ -852,6 +852,41 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                   : "The opponent wins."
                 : `Your turn · land drop ${game.landPlayed ? "used" : "available"}`;
 
+  // Your answer, offered where you're looking: under the opponent's spell
+  // while it's shown big, or in the bar for its end step.
+  const answerButtons = mode === "respond" && pending && (
+    <>
+      {pending.kind === "spell" &&
+        you.hand
+          .filter((c, i, all) => {
+            // One button per counterspell, however many copies you hold.
+            if (all.findIndex((x) => x.name === c.name) !== i) return false;
+            const k = counterOf(infoOf(book, c));
+            const info = infoOf(book, pending.card);
+            return !!k && k.hits({ typeLine: info?.typeLine ?? pending.card.typeLine ?? "", manaValue: info?.manaValue ?? 0, blue: isBlue(info) });
+          })
+          .map((c) => (
+            <button key={c.iid} type="button" className="pt-btn pt-btn-gold" onClick={counterWith.bind(null, c.iid)}>
+              Counter with {c.name}
+            </button>
+          ))}
+      <button type="button" className={pending.kind === "end" ? "pt-btn pt-btn-gold" : "pt-btn"} onClick={letResolve}>
+        {pending.kind === "end" ? "Go to my turn" : "Let it resolve"}
+      </button>
+      <button
+        type="button"
+        className="pt-btn"
+        title="No more stops for your answers, for the rest of this game"
+        onClick={() => {
+          noAsk.current = true;
+          letResolve();
+        }}
+      >
+        Don&apos;t ask again
+      </button>
+    </>
+  );
+
   return (
     <div className="pt-root pt-vs pt-table" role="dialog" aria-label="Practice game against the AI">
       <RotateHint onClose={onClose} />
@@ -907,38 +942,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               )}
             </>
           )}
-          {mode === "respond" && pending && (
-            <>
-              {pending.kind === "spell" &&
-                you.hand
-                .filter((c, i, all) => {
-                  // One button per counterspell, however many copies you hold.
-                  if (all.findIndex((x) => x.name === c.name) !== i) return false;
-                  const k = counterOf(infoOf(book, c));
-                  const info = infoOf(book, pending.card);
-                  return !!k && k.hits({ typeLine: info?.typeLine ?? pending.card.typeLine ?? "", manaValue: info?.manaValue ?? 0, blue: isBlue(info) });
-                })
-                .map((c) => (
-                  <button key={c.iid} type="button" className="pt-btn pt-btn-gold" onClick={counterWith.bind(null, c.iid)}>
-                    Counter with {c.name}
-                  </button>
-                ))}
-              <button type="button" className={pending.kind === "end" ? "pt-btn pt-btn-gold" : "pt-btn"} onClick={letResolve}>
-                {pending.kind === "end" ? "Go to my turn" : "Let it resolve"}
-              </button>
-              <button
-                type="button"
-                className="pt-btn"
-                title="No more stops for your answers, for the rest of this game"
-                onClick={() => {
-                  noAsk.current = true;
-                  letResolve();
-                }}
-              >
-                Don&apos;t ask again
-              </button>
-            </>
-          )}
+          {/* The end-step stop has no card to show: its buttons stay up here.
+              An answer to a spell sits with the spell, under the big card. */}
+          {mode === "respond" && pending?.kind === "end" && answerButtons}
           {mode === "over" && (
             <>
               <button type="button" className="pt-btn pt-btn-gold" onClick={() => lastOpponent.current && void start(lastOpponent.current)}>
@@ -976,13 +982,16 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         <div className="pt-play">
           {/* The opponent's spell, big while it's cast. */}
           {spotlight && (
-            <div className="pt-spot" aria-live="polite">
+            <div className="pt-spot" aria-live="polite" data-asking={pending?.kind === "spell" ? "true" : undefined}>
               <div className="pt-spot-card">
                 <CardArt name={spotlight.card.name} src={spotlight.card.imageUri || undefined} prefer="src" version="normal" loading="eager" radius={0} style={{ position: "absolute", inset: 0 }} />
               </div>
-              <div className="pt-spot-caption">
-                The opponent casts {spotlight.card.name.split(" // ")[0]}
-                {spotlight.target ? ` → ${spotlight.target.split(" // ")[0]}` : ""}
+              <div className="pt-spot-side">
+                <div className="pt-spot-caption">
+                  The opponent casts {spotlight.card.name.split(" // ")[0]}
+                  {spotlight.target ? ` → ${spotlight.target.split(" // ")[0]}` : ""}
+                </div>
+                {pending?.kind === "spell" && <div className="pt-spot-actions">{answerButtons}</div>}
               </div>
             </div>
           )}
