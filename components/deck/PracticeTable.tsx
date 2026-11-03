@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Bot, Loader2, Plus, Swords, Undo2, X } from "lucide-react";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt } from "@/components/mtg";
-import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
@@ -13,6 +13,7 @@ import { parseCost } from "@/lib/practice/mana";
 import {
   addCounters,
   adjustLife,
+  aiNinjutsu,
   aiRemovalAction,
   aiResponds,
   createTokens,
@@ -33,7 +34,10 @@ import {
   findCard,
   moveAnyCard,
   newGame,
+  ninjutsu,
+  ninjutsuOptions,
   parseCardId,
+  playerScry,
   resolveCombat,
   setBlocks,
   startTurn,
@@ -74,7 +78,8 @@ interface Setup {
   opp: { label: string; detail: string; cards: DeckCard[]; commander: string | null };
 }
 // "respond": the opponent has cast a spell and waits for your answer.
-type Mode = "pick" | "loading" | "mulligan" | "main" | "attack" | "combat" | "ai" | "block" | "respond" | "over";
+// "ninjutsu": your attack's blocks are in, and you could ninjutsu a ninja in.
+type Mode = "pick" | "loading" | "mulligan" | "main" | "attack" | "combat" | "ai" | "block" | "respond" | "ninjutsu" | "over";
 type Answer = { kind: "resolve" | "counter"; g: PracticeGame };
 type Step = (g: PracticeGame) => PracticeGame;
 
@@ -114,6 +119,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   // The opponent's turn waiting on a choice of yours (Kefka's discard, a
   // sacrifice): your pick hands it the game after.
   const choiceRef = useRef<((g: PracticeGame) => void) | null>(null);
+  // Your attack waiting on your ninjutsu (or "To damage").
+  const ninjaRef = useRef<((g: PracticeGame) => void) | null>(null);
+  const [scryOpen, setScryOpen] = useState(false);
   // "Don't ask again": the opponent's spells resolve without a pause, this game.
   const noAsk = useRef(false);
   const [logOpen, setLogOpen] = useState(false);
@@ -399,6 +407,18 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   };
   const letResolve = () => game && answerRef.current?.({ kind: "resolve", g: game });
 
+  /** Your ninjutsu: the ninja comes in for that unblocked attacker; with
+      no other ninja to bring in, combat goes on. */
+  const bringNinja = (ninjaIid: number, attackerIid: number) => {
+    if (!game || !setup || !ninjaRef.current) return;
+    const next = ninjutsu(game, "you", ninjaIid, attackerIid, setup.book);
+    if (next === game) return;
+    setMenu(null);
+    setZoom(null);
+    setGame(next);
+    if (!ninjutsuOptions(next, "you", setup.book).length) ninjaRef.current(next);
+  };
+
   async function runAi(g0: PracticeGame) {
     if (!setup) return;
     setMode("ai");
@@ -459,6 +479,14 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     setGame(g);
     setMode("ai");
     await sleep(BEAT);
+    // Its ninjutsu, for an attacker you left unblocked (Yuriko).
+    const ninja = aiNinjutsu(g, setup.book);
+    if (ninja !== g) {
+      g = ninja;
+      setGame(g);
+      await sleep(SPOTLIGHT);
+      if (!alive.current) return;
+    }
     g = resolveCombat(g, setup.book);
     setGame(g);
     if (g.winner) return;
@@ -520,8 +548,18 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     g = setBlocks(g, chooseBlocks(g, setup.book), setup.book);
     setGame(g);
     setHistory([]);
-    setMode("combat");
-    await sleep(1400);
+    // Blocks are in: a ninja you could bring in waits for you.
+    if (ninjutsuOptions(g, "you", setup.book).length) {
+      setMode("ninjutsu");
+      g = await new Promise<PracticeGame>((resolve) => (ninjaRef.current = resolve));
+      ninjaRef.current = null;
+      if (!alive.current) return;
+      setMode("combat");
+      await sleep(BEAT);
+    } else {
+      setMode("combat");
+      await sleep(1400);
+    }
     if (!alive.current) return;
     g = resolveCombat(g, setup.book);
     setGame(g);
@@ -536,6 +574,17 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const at = findCard(game, card.iid);
     if (!at) return;
     const seat = at.seat;
+    // The ninjutsu window: a ninja you click comes in for your weakest
+    // unblocked attacker.
+    if (mode === "ninjutsu" && seat === "you" && (zone === "hand" || zone === "command")) {
+      const o = ninjutsuOptions(game, "you", setup.book).find((x) => x.ninja.iid === card.iid);
+      const weakest = o && [...o.unblocked].sort((a, b) => stats(setup.book, a).power - stats(setup.book, b).power)[0];
+      if (weakest) {
+        setHandUp(false);
+        bringNinja(card.iid, weakest.iid);
+        return;
+      }
+    }
     // A discard or a sacrifice to choose: your click picks it.
     if (game.choice && seat === "you" && zone === (game.choice.kind === "discard" ? "hand" : "battlefield")) {
       setHandUp(false);
@@ -667,6 +716,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   // you're choosing attackers, the creatures that can attack.
   const playableNow = (card: PlayCard, zone: Zone): boolean => {
     if (!game || !setup) return false;
+    if (mode === "ninjutsu") return ninjutsuOptions(game, "you", setup.book).some((o) => o.ninja.iid === card.iid);
     // A choice waiting: what you may pick glows.
     if (game.choice) return zone === (game.choice.kind === "discard" ? "hand" : "battlefield") && !!game.sides.you[zone].some((c) => c.iid === card.iid);
     if (zone === "battlefield") return mode === "attack" && !picked.includes(card.iid) && canAttack(game, "you", card, setup.book);
@@ -900,6 +950,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       ? you.toBottom > 0
         ? `Put ${you.toBottom} card${you.toBottom === 1 ? "" : "s"} from your hand on the bottom.`
         : `${game.first === "you" ? "You're" : "The opponent is"} on the play.`
+      : mode === "ninjutsu"
+        ? "Blocks are in. Use ninjutsu for an unblocked attacker, or go to damage."
       : mode === "attack"
         ? "Tap the creatures that attack."
         : mode === "block"
@@ -991,6 +1043,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               <button type="button" className="pt-btn" onClick={() => act((g) => withYourSide(g, (s) => draw(s, 1)))} disabled={!you.library.length}>
                 Draw
               </button>
+              <button type="button" className="pt-btn" onClick={() => setScryOpen(true)} disabled={!you.library.length || !!game.choice}>
+                Scry
+              </button>
             </>
           )}
           {mode === "attack" && (
@@ -1053,6 +1108,26 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       {/* The board and the hand; the column beside them where there's room. */}
       <div className="pt-body">
         <div className="pt-play">
+          {/* Your ninjutsu, over the board where there's room for it: one
+              button per ninja and attacker by name (two copies of either
+              are the same choice). */}
+          {mode === "ninjutsu" && (
+            <div className="pt-ninja" role="group" aria-label="Ninjutsu">
+              <span className="pt-ninja-caption">Blocks are in. Ninjutsu?</span>
+              {ninjutsuOptions(game, "you", book)
+                .flatMap((o) => [...o.unblocked].sort((a, b) => stats(book, a).power - stats(book, b).power).map((a) => ({ o, a })))
+                .filter(({ o, a }, i, all) => all.findIndex((x) => x.o.ninja.name === o.ninja.name && x.a.name === a.name) === i)
+                .slice(0, 6)
+                .map(({ o, a }) => (
+                  <button key={`${o.ninja.iid}:${a.iid}`} type="button" className="pt-btn pt-btn-gold" onClick={() => bringNinja(o.ninja.iid, a.iid)}>
+                    {o.ninja.name.split(",")[0]} for {a.name.split(",")[0]} <span className="pt-ninja-cost">{o.cost}</span>
+                  </button>
+                ))}
+              <button type="button" className="pt-btn" onClick={() => game && ninjaRef.current?.(game)}>
+                To damage
+              </button>
+            </div>
+          )}
           {/* A choice waiting on you (Kefka's discard, a sacrifice). */}
           {choicePrompt && (
             <div className="pt-choice" role="status">
@@ -1288,6 +1363,17 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         </Panel>
       )}
 
+      {scryOpen && (
+        <ScryPanel
+          library={you.library}
+          onZoom={onZoom}
+          onClose={() => setScryOpen(false)}
+          onDone={(top, bottom) => {
+            act((g) => playerScry(g, top, bottom));
+            setScryOpen(false);
+          }}
+        />
+      )}
       {search &&
         (() => {
           const { spec } = search;

@@ -4,7 +4,7 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { canPlayAsLand, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, indestructibleOnYourTurn, infoOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats } from "./cards";
+import { canPlayAsLand, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats } from "./cards";
 import { availableMana, castable, cardId, lifeFor } from "./game";
 import { manaSummary } from "./mana";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
@@ -128,6 +128,12 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (edict) notes.push(`to use its ${edict.mana} ability, activate it with "mana":"${edict.mana}" and no effects: the player chooses what to sacrifice${edict.transform ? " and it transforms" : ""}`);
     if (drawsOnLifeLoss(book, back) || drawsOnLifeLoss(book, front)) notes.push("drawing when the player loses life on your turn happens by itself");
     if (indestructibleOnYourTurn(book, front)) notes.push("it's indestructible on your turn");
+    const ninja = ninjutsuOf(book, front);
+    if (ninja)
+      notes.push(
+        `its ${ninja.commander ? "commander " : ""}ninjutsu ${ninja.cost} is used in combat, after the player's blocks, for one of your unblocked attackers (from your hand${ninja.commander ? " or the command zone, with no tax" : ""}) when you have the mana: attack with cheap or evasive creatures to set it up, and keep ${ninja.cost} untapped`
+      );
+    if (hitTriggersOf(book, front).length) notes.push("what it does when a creature deals combat damage to the player happens by itself");
     if (notes.length) out.push(`- ${info.name}: ${notes.join("; ")}.`);
   }
   return out;

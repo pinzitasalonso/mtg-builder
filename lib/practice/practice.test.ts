@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { chooseBlocks, aiMulligan, fallbackPlan } from "./ai";
-import { counterOf, fetchOf, has, isCreature, isInstantSpeed, manaOutput, removalOf, searchAbility, searchOnCast, stats } from "./cards";
+import { counterOf, fetchOf, has, hitTriggersOf, isCreature, isInstantSpeed, isNinja, manaOutput, ninjutsuOf, removalOf, searchAbility, searchOnCast, stats } from "./cards";
 import { automatedNotes } from "./brief";
 import {
   addCounters,
+  aiNinjutsu,
   aiRemovalAction,
   aiResponds,
   applyAction,
@@ -12,6 +13,9 @@ import {
   indestructible,
   playerCast,
   playerEdict,
+  playerScry,
+  ninjutsu,
+  ninjutsuOptions,
   resolveChoice,
   playerFind,
   cardId,
@@ -947,5 +951,135 @@ describe("K'rrik, Kefka and cast triggers", () => {
     expect(notes).toHaveLength(3);
     expect(notes[0]).toContain('activate it with "mana":"{8}" and no effects');
     expect(notes[1]).toContain("2 life for each {B}");
+  });
+});
+
+describe("first strike, double strike and deathtouch in the AI's blocks", () => {
+  it("doesn't block a first striker with a deathtouch creature it would kill first", () => {
+    const g0 = { ...table({ youField: ["White Knight"], oppField: ["Typhoid Rats"] }), active: "you" as const };
+    const g = declareAttackers(g0, "you", [iidOf(g0, "you", "White Knight")], BOOK);
+    expect(chooseBlocks(g, BOOK)).toEqual({});
+  });
+
+  it("blocks a first striker it survives and kills", () => {
+    const g0 = { ...table({ youField: ["White Knight"], oppField: ["Giant Spider"] }), active: "you" as const };
+    const g = declareAttackers(g0, "you", [iidOf(g0, "you", "White Knight")], BOOK);
+    expect(chooseBlocks(g, BOOK)).toEqual({ [iidOf(g0, "you", "White Knight")]: [iidOf(g0, "opp", "Giant Spider")] });
+  });
+});
+
+describe("Yuriko and ninjutsu", () => {
+  const YB: CardBook = {
+    ...BOOK,
+    ...Object.fromEntries(
+      [
+        info("Yuriko, the Tiger's Shadow", {
+          typeLine: "Legendary Creature — Human Ninja",
+          manaCost: "{1}{U}{B}",
+          manaValue: 3,
+          power: 1,
+          toughness: 3,
+          keywords: ["Commander ninjutsu"],
+          oracleText:
+            "Commander ninjutsu {U}{B} ({U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand or the command zone tapped and attacking.)\nWhenever a Ninja you control deals combat damage to a player, reveal the top card of your library and put that card into your hand. Each opponent loses life equal to that card's mana value.",
+        }),
+        info("Ingenious Infiltrator", {
+          typeLine: "Creature — Vedalken Ninja",
+          manaCost: "{2}{U}{B}",
+          manaValue: 4,
+          power: 2,
+          toughness: 3,
+          keywords: ["Ninjutsu"],
+          oracleText:
+            "Ninjutsu {U}{B} ({U}{B}, Return an unblocked attacker you control to hand: Put this card onto the battlefield from your hand tapped and attacking.)\nWhenever a Ninja you control deals combat damage to a player, draw a card.",
+        }),
+      ].map((c) => [c.name.toLowerCase(), c])
+    ),
+  };
+  const YURIKO = "Yuriko, the Tiger's Shadow";
+  const ydeck = (...names: string[]): DeckCard[] => names.map((name) => ({ name, imageUri: "", typeLine: YB[name.toLowerCase()]!.typeLine }));
+  /** A commander game: `seat` has Yuriko in the command zone, an Island and
+      a Swamp, a Raging Goblin attacking unblocked, Hill Giant on top of its
+      library. */
+  function yTable(seat: "you" | "opp", hand: string[] = []) {
+    const mine = ydeck(YURIKO, "Raging Goblin", "Island", "Swamp", ...hand, "Hill Giant", ...Array(10).fill("Forest"));
+    const theirs = ydeck(...Array(20).fill("Plains"));
+    let g = newGame({
+      you: seat === "you" ? { cards: mine, commander: YURIKO } : { cards: theirs },
+      opp: seat === "opp" ? { cards: mine, commander: YURIKO } : { cards: theirs },
+      commanderGame: true,
+      first: seat,
+      shuffle: keep,
+    });
+    const side = g.sides[seat];
+    const all = [...side.hand, ...side.library];
+    const take = (name: string) => all.splice(all.findIndex((c) => c.name === name), 1)[0]!;
+    const field = ["Raging Goblin", "Island", "Swamp"].map((n) => ({ ...take(n), enteredTurn: 0 }));
+    const inHand = hand.map(take);
+    const top = take("Hill Giant");
+    g.sides[seat] = { ...side, battlefield: field, hand: inHand, library: [top, ...all] };
+    g = { ...g, turn: 3, active: seat };
+    g = declareAttackers(g, seat, [field[0]!.iid], YB);
+    return setBlocks(g, {}, YB);
+  }
+
+  it("reads ninjutsu and the hit triggers", () => {
+    const y = { iid: 1, name: YURIKO, imageUri: "", typeLine: YB[YURIKO.toLowerCase()]!.typeLine, tapped: false, commander: true, flipped: false };
+    expect(ninjutsuOf(YB, y)).toEqual({ cost: "{U}{B}", commander: true });
+    expect(hitTriggersOf(YB, y)).toEqual([{ ninjas: true, reveal: true, draw: 0 }]);
+    expect(isNinja(YB, y)).toBe(true);
+  });
+
+  it("the AI brings Yuriko in from the command zone for its unblocked Goblin, then reveals and drains", () => {
+    const g0 = yTable("opp");
+    const g = aiNinjutsu(g0, YB);
+    const yuriko = g.sides.opp.battlefield.find((c) => c.name === YURIKO)!;
+    expect(yuriko.tapped).toBe(true);
+    expect(g.combat!.attackers).toEqual([yuriko.iid]);
+    expect(g.sides.opp.hand.map((c) => c.name)).toEqual(["Raging Goblin"]);
+    expect(g.sides.opp.battlefield.filter((c) => c.tapped).map((c) => c.name).sort()).toEqual(["Island", "Swamp", YURIKO]);
+    expect(g.tax.opp).toBe(0);
+    const after = resolveCombat(g, YB);
+    // 1 combat damage, then Hill Giant revealed: 4 more.
+    expect(after.sides.you.life).toBe(40 - 1 - 4);
+    expect(after.sides.opp.hand.map((c) => c.name)).toEqual(["Raging Goblin", "Hill Giant"]);
+    expect(after.log.map((l) => l.text)).toContain("Yuriko, the Tiger's Shadow: the opponent reveals Hill Giant and puts it into its hand; you lose 4 life.");
+  });
+
+  it("your ninjutsu: a ninja from your hand, paid for you; Infiltrator draws when it hits", () => {
+    const g0 = yTable("you", ["Ingenious Infiltrator"]);
+    const options = ninjutsuOptions(g0, "you", YB);
+    expect(options.map((o) => [o.ninja.name, o.zone])).toEqual([
+      ["Ingenious Infiltrator", "hand"],
+      [YURIKO, "command"],
+    ]);
+    const goblin = g0.combat!.attackers[0]!;
+    const g = ninjutsu(g0, "you", options[0]!.ninja.iid, goblin, YB);
+    expect(g.sides.you.hand.map((c) => c.name)).toEqual(["Raging Goblin"]);
+    expect(ninjutsuOptions(g, "you", YB)).toEqual([]);
+    const after = resolveCombat(g, YB);
+    expect(after.sides.opp.life).toBe(40 - 2);
+    expect(after.sides.you.hand.map((c) => c.name)).toEqual(["Raging Goblin", "Hill Giant"]);
+  });
+
+  it("no ninjutsu for a blocked attacker, or without the mana", () => {
+    let g0 = yTable("you");
+    const tapped = { ...g0, sides: { ...g0.sides, you: { ...g0.sides.you, battlefield: g0.sides.you.battlefield.map((c) => ({ ...c, tapped: true })) } } };
+    expect(ninjutsuOptions(tapped, "you", YB)).toEqual([]);
+    g0 = { ...g0, combat: { ...g0.combat!, blocks: { [g0.combat!.attackers[0]!]: [1] } } };
+    expect(ninjutsuOptions(g0, "you", YB)).toEqual([]);
+  });
+});
+
+describe("scry", () => {
+  it("puts the kept cards on top in order and the rest on the bottom; the log says how many", () => {
+    const g0 = { ...table({}), active: "you" as const };
+    const [a, b, c] = g0.sides.you.library;
+    const g = playerScry(g0, [c!.iid, a!.iid], [b!.iid]);
+    expect(g.sides.you.library.slice(0, 2).map((x) => x.iid)).toEqual([c!.iid, a!.iid]);
+    expect(g.sides.you.library.at(-1)!.iid).toBe(b!.iid);
+    expect(g.sides.you.library).toHaveLength(g0.sides.you.library.length);
+    expect(g.log.at(-1)!.text).toBe("You scry 3: 2 on top, 1 on the bottom.");
+    expect(playerScry(g0, [99_999], [])).toBe(g0);
   });
 });

@@ -8,7 +8,7 @@
 // refused. The AI's moves are checked: a spell it can't pay for, or a target
 // that isn't there, is skipped and logged.
 
-import { draw, faceUpType, moveCard, resolvesToGraveyard, type PlayCard, type PlaytestState, type Shuffle, type Zone } from "../playtest";
+import { draw, faceUpType, moveCard, resolvesToGraveyard, scry, type PlayCard, type PlaytestState, type Shuffle, type Zone } from "../playtest";
 import { shuffled } from "../probability";
 import {
   canPlayAsLand,
@@ -22,14 +22,17 @@ import {
   fetchOf,
   has,
   hasAltCost,
+  hitTriggersOf,
   indestructibleOnYourTurn,
   infoOf,
   isBlue,
   isCreature,
   isLand,
+  isNinja,
   isSick,
   lifeForMana,
   manaOutput,
+  ninjutsuOf,
   removalOf,
   shockLife,
   stats,
@@ -1174,6 +1177,9 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
     const deathtouched = new Set<number>();
     let toPlayer = 0;
     let cmdToPlayer = 0;
+    // Attackers that hit the player this step, for "deals combat damage to
+    // a player" triggers (Yuriko).
+    const hitters: PlayCard[] = [];
     const gain: Record<Seat, number> = { you: 0, opp: 0 };
     const mark = (iid: number, n: number, from: PlayCard) => {
       if (n <= 0) return;
@@ -1191,6 +1197,7 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
         if (!wasBlocked) {
           toPlayer += left;
           if (attacker.commander) cmdToPlayer += left;
+          if (left > 0) hitters.push(attacker);
           left = 0;
         } else {
           blockers.forEach((b, i) => {
@@ -1205,6 +1212,7 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
             if (has(book, attacker, "Trample")) {
               toPlayer += left;
               if (attacker.commander) cmdToPlayer += left;
+              hitters.push(attacker);
             }
           }
         }
@@ -1230,6 +1238,7 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
         say(g, s, `${s === "you" ? "You gain" : "The opponent gains"} ${gain[s]} life (lifelink).`);
       }
     }
+    for (const h of hitters) hitTriggers(g, atk, h, book);
     for (const iid of deathtouched) {
       const c = findCard(g, iid);
       if (c && c.zone === "battlefield" && !indestructible(g, c.seat, c.card, book)) {
@@ -1241,5 +1250,133 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
     if (g.winner) break;
   }
   g.combat = null;
+  return g;
+}
+
+/** An attacker hit the player: its controller's "whenever a Ninja you
+    control deals combat damage to a player" triggers (Yuriko's reveal and
+    life loss, a card), and its own "whenever ~ deals combat damage to a
+    player, draw a card". */
+function hitTriggers(g: PracticeGame, seat: Seat, hitter: PlayCard, book: CardBook) {
+  const foe = other(seat);
+  for (const c of [...g.sides[seat].battlefield]) {
+    for (const t of hitTriggersOf(book, c)) {
+      if (t.ninjas ? !isNinja(book, hitter) : c.iid !== hitter.iid) continue;
+      const name = faceName(c);
+      if (t.reveal) {
+        const top = g.sides[seat].library[0];
+        if (!top) continue;
+        const mv = infoOf(book, top)?.manaValue ?? 0;
+        drawCards(g, seat, 1);
+        say(g, seat, `${name}: ${seat === "you" ? "you reveal" : "the opponent reveals"} ${top.name} and ${verb(seat, "put")} it into ${seat === "you" ? "your" : "its"} hand${mv ? `; ${foe === "you" ? "you lose" : "the opponent loses"} ${mv} life` : ""}.`);
+        loseLife(g, foe, mv, book);
+      }
+      if (t.draw) {
+        say(g, seat, `${who(seat)} ${verb(seat, "draw")} ${t.draw} (${name}).`);
+        drawCards(g, seat, t.draw);
+      }
+    }
+  }
+}
+
+// ── Ninjutsu (Yuriko) ──────────────────────────────────────────────────
+
+export interface NinjutsuOption {
+  ninja: PlayCard;
+  zone: "hand" | "command";
+  cost: string;
+  /** The unblocked attackers it can replace. */
+  unblocked: PlayCard[];
+}
+
+/** After blocks: the ninjas a seat can bring in now, from its hand (or
+    its command zone, for commander ninjutsu), that it can pay for. */
+export function ninjutsuOptions(g: PracticeGame, seat: Seat, book: CardBook): NinjutsuOption[] {
+  const combat = g.combat;
+  if (!combat || combat.attacker !== seat || combat.stage !== "blocked" || g.winner) return [];
+  const side = g.sides[seat];
+  const unblocked = combat.attackers
+    .filter((a) => !combat.blocks[a]?.length)
+    .map((a) => side.battlefield.find((c) => c.iid === a))
+    .filter((c): c is PlayCard => !!c);
+  if (!unblocked.length) return [];
+  const sources = availableMana(g, seat, book);
+  const out: NinjutsuOption[] = [];
+  for (const [zone, cards] of [
+    ["hand", side.hand],
+    ["command", side.command],
+  ] as const) {
+    for (const card of cards) {
+      const n = ninjutsuOf(book, card);
+      if (!n || (zone === "command" && !n.commander)) continue;
+      const cost = parseCost(n.cost);
+      const paid = seat === "you" ? youPay(g, cost, sources, book) : aiPay(g, seat, cost, sources, book);
+      if (paid) out.push({ ninja: card, zone, cost: n.cost, unblocked });
+    }
+  }
+  return out;
+}
+
+/** Ninjutsu: pay, return an unblocked attacker to its owner's hand, and
+    put the ninja onto the battlefield tapped and attacking in its place.
+    It isn't cast: no commander tax, and nothing counters it. */
+export function ninjutsu(g0: PracticeGame, seat: Seat, ninjaIid: number, attackerIid: number, book: CardBook): PracticeGame {
+  const opt = ninjutsuOptions(g0, seat, book).find((o) => o.ninja.iid === ninjaIid);
+  const attacker = opt?.unblocked.find((a) => a.iid === attackerIid);
+  if (!opt || !attacker) return g0;
+  const g = structuredClone(g0);
+  const name = faceName(opt.ninja);
+  if (seat === "you") payForYou(g, parseCost(opt.cost), `${name}'s ninjutsu`, book);
+  else {
+    const sources = availableMana(g, seat, book);
+    const paid = aiPay(g, seat, parseCost(opt.cost), sources, book);
+    if (!paid) return g0;
+    spend(g, seat, paid.tap, sources);
+    loseLife(g, seat, paid.life, book);
+  }
+  moveTo(g, attackerIid, "hand");
+  moveTo(g, ninjaIid, "battlefield", { tapped: true });
+  g.combat = { ...g.combat!, attackers: g.combat!.attackers.map((a) => (a === attackerIid ? ninjaIid : a)) };
+  say(g, seat, `${who(seat)} ${seat === "you" ? "use" : "uses"} ninjutsu: ${name} attacks in place of ${attacker.name}, which goes back to ${seat === "you" ? "your" : "its"} hand.`, opt.ninja);
+  return g;
+}
+
+/** The AI's ninjutsu after your blocks: a ninja with a hit trigger
+    (Yuriko) first, then the biggest, each for its least valuable unblocked
+    attacker (not its commander, not another ninja), when the swap is worth
+    it. */
+export function aiNinjutsu(g0: PracticeGame, book: CardBook): PracticeGame {
+  let g = g0;
+  const worth = (c: PlayCard) => (c.token ? 0.5 : (infoOf(book, c)?.manaValue ?? 0));
+  const triggers = (c: PlayCard) => hitTriggersOf(book, c).some((t) => t.ninjas) || g.sides.opp.battlefield.some((x) => hitTriggersOf(book, x).some((t) => t.ninjas));
+  for (let i = 0; i < 3; i++) {
+    const options = ninjutsuOptions(g, "opp", book);
+    if (!options.length) break;
+    const score = (o: NinjutsuOption) => (hitTriggersOf(book, o.ninja).length ? 100 : 0) + stats(book, o.ninja).power + (o.zone === "command" ? 1 : 0);
+    const best = options.reduce((a, b) => (score(b) > score(a) ? b : a));
+    const back = best.unblocked
+      .filter((a) => !a.commander && !isNinja(book, a))
+      .sort((x, y) => worth(x) - worth(y) || stats(book, x).power - stats(book, y).power)[0];
+    if (!back) break;
+    if (!triggers(best.ninja) && stats(book, best.ninja).power <= stats(book, back).power) break;
+    const next = ninjutsu(g, "opp", best.ninja.iid, back.iid, book);
+    if (next === g) break;
+    g = next;
+  }
+  return g;
+}
+
+// ── Scry (your side) ───────────────────────────────────────────────────
+
+/** You scry: the cards you looked at go back, some on top in the order you
+    set, the rest on the bottom. The log says how many, not which. */
+export function playerScry(g0: PracticeGame, top: number[], bottom: number[]): PracticeGame {
+  const n = top.length + bottom.length;
+  if (!n) return g0;
+  const next = scry(g0.sides.you, top, bottom);
+  if (next === g0.sides.you) return g0;
+  const g = structuredClone(g0);
+  g.sides.you = next;
+  say(g, "you", `You scry ${n}: ${top.length} on top, ${bottom.length} on the bottom.`);
   return g;
 }

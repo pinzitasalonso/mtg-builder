@@ -124,6 +124,17 @@ export function draw(state: PlaytestState, n = 1): PlaytestState {
   return { ...state, library: state.library.slice(taken.length), hand: [...state.hand, ...taken] };
 }
 
+/** Scry: the cards looked at go back, those in `top` on top of the
+    library in that order (the first on top), those in `bottom` at the
+    bottom in that order. Unchanged if any of them isn't in the library. */
+export function scry(state: PlaytestState, top: number[], bottom: number[]): PlaytestState {
+  const seen = new Set([...top, ...bottom]);
+  const byId = new Map(state.library.map((c) => [c.iid, c]));
+  if (!seen.size || [...seen].some((iid) => !byId.has(iid))) return state;
+  const rest = state.library.filter((c) => !seen.has(c.iid));
+  return { ...state, library: [...top.map((iid) => byId.get(iid)!), ...rest, ...bottom.map((iid) => byId.get(iid)!)] };
+}
+
 /** London mulligan: shuffle the hand back, draw seven, then owe N cards to the bottom. */
 export function mulligan(state: PlaytestState, shuffle: Shuffle = shuffled): PlaytestState {
   if (state.mulligans >= 6) return state;

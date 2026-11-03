@@ -121,6 +121,10 @@ side does.
      life and sacrifice paid;
    - Token makes Treasures, Food, Clues and creature tokens (a Treasure pays
      mana); any creature's ⋯ menu adds +1/+1 or -1/-1 counters.
+   - Scry, next to Draw (on both tables: `ScryPanel`, `scry` in
+     lib/playtest): pick how many, tap a card to send it to the bottom,
+     arrows for the order. The log says how many went where, never which
+     (the AI reads the log).
 
    **Answering each other.** The opponent's casts are staged (`applyAction`
    with `stage`: "pay", then "resolve" or "counter"). When it casts a spell
@@ -196,6 +200,19 @@ side does.
      (damage, payments, drains, the life buttons);
    - "During your turn, Kefka has indestructible" (Kefka, Dancing Mad).
      Its end-step exile and free casts are left to you.
+   - Ninjutsu and commander ninjutsu (Yuriko: `ninjutsuOf`): once blocks
+     are in, a ninja you could bring in (from your hand, or the command
+     zone for commander ninjutsu, paid from your untapped mana) stops the
+     attack with "Ninjutsu X for Y" buttons and "To damage"; the ninja
+     glows, and clicking it takes your weakest unblocked attacker. The AI
+     does it after your blocks (`aiNinjutsu`): a ninja with a hit trigger
+     first, for its least valuable unblocked attacker. Ninjutsu isn't a
+     cast: no commander tax, no counterspell;
+   - "Whenever a Ninja you control deals combat damage to a player"
+     (`hitTriggersOf`): Yuriko's reveal (the card goes to its owner's hand
+     and the other player loses its mana value) and a card (Ingenious
+     Infiltrator), and a creature's own "deals combat damage to a player,
+     draw a card".
    The model is told which of its deck's cards these are, so its plan
    leaves them out (`automatedNotes`); a plan's discard for Kefka's entry
    is dropped anyway.

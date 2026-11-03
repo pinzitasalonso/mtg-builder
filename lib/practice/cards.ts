@@ -471,3 +471,46 @@ export const drawsOnLifeLoss = (book: CardBook, card: PlayCard) =>
 /** "During your turn, Kefka has indestructible." */
 export const indestructibleOnYourTurn = (book: CardBook, card: PlayCard) =>
   !card.token && /during your turn, [^.\n]*\bhas indestructible\b/i.test(faceText(infoOf(book, card), card));
+
+/** "Ninjutsu {U}{B}" or "Commander ninjutsu {U}{B}" (Yuriko): its cost, and
+    whether it also works from the command zone. */
+export function ninjutsuOf(book: CardBook, card: PlayCard): { cost: string; commander: boolean } | null {
+  if (card.token) return null;
+  const m = /^(commander )?ninjutsu ((?:\{[^}]+\})+)/im.exec(faceText(infoOf(book, card), card));
+  return m ? { cost: m[2]!, commander: !!m[1] } : null;
+}
+
+/** A Ninja: by its type line, or a changeling. */
+export const isNinja = (book: CardBook, card: PlayCard) =>
+  /\bNinja\b/.test(card.token ? (card.typeLine ?? "") : faceUpType({ typeLine: infoOf(book, card)?.typeLine ?? card.typeLine, flipped: card.flipped })) ||
+  has(book, card, "Changeling");
+
+/** What a permanent does when a creature hits a player: "Whenever a Ninja
+    you control deals combat damage to a player, reveal the top card of your
+    library and put that card into your hand. Each opponent loses life equal
+    to that card's mana value" (Yuriko), "…, draw a card" (Ingenious
+    Infiltrator), and its own "Whenever ~ deals combat damage to a player,
+    draw a card" (Ninja of the Deep Hours). */
+export interface HitTrigger {
+  /** Any Ninja of its controller's, or only itself. */
+  ninjas: boolean;
+  reveal: boolean;
+  draw: number;
+}
+export function hitTriggersOf(book: CardBook, card: PlayCard): HitTrigger[] {
+  if (card.token) return [];
+  const info = infoOf(book, card);
+  const text = faceText(info, card);
+  const self = (info?.name ?? card.name).split(" // ")[card.flipped ? 1 : 0]!.trim();
+  const out: HitTrigger[] = [];
+  for (const m of text.matchAll(/whenever ([^,\n]+?) deals combat damage to a player, ([^\n]*)/gi)) {
+    const who = m[1]!.toLowerCase();
+    const ninjas = /^a ninja you control$/.test(who);
+    if (!ninjas && who !== self.toLowerCase() && who !== self.split(",")[0]!.toLowerCase() && who !== "this creature") continue;
+    const what = m[2]!.toLowerCase();
+    const reveal = /reveal the top card of your library and put that card into your hand\. each opponent loses life equal to that card's mana value/.test(what);
+    const draw = /^(?:you may )?draw a card\b/.test(what) ? 1 : 0;
+    if (reveal || draw) out.push({ ninjas, reveal, draw });
+  }
+  return out;
+}

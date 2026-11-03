@@ -337,6 +337,90 @@ export function Panel({ title, onClose, children }: { title: string; onClose: ()
   );
 }
 
+/* Scry X: the top X cards of your library, each kept on top or sent to
+   the bottom (tap a card to switch), in an order you set with the arrows:
+   the left one ends up on top. */
+export function ScryPanel({
+  library,
+  onDone,
+  onClose,
+  onZoom,
+}: {
+  library: PlayCard[];
+  onDone: (top: number[], bottom: number[]) => void;
+  onClose: () => void;
+  onZoom: (card: PlayCard | null, zone?: Zone, anchor?: DOMRect, hover?: boolean) => void;
+}) {
+  const max = Math.min(10, library.length);
+  const [n, setN] = useState(Math.min(1, max));
+  const [order, setOrder] = useState<number[]>(() => library.slice(0, Math.min(1, max)).map((c) => c.iid));
+  const [bottom, setBottom] = useState<number[]>([]);
+  const look = (k: number) => {
+    const x = Math.max(1, Math.min(max, k));
+    setN(x);
+    setOrder(library.slice(0, x).map((c) => c.iid));
+    setBottom([]);
+  };
+  const byId = new Map(library.map((c) => [c.iid, c]));
+  const shown = order.map((iid) => byId.get(iid)).filter((c): c is PlayCard => !!c);
+  const toggle = (iid: number) => setBottom((b) => (b.includes(iid) ? b.filter((x) => x !== iid) : [...b, iid]));
+  const move = (i: number, d: -1 | 1) =>
+    setOrder((o) => {
+      const j = i + d;
+      if (j < 0 || j >= o.length) return o;
+      const next = [...o];
+      [next[i], next[j]] = [next[j]!, next[i]!];
+      return next;
+    });
+  const kept = order.filter((iid) => !bottom.includes(iid));
+  const sent = order.filter((iid) => bottom.includes(iid));
+  return (
+    <Panel title={`Scry ${n}`} onClose={onClose}>
+      <div className="pt-scry-x" role="group" aria-label="How many to look at">
+        <span>Look at the top</span>
+        <button type="button" className="pt-btn" onClick={() => look(n - 1)} disabled={n <= 1} aria-label="One fewer">
+          −
+        </button>
+        <b aria-live="polite">{n}</b>
+        <button type="button" className="pt-btn" onClick={() => look(n + 1)} disabled={n >= max} aria-label="One more">
+          +
+        </button>
+        <span>
+          card{n === 1 ? "" : "s"}. Tap a card to send it to the bottom; the arrows set the order (left ends up on top).
+        </span>
+      </div>
+      {shown.length === 0 ? (
+        <div className="pt-empty">Your library is empty.</div>
+      ) : (
+        <div className="pt-row pt-scry-row">
+          {shown.map((c, i) => (
+            <div key={c.iid} className="pt-scry-card" data-bottom={bottom.includes(c.iid) ? "true" : undefined}>
+              <PtCard card={c} zone="library" onPrimary={() => toggle(c.iid)} onMenu={() => toggle(c.iid)} onZoom={onZoom} onTurn={() => {}} />
+              <div className="pt-scry-controls">
+                <button type="button" className="pt-btn" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${c.name} left`}>
+                  ‹
+                </button>
+                <button type="button" className={bottom.includes(c.iid) ? "pt-btn" : "pt-btn pt-btn-gold"} onClick={() => toggle(c.iid)}>
+                  {bottom.includes(c.iid) ? "Bottom" : "Top"}
+                </button>
+                <button type="button" className="pt-btn" onClick={() => move(i, 1)} disabled={i === shown.length - 1} aria-label={`Move ${c.name} right`}>
+                  ›
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="pt-panel-note">
+        {kept.length} on top, {sent.length} on the bottom.
+        <button type="button" className="pt-btn pt-btn-gold" style={{ marginLeft: 10 }} onClick={() => onDone(kept, sent)} disabled={!shown.length}>
+          Done
+        </button>
+      </p>
+    </Panel>
+  );
+}
+
 /* Phones play the table sideways. A web page can't turn an iPhone's screen,
    so held upright the table asks for it (CSS shows this only on a phone in
    portrait); Android can, from fullscreen, which useLandscapeLock asks for. */
