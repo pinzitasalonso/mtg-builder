@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart3, Bot, Dices, RotateCw, Undo2, X } from "lucide-react";
 import { hasKnownBack } from "@/components/useCardFlip";
-import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ZoomPreview, useLandscapeLock, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import PracticeTable from "@/components/deck/PracticeTable";
 import { PoolEntry } from "@/lib/pool-client";
 import { hypergeometric, hypergeometricAtLeast } from "@/lib/probability";
@@ -21,6 +21,7 @@ import {
   nextTurn,
   play,
   resolvesToGraveyard,
+  scry,
   shuffleLibrary,
   startGame,
   toggleTap,
@@ -97,6 +98,7 @@ function SoloTable({
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [pile, setPile] = useState<Pile | null>(null);
   const [oddsOpen, setOddsOpen] = useState(false);
+  const [scryOpen, setScryOpen] = useState(false);
   const [zoom, setZoom] = useState<Zoom | null>(null);
   // A phone held sideways: whether the hand is raised over the board.
   const [handUp, setHandUp] = useState(false);
@@ -269,6 +271,9 @@ function SoloTable({
         <button type="button" className="pt-btn" onClick={() => act((s) => draw(s, 1))} disabled={state.library.length === 0} title="Draw a card (D)">
           Draw
         </button>
+        <button type="button" className="pt-btn" onClick={() => setScryOpen(true)} disabled={state.library.length === 0} title="Look at the top cards and keep each on top or send it to the bottom">
+          Scry
+        </button>
         <button type="button" className="pt-btn" onClick={() => act(nextTurn)} title="Untap and draw (N)">
           Next turn <RotateCw size={14} strokeWidth={2.25} />
         </button>
@@ -374,6 +379,17 @@ function SoloTable({
         )}
       {zoom && zoomLive && createPortal(<ZoomPreview zoom={zoom} onDismiss={() => setZoom(null)} />, document.body)}
 
+      {scryOpen && (
+        <ScryPanel
+          library={state.library}
+          onZoom={onZoom}
+          onClose={() => setScryOpen(false)}
+          onDone={(top, bottom) => {
+            act((s) => scry(s, top, bottom));
+            setScryOpen(false);
+          }}
+        />
+      )}
       {pile && (
         <Panel title={`${ZONE_LABEL[pile]} · ${pileCards.length}`} onClose={() => setPile(null)}>
           {pile === "library" && (

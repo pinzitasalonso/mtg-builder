@@ -10,16 +10,37 @@ import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, 
 
 const value = (book: CardBook, c: PlayCard) => (c.token ? 1 : (infoOf(book, c)?.manaValue ?? 0));
 
-/** Would this blocker kill the attacker? Survive it? */
+/** Would this blocker kill the attacker? Survive it? The fight as combat
+    plays it: a first-strike step, then the regular one (double strike hits
+    in both), deathtouch kills with any damage, indestructible doesn't die,
+    and a creature dead after the first step deals no regular damage. */
 function exchange(book: CardBook, attacker: PlayCard, blocker: PlayCard) {
-  const a = stats(book, attacker);
-  const b = stats(book, blocker);
-  const kills = (b.power >= a.toughness - (attacker.damage ?? 0) && b.power > 0) || (has(book, blocker, "Deathtouch") && b.power > 0);
-  const dies =
-    !has(book, blocker, "Indestructible") &&
-    ((a.power >= b.toughness - (blocker.damage ?? 0) && a.power > 0) || (has(book, attacker, "Deathtouch") && a.power > 0));
-  const firstStrikeWin = (has(book, blocker, "First strike") || has(book, blocker, "Double strike")) && !has(book, attacker, "First strike") && kills;
-  return { kills: kills && !has(book, attacker, "Indestructible"), dies: dies && !firstStrikeWin };
+  const fighters = [attacker, blocker].map((c) => ({
+    c,
+    power: Math.max(0, stats(book, c).power),
+    toughness: stats(book, c).toughness,
+    damage: c.damage ?? 0,
+    deathtouched: false,
+    first: has(book, c, "First strike") || has(book, c, "Double strike"),
+    regular: !has(book, c, "First strike") || has(book, c, "Double strike"),
+    deathtouch: has(book, c, "Deathtouch"),
+    indestructible: has(book, c, "Indestructible"),
+  }));
+  const dead = (f: (typeof fighters)[number]) => !f.indestructible && (f.damage >= f.toughness || f.deathtouched);
+  const [a, b] = fighters as [(typeof fighters)[0], (typeof fighters)[0]];
+  for (const step of ["first", "regular"] as const) {
+    const aHits = !dead(a) && a[step] && a.power > 0;
+    const bHits = !dead(b) && b[step] && b.power > 0;
+    if (aHits) {
+      b.damage += a.power;
+      if (a.deathtouch) b.deathtouched = true;
+    }
+    if (bHits) {
+      a.damage += b.power;
+      if (b.deathtouch) a.deathtouched = true;
+    }
+  }
+  return { kills: dead(a), dies: dead(b) };
 }
 
 /** How the defending side blocks: to survive first, then blocks that win,
@@ -90,7 +111,7 @@ export function safeAttackers(g: PracticeGame, seat: Seat, book: CardBook): Play
   const def = other(seat);
   const able = g.sides[seat].battlefield.filter((c) => canAttack(g, seat, c, book) && stats(book, c).power > 0);
   const blockers = g.sides[def].battlefield.filter((c) => isCreature(book, c) && !c.tapped);
-  const total = able.reduce((n, c) => n + stats(book, c).power, 0);
+  const total = able.reduce((n, c) => n + stats(book, c).power * (has(book, c, "Double strike") ? 2 : 1), 0);
   if (total >= g.sides[def].life + blockers.reduce((n, b) => n + Math.max(0, stats(book, b).power), 0) && able.length > blockers.length) return able;
   return able.filter((a) => !blockers.some((b) => canBlock(book, b, a) && exchange(book, a, b).kills && !exchange(book, a, b).dies));
 }
