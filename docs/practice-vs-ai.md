@@ -139,7 +139,8 @@ side does.
    **Borrowed from Arena**, so the table reads at a glance:
    - every opponent spell is shown big in the middle while it's cast (paid,
      then resolved a moment later), its target pulsing red; while it waits
-     for your answer it stays up;
+     for your answer it stays up, with your answer's buttons right under it
+     (beside it on a phone held sideways);
    - what you can do glows: on your turn the cards you can afford and a
      land while your drop is there; when answering or blocking, the
      instants and flash cards you can afford; when attacking, the creatures
