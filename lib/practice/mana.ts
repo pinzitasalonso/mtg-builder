@@ -44,6 +44,12 @@ export interface Source {
   amount: number;
   /** Used up when it's used (Lotus Petal). */
   sacrifice?: boolean;
+  /** Not tapped: used once a turn (Vivi's {0} ability). */
+  once?: boolean;
+  /** Also tapped when it's used (the land paying Selvala's {G}). */
+  also?: number[];
+  /** Makes all its mana at once: what the payment doesn't use floats. */
+  float?: boolean;
 }
 
 /** Untapped permanents that can tap for mana now (creatures not summoning sick). */
@@ -67,9 +73,10 @@ export function manaSources(side: PlaytestState, book: CardBook, turn: number, e
   return out;
 }
 
-/** Floating mana as sources: unit i is iid -(i + 1). */
+/** Floating mana as sources: unit i is iid -(i + 1). A unit is a colour
+    letter, or several ("UR": either, from Vivi). */
 export const poolSources = (pool: string[] | undefined): Source[] =>
-  (pool ?? []).map((c, i) => ({ iid: -(i + 1), name: "floating mana", colors: [c], amount: 1 }));
+  (pool ?? []).map((c, i) => ({ iid: -(i + 1), name: "floating mana", colors: c.split(""), amount: 1 }));
 
 export const manaTotal = (sources: Source[]) => sources.reduce((n, s) => n + s.amount, 0);
 
@@ -77,7 +84,14 @@ export const manaTotal = (sources: Source[]) => sources.reduce((n, s) => n + s.a
     can't be paid. Generic "2" in a {2/W} pip pays with any two. With
     `lifeFor` (K'rrik: ["B"]), a pip of those colours may be paid with 2 life
     instead: mana first, and life for as few pips as the payment needs. */
-export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?: number; lifeFor?: string[] } = {}): { tap: number[]; life: number } | null {
+export interface Payment {
+  tap: number[];
+  life: number;
+  /** Units used of each source, by iid. */
+  used: Record<number, number>;
+}
+
+export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?: number; lifeFor?: string[] } = {}): Payment | null {
   const lifeFor = opts.lifeFor ?? [];
   const eligible = lifeFor.length ? cost.pips.filter((p) => p.some((c) => lifeFor.includes(c))).length : 0;
   for (let n = 0; n <= eligible; n++) {
@@ -89,7 +103,7 @@ export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?
 
 /** One try: `byLife` of the pips `lifeFor` covers are paid with life first;
     any of them mana can't pay is paid with life too. */
-function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: number }, lifeFor: string[], byLife: number): { tap: number[]; life: number } | null {
+function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: number }, lifeFor: string[], byLife: number): Payment | null {
   const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors, sacrifice: !!s.sacrifice })));
   const used = new Set<number>();
   const take = (i: number) => used.add(i);
@@ -139,7 +153,9 @@ function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: numbe
     if (i < 0) return null;
     take(i);
   }
-  return { tap: [...new Set([...used].map((i) => units[i]!.iid))], life };
+  const counts: Record<number, number> = {};
+  for (const i of used) counts[units[i]!.iid] = (counts[units[i]!.iid] ?? 0) + 1;
+  return { tap: [...new Set([...used].map((i) => units[i]!.iid))], life, used: counts };
 }
 
 /** "5 mana: G G U C C" — for the AI's brief. */

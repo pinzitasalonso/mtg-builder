@@ -157,7 +157,7 @@ describe("mana", () => {
     expect(payCost(parseCost("{G}{G}{G}"), sources)).toBeNull();
     expect(payCost(parseCost("{X}{G}"), sources, { x: 2 })?.tap).toHaveLength(3);
     expect(payCost(parseCost("{X}{G}"), sources, { x: 3 })).toBeNull();
-    expect(payCost(parseCost("{B/P}"), sources)).toEqual({ tap: [], life: 2 });
+    expect(payCost(parseCost("{B/P}"), sources)).toMatchObject({ tap: [], life: 2 });
     expect(payCost(parseCost("{2}"), [{ iid: 9, name: "Sol Ring", colors: ["C"], amount: 2 }])?.tap).toEqual([9]);
   });
 
@@ -829,10 +829,10 @@ describe("K'rrik, Kefka and cast triggers", () => {
       { iid: 2, name: "Swamp", colors: ["B"], amount: 1 },
       { iid: 3, name: "Swamp", colors: ["B"], amount: 1 },
     ];
-    expect(payCost(cost, swamps, { lifeFor: ["B"] })).toEqual({ tap: [1, 2, 3], life: 0 });
+    expect(payCost(cost, swamps, { lifeFor: ["B"] })).toMatchObject({ tap: [1, 2, 3], life: 0 });
     expect(payCost(cost, swamps.slice(0, 2))).toBeNull();
-    expect(payCost(cost, swamps.slice(0, 2), { lifeFor: ["B"] })).toEqual({ tap: [1, 2], life: 2 });
-    expect(payCost(parseCost("{B}{B}"), [], { lifeFor: ["B"] })).toEqual({ tap: [], life: 4 });
+    expect(payCost(cost, swamps.slice(0, 2), { lifeFor: ["B"] })).toMatchObject({ tap: [1, 2], life: 2 });
+    expect(payCost(parseCost("{B}{B}"), [], { lifeFor: ["B"] })).toMatchObject({ tap: [], life: 4 });
     expect(payCost(parseCost("{1}{B}"), [], { lifeFor: ["B"] })).toBeNull();
   });
 

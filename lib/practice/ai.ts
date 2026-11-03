@@ -4,7 +4,7 @@
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
 import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, stats } from "./cards";
-import { canAttack, canBlock, cardId, castable, lifeFor } from "./game";
+import { availableMana, canAttack, canBlock, cardId, castable, lifeFor, spellCost } from "./game";
 import { manaSources, parseCost, payCost } from "./mana";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
 
@@ -187,13 +187,17 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
   }
   // Pay from the simulated table: tap what's used, and pay the life.
   const payIn = (cost: ReturnType<typeof parseCost>) => {
-    const paid = payCost(cost, manaSources(sim.sides[seat], book, sim.turn), { lifeFor: lifeFor(sim, seat, book) });
+    const sources = availableMana(sim, seat, book);
+    const paid = payCost(cost, sources, { lifeFor: lifeFor(sim, seat, book) });
     if (!paid || (paid.life && sim.sides[seat].life - paid.life < 10)) return false;
+    const once = paid.tap.filter((t) => sources.find((x) => x.iid === t)?.once);
+    const tapped = new Set(paid.tap.flatMap((t) => [t, ...(sources.find((x) => x.iid === t)?.also ?? [])]).filter((t) => !once.includes(t)));
     sim = structuredClone(sim);
+    sim.once = [...(sim.once ?? []), ...once];
     sim.sides[seat] = {
       ...sim.sides[seat],
       life: sim.sides[seat].life - paid.life,
-      battlefield: sim.sides[seat].battlefield.map((x) => (paid.tap.includes(x.iid) ? { ...x, tapped: true } : x)),
+      battlefield: sim.sides[seat].battlefield.map((x) => (tapped.has(x.iid) ? { ...x, tapped: true } : x)),
     };
     return true;
   };
@@ -213,9 +217,7 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     .sort((a, b) => (drawOnly(book, a.c) ? 1 : 0) - (drawOnly(book, b.c) ? 1 : 0) || value(book, b.c) - value(book, a.c));
   for (const { c, zone } of candidates) {
     if (!castable(sim, seat, c, book, zone)) continue;
-    const cost = parseCost(infoOf(book, c)?.manaCost ?? null);
-    if (zone === "command") cost.generic += 2 * sim.tax[seat];
-    if (!payIn(cost)) continue;
+    if (!payIn(spellCost(sim, seat, c, book, zone))) continue;
     const draws = drawOnly(book, c);
     main.push(draws ? { ...blankAction("cast", c.iid), effects: [drawEffect(draws)] } : blankAction("cast", c.iid));
   }

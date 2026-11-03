@@ -38,6 +38,19 @@ export interface PlayCard {
   /** A token: its stats, and whether it's an artifact (Treasure, Food,
       Clue) rather than a creature. */
   token?: { power: number; toughness: number; keywords: string[]; kind?: "creature" | "artifact" };
+  /** Keywords until end of turn ("gains indestructible until end of turn"). */
+  eot?: string[];
+  /** What other permanents give it while they're there: lords ("Other Elves
+      you control get +1/+1"), the Auras on it, "All creatures have haste".
+      Worked out again after every move (lib/practice refreshStatics). */
+  boost?: { power: number; toughness: number; keywords: string[] };
+  /** An Aura: the permanent it's attached to. */
+  attachedTo?: number;
+  /** A token that's a copy of a card (Inalla): it ceases to exist off the
+      battlefield, like any token. */
+  copy?: boolean;
+  /** Exiled at the beginning of the next end step (Inalla's copies). */
+  exileAtEnd?: boolean;
 }
 
 export interface PlaytestState {
@@ -172,6 +185,10 @@ export function moveCard(
     delete card.damage;
     delete card.counters;
     delete card.pump;
+    delete card.eot;
+    delete card.boost;
+    delete card.attachedTo;
+    delete card.exileAtEnd;
   }
   const next = { ...state, [from]: state[from].filter((c) => c.iid !== iid) } as PlaytestState;
   const target = [...next[to]];
