@@ -8,8 +8,8 @@ import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
-import { canPlayAsLand, counterOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
-import { parseCost, payCost } from "@/lib/practice/mana";
+import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
+import { parseCost } from "@/lib/practice/mana";
 import {
   addCounters,
   adjustLife,
@@ -18,8 +18,11 @@ import {
   createTokens,
   finishSearch,
   playerCast,
+  playerEdict,
+  playerEnters,
   playerFind,
   playerUseSearch,
+  resolveChoice,
   type TokenSpec,
   applyAction,
   availableMana,
@@ -36,6 +39,7 @@ import {
   startTurn,
   tapToggle,
   withYourSide,
+  youPay,
   type DeckCard,
 } from "@/lib/practice/game";
 import type { CardBook, PlanAction, PracticeGame, Seat, TurnPlan } from "@/lib/practice/types";
@@ -107,6 +111,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   // The opponent's spell, shown big while it's cast (as in Arena), and what it targets.
   const [spotlight, setSpotlight] = useState<{ card: PlayCard; target?: string; targetIid?: number } | null>(null);
   const answerRef = useRef<((a: Answer) => void) | null>(null);
+  // The opponent's turn waiting on a choice of yours (Kefka's discard, a
+  // sacrifice): your pick hands it the game after.
+  const choiceRef = useRef<((g: PracticeGame) => void) | null>(null);
   // "Don't ask again": the opponent's spells resolve without a pause, this game.
   const noAsk = useRef(false);
   const [logOpen, setLogOpen] = useState(false);
@@ -149,6 +156,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   useEffect(() => {
     if (game?.winner) setMode("over");
   }, [game?.winner]);
+
+  // A discard to choose raises your hand; a sacrifice lowers it, for the board.
+  const choiceKind = game?.choice?.kind;
+  useEffect(() => {
+    if (choiceKind) setHandUp(choiceKind === "discard");
+  }, [choiceKind]);
 
   // The history beside the board follows the newest line.
   const logLength = game?.log.length ?? 0;
@@ -240,7 +253,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       // A tutor, or a creature that searches as it enters: the search opens.
       const spec = searchOnCast(infoOf(book, card));
       if (spec) setSearch({ source: card.name, spec, found: 0, top: [] });
-      return answered;
+      // What it does as it enters (Kefka's discard).
+      return playerEnters(answered, iid, book);
     };
   const cast = (iid: number) => act(castStep(iid));
   const undo = () => {
@@ -274,6 +288,28 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!g.winner) void runAi(g);
   }
 
+  /** A choice of yours the game waits on (Kefka's discard, a sacrifice
+      the opponent's ability asks for): the opponent's turn, or your
+      attack, goes on once you've picked. */
+  async function waitChoice(g: PracticeGame): Promise<PracticeGame> {
+    if (!g.choice || g.winner) return g;
+    setGame(g);
+    const next = await new Promise<PracticeGame>((resolve) => (choiceRef.current = resolve));
+    choiceRef.current = null;
+    return next;
+  }
+  const choose = (iid: number) => {
+    if (!game?.choice) return;
+    const next = resolveChoice(game, iid, book);
+    if (next === game) return;
+    if (choiceRef.current) {
+      setMenu(null);
+      setZoom(null);
+      setGame(next);
+      choiceRef.current(next);
+    } else act(() => next);
+  };
+
   /** The opponent casts a spell. If you hold something you could answer
       with (an instant, a card with flash), it waits: paid for and on the
       table's log, until you counter it, cast your own instants, or let it
@@ -286,7 +322,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     return g.sides.you.hand.some((c) => {
       if (!isInstantSpeed(setup.book, c)) return false;
       const info = infoOf(setup.book, c);
-      return hasAltCost(info) || payCost(parseCost(info?.manaCost ?? null), mana) !== null;
+      return hasAltCost(info) || youPay(g, parseCost(info?.manaCost ?? null), mana, setup.book) !== null;
     });
   };
 
@@ -325,8 +361,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       await sleep(SPOTLIGHT);
     }
     setSpotlight(null);
-    const g = answer.kind === "counter" ? answer.g : applyAction(answer.g, "opp", a, setup.book, { stage: "resolve" }).game;
+    let g = answer.kind === "counter" ? answer.g : applyAction(answer.g, "opp", a, setup.book, { stage: "resolve" }).game;
     setGame(g);
+    g = await waitChoice(g);
     await sleep(BEAT);
     return g;
   }
@@ -393,14 +430,18 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       else {
         g = applyAction(g, "opp", a, setup.book).game;
         setGame(g);
+        g = await waitChoice(g);
         await sleep(BEAT);
       }
       if (!alive.current || g.winner) return;
     }
     const attackers = plan.attack.map(parseCardId).filter((n): n is number => n !== null);
     if (attackers.length) {
-      const declared = declareAttackers(g, "opp", attackers, setup.book);
+      let declared = declareAttackers(g, "opp", attackers, setup.book);
       if (declared.combat) {
+        // "Whenever Kefka attacks": your discard first.
+        declared = await waitChoice(declared);
+        if (!alive.current || declared.winner) return;
         setGame(declared);
         afterCombatPlan.current = plan.after_combat;
         setBlocksState({});
@@ -433,6 +474,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       else {
         g = applyAction(g, "opp", a, setup.book).game;
         setGame(g);
+        g = await waitChoice(g);
         await sleep(BEAT);
       }
       if (!alive.current || g.winner) return;
@@ -457,6 +499,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       return;
     }
     setHistory([]);
+    // "Whenever Kefka attacks": your discard first.
+    if (g.choice) {
+      setMode("combat");
+      g = await waitChoice(g);
+      if (!alive.current || g.winner || !g.combat) return;
+    }
     // The AI may answer an attacker with instant removal before it blocks.
     const removal = aiRemovalAction(g, setup.book, g.combat.attackers, "attack");
     if (removal) {
@@ -488,6 +536,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const at = findCard(game, card.iid);
     if (!at) return;
     const seat = at.seat;
+    // A discard or a sacrifice to choose: your click picks it.
+    if (game.choice && seat === "you" && zone === (game.choice.kind === "discard" ? "hand" : "battlefield")) {
+      setHandUp(false);
+      choose(card.iid);
+      return;
+    }
     if (seat === "you" && zone === "hand") {
       if (mode === "mulligan" && game.sides.you.toBottom > 0) act((g) => withYourSide(g, (s) => bottomCard(s, card.iid)));
       else if (mode === "main" || ((mode === "respond" || mode === "block") && isInstantSpeed(setup.book, card))) {
@@ -558,12 +612,20 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     out.push(...counters);
     // A search it can do (crack a fetch land, Evolving Wilds, Sakura-Tribe Elder).
     const ability = zone === "battlefield" ? searchAbility(infoOf(book, card)) : null;
+    // An "each opponent sacrifices" ability (Kefka's {8}).
+    const edict = zone === "battlefield" ? edictOf(book, card) : null;
+    if (edict) {
+      out.unshift({
+        label: `${edict.mana}: the opponent sacrifices a ${edict.what}${edict.transform ? ", transform" : ""}`,
+        step: (g) => playerEdict(g, card.iid, book),
+      });
+    }
     if (ability && !(ability.tap && card.tapped)) {
       out.unshift({
         label: `Search for ${/^[aeiou]/i.test(ability.what) ? "an" : "a"} ${ability.what}${ability.mana ? ` (pay ${ability.mana})` : ""}`,
         step: (g) => {
           setSearch({ source: card.name, spec: ability, found: 0, top: [] });
-          return playerUseSearch(g, card.iid, ability);
+          return playerUseSearch(g, card.iid, ability, book);
         },
       });
     }
@@ -605,6 +667,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   // you're choosing attackers, the creatures that can attack.
   const playableNow = (card: PlayCard, zone: Zone): boolean => {
     if (!game || !setup) return false;
+    // A choice waiting: what you may pick glows.
+    if (game.choice) return zone === (game.choice.kind === "discard" ? "hand" : "battlefield") && !!game.sides.you[zone].some((c) => c.iid === card.iid);
     if (zone === "battlefield") return mode === "attack" && !picked.includes(card.iid) && canAttack(game, "you", card, setup.book);
     if (zone !== "hand" && zone !== "command") return false;
     const yourMain = mode === "main" && game.active === "you";
@@ -616,7 +680,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (hasAltCost(info)) return true;
     const cost = parseCost(info?.manaCost ?? null);
     if (zone === "command") cost.generic += 2 * game.tax.you;
-    return payCost(cost, availableMana(game, "you", setup.book)) !== null;
+    return youPay(game, cost, availableMana(game, "you", setup.book), setup.book) !== null;
   };
   const cardProps = (seat: Seat) => (card: PlayCard, zone: Zone) => ({
     playable: seat === "you" && playableNow(card, zone),
@@ -827,8 +891,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const zoomLive = zoom !== null && !!findCard(game, zoom.card.iid);
   const pileCards = pile ? [...game.sides[pile.seat][pile.zone]].reverse() : [];
 
-  const status =
-    mode === "mulligan"
+  const choicePrompt = game.choice
+    ? `${game.choice.source}: ${game.choice.kind === "discard" ? "choose a card from your hand to discard" : `choose a ${game.choice.what ?? "permanent"} of yours to sacrifice`}.`
+    : null;
+  const status = choicePrompt
+    ? choicePrompt
+    : mode === "mulligan"
       ? you.toBottom > 0
         ? `Put ${you.toBottom} card${you.toBottom === 1 ? "" : "s"} from your hand on the bottom.`
         : `${game.first === "you" ? "You're" : "The opponent is"} on the play.`
@@ -906,10 +974,15 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           )}
           {mode === "main" && yourTurn && (
             <>
-              <button type="button" className="pt-btn pt-btn-gold" onClick={() => setMode("attack")} disabled={!you.battlefield.some((c) => canAttack(game, "you", c, book))}>
+              <button
+                type="button"
+                className="pt-btn pt-btn-gold"
+                onClick={() => setMode("attack")}
+                disabled={!!game.choice || !you.battlefield.some((c) => canAttack(game, "you", c, book))}
+              >
                 <Swords size={14} strokeWidth={2.25} /> Attack
               </button>
-              <button type="button" className="pt-btn" onClick={() => void endMyTurn()}>
+              <button type="button" className="pt-btn" onClick={() => void endMyTurn()} disabled={!!game.choice}>
                 End turn
               </button>
               <button type="button" className="pt-btn" onClick={undo} disabled={!history.length} aria-label="Undo">
@@ -980,6 +1053,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       {/* The board and the hand; the column beside them where there's room. */}
       <div className="pt-body">
         <div className="pt-play">
+          {/* A choice waiting on you (Kefka's discard, a sacrifice). */}
+          {choicePrompt && (
+            <div className="pt-choice" role="status">
+              {choicePrompt}
+            </div>
+          )}
           {/* The opponent's spell, big while it's cast. */}
           {spotlight && (
             <div className="pt-spot" aria-live="polite" data-asking={pending?.kind === "spell" ? "true" : undefined}>

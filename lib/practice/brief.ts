@@ -4,8 +4,8 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { canPlayAsLand, counterOf, infoOf, isCreature, isLand, isSick, stats } from "./cards";
-import { availableMana, castable, cardId } from "./game";
+import { canPlayAsLand, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, indestructibleOnYourTurn, infoOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats } from "./cards";
+import { availableMana, castable, cardId, lifeFor } from "./game";
 import { manaSummary } from "./mana";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
@@ -110,12 +110,36 @@ const line = (book: CardBook, name: string) => {
   return `${info.name} ${info.manaCost ?? ""} — ${info.typeLine ?? ""}${pt}${text ? ` — ${text}` : ""}`;
 };
 
+/** What the app does by itself for a card of the deck (K'rrik's life for
+    {B}, cast triggers, Kefka's discard and its {8}), so the plan leaves it
+    out: one line per card that has any. */
+export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
+  const out: string[] = [];
+  for (const d of deck) {
+    const info = book[d.name.toLowerCase()];
+    if (!info) continue;
+    const front: PlayCard = { iid: 0, name: info.name, imageUri: "", typeLine: info.typeLine, tapped: false, commander: false, flipped: false };
+    const back: PlayCard = { ...front, flipped: true };
+    const notes: string[] = [];
+    if (lifeForMana(book, front).length) notes.push(`while it's out you may pay 2 life for each {${lifeForMana(book, front).join("}/{")}} in a cost: the app does it when your mana runs short, and "you can pay for it now" counts it`);
+    if (castTriggerOf(book, front)) notes.push("its trigger when you cast a spell (counters, damage, a token) happens by itself");
+    if (discardTriggerOf(book, front)) notes.push("its discard-and-draw as it enters or attacks happens by itself: give it no discard or draw effects");
+    const edict = edictOf(book, front);
+    if (edict) notes.push(`to use its ${edict.mana} ability, activate it with "mana":"${edict.mana}" and no effects: the player chooses what to sacrifice${edict.transform ? " and it transforms" : ""}`);
+    if (drawsOnLifeLoss(book, back) || drawsOnLifeLoss(book, front)) notes.push("drawing when the player loses life on your turn happens by itself");
+    if (indestructibleOnYourTurn(book, front)) notes.push("it's indestructible on your turn");
+    if (notes.length) out.push(`- ${info.name}: ${notes.join("; ")}.`);
+  }
+  return out;
+}
+
 /** The cached prefix: the rules, then the AI's deck with each card's text. */
 export function systemPrompt(deck: DeckLine[], book: CardBook, commander: string | null): { rules: string; deck: string } {
   const lines = [...deck].sort((a, b) => a.name.localeCompare(b.name)).map((d) => `- ${d.quantity}× ${line(book, d.name)}`);
+  const auto = automatedNotes(deck, book);
   return {
     rules: RULES,
-    deck: `YOUR DECK${commander ? ` (commander: ${commander})` : ""}\n${lines.join("\n")}`,
+    deck: `YOUR DECK${commander ? ` (commander: ${commander})` : ""}\n${lines.join("\n")}${auto.length ? `\n\nTHE APP DOES THESE BY ITSELF (never put them in effects)\n${auto.join("\n")}` : ""}`,
   };
 }
 
@@ -126,14 +150,15 @@ const describe = (g: PracticeGame, book: CardBook, c: PlayCard, opts: { text?: b
     bits.push(`${s.power}/${s.toughness}`);
     if (c.damage) bits.push(`${c.damage} damage marked`);
   }
-  const kw = c.token ? c.token.keywords : (infoOf(book, c)?.keywords ?? []);
+  const kw = keywordsOf(book, c);
   if (kw.length) bits.push(kw.join(", "));
   bits.push(c.tapped ? "tapped" : "untapped");
   if (isCreature(book, c) && isSick(book, c, g.turn) && g.active === "opp") bits.push("summoning sick");
   if (c.counters) bits.push(`${c.counters > 0 ? "+" : ""}${c.counters} counters`);
   if (c.commander) bits.push("commander");
+  if (c.flipped && c.name.includes(" // ")) bits.push(`transformed: ${c.name.split(" // ")[1]!.trim()}`);
   const kind = c.token ? "token" : isLand(c) ? "land" : (infoOf(book, c)?.typeLine ?? c.typeLine ?? "").split(" — ")[0];
-  const text = opts.text && !c.token ? (infoOf(book, c)?.oracleText ?? "").replace(/\s*\n\s*/g, " ").slice(0, 300) : "";
+  const text = opts.text && !c.token ? faceText(infoOf(book, c), c).replace(/\s*\n\s*/g, " ").slice(0, 300) : "";
   return `- ${cardId(c.iid)} ${c.name.slice(0, 80)} (${kind}) ${bits.join(", ")}${text ? ` — ${text}` : ""}`;
 };
 
@@ -162,7 +187,7 @@ export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[]):
       (g.commanderGame ? ` Commander damage taken: you ${g.cmdDamage.opp}, the player ${g.cmdDamage.you}.` : ""),
     `Your library: ${me.library.length} cards. The player has ${them.hand.length} cards in hand and ${them.library.length} in library.`,
     `Land drop: ${g.landPlayed ? "already used this turn" : "available"}.`,
-    `YOUR MANA RIGHT NOW: ${manaSummary(sources)}.`,
+    `YOUR MANA RIGHT NOW: ${manaSummary(sources)}.${lifeFor(g, "opp", book).length ? ` You may also pay 2 life for each {${lifeFor(g, "opp", book).join("}/{")}}: the app does it when your mana runs short, keeping your life above what the player's creatures could hit for.` : ""}`,
     sinceLast.length ? `SINCE YOUR LAST TURN:\n${sinceLast.map((t) => `- ${t}`).join("\n")}` : "",
     `YOUR HAND:\n${hand.join("\n") || "(empty)"}`,
     command.length ? `YOUR COMMAND ZONE:\n${command.join("\n")}` : "",

@@ -168,6 +168,38 @@ side does.
    has a head of counts at its left instead. A commander in the command
    zone is dimmed until it's cast, and shows its tax.
 
+   **Abilities the table carries out** (read from the card's text, so any
+   card worded the same way works, on either side):
+   - "For each {B} in a cost, you may pay 2 life rather than pay that mana"
+     (K'rrik): your casts pay with mana first and 2 life for each {B} the
+     mana can't cover, never the life you have left (`youPay`; a card you
+     could pay that way glows); the AI does the same, but never below the
+     power of your creatures plus one (`lifeFor`, `payCost`'s `lifeFor`);
+   - "Whenever you cast a … spell" (`castTriggerOf`): +1/+1 counters on
+     itself (K'rrik), damage or life loss to each opponent (Vivi), life,
+     a card, a creature token, and prowess, when the spell is cast (a
+     countered spell still triggers);
+   - Kefka, Court Mage as it enters or attacks (`discardTriggerOf`): the AI
+     discards what it would rather lose (a spare land, else its priciest
+     card), you pick yours (the game's `choice`: your hand glows and the
+     table waits), then Kefka's controller draws one card for each card
+     type discarded;
+   - "{8}: Each opponent sacrifices a permanent of their choice. Transform
+     Kefka" (`edictOf`): the AI uses it (the model, or the planner when it
+     has the mana) and you pick what you sacrifice; yours is in Kefka's ⋯
+     menu, and the AI gives up a token, a spare land, or its cheapest
+     card. Kefka turns over, with its back's stats (`CardInfo.back`) and
+     keywords: a double-faced card has only the keywords of the face that's
+     up;
+   - "Whenever an opponent loses life during your turn, you draw that many
+     cards" (Kefka, Ruler of Ruin): every life loss goes through `loseLife`
+     (damage, payments, drains, the life buttons);
+   - "During your turn, Kefka has indestructible" (Kefka, Dancing Mad).
+     Its end-step exile and free casts are left to you.
+   The model is told which of its deck's cards these are, so its plan
+   leaves them out (`automatedNotes`); a plan's discard for Kefka's entry
+   is dropped anyway.
+
    A modal card with a land on its back (Shatterskull Smashing) is played
    by the face that's up, on both sides: clicked, it's cast; turned over
    first, it's your land. The AI can do either, and its land goes in land

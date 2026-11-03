@@ -74,8 +74,22 @@ export const poolSources = (pool: string[] | undefined): Source[] =>
 export const manaTotal = (sources: Source[]) => sources.reduce((n, s) => n + s.amount, 0);
 
 /** The sources to tap to pay a cost, and the life it costs; null when it
-    can't be paid. Generic "2" in a {2/W} pip pays with any two. */
-export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?: number } = {}): { tap: number[]; life: number } | null {
+    can't be paid. Generic "2" in a {2/W} pip pays with any two. With
+    `lifeFor` (K'rrik: ["B"]), a pip of those colours may be paid with 2 life
+    instead: mana first, and life for as few pips as the payment needs. */
+export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?: number; lifeFor?: string[] } = {}): { tap: number[]; life: number } | null {
+  const lifeFor = opts.lifeFor ?? [];
+  const eligible = lifeFor.length ? cost.pips.filter((p) => p.some((c) => lifeFor.includes(c))).length : 0;
+  for (let n = 0; n <= eligible; n++) {
+    const paid = payWith(cost, sources, opts, lifeFor, n);
+    if (paid) return paid;
+  }
+  return null;
+}
+
+/** One try: `byLife` of the pips `lifeFor` covers are paid with life first;
+    any of them mana can't pay is paid with life too. */
+function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: number }, lifeFor: string[], byLife: number): { tap: number[]; life: number } | null {
   const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors, sacrifice: !!s.sacrifice })));
   const used = new Set<number>();
   const take = (i: number) => used.add(i);
@@ -97,16 +111,24 @@ export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?
     return best;
   };
   let generic = cost.generic + cost.xCount * Math.max(0, opts.x ?? 0);
+  let life = opts.life ?? 0;
   // Fewest options first.
   const pips = [...cost.pips].sort((a, b) => a.length - b.length);
+  let toLife = byLife;
   for (const pip of pips) {
     const colors = pip.filter((c) => c !== "2");
+    const lifeOk = pip.some((c) => lifeFor.includes(c));
+    if (lifeOk && toLife > 0) {
+      toLife--;
+      life += 2;
+      continue;
+    }
     const i = pick((have) => have.some((c) => colors.includes(c)));
     if (i >= 0) take(i);
     else if (pip.includes("2")) generic += 2;
+    else if (lifeOk) life += 2;
     else return null;
   }
-  let life = opts.life ?? 0;
   for (const c of cost.phyrexian) {
     const i = pick((have) => have.includes(c));
     if (i >= 0) take(i);

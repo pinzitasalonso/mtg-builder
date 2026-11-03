@@ -25,7 +25,9 @@ export const canPlayAsLand = (card: PlayCard) => isLandCard(card.typeLine);
     creature doesn't die the moment it lands for want of data. */
 export function stats(book: CardBook, card: PlayCard): { power: number; toughness: number } {
   const info = infoOf(book, card);
-  const base = card.token ?? { power: info?.power ?? 1, toughness: info?.toughness ?? 1 };
+  // A transformed card (Kefka, Ruler of Ruin) has its back face's stats.
+  const face = card.flipped && info?.back ? info.back : info;
+  const base = card.token ?? { power: face?.power ?? 1, toughness: face?.toughness ?? 1 };
   const plus = card.counters ?? 0;
   return {
     power: base.power + plus + (card.pump?.power ?? 0),
@@ -36,14 +38,30 @@ export function stats(book: CardBook, card: PlayCard): { power: number; toughnes
 /** A keyword, from Scryfall's list or the card's text ("can't be blocked"). */
 export function has(book: CardBook, card: PlayCard, keyword: string): boolean {
   const k = keyword.toLowerCase();
-  if (card.token) return card.token.keywords.some((x) => x.toLowerCase() === k);
-  const info = infoOf(book, card);
-  if (!info) return false;
-  if (info.keywords.some((x) => x.toLowerCase() === k)) return true;
-  const text = (info.oracleText ?? "").toLowerCase().split("\n//\n")[0]!;
+  if (keywordsOf(book, card).some((x) => x.toLowerCase() === k)) return true;
+  if (card.token) return false;
+  const text = faceText(infoOf(book, card), card).toLowerCase();
   if (k === "unblockable") return /\bcan't be blocked\b(?! except| by)/.test(text) && !/can't be blocked except/.test(text);
   if (k === "defender") return /^defender\b/m.test(text);
   return false;
+}
+
+/** The rules text of the face that's up: the back of a transformed card. */
+export function faceText(info: CardInfo | undefined, card: Pick<PlayCard, "flipped">): string {
+  const faces = (info?.oracleText ?? "").split("\n//\n");
+  return (card.flipped && faces[1] !== undefined ? faces[1] : faces[0]) ?? "";
+}
+
+/** Its keywords now. Scryfall lists every face's keywords together, so a
+    double-faced card keeps only those its face that's up has (Kefka is no
+    flier until it transforms). */
+export function keywordsOf(book: CardBook, card: PlayCard): string[] {
+  if (card.token) return card.token.keywords;
+  const info = infoOf(book, card);
+  if (!info) return [];
+  if (!(info.oracleText ?? "").includes("\n//\n")) return info.keywords;
+  const text = faceText(info, card).toLowerCase();
+  return info.keywords.filter((k) => text.includes(k.toLowerCase()));
 }
 
 /** Summoning sick: came under its controller's control this turn, and no haste. */
@@ -309,3 +327,147 @@ export function removalOf(info: CardInfo | undefined): Removal | null {
 
 /** Blue, by its mana cost (hybrid and phyrexian count). */
 export const isBlue = (info: CardInfo | undefined) => /\{[^}]*U[^}]*\}/.test(info?.manaCost ?? "");
+
+// ── Abilities the engine carries out (K'rrik, Kefka, Vivi…) ─────────────
+
+const CARD_TYPES = ["artifact", "battle", "creature", "enchantment", "instant", "kindred", "land", "planeswalker", "sorcery", "tribal"];
+
+/** A card's types ("Artifact Creature" is two), from its front face. */
+export const cardTypes = (typeLine: string | null | undefined): string[] => {
+  const words = frontType(typeLine).split(/\s+[—-]\s+/)[0]!.toLowerCase().split(/\s+/);
+  return CARD_TYPES.filter((t) => words.includes(t));
+};
+
+/** The colours of mana a permanent lets its controller pay with 2 life
+    instead ("For each {B} in a cost, you may pay 2 life rather than pay that
+    mana": K'rrik). */
+export function lifeForMana(book: CardBook, card: PlayCard): string[] {
+  if (card.token) return [];
+  const text = faceText(infoOf(book, card), card);
+  return [...text.matchAll(/for each \{([WUBRG])\} in a cost, you may pay 2 life rather than pay that mana/gi)].map((m) => m[1]!.toUpperCase());
+}
+
+/** A spell, as a cast trigger sees it. */
+export interface SpellSeen {
+  typeLine: string;
+  manaCost: string;
+}
+
+/** Does "a <words> spell" describe this spell? Words are colours ("black":
+    by its mana cost, hybrid and phyrexian included), "multicolored",
+    "colorless", card types and their "non-" forms. A word it doesn't know
+    (historic, a spell with a target) never matches. */
+function spellIs(words: string[], spell: SpellSeen): boolean {
+  const t = frontType(spell.typeLine).toLowerCase();
+  const colors = new Set([...(spell.manaCost.split(" // ")[0] ?? "").toUpperCase().matchAll(/\{([^}]+)\}/g)].flatMap((m) => m[1]!.match(/[WUBRG]/g) ?? []));
+  return words.every((w) => {
+    if (COLOR_PIP[w]) return colors.has(COLOR_PIP[w]!);
+    if (w === "multicolored") return colors.size >= 2;
+    if (w === "colorless") return colors.size === 0;
+    if (w.startsWith("non") && CARD_TYPES.includes(w.slice(3))) return !new RegExp(`\\b${w.slice(3)}\\b`).test(t);
+    if (CARD_TYPES.includes(w)) return new RegExp(`\\b${w}\\b`).test(t);
+    if (w === "legendary") return /\blegendary\b/.test(t);
+    return false;
+  });
+}
+
+/** What a permanent does when its controller casts a spell: "Whenever you
+    cast a black spell, put a +1/+1 counter on K'rrik", Vivi's counter and
+    damage, prowess, a cantrip, a token. Only the parts the table can do. */
+export interface CastTrigger {
+  hits: (spell: SpellSeen) => boolean;
+  counters: number;
+  /** Damage to each opponent ("it deals 1 damage to each opponent"). */
+  damage: number;
+  /** "Each opponent loses 1 life." */
+  drain: number;
+  gain: number;
+  draw: number;
+  /** Until end of turn, on itself (prowess). */
+  pump: number;
+  token: { name: string; power: number; toughness: number; keywords: string[] } | null;
+}
+
+export function castTriggerOf(book: CardBook, card: PlayCard): CastTrigger | null {
+  if (card.token) return null;
+  const info = infoOf(book, card);
+  const text = faceText(info, card);
+  const self = (info?.name ?? card.name).split(" // ")[card.flipped ? 1 : 0]!.trim();
+  const short = self.split(",")[0]!;
+  const m = /\bwhenever you cast an? ([a-z ,]*?)\s*spell, ([^\n]*)/i.exec(text);
+  if (!m) {
+    if (!keywordsOf(book, card).some((k) => k.toLowerCase() === "prowess")) return null;
+    return { hits: (s) => spellIs(["noncreature"], s), counters: 0, damage: 0, drain: 0, gain: 0, draw: 0, pump: 1, token: null };
+  }
+  const alts = m[1]!
+    .toLowerCase()
+    .split(/,\s*(?:or\s+)?|\s+or\s+/)
+    .map((a) => a.trim().split(/\s+/).filter(Boolean));
+  const rest = m[2]!.split(/(?<=\.)\s/)[0]!.toLowerCase();
+  const NUM: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3 };
+  const num = (w: string | undefined) => (w ? (NUM[w] ?? (Number(w) || 0)) : 0);
+  const names = [self.toLowerCase(), short.toLowerCase(), "it", "this creature", "~"].map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const onSelf = `(?:${names.join("|")})`;
+  const counters = new RegExp(`put (a|an|one|two|three|\\d+) \\+1/\\+1 counters? on ${onSelf}\\b`).exec(rest);
+  const damage = /deals? (\d+) damage to each opponent/.exec(rest);
+  const drain = /each opponent loses (\d+) life/.exec(rest);
+  const gain = /you gain (\d+) life/.exec(rest);
+  const draw = /\bdraw (a|one|two) cards?\b/.exec(rest);
+  const pump = new RegExp(`${onSelf} gets \\+(\\d+)/\\+\\d+ until end of turn`).exec(rest);
+  const token = /create (?:a|one) (\d+)\/(\d+) ([a-z ]+?) creature token(?: with ([a-z]+))?/.exec(rest);
+  const t: CastTrigger = {
+    hits: (s) => alts.some((words) => words.length > 0 && spellIs(words, s)) || (alts.length === 1 && alts[0]!.length === 0),
+    counters: num(counters?.[1]),
+    damage: num(damage?.[1]),
+    drain: num(drain?.[1]),
+    gain: num(gain?.[1]),
+    draw: num(draw?.[1]),
+    pump: num(pump?.[1]),
+    token: token
+      ? {
+          name: token[3]!.split(" ").filter((w) => !COLOR_PIP[w] && w !== "and" && w !== "colorless").map((w) => w[0]!.toUpperCase() + w.slice(1)).join(" ") || "Token",
+          power: Number(token[1]),
+          toughness: Number(token[2]),
+          keywords: token[4] ? [token[4][0]!.toUpperCase() + token[4].slice(1)] : [],
+        }
+      : null,
+  };
+  if (!t.counters && !t.damage && !t.drain && !t.gain && !t.draw && !t.pump && !t.token) return null;
+  return t;
+}
+
+/** "Whenever Kefka enters or attacks, each player discards a card. Then you
+    draw a card for each card type among cards discarded this way." */
+export function discardTriggerOf(book: CardBook, card: PlayCard): { enters: boolean; attacks: boolean } | null {
+  if (card.token) return null;
+  const m = /whenever [^.\n]*?\b(enters or attacks|enters|attacks), each player discards a card\. then you draw a card for each card type among cards discarded this way/i.exec(
+    faceText(infoOf(book, card), card)
+  );
+  if (!m) return null;
+  const when = m[1]!.toLowerCase();
+  return { enters: when.includes("enters"), attacks: when.includes("attacks") };
+}
+
+/** "{8}: Each opponent sacrifices a permanent of their choice. Transform
+    Kefka. Activate only as a sorcery." */
+export interface Edict {
+  mana: string;
+  /** What's sacrificed: "permanent", "creature", "nonland permanent". */
+  what: string;
+  transform: boolean;
+}
+export function edictOf(book: CardBook, card: PlayCard): Edict | null {
+  if (card.token) return null;
+  const m = /^((?:\{[^}]+\})+): each opponent sacrifices an? ([a-z ]+?)(?: of their choice)?\.( transform [^.]+\.)?/im.exec(faceText(infoOf(book, card), card));
+  if (!m || /\{T\}/.test(m[1]!)) return null;
+  return { mana: m[1]!, what: m[2]!.toLowerCase(), transform: !!m[3] };
+}
+
+/** "Whenever an opponent loses life during your turn, you draw that many
+    cards" (Kefka, Ruler of Ruin). */
+export const drawsOnLifeLoss = (book: CardBook, card: PlayCard) =>
+  !card.token && /whenever an opponent loses life during your turn, you draw that many cards/i.test(faceText(infoOf(book, card), card));
+
+/** "During your turn, Kefka has indestructible." */
+export const indestructibleOnYourTurn = (book: CardBook, card: PlayCard) =>
+  !card.token && /during your turn, [^.\n]*\bhas indestructible\b/i.test(faceText(infoOf(book, card), card));

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { chooseBlocks, aiMulligan, fallbackPlan } from "./ai";
-import { counterOf, fetchOf, isCreature, isInstantSpeed, manaOutput, removalOf, searchAbility, searchOnCast } from "./cards";
+import { counterOf, fetchOf, has, isCreature, isInstantSpeed, manaOutput, removalOf, searchAbility, searchOnCast, stats } from "./cards";
+import { automatedNotes } from "./brief";
 import {
   addCounters,
   aiRemovalAction,
@@ -8,7 +9,10 @@ import {
   applyAction,
   createTokens,
   finishSearch,
+  indestructible,
   playerCast,
+  playerEdict,
+  resolveChoice,
   playerFind,
   cardId,
   declareAttackers,
@@ -733,5 +737,215 @@ describe("answering on the other's turn", () => {
     const resolved = applyAction(paid, "opp", a, BOOK, { stage: "resolve" }).game;
     expect(resolved.sides.opp.battlefield.map((c) => c.name)).toContain("Hill Giant");
     expect(resolved.sides.opp.battlefield.filter((c) => c.tapped)).toHaveLength(4);
+  });
+});
+
+describe("K'rrik, Kefka and cast triggers", () => {
+  const KB: CardBook = {
+    ...BOOK,
+    ...Object.fromEntries(
+      [
+        info("K'rrik, Son of Yawgmoth", {
+          typeLine: "Legendary Creature — Phyrexian Horror Minion",
+          manaCost: "{4}{B/P}{B/P}{B/P}",
+          manaValue: 7,
+          power: 2,
+          toughness: 2,
+          keywords: ["Lifelink"],
+          oracleText:
+            "({B/P} can be paid with either {B} or 2 life.)\nLifelink\nFor each {B} in a cost, you may pay 2 life rather than pay that mana.\nWhenever you cast a black spell, put a +1/+1 counter on K'rrik.",
+        }),
+        info("Kefka, Court Mage // Kefka, Ruler of Ruin", {
+          typeLine: "Legendary Creature — Human Wizard // Legendary Creature — Avatar Wizard",
+          manaCost: "{2}{U}{B}{R}",
+          manaValue: 5,
+          power: 4,
+          toughness: 5,
+          keywords: ["Flying", "Transform"],
+          back: { power: 5, toughness: 7 },
+          oracleText:
+            "Whenever Kefka enters or attacks, each player discards a card. Then you draw a card for each card type among cards discarded this way.\n{8}: Each opponent sacrifices a permanent of their choice. Transform Kefka. Activate only as a sorcery.\n//\nFlying\nWhenever an opponent loses life during your turn, you draw that many cards.",
+        }),
+        info("Kefka, Dancing Mad", {
+          typeLine: "Legendary Creature — Human Wizard",
+          manaCost: "{5}{B}{R}",
+          manaValue: 7,
+          power: 6,
+          toughness: 6,
+          oracleText: "During your turn, Kefka has indestructible.\nAt the beginning of your end step, exile a card at random from each opponent's graveyard.",
+        }),
+        info("Vivi Ornitier", {
+          typeLine: "Legendary Creature — Wizard",
+          manaCost: "{1}{U}{R}",
+          manaValue: 3,
+          power: 0,
+          toughness: 3,
+          oracleText:
+            "{0}: Add X mana in any combination of {U} and/or {R}, where X is Vivi Ornitier's power. Activate only during your turn and only once each turn.\nWhenever you cast a noncreature spell, put a +1/+1 counter on Vivi Ornitier and it deals 1 damage to each opponent.",
+        }),
+        info("Monastery Swiftspear", { typeLine: "Creature — Human Monk", manaCost: "{R}", manaValue: 1, power: 1, toughness: 2, keywords: ["Haste", "Prowess"] }),
+        info("Sign in Blood", { typeLine: "Sorcery", manaCost: "{B}{B}", manaValue: 2, oracleText: "Target player draws two cards and loses 2 life." }),
+        info("Bloodghast", { typeLine: "Creature — Vampire Spirit", manaCost: "{B}{B}", manaValue: 2, power: 2, toughness: 1 }),
+        info("Crumbling Necropolis", { typeLine: "Land", producedMana: ["U", "B", "R"] }),
+      ].map((c) => [c.name.toLowerCase(), c])
+    ),
+  };
+  const kdeck = (...names: string[]): DeckCard[] => names.map((name) => ({ name, imageUri: "", typeLine: KB[name.toLowerCase()]!.typeLine }));
+  const KEFKA = "Kefka, Court Mage // Kefka, Ruler of Ruin";
+  /** A table with K'rrik's book: the same layout as table(). */
+  function ktable(o: { oppHand?: string[]; oppField?: string[]; youField?: string[]; youHand?: string[] }) {
+    let g = newGame({
+      you: { cards: kdeck(...(o.youField ?? []), ...(o.youHand ?? []), ...Array(10).fill("Forest")) },
+      opp: { cards: kdeck(...(o.oppHand ?? []), ...(o.oppField ?? []), ...Array(10).fill("Island")) },
+      commanderGame: false,
+      first: "opp",
+      shuffle: keep,
+    });
+    for (const seat of ["you", "opp"] as const) g.sides[seat] = { ...g.sides[seat], library: [...g.sides[seat].hand, ...g.sides[seat].library], hand: [] };
+    const deal = (seat: "you" | "opp", names: string[], zone: "hand" | "battlefield") => {
+      for (const name of names) {
+        const side = g.sides[seat];
+        const card = side.library.find((c) => c.name === name)!;
+        g.sides[seat] = { ...side, library: side.library.filter((c) => c !== card), [zone]: [...side[zone], zone === "battlefield" ? { ...card, enteredTurn: 0 } : card] };
+      }
+    };
+    deal("opp", o.oppHand ?? [], "hand");
+    deal("opp", o.oppField ?? [], "battlefield");
+    deal("you", o.youField ?? [], "battlefield");
+    deal("you", o.youHand ?? [], "hand");
+    g = { ...g, turn: 3, active: "opp" };
+    return g;
+  }
+  const texts = (g: PracticeGame) => g.log.map((l) => l.text);
+
+  it("pays 2 life for {B} only when the mana runs short", () => {
+    const cost = parseCost("{2}{B}");
+    const swamps = [
+      { iid: 1, name: "Swamp", colors: ["B"], amount: 1 },
+      { iid: 2, name: "Swamp", colors: ["B"], amount: 1 },
+      { iid: 3, name: "Swamp", colors: ["B"], amount: 1 },
+    ];
+    expect(payCost(cost, swamps, { lifeFor: ["B"] })).toEqual({ tap: [1, 2, 3], life: 0 });
+    expect(payCost(cost, swamps.slice(0, 2))).toBeNull();
+    expect(payCost(cost, swamps.slice(0, 2), { lifeFor: ["B"] })).toEqual({ tap: [1, 2], life: 2 });
+    expect(payCost(parseCost("{B}{B}"), [], { lifeFor: ["B"] })).toEqual({ tap: [], life: 4 });
+    expect(payCost(parseCost("{1}{B}"), [], { lifeFor: ["B"] })).toBeNull();
+  });
+
+  it("your K'rrik: a black spell is paid with life when you're short, and K'rrik grows", () => {
+    const g0 = { ...ktable({ youField: ["K'rrik, Son of Yawgmoth"], youHand: ["Sign in Blood", "Grizzly Bears"] }), active: "you" as const };
+    const g = playerCast(g0, iidOf(g0, "you", "Sign in Blood", "hand"), KB);
+    expect(g.sides.you.life).toBe(16);
+    expect(texts(g)).toEqual(expect.arrayContaining(["You pay 4 life for Sign in Blood.", "K'rrik, Son of Yawgmoth gets a +1/+1 counter."]));
+    expect(g.sides.you.battlefield.find((c) => c.name.startsWith("K'rrik"))!.counters).toBe(1);
+    // Never the life you have left: at 4 life, it's left to you.
+    const low = { ...g0, sides: { ...g0.sides, you: { ...g0.sides.you, life: 4 } } };
+    const lowCast = playerCast(low, iidOf(low, "you", "Sign in Blood", "hand"), KB);
+    expect(lowCast.sides.you.life).toBe(4);
+    expect(texts(lowCast)).toContain("(Not enough untapped mana for Sign in Blood: tap what you use by hand.)");
+    // A green spell: no counter, and no life for its {G}.
+    const bears = playerCast(g, iidOf(g, "you", "Grizzly Bears", "hand"), KB);
+    expect(bears.sides.you.battlefield.find((c) => c.name.startsWith("K'rrik"))!.counters).toBe(1);
+    expect(bears.sides.you.life).toBe(16);
+  });
+
+  it("the AI's K'rrik casts on life, but not below what your creatures could hit for", () => {
+    const g0 = ktable({ oppField: ["K'rrik, Son of Yawgmoth", "Swamp"], oppHand: ["Bloodghast"], youField: ["Craw Wurm"] });
+    const g = applyAction(g0, "opp", action("cast", iidOf(g0, "opp", "Bloodghast", "hand")), KB).game;
+    expect(g.sides.opp.life).toBe(18);
+    expect(g.sides.opp.battlefield.find((c) => c.name.startsWith("K'rrik"))!.counters).toBe(1);
+    const low = { ...g0, sides: { ...g0.sides, opp: { ...g0.sides.opp, life: 8 } } };
+    expect(applyAction(low, "opp", action("cast", iidOf(low, "opp", "Bloodghast", "hand")), KB).ok).toBe(false);
+  });
+
+  it("Vivi and prowess: a noncreature spell grows them, and Vivi pings", () => {
+    const g0 = { ...ktable({ youField: ["Vivi Ornitier", "Monastery Swiftspear", "Mountain"], youHand: ["Lightning Bolt", "Raging Goblin"] }), active: "you" as const };
+    const g = playerCast(g0, iidOf(g0, "you", "Lightning Bolt", "hand"), KB);
+    expect(g.sides.opp.life).toBe(19);
+    expect(g.sides.you.battlefield.find((c) => c.name === "Vivi Ornitier")!.counters).toBe(1);
+    expect(g.sides.you.battlefield.find((c) => c.name === "Monastery Swiftspear")!.pump).toEqual({ power: 1, toughness: 1 });
+    const creature = playerPlay(g, iidOf(g, "you", "Raging Goblin", "hand"), KB);
+    expect(creature.sides.you.battlefield.find((c) => c.name === "Vivi Ornitier")!.counters).toBe(1);
+  });
+
+  it("the AI's Kefka enters: it discards, you choose yours, it draws for the card types", () => {
+    const g0 = ktable({ oppHand: [KEFKA, "Hill Giant", "Island"], oppField: Array(5).fill("Crumbling Necropolis"), youHand: ["Grizzly Bears", "Forest"] });
+    const before = g0.sides.opp.hand.length;
+    // The plan's own discard is dropped: the table does Kefka's.
+    const g = applyAction(g0, "opp", action("cast", iidOf(g0, "opp", KEFKA, "hand"), { effects: [effect({ type: "discard", player: "player", amount: 1 })] }), KB).game;
+    expect(g.sides.opp.battlefield.map((c) => c.name)).toContain(KEFKA);
+    // Kefka left the hand, and it discarded Hill Giant (it has one land in hand, few on the table).
+    expect(g.sides.opp.hand.map((c) => c.name)).toEqual(["Island"]);
+    expect(g.sides.opp.graveyard.map((c) => c.name)).toEqual(["Hill Giant"]);
+    expect(texts(g).filter((t) => t.startsWith("Resolve:"))).toEqual([]);
+    expect(g.choice).toMatchObject({ kind: "discard", by: "opp" });
+    const after = resolveChoice(g, iidOf(g, "you", "Grizzly Bears", "hand"), KB);
+    expect(after.choice).toBeNull();
+    expect(after.sides.you.graveyard.map((c) => c.name)).toContain("Grizzly Bears");
+    // Hill Giant (creature) and Grizzly Bears (creature): one type, one card.
+    expect(after.sides.opp.hand.length).toBe(2);
+    expect(texts(after)).toContain("The opponent draws 1 for the card types discarded (creature).");
+    expect(before).toBe(3);
+  });
+
+  it("your Kefka enters and attacks: the AI discards, you choose, you draw for the types", () => {
+    const g0 = { ...ktable({ youField: [KEFKA], youHand: ["Lightning Bolt", "Forest"], oppHand: ["Hill Giant"] }), active: "you" as const };
+    const kefka = iidOf(g0, "you", KEFKA);
+    const g = declareAttackers(g0, "you", [kefka], KB);
+    expect(g.combat?.attackers).toEqual([kefka]);
+    expect(g.sides.opp.graveyard.map((c) => c.name)).toEqual(["Hill Giant"]);
+    expect(g.choice).toMatchObject({ kind: "discard", by: "you" });
+    const hand = g.sides.you.hand.length;
+    const after = resolveChoice(g, iidOf(g, "you", "Lightning Bolt", "hand"), KB);
+    // Creature + instant: two cards, after the one discarded.
+    expect(after.sides.you.hand.length).toBe(hand - 1 + 2);
+    expect(texts(after)).toContain("You draw 2 for the card types discarded (creature, instant).");
+    // Front face up, Kefka doesn't fly.
+    expect(has(KB, after.sides.you.battlefield.find((c) => c.iid === kefka)!, "Flying")).toBe(false);
+  });
+
+  it("Kefka's {8}: you sacrifice a permanent you choose, and it transforms into a 5/7 flier that draws on your life loss", () => {
+    const islands = Array(8).fill("Island");
+    const g0 = ktable({ oppField: [KEFKA, ...islands], youField: ["Grizzly Bears", "Forest"] });
+    const kefka = iidOf(g0, "opp", KEFKA);
+    const g = applyAction(g0, "opp", action("activate", kefka, { mana: "{8}", effects: [effect({ type: "destroy", target: cardId(iidOf(g0, "you", "Grizzly Bears")) })] }), KB).game;
+    expect(g.choice).toMatchObject({ kind: "sacrifice", by: "opp" });
+    expect(g.sides.you.battlefield.map((c) => c.name)).toContain("Grizzly Bears");
+    const k = g.sides.opp.battlefield.find((c) => c.iid === kefka)!;
+    expect(k.flipped).toBe(true);
+    expect(stats(KB, k)).toEqual({ power: 5, toughness: 7 });
+    expect(has(KB, k, "Flying")).toBe(true);
+    const after = resolveChoice(g, iidOf(g, "you", "Forest"), KB);
+    expect(after.sides.you.battlefield.map((c) => c.name)).toEqual(["Grizzly Bears"]);
+    // On its turn, you lose 3 life: it draws 3.
+    const hand = after.sides.opp.hand.length;
+    const hit = applyAction(after, "opp", action("activate", kefka, { mana: null, tap_card: true, effects: [effect({ type: "damage", target: "player", amount: 3 })] }), KB).game;
+    expect(hit.sides.you.life).toBe(17);
+    expect(hit.sides.opp.hand.length).toBe(hand + 3);
+  });
+
+  it("your Kefka's {8}: the AI sacrifices what it would rather lose", () => {
+    const g0 = { ...ktable({ youField: [KEFKA, ...Array(8).fill("Forest")], oppField: ["Serra Angel", "Island", "Island", "Island", "Island", "Island"] }), active: "you" as const };
+    const g = playerEdict(g0, iidOf(g0, "you", KEFKA), KB);
+    expect(g.sides.you.battlefield.filter((c) => c.tapped)).toHaveLength(8);
+    expect(g.sides.opp.graveyard.map((c) => c.name)).toEqual(["Island"]);
+    expect(g.sides.you.battlefield.find((c) => c.name === KEFKA)!.flipped).toBe(true);
+  });
+
+  it("Kefka, Dancing Mad is indestructible on its controller's turn only", () => {
+    const g0 = ktable({ oppField: ["Kefka, Dancing Mad"] });
+    const card = g0.sides.opp.battlefield[0]!;
+    expect(indestructible(g0, "opp", card, KB)).toBe(true);
+    expect(indestructible({ ...g0, active: "you" }, "opp", card, KB)).toBe(false);
+  });
+
+  it("tells the AI what the table does by itself", () => {
+    const notes = automatedNotes(
+      [KEFKA, "K'rrik, Son of Yawgmoth", "Vivi Ornitier", "Grizzly Bears"].map((name) => ({ name, quantity: 1 })),
+      KB
+    );
+    expect(notes).toHaveLength(3);
+    expect(notes[0]).toContain('activate it with "mana":"{8}" and no effects');
+    expect(notes[1]).toContain("2 life for each {B}");
   });
 });
