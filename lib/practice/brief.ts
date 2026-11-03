@@ -6,6 +6,29 @@
 import type { PlayCard } from "../playtest";
 import { canPlayAsLand, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats } from "./cards";
 import { availableMana, castable, cardId, lifeFor } from "./game";
+import {
+  affinityOf,
+  auraTutorOf,
+  braidsOf,
+  castFromGraveyardOnHitOf,
+  copyOnEnterOf,
+  drawsForBiggest,
+  globalKeywordsOf,
+  grantedAffinityOf,
+  grantedManaOf,
+  greatestPowerManaOf,
+  landfallTokenOf,
+  lootOnEnterOf,
+  lordsOf,
+  powerManaOf,
+  punishesIdleOf,
+  reducersOf,
+  tapTribeOf,
+  tribeAttackOf,
+  untapLandsOf,
+  upkeepTokenOf,
+  winotaOf,
+} from "./abilities";
 import { manaSummary } from "./mana";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
@@ -134,6 +157,26 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
         `its ${ninja.commander ? "commander " : ""}ninjutsu ${ninja.cost} is used in combat, after the player's blocks, for one of your unblocked attackers (from your hand${ninja.commander ? " or the command zone, with no tax" : ""}) when you have the mana: attack with cheap or evasive creatures to set it up, and keep ${ninja.cost} untapped`
       );
     if (hitTriggersOf(book, front).length) notes.push("what it does when a creature deals combat damage to the player happens by itself");
+    // The commanders the table plays for you (lib/practice/abilities).
+    if (winotaOf(book, front)) notes.push("when your non-Humans attack, the app looks at the top six and puts the best Human in attacking: attack with non-Humans");
+    if (powerManaOf(book, front)) notes.push("its {0} mana (X = its power) is counted in your mana and used by the app when you cast: don't activate it");
+    if (greatestPowerManaOf(book, front)) notes.push("its mana ability (X = your greatest power) is counted in your mana and used by the app: don't activate it");
+    if (grantedManaOf(book, front)) notes.push("the mana it gives your creatures is counted in your mana");
+    if (braidsOf(book, front)) notes.push("its end-step sacrifice happens by itself (the app sacrifices tokens or spare lands)");
+    if (castFromGraveyardOnHitOf(book, front)) notes.push("when it hits the player, the app lets you cast an artifact from your graveyard after combat");
+    if (affinityOf(book, front) || grantedAffinityOf(book, front) || reducersOf(book, front).length) notes.push("the cost reduction is already counted in what you can pay for");
+    if (drawsForBiggest(book, front)) notes.push("the draw when a creature enters bigger than all others happens by itself");
+    if (copyOnEnterOf(book, front)) notes.push("its copies of your Wizards (paying {1}) happen by itself, and a copy's enters effects happen again: plan the Wizard's enters effects once");
+    const tribe = tapTribeOf(book, front);
+    if (tribe) notes.push(`the app taps ${tribe.count} ${tribe.type}s for ${tribe.life} life at your end step whenever it can, so keep them untapped when you can`);
+    if (auraTutorOf(book, front)) notes.push("when you cast an Aura, the app attaches it (to the target in its effects, else your best creature) and searches for the next Aura onto it");
+    if (lootOnEnterOf(book, front)) notes.push("its draw-then-discard happens by itself");
+    if (landfallTokenOf(book, front)) notes.push("its landfall tokens happen by itself");
+    if (lordsOf(book, front).length || globalKeywordsOf(book, front).length) notes.push("its bonus to other creatures is already in their stats");
+    if (tribeAttackOf(book, front)) notes.push("when your Dragons attack, the app draws for them and puts your priciest permanent from your hand onto the battlefield");
+    if (upkeepTokenOf(book, front)) notes.push("its upkeep tokens happen by itself");
+    if (untapLandsOf(book, front)) notes.push(`to untap your lands, activate it with "life":${untapLandsOf(book, front)!.life} and no mana or effects`);
+    if (punishesIdleOf(book, front)) notes.push("the end-step damage for creatures that didn't attack happens by itself, to both players: attack with what you can");
     if (notes.length) out.push(`- ${info.name}: ${notes.join("; ")}.`);
   }
   return out;

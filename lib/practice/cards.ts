@@ -30,8 +30,8 @@ export function stats(book: CardBook, card: PlayCard): { power: number; toughnes
   const base = card.token ?? { power: face?.power ?? 1, toughness: face?.toughness ?? 1 };
   const plus = card.counters ?? 0;
   return {
-    power: base.power + plus + (card.pump?.power ?? 0),
-    toughness: base.toughness + plus + (card.pump?.toughness ?? 0),
+    power: base.power + plus + (card.pump?.power ?? 0) + (card.boost?.power ?? 0),
+    toughness: base.toughness + plus + (card.pump?.toughness ?? 0) + (card.boost?.toughness ?? 0),
   };
 }
 
@@ -39,6 +39,8 @@ export function stats(book: CardBook, card: PlayCard): { power: number; toughnes
 export function has(book: CardBook, card: PlayCard, keyword: string): boolean {
   const k = keyword.toLowerCase();
   if (keywordsOf(book, card).some((x) => x.toLowerCase() === k)) return true;
+  // Given until end of turn, or by another permanent (a lord, an Aura).
+  if ([...(card.eot ?? []), ...(card.boost?.keywords ?? [])].some((x) => x.toLowerCase() === k)) return true;
   if (card.token) return false;
   const text = faceText(infoOf(book, card), card).toLowerCase();
   if (k === "unblockable") return /\bcan't be blocked\b(?! except| by)/.test(text) && !/can't be blocked except/.test(text);
@@ -263,7 +265,9 @@ export function searchOnCast(info: CardInfo | undefined): Search | null {
     if (at < 0) continue;
     const colon = line.indexOf(":");
     if (colon >= 0 && colon < at) continue;
-    if (!spell && !/\benters\b/i.test(line)) continue;
+    // A permanent's own "When ~ enters": not "Whenever an Aura you control
+    // enters" (Light-Paws), which is about other cards.
+    if (!spell && !/^when\b[^.]*\benters\b/i.test(line.trim())) continue;
     const s = parseSearch(line);
     if (s) return s;
   }

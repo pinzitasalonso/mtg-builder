@@ -69,12 +69,21 @@ export interface PracticeGame {
   /** A choice the player has to make before the game goes on (Kefka's
       discard, a sacrifice). */
   choice?: Choice | null;
+  /** This turn: the creatures that attacked (Kratos), the once-a-turn
+      abilities used (Vivi's mana, Beledros), and the cards that may be cast
+      from a graveyard (Silas Renn). */
+  attacked?: number[];
+  once?: number[];
+  mayCast?: number[];
 }
 
 /** What the player picks: a card from their hand to discard, or one of
     their permanents to sacrifice. */
 export interface Choice {
-  kind: "discard" | "sacrifice";
+  /** discard: a card from your hand. sacrifice: one of your permanents.
+      put: a permanent card from your hand onto the battlefield (The
+      Ur-Dragon). attach: the creature your Aura goes on. */
+  kind: "discard" | "sacrifice" | "put" | "attach";
   /** The card asking, for the prompt. */
   source: string;
   /** Who controls it. */
@@ -84,6 +93,21 @@ export interface Choice {
   discarded?: string[];
   /** A sacrifice: what kind of permanent ("permanent", "creature"). */
   what?: string;
+  /** A sacrifice: it must share one of these card types (Braids). */
+  types?: string[];
+  /** A discard that draws nothing after (a loot). */
+  loot?: boolean;
+  /** The button for not doing it, when it's optional ("Lose 2 life"). */
+  decline?: string;
+  /** Braids, Arisen Nightmare: your own end step ("yours": you may
+      sacrifice), or the opponent's ("theirs": sacrifice, or lose 2 life and
+      it draws). */
+  braids?: "yours" | "theirs";
+  /** Braids: the life not sacrificing costs. */
+  life?: number;
+  /** attach: the Aura, and whether Light-Paws searches for another after. */
+  aura?: number;
+  tutor?: number;
 }
 
 // ── The AI's plan, as the model writes it (and the fallback planner). ──

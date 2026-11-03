@@ -1800,6 +1800,12 @@ button {
   pointer-events: none;
   animation: pt-spot-in 0.18s ease-out;
 }
+.pt-choice .pt-btn {
+  margin-left: 10px;
+  padding: 4px 12px;
+  font-size: 13px;
+  pointer-events: auto;
+}
 @keyframes pt-spot-in {
   from {
     opacity: 0;

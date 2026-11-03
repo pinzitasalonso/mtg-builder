@@ -213,6 +213,56 @@ side does.
      and the other player loses its mana value) and a card (Ingenious
      Infiltrator), and a creature's own "deals combat damage to a player,
      draw a card".
+   More commanders, read the same way (`lib/practice/abilities.ts`), on
+   both sides unless it says otherwise:
+   - **Winota**: each non-Human attacker looks at the top six; the best
+     Human (priciest) comes in tapped and attacking, indestructible this
+     turn (`eot` keywords); the rest go to the bottom at random. Picked for
+     you too.
+   - **Vivi**'s {0} mana (X = its power, your turn, once a turn) and
+     **Selvala**'s {G},{T} (X = your greatest power, a {G} source paying
+     the {G}) are mana sources (`availableMana`): they make all X at once
+     and what a payment leaves floats (`Source.float`, pool units like
+     "UR"). Selvala also draws for a creature entering bigger than every
+     other. Thranduil the Strategist's Elves tap for {G} or {U}.
+   - **Braids, Arisen Nightmare**: at your end step you're asked to
+     sacrifice (or "Don't sacrifice"); the AI then gives up a token, a copy
+     or a spare land (with six or more), else loses 2 and you draw. At the
+     AI's end step it sacrifices such fodder and you answer the same way,
+     with "Lose 2 life" (`playerEndStep`, `aiEndStep`, `declineChoice`).
+   - **Rograkh** is its keywords (first strike, menace, trample);
+     **Silas Renn** hitting lets its controller cast the priciest artifact
+     in its graveyard this turn (`mayCast`: yours shows "Cast it" in its
+     menu; the AI casts it after combat: `aiGraveyardCasts`).
+   - **Witherbloom, the Balancer**: affinity for creatures, for itself and
+     your instants and sorceries; **Beledros Witherbloom**: a Pest every
+     upkeep, and "Pay 10 life: untap your lands" (its menu; once a turn).
+     Costs go through `spellCost` (tax, affinity, "<kind> spells cost {1}
+     less", The Ur-Dragon's eminence from the command zone).
+   - **Inalla**: a nontoken Wizard entering gets a hasty copy for {1}
+     (paid for you), exiled at the end step; the AI's copy repeats the
+     plan's enters effects, yours asks you to resolve its enters ability.
+     "Tap five Wizards: lose 7" is in Inalla's menu; the AI uses it at its
+     end step whenever it can.
+   - **Light-Paws** and Auras: Auras attach (`attachedTo`; one that loses
+     its creature goes to the graveyard) and give their bonus
+     ("Enchanted creature gets +2/+2 and has flying"). Your Aura asks for
+     its creature (a `choice`), then Light-Paws opens a search for an Aura
+     no pricier with a new name, which goes on Light-Paws. The AI's Aura
+     goes on its plan's target, a curse on your best creature, otherwise
+     Light-Paws or its commander, and Light-Paws searches for it.
+   - **Thranduil**: lords ("Other Elves you control get +1/+1"), landfall
+     Elf tokens, the Strategist's mana, and the Elvenking's draw two and
+     discard one (you pick, as a loot) when another legendary Elf enters.
+   - **The Ur-Dragon**: Dragons cost {1} less, from the command zone too;
+     attacking Dragons draw that many, then a permanent from the hand comes
+     in (the AI's priciest; you choose, or "None").
+   - **Kratos, God of War**: all creatures have haste; at each end step,
+     each creature its player controls that didn't attack deals 1 to them
+     (`attacked`).
+   Lords, Auras and "all creatures have" are worked out again after every
+   move (`refreshStatics` in `checkState`) into each card's `boost`.
+
    The model is told which of its deck's cards these are, so its plan
    leaves them out (`automatedNotes`); a plan's discard for Kefka's entry
    is dropped anyway.

@@ -19,6 +19,7 @@ import {
   drawsOnLifeLoss,
   edictOf,
   entersTapped,
+  faceText,
   fetchOf,
   has,
   hasAltCost,
@@ -39,7 +40,34 @@ import {
   type Edict,
   type SearchAbility,
 } from "./cards";
-import { manaSources, parseCost, payCost, poolSources, totalOf, type Cost, type Source } from "./mana";
+import {
+  affinityHits,
+  affinityOf,
+  auraBonusOf,
+  auraTutorOf,
+  braidsOf,
+  castFromGraveyardOnHitOf,
+  copyOnEnterOf,
+  drawsForBiggest,
+  globalKeywordsOf,
+  grantedAffinityOf,
+  grantedManaOf,
+  greatestPowerManaOf,
+  isType,
+  landfallTokenOf,
+  lootOnEnterOf,
+  lordsOf,
+  powerManaOf,
+  punishesIdleOf,
+  reducerHits,
+  reducersOf,
+  tapTribeOf,
+  tribeAttackOf,
+  untapLandsOf,
+  upkeepTokenOf,
+  winotaOf,
+} from "./abilities";
+import { manaSources, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
 import { other, type CardBook, type Choice, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
@@ -132,8 +160,13 @@ export function findCard(g: PracticeGame, iid: number): { seat: Seat; zone: Zone
 function moveTo(g: PracticeGame, iid: number, to: Zone, opts: { tapped?: boolean; bottom?: boolean } = {}) {
   const at = findCard(g, iid);
   if (!at) return;
+  // The Auras on a permanent that leaves go to the graveyard.
+  if (at.zone === "battlefield" && to !== "battlefield") {
+    for (const s of ["you", "opp"] as Seat[]) for (const a of g.sides[s].battlefield.filter((c) => c.attachedTo === iid)) moveTo(g, a.iid, "graveyard");
+  }
   const side = g.sides[at.seat];
-  if (at.card.token && to !== "battlefield") {
+  // A token, or a token that's a copy (Inalla), ceases to exist off the battlefield.
+  if ((at.card.token || at.card.copy) && to !== "battlefield") {
     g.sides[at.seat] = { ...side, [at.zone]: side[at.zone].filter((c) => c.iid !== iid) };
     return;
   }
@@ -167,16 +200,24 @@ function drawCards(g: PracticeGame, seat: Seat, n: number) {
 /** State-based checks: creatures with lethal damage die, then life and
     commander damage settle the game. */
 function checkState(g: PracticeGame, book: CardBook) {
-  for (const seat of ["you", "opp"] as Seat[]) {
-    for (const c of [...g.sides[seat].battlefield]) {
-      if (!isCreature(book, c)) continue;
-      const { toughness } = stats(book, c);
-      const dead = toughness <= 0 || ((c.damage ?? 0) >= toughness && !indestructible(g, seat, c, book));
-      if (dead) {
-        moveTo(g, c.iid, "graveyard");
-        say(g, seat, `${c.name} dies.`);
+  // A lord that dies takes its bonus with it, which can kill more: again
+  // until nothing dies.
+  for (let pass = 0; pass < 5; pass++) {
+    refreshStatics(g, book);
+    let died = false;
+    for (const seat of ["you", "opp"] as Seat[]) {
+      for (const c of [...g.sides[seat].battlefield]) {
+        if (!isCreature(book, c) || !findCard(g, c.iid)) continue;
+        const { toughness } = stats(book, c);
+        const dead = toughness <= 0 || ((c.damage ?? 0) >= toughness && !indestructible(g, seat, c, book));
+        if (dead) {
+          moveTo(g, c.iid, "graveyard");
+          say(g, seat, `${c.name} dies.`);
+          died = true;
+        }
       }
     }
+    if (!died) break;
   }
   if (g.winner) return;
   for (const seat of ["you", "opp"] as Seat[]) {
@@ -204,6 +245,75 @@ const faceName = (c: PlayCard) => (c.flipped ? c.name.split(" // ")[1] : c.name.
 export const indestructible = (g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook) =>
   has(book, card, "Indestructible") || (g.active === seat && indestructibleOnYourTurn(book, card));
 
+/** What permanents give each other, worked out again from the board:
+    lords ("Other Elves you control get +1/+1"), the Auras on a creature,
+    and "All creatures have haste" (Kratos). Kept on each card as `boost`. */
+function refreshStatics(g: PracticeGame, book: CardBook) {
+  const field = (["you", "opp"] as Seat[]).flatMap((seat) => g.sides[seat].battlefield.map((c) => ({ c, seat })));
+  const lords = field.flatMap(({ c, seat }) => lordsOf(book, c).map((l) => ({ ...l, seat, from: c.iid })));
+  const everyone = [...new Set(field.flatMap(({ c }) => globalKeywordsOf(book, c)))];
+  const auras = field.flatMap(({ c }) => (c.attachedTo !== undefined ? [{ on: c.attachedTo, bonus: auraBonusOf(book, c) }] : []));
+  if (!lords.length && !everyone.length && !auras.length && !field.some(({ c }) => c.boost)) return;
+  for (const seat of ["you", "opp"] as Seat[]) {
+    const side = g.sides[seat];
+    g.sides[seat] = {
+      ...side,
+      battlefield: side.battlefield.map((card) => {
+        const { boost: _old, ...bare } = card;
+        if (!isCreature(book, bare)) return bare;
+        let power = 0;
+        let toughness = 0;
+        const keywords = [...everyone];
+        for (const l of lords) {
+          if (l.seat !== seat || (l.other && l.from === card.iid) || (l.type !== null && !isType(book, bare, l.type))) continue;
+          power += l.power;
+          toughness += l.toughness;
+          keywords.push(...l.keywords);
+        }
+        for (const a of auras) {
+          if (a.on !== card.iid || !a.bonus) continue;
+          power += a.bonus.power;
+          toughness += a.bonus.toughness;
+          keywords.push(...a.bonus.keywords);
+        }
+        return power || toughness || keywords.length ? { ...bare, boost: { power, toughness, keywords: [...new Set(keywords)] } } : bare;
+      }),
+    };
+  }
+}
+
+const frontLine = (book: CardBook, c: PlayCard) => (c.token ? (c.typeLine ?? "") : (infoOf(book, c)?.typeLine ?? c.typeLine ?? "").split(" // ")[0]!);
+
+/** What a spell costs a seat now: its mana cost, commander tax from the
+    command zone, less affinity ("for creatures": Witherbloom, and the
+    instants and sorceries it gives it to) and "<kind> spells you cast cost
+    {1} less" (The Ur-Dragon, from the command zone too). */
+export function spellCost(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, zone: Zone): Cost {
+  const info = infoOf(book, card);
+  const cost = parseCost(info?.manaCost ?? null);
+  if (zone === "command") cost.generic += 2 * g.tax[seat];
+  const side = g.sides[seat];
+  const spell = { typeLine: info?.typeLine ?? card.typeLine ?? "" };
+  let off = 0;
+  const granted = side.battlefield.map((c) => grantedAffinityOf(book, c)).find((a) => a && affinityHits(a.words, spell, book, card));
+  const affinity = affinityOf(book, card) ?? granted?.kind ?? null;
+  if (affinity) off += side.battlefield.filter((c) => (affinity === "creature" ? isCreature(book, c) : /\bArtifact\b/.test(frontLine(book, c)))).length;
+  for (const [zoneOf, cards] of [
+    ["battlefield", side.battlefield],
+    ["command", side.command],
+  ] as const) {
+    for (const c of cards) {
+      if (c.iid === card.iid) continue;
+      for (const r of reducersOf(book, c)) {
+        if (zoneOf === "command" && !r.eminence) continue;
+        if (reducerHits(r, spell, book, card)) off += r.amount;
+      }
+    }
+  }
+  cost.generic = Math.max(0, cost.generic - off);
+  return cost;
+}
+
 /** A seat loses life (damage, a payment, a drain). On the other seat's
     turn, its "whenever an opponent loses life during your turn, you draw
     that many cards" permanents draw (Kefka, Ruler of Ruin). */
@@ -227,21 +337,66 @@ function loseLife(g: PracticeGame, seat: Seat, n: number, book: CardBook) {
 /** What a seat can pay with now: its floating mana, then its untapped
     sources. */
 export function availableMana(g: PracticeGame, seat: Seat, book: CardBook, exclude: number[] = []): Source[] {
-  return [...poolSources(g.pool?.[seat]), ...manaSources(g.sides[seat], book, g.turn, exclude)];
+  const side = g.sides[seat];
+  // Vivi and Selvala make mana their own way (below), not by tapping for one.
+  const special = (c: PlayCard) => !!powerManaOf(book, c) || !!greatestPowerManaOf(book, c);
+  const all = manaSources(side, book, g.turn, exclude).filter((s) => !special(side.battlefield.find((c) => c.iid === s.iid) ?? ({} as PlayCard)));
+  const ready = (c: PlayCard) => !c.tapped && !exclude.includes(c.iid) && !(isCreature(book, c) && isSick(book, c, g.turn));
+  // 'Other Elves you control have "{T}: Add {G} or {U}."' (Thranduil the Strategist)
+  for (const granter of side.battlefield) {
+    const gm = grantedManaOf(book, granter);
+    if (!gm) continue;
+    for (const c of side.battlefield) {
+      if (c.iid === granter.iid || !isCreature(book, c) || !isType(book, c, gm.type) || !ready(c) || all.some((s) => s.iid === c.iid)) continue;
+      all.push({ iid: c.iid, name: c.name, colors: gm.colors, amount: 1 });
+    }
+  }
+  for (const c of side.battlefield) {
+    // Vivi: {0}, X of {U} and/or {R}, X its power; once a turn, on your turn.
+    const pm = powerManaOf(book, c);
+    if (pm && !exclude.includes(c.iid) && !g.once?.includes(c.iid) && (!pm.yourTurn || g.active === seat)) {
+      const x = stats(book, c).power;
+      if (x > 0) all.push({ iid: c.iid, name: c.name, colors: pm.colors, amount: x, once: true, float: true });
+    }
+    // Selvala: {G}, {T}: X of any colours, X the greatest power among your
+    // creatures. One of your {G} sources pays the {G}.
+    const sm = greatestPowerManaOf(book, c);
+    if (sm && ready(c)) {
+      const x = Math.max(0, ...side.battlefield.filter((y) => isCreature(book, y)).map((y) => stats(book, y).power));
+      const payer = all
+        .filter((s) => s.iid !== c.iid && s.amount === 1 && !s.sacrifice && !s.once && !s.float && s.colors.includes(sm.input))
+        .sort((a, b) => a.colors.length - b.colors.length)[0];
+      if (payer && x >= 2) {
+        all.splice(all.indexOf(payer), 1);
+        all.push({ iid: c.iid, name: c.name, colors: ["W", "U", "B", "R", "G"], amount: x, also: [payer.iid], float: true });
+      }
+    }
+  }
+  return [...poolSources(g.pool?.[seat]), ...all];
 }
 
 /** Pay: tap the sources (sacrificing the one-shot ones) and spend the
     floating mana that was used. */
-function spend(g: PracticeGame, seat: Seat, tap: number[], sources: Source[]) {
-  const floating = new Set(tap.filter((t) => t < 0).map((t) => -t - 1));
+function spend(g: PracticeGame, seat: Seat, paid: Payment, sources: Source[]) {
+  const floating = new Set(paid.tap.filter((t) => t < 0).map((t) => -t - 1));
   if (floating.size && g.pool) g.pool[seat] = g.pool[seat].filter((_, i) => !floating.has(i));
-  for (const t of tap) {
+  for (const t of paid.tap) {
     if (t < 0) continue;
-    if (sources.find((x) => x.iid === t)?.sacrifice) {
+    const src = sources.find((x) => x.iid === t);
+    if (src?.sacrifice) {
       const name = findCard(g, t)?.card.name;
       moveTo(g, t, "graveyard");
       say(g, seat, `${who(seat)} sacrifice${seat === "you" ? "" : "s"} ${name} for mana.`);
-    } else update(g, t, (c) => ({ ...c, tapped: true }));
+    } else if (src?.once) g.once = [...(g.once ?? []), t];
+    else update(g, t, (c) => ({ ...c, tapped: true }));
+    for (const a of src?.also ?? []) update(g, a, (c) => ({ ...c, tapped: true }));
+    // Vivi, Selvala: all of it at once; what this payment leaves floats.
+    if (src?.float) {
+      const left = src.amount - (paid.used[t] ?? 0);
+      if (!g.pool) g.pool = { you: [], opp: [] };
+      if (left > 0) g.pool[seat] = [...g.pool[seat], ...Array.from({ length: left }, () => src.colors.join(""))];
+      say(g, seat, `${faceName(findCard(g, t)?.card ?? ({ name: src.name } as PlayCard))} adds ${src.amount} mana${left > 0 ? ` (${left} left floating)` : ""}.`);
+    }
   }
 }
 
@@ -280,6 +435,7 @@ function aiLandEnters(g: PracticeGame, seat: Seat, land: PlayCard, book: CardBoo
   const shock = shockLife(info);
   const untappedShock = shock > 0 && g.sides[seat].life > 6;
   moveTo(g, land.iid, "battlefield", { tapped: shock > 0 ? !untappedShock : entersTapped(info) });
+  landEntered(g, seat, book);
   if (untappedShock) {
     say(g, seat, `${who(seat)} pay${seat === "you" ? "" : "s"} ${shock} life for ${land.name} to enter untapped.`);
     loseLife(g, seat, shock, book);
@@ -309,6 +465,7 @@ function aiLandEnters(g: PracticeGame, seat: Seat, land: PlayCard, book: CardBoo
   const pickShock = shockLife(pickInfo);
   const pickUntapped = !fetch.tapped && (pickShock ? g.sides[seat].life > 6 : !entersTapped(pickInfo));
   moveTo(g, pick.iid, "battlefield", { tapped: !pickUntapped });
+  landEntered(g, seat, book);
   if (pickShock && pickUntapped) {
     say(g, seat, `${who(seat)} pay${seat === "you" ? "" : "s"} ${pickShock} life for ${pick.name} to enter untapped.`);
     loseLife(g, seat, pickShock, book);
@@ -320,31 +477,72 @@ function aiLandEnters(g: PracticeGame, seat: Seat, land: PlayCard, book: CardBoo
 
 /** The active player's turn begins: untap, and draw (not the first player
     on turn one). */
-export function startTurn(g0: PracticeGame): PracticeGame {
+export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   const g = structuredClone(g0);
   const seat = g.active;
   const side = g.sides[seat];
   g.sides[seat] = { ...side, battlefield: side.battlefield.map((c) => ({ ...c, tapped: false })) };
   g.landPlayed = false;
+  g.attacked = [];
+  g.once = [];
+  g.mayCast = [];
   say(g, seat, `Turn ${g.turn} — ${seat === "you" ? "your turn" : "the opponent's turn"}.`);
+  // "At the beginning of each upkeep, create a 1/1 … Pest" (Beledros
+  // Witherbloom): every upkeep, for whoever controls it.
+  for (const s of ["you", "opp"] as Seat[]) {
+    for (const c of [...g.sides[s].battlefield]) {
+      const t = upkeepTokenOf(book, c);
+      if (!t) continue;
+      addTokens(g, s, { name: t.name, power: t.power, toughness: t.toughness, keywords: [], kind: "creature" }, t.count);
+      say(g, s, `${faceName(c)}: ${s === "you" ? "you create" : "the opponent creates"} ${t.count === 1 ? "a" : t.count} ${t.name} token${t.count === 1 ? "" : "s"} (${t.power}/${t.toughness}).`);
+    }
+  }
   if (g.turn > 1) drawCards(g, seat, 1);
+  checkState(g, book);
   return g;
 }
 
 /** End the turn: damage and "until end of turn" wear off, and the other
     player's turn starts. */
-export function endTurn(g0: PracticeGame): PracticeGame {
+export function endTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   if (g0.winner) return g0;
   const g = structuredClone(g0);
+  g.combat = null;
+  // Damage and "until end of turn" wear off (the cleanup, here before the
+  // end step's checks, which only touch players and copies).
   for (const seat of ["you", "opp"] as Seat[]) {
     const side = g.sides[seat];
-    g.sides[seat] = { ...side, battlefield: side.battlefield.map(({ damage: _d, pump: _p, ...c }) => c) };
+    g.sides[seat] = { ...side, battlefield: side.battlefield.map(({ damage: _d, pump: _p, eot: _e, ...c }) => c) };
   }
-  g.combat = null;
+  endStep(g, book);
+  if (g.winner) return g;
   emptyPool(g);
   g.active = other(g.active);
   g.turn += 1;
-  return startTurn(g);
+  return startTurn(g, book);
+}
+
+/** The end step's automatic triggers: Kratos punishes the creatures that
+    didn't attack, and Inalla's copies are exiled. (Braids asks, so the
+    table runs it first: playerEndStep, aiEndStep.) */
+function endStep(g: PracticeGame, book: CardBook) {
+  const seat = g.active;
+  for (const s of ["you", "opp"] as Seat[]) {
+    for (const c of g.sides[s].battlefield) {
+      if (!punishesIdleOf(book, c)) continue;
+      const idle = g.sides[seat].battlefield.filter((x) => isCreature(book, x) && !(g.attacked ?? []).includes(x.iid)).length;
+      if (!idle) continue;
+      say(g, s, `${faceName(c)} deals ${idle} damage to ${seat === "you" ? "you" : "the opponent"}: ${idle === 1 ? "a creature" : `${idle} creatures`} that didn't attack.`);
+      loseLife(g, seat, idle, book);
+    }
+  }
+  for (const s of ["you", "opp"] as Seat[]) {
+    for (const c of g.sides[s].battlefield.filter((x) => x.exileAtEnd)) {
+      moveTo(g, c.iid, "exile");
+      say(g, s, `The copy of ${c.name} is exiled.`);
+    }
+  }
+  checkState(g, book);
 }
 
 // ── Your side (by hand) ────────────────────────────────────────────────
@@ -352,12 +550,18 @@ export function endTurn(g0: PracticeGame): PracticeGame {
 /** A card from your hand or command zone, played as the solo table would:
     a permanent onto the battlefield, an instant or sorcery to the graveyard.
     Not checked; you're the rules. */
+/** Where you may play a card from: your hand, the command zone, or your
+    graveyard when a card let you this turn (Silas Renn). */
+const playableZone = (g: PracticeGame, at: { seat: Seat; zone: Zone; card: PlayCard }) =>
+  at.seat === "you" && (at.zone === "hand" || at.zone === "command" || (at.zone === "graveyard" && !!g.mayCast?.includes(at.card.iid)));
+
 export function playerPlay(g0: PracticeGame, iid: number, book: CardBook = {}): PracticeGame {
   const at = findCard(g0, iid);
-  if (!at || at.seat !== "you" || (at.zone !== "hand" && at.zone !== "command")) return g0;
+  if (!at || !playableZone(g0, at)) return g0;
   const g = structuredClone(g0);
   const card = at.card;
   if (at.zone === "command") g.tax.you += 1;
+  if (at.zone === "graveyard") g.mayCast = g.mayCast!.filter((i) => i !== iid);
   // The face that's up is what's played (turn a modal card over for its land).
   if (isLand(card) && at.zone === "hand") g.landPlayed = true;
   const triggers = isLand(card) ? null : () => castTriggers(g, "you", card, book);
@@ -369,18 +573,28 @@ export function playerPlay(g0: PracticeGame, iid: number, book: CardBook = {}): 
     say(g, "you", `You ${isLand(card) ? "play" : "cast"} ${card.name}.`, isLand(card) ? undefined : card);
     triggers?.();
     moveTo(g, iid, "battlefield");
+    if (isLand(card)) landEntered(g, "you", book);
   }
   checkState(g, book);
   return g;
 }
 
-/** Your permanent has entered (it resolved, not countered): what it does
-    as it enters that the table carries out (Kefka's discard). */
+/** Your permanent has entered (it resolved, not countered): what the table
+    carries out as it enters (Kefka's discard, Selvala's draw, Inalla's
+    copy, the Elvenking's loot), and an Aura asks where it goes (then
+    Light-Paws may search: the table opens that). */
 export function playerEnters(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
   const at = findCard(g0, iid);
-  if (!at || at.seat !== "you" || at.zone !== "battlefield" || !discardTriggerOf(book, at.card)?.enters) return g0;
+  if (!at || at.seat !== "you" || at.zone !== "battlefield") return g0;
   const g = structuredClone(g0);
-  discardTrigger(g, "you", at.card, book);
+  const copied = entered(g, "you", at.card, book, { cast: true });
+  if (copied && /\benters\b/i.test(faceText(infoOf(book, at.card), at.card))) say(g, "you", `Resolve: the copy's enters ability (${at.card.name}).`);
+  if (discardTriggerOf(book, at.card)?.enters && !g.choice) discardTrigger(g, "you", at.card, book);
+  if (isType(book, at.card, "aura") && !g.choice && [...g.sides.you.battlefield, ...g.sides.opp.battlefield].some((c) => isCreature(book, c))) {
+    const lightPaws = g.sides.you.battlefield.find((c) => auraTutorOf(book, c));
+    g.choice = { kind: "attach", source: at.card.name, by: "you", aura: iid, tutor: lightPaws?.iid };
+  }
+  checkState(g, book);
   return g;
 }
 
@@ -432,10 +646,7 @@ export interface Step {
     what it costs including commander tax. */
 export function castable(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, zone: Zone): boolean {
   if (isLand(card)) return zone === "hand" && !g.landPlayed && g.active === seat;
-  const info = infoOf(book, card);
-  const cost = parseCost(info?.manaCost ?? null);
-  if (zone === "command") cost.generic += 2 * g.tax[seat];
-  return aiPay(g, seat, cost, availableMana(g, seat, book), book) !== null;
+  return aiPay(g, seat, spellCost(g, seat, card, book, zone), availableMana(g, seat, book), book) !== null;
 }
 
 /** A cast in stages, so the player can answer it: "pay" pays and announces
@@ -474,7 +685,9 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   }
 
   if (action.kind === "cast") {
-    if (at.zone !== "hand" && at.zone !== "command") return fail(`(The opponent tried to cast ${card.name} from its ${at.zone}.)`);
+    // From its graveyard only when a card let it, this turn (Silas Renn).
+    const fromGrave = at.zone === "graveyard" && !!g.mayCast?.includes(card.iid);
+    if (at.zone !== "hand" && at.zone !== "command" && !fromGrave) return fail(`(The opponent tried to cast ${card.name} from its ${at.zone}.)`);
     if (isLand(card)) return fail(`(The opponent tried to cast the land ${card.name}.)`);
     if (opts.stage === "counter") {
       moveTo(g, card.iid, card.commander ? "command" : "graveyard");
@@ -485,13 +698,13 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
       resolveCast(g, seat, card, action, book);
       return { game: g, ok: true };
     }
-    const cost = parseCost(info?.manaCost ?? null);
-    if (at.zone === "command") cost.generic += 2 * g.tax[seat];
+    const cost = spellCost(g, seat, card, book, at.zone);
     const sources = availableMana(g, seat, book);
     const paid = aiPay(g, seat, cost, sources, book, { x: action.x ?? 0 });
     if (!paid) return fail(`The opponent can't pay for ${card.name} yet.`);
-    spend(g, seat, paid.tap, sources);
+    spend(g, seat, paid, sources);
     if (at.zone === "command") g.tax[seat] += 1;
+    if (fromGrave) g.mayCast = g.mayCast!.filter((i) => i !== card.iid);
     const x = cost.xCount ? ` (X = ${action.x ?? 0})` : "";
     const target = action.effects.map((e) => parseCardId(e.target)).find((t) => t !== null);
     const on = target !== undefined && target !== null ? findCard(g, target)?.card.name : undefined;
@@ -509,6 +722,18 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   // A fetch land already cracked itself when it was played.
   if (at.zone === "graveyard" && fetchOf(info)) return { game: g0, ok: true };
   if (at.zone !== "battlefield") return fail(`(The opponent tried to use ${card.name}, which isn't in play.)`);
+  // Inalla's "tap five Wizards", Beledros's "pay 10 life: untap your
+  // lands": the table carries them out, whatever effects the plan gave.
+  const tribe = tapTribeOf(book, card);
+  if (tribe && !action.tap_card && !action.mana) {
+    if (!tapTribe(g, seat, card, tribe, book)) return fail(`(${faceName(card)} needs ${tribe.count} untapped ${tribe.type}s.)`);
+    return { game: g, ok: true };
+  }
+  const untap = untapLandsOf(book, card);
+  if (untap && !action.tap_card && !action.mana && (action.life ?? untap.life) >= untap.life) {
+    if (!untapLands(g, seat, card, untap.life, book)) return fail(`(${faceName(card)}'s ability is once a turn.)`);
+    return { game: g, ok: true };
+  }
   // Kefka's {8}: the table carries it out (the player picks what to
   // sacrifice; Kefka transforms), whatever effects the plan gave it.
   const edict = edictOf(book, card);
@@ -517,7 +742,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     const sources = availableMana(g, seat, book);
     const paid = aiPay(g, seat, parseCost(edict.mana), sources, book);
     if (!paid) return fail(`The opponent can't pay for ${faceName(card)}'s ability.`);
-    spend(g, seat, paid.tap, sources);
+    spend(g, seat, paid, sources);
     loseLife(g, seat, paid.life, book);
     say(g, seat, `${who(seat)} ${verb(seat, "activate")} ${faceName(card)}.`, card);
     edictResolve(g, seat, card, edict, book);
@@ -532,7 +757,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   const sources = availableMana(g, seat, book, action.tap_card ? [card.iid] : []);
   const paid = aiPay(g, seat, cost, sources, book, { life: action.life ?? 0 });
   if (!paid) return fail(`The opponent can't pay for ${card.name}'s ability.`);
-  spend(g, seat, paid.tap, sources);
+  spend(g, seat, paid, sources);
   if (action.tap_card) update(g, card.iid, (c) => ({ ...c, tapped: true }));
   loseLife(g, seat, paid.life, book);
   if (action.sacrifice_card) moveTo(g, card.iid, "graveyard");
@@ -567,7 +792,7 @@ export function aiResponds(g0: PracticeGame, iid: number, book: CardBook): Pract
     const exact = !k.hits({ ...spell, manaValue: spell.manaValue + 1 });
     if (spell.manaValue < 2 && !at.card.commander && !exact) continue;
     const sources = availableMana(g0, "opp", book);
-    const paid = aiPay(g0, "opp", parseCost(infoOf(book, c)?.manaCost ?? null), sources, book, { x: k.xIsValue ? spell.manaValue : 0 });
+    const paid = aiPay(g0, "opp", spellCost(g0, "opp", c, book, "hand"), sources, book, { x: k.xIsValue ? spell.manaValue : 0 });
     let free: "commander" | "exile-blue" | null = null;
     let pitched: PlayCard | null = null;
     if (!paid && k.free === "commander" && commanderOut) free = "commander";
@@ -578,7 +803,7 @@ export function aiResponds(g0: PracticeGame, iid: number, book: CardBook): Pract
     if (!paid && !free) continue;
     const g = structuredClone(g0);
     if (paid) {
-      spend(g, "opp", paid.tap, sources);
+      spend(g, "opp", paid, sources);
       loseLife(g, "opp", paid.life, book);
     }
     if (pitched) {
@@ -776,20 +1001,66 @@ function edictResolve(g: PracticeGame, by: Seat, source: PlayCard, e: Edict, boo
   }
 }
 
+/** The cards you may pick for the choice the game is waiting on. */
+export function choiceTargets(g: PracticeGame, book: CardBook): number[] {
+  const c = g.choice;
+  if (!c) return [];
+  const you = g.sides.you;
+  switch (c.kind) {
+    case "discard":
+      return you.hand.map((x) => x.iid);
+    case "sacrifice":
+      return you.battlefield.filter((x) => (c.types ? sharedTypes(book, x, c.types).length > 0 : sacrificable(book, x, c.what ?? "permanent"))).map((x) => x.iid);
+    case "put":
+      return you.hand.filter((x) => isPermanentCard(book, x)).map((x) => x.iid);
+    case "attach":
+      return [...you.battlefield, ...g.sides.opp.battlefield].filter((x) => x.iid !== c.aura && isCreature(book, x)).map((x) => x.iid);
+  }
+}
+
 /** Your pick for the choice the game is waiting on: the card you discard,
-    or the permanent you sacrifice. */
+    the permanent you sacrifice, the card you put onto the battlefield, or
+    the creature your Aura goes on. */
 export function resolveChoice(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
   const choice = g0.choice;
-  if (!choice) return g0;
-  const at = findCard(g0, iid);
-  if (!at || at.seat !== "you") return g0;
-  if (choice.kind === "discard" && at.zone !== "hand") return g0;
-  if (choice.kind === "sacrifice" && (at.zone !== "battlefield" || !sacrificable(book, at.card, choice.what ?? "permanent"))) return g0;
+  if (!choice || !choiceTargets(g0, book).includes(iid)) return g0;
+  const at = findCard(g0, iid)!;
   const g = structuredClone(g0);
   g.choice = null;
-  moveTo(g, iid, "graveyard");
-  say(g, "you", `You ${choice.kind === "discard" ? "discard" : "sacrifice"} ${at.card.name}.`);
-  if (choice.kind === "discard") drawForTypes(g, { ...choice, discarded: [...(choice.discarded ?? []), infoOf(book, at.card)?.typeLine ?? at.card.typeLine ?? ""] }, book);
+  if (choice.kind === "discard") {
+    moveTo(g, iid, "graveyard");
+    say(g, "you", `You discard ${at.card.name}.`);
+    if (!choice.loot) drawForTypes(g, { ...choice, discarded: [...(choice.discarded ?? []), infoOf(book, at.card)?.typeLine ?? at.card.typeLine ?? ""] }, book);
+  } else if (choice.kind === "sacrifice") {
+    moveTo(g, iid, "graveyard");
+    say(g, "you", `You sacrifice ${at.card.name}${choice.braids ? ` (${choice.source})` : ""}.`);
+    if (choice.braids === "yours") braidsAnswer(g, "you", sharedTypes(book, at.card, choice.types ?? BRAIDS_TYPES), choice.life ?? 2, choice.source, book);
+  } else if (choice.kind === "put") {
+    moveTo(g, iid, "battlefield");
+    say(g, "you", `You put ${at.card.name} onto the battlefield (${choice.source}).`, at.card);
+    if (isLand(at.card)) landEntered(g, "you", book);
+    else entered(g, "you", at.card, book, { cast: false });
+  } else {
+    update(g, choice.aura!, (c) => ({ ...c, attachedTo: iid }));
+    say(g, "you", `${choice.source} goes on ${at.card.name}.`);
+  }
+  checkState(g, book);
+  return g;
+}
+
+/** Not doing what the choice offers, when it's optional: Braids's
+    sacrifice (yours: nothing happens; the AI's: you lose the life and it
+    draws), or The Ur-Dragon's permanent. */
+export function declineChoice(g0: PracticeGame, book: CardBook): PracticeGame {
+  const c = g0.choice;
+  if (!c?.decline) return g0;
+  const g = structuredClone(g0);
+  g.choice = null;
+  if (c.braids === "theirs") {
+    say(g, "you", `You don't sacrifice: you lose ${c.life ?? 2} life, and the opponent draws a card.`);
+    loseLife(g, "you", c.life ?? 2, book);
+    drawCards(g, "opp", 1);
+  }
   checkState(g, book);
   return g;
 }
@@ -811,6 +1082,298 @@ export function playerEdict(g0: PracticeGame, iid: number, book: CardBook): Prac
   return g;
 }
 
+// ── Commanders' triggers (Winota, Selvala, Inalla, Light-Paws, Thranduil,
+// The Ur-Dragon, Silas Renn, Braids, Beledros): see lib/practice/abilities.
+
+/** A land entered under a seat's control: its landfall tokens (Thranduil). */
+function landEntered(g: PracticeGame, seat: Seat, book: CardBook) {
+  for (const c of [...g.sides[seat].battlefield]) {
+    const t = landfallTokenOf(book, c);
+    if (!t) continue;
+    addTokens(g, seat, { name: t.name, power: t.power, toughness: t.toughness, keywords: t.keywords, kind: "creature" }, t.count);
+    say(g, seat, `${faceName(c)}: landfall, ${t.count === 1 ? "a" : t.count} ${t.name} token${t.count === 1 ? "" : "s"} (${t.power}/${t.toughness}).`);
+  }
+}
+
+/** A permanent entered under a seat's control: Selvala's draw for the
+    biggest creature, the Elvenking's loot, Inalla's copy (paid, {1}), and
+    the AI's Light-Paws search. Returns whether a copy was made, so the AI's
+    enters effects can happen again. */
+function entered(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, opts: { cast: boolean }): boolean {
+  const at = findCard(g, card.iid);
+  if (!at || at.zone !== "battlefield") return false;
+  const now = at.card;
+  // Selvala: "its controller may draw a card if its power is greater than
+  // each other creature's power".
+  if (isCreature(book, now)) {
+    const p = stats(book, now).power;
+    const others = [...g.sides.you.battlefield, ...g.sides.opp.battlefield].filter((c) => c.iid !== now.iid && isCreature(book, c));
+    if (others.every((c) => stats(book, c).power < p)) {
+      for (const s of ["you", "opp"] as Seat[]) {
+        for (const c of g.sides[s].battlefield) {
+          if (c.iid === now.iid || !drawsForBiggest(book, c)) continue;
+          say(g, seat, `${faceName(c)}: ${now.name} is the biggest creature; ${seat === "you" ? "you draw" : "the opponent draws"} a card.`);
+          drawCards(g, seat, 1);
+        }
+      }
+    }
+  }
+  // Thranduil, the Elvenking: another legendary Elf enters: draw two, then discard one.
+  for (const c of [...g.sides[seat].battlefield]) {
+    const l = lootOnEnterOf(book, c);
+    if (!l || c.iid === now.iid || !isType(book, now, l.type) || (l.legendary && !isType(book, now, "legendary"))) continue;
+    say(g, seat, `${faceName(c)}: ${seat === "you" ? "you draw" : "the opponent draws"} ${l.draw}, then discard${seat === "you" ? "" : "s"} a card.`);
+    drawCards(g, seat, l.draw);
+    if (seat === "opp") {
+      const pick = aiDiscardPick(g, "opp", book);
+      if (pick) {
+        moveTo(g, pick.iid, "graveyard");
+        say(g, "opp", `The opponent discards ${pick.name}.`);
+      }
+    } else if (!g.choice && g.sides.you.hand.length) g.choice = { kind: "discard", source: faceName(c), by: "you", loot: true };
+  }
+  // Inalla's eminence: another nontoken Wizard enters: pay {1} for a hasty copy.
+  let copied = false;
+  if (!now.token && !now.copy) {
+    for (const c of [...g.sides[seat].battlefield, ...g.sides[seat].command]) {
+      const e = copyOnEnterOf(book, c);
+      if (!e || c.iid === now.iid || !isType(book, now, e.type)) continue;
+      const cost = parseCost(e.cost);
+      const sources = availableMana(g, seat, book);
+      const paid = seat === "you" ? youPay(g, cost, sources, book) : aiPay(g, seat, cost, sources, book);
+      if (!paid) {
+        say(g, seat, `(${faceName(c)}: no mana left for a copy of ${now.name}.)`);
+        break;
+      }
+      spend(g, seat, paid, sources);
+      loseLife(g, seat, paid.life, book);
+      const { counters: _c, damage: _d, attachedTo: _a, pump: _p, boost: _b, ...base } = now;
+      const copy: PlayCard = { ...base, iid: g.nextIid++, copy: true, exileAtEnd: true, eot: ["Haste"], commander: false, enteredTurn: g.turn, tapped: false };
+      g.sides[seat] = { ...g.sides[seat], battlefield: [...g.sides[seat].battlefield, copy] };
+      say(g, seat, `${faceName(c)}: ${who(seat)} ${verb(seat, "pay")} ${e.cost} for a copy of ${now.name}, with haste. It's exiled at the end step.`, copy);
+      entered(g, seat, copy, book, { cast: false });
+      copied = true;
+      break;
+    }
+  }
+  // Light-Paws, the AI's (yours opens a search at the table): an Aura it
+  // cast finds another, no pricier, with a new name, onto Light-Paws.
+  if (opts.cast && seat === "opp" && isType(book, now, "aura")) {
+    for (const lp of g.sides.opp.battlefield) if (auraTutorOf(book, lp)) aiAuraTutor(g, lp, now, book);
+  }
+  return copied;
+}
+
+/** What Light-Paws may find for an Aura of this mana value: an Aura no
+    pricier, with a name none of your Auras has. */
+export function auraTutorTest(g: PracticeGame, seat: Seat, aura: PlayCard, book: CardBook): (c: PlayCard) => boolean {
+  const mv = infoOf(book, aura)?.manaValue ?? 0;
+  const names = new Set(g.sides[seat].battlefield.filter((c) => isType(book, c, "aura")).map((c) => c.name));
+  return (c) => isType(book, c, "aura") && (infoOf(book, c)?.manaValue ?? 0) <= mv && !names.has(c.name);
+}
+
+function aiAuraTutor(g: PracticeGame, lightPaws: PlayCard, aura: PlayCard, book: CardBook) {
+  const test = auraTutorTest(g, "opp", aura, book);
+  const pick = g.sides.opp.library.filter(test).sort((a, b) => (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0))[0];
+  g.sides.opp = { ...g.sides.opp, library: shuffled(g.sides.opp.library.filter((c) => c !== pick)) };
+  if (!pick) {
+    say(g, "opp", `${faceName(lightPaws)}: the opponent finds no Aura.`);
+    return;
+  }
+  g.sides.opp = { ...g.sides.opp, library: [pick, ...g.sides.opp.library] };
+  moveTo(g, pick.iid, "battlefield");
+  update(g, pick.iid, (c) => ({ ...c, attachedTo: lightPaws.iid }));
+  say(g, "opp", `${faceName(lightPaws)}: the opponent finds ${pick.name} and puts it on ${faceName(lightPaws)}.`, pick);
+}
+
+/** The AI's Aura goes on what its plan targets, else on the player's best
+    creature if it's a curse (can't attack or block, -N/-N), else on its own
+    best: Light-Paws, its commander, its biggest. Nothing to enchant: it's
+    put into the graveyard. */
+function aiAttach(g: PracticeGame, seat: Seat, aura: PlayCard, action: PlanAction, book: CardBook) {
+  const creatures = (s: Seat) => g.sides[s].battlefield.filter((c) => c.iid !== aura.iid && isCreature(book, c));
+  const targeted = action.effects.map((e) => parseCardId(e.target)).find((t) => t !== null && [...creatures("you"), ...creatures("opp")].some((c) => c.iid === t));
+  const text = faceText(infoOf(book, aura), aura).toLowerCase();
+  const curse = /can't attack|can't block|gets -\d|doesn't untap/.test(text);
+  const biggest = (cs: PlayCard[]) => [...cs].sort((a, b) => stats(book, b).power - stats(book, a).power)[0];
+  const mine = creatures(seat);
+  const host =
+    targeted ??
+    (curse
+      ? biggest(creatures(other(seat)))?.iid
+      : (mine.find((c) => auraTutorOf(book, c)) ?? mine.find((c) => c.commander) ?? biggest(mine))?.iid);
+  if (host === undefined) {
+    moveTo(g, aura.iid, "graveyard");
+    say(g, seat, `${aura.name} has nothing to enchant.`);
+    return;
+  }
+  update(g, aura.iid, (c) => ({ ...c, attachedTo: host }));
+  say(g, seat, `${aura.name} goes on ${findCard(g, host)?.card.name ?? "a creature"}.`);
+}
+
+/** Winota: a non-Human attacker looks at the top six for a Human to put
+    in tapped and attacking (indestructible this turn); the rest go to the
+    bottom in a random order. The best Human is picked for you too. */
+function winotaTrigger(g: PracticeGame, seat: Seat, source: PlayCard, w: { look: number; type: string }, book: CardBook) {
+  const top = g.sides[seat].library.slice(0, w.look);
+  const pick = top
+    .filter((c) => isCreature(book, c) && isType(book, c, w.type))
+    .sort((a, b) => (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0) || stats(book, b).power - stats(book, a).power)[0];
+  const rest = new Set(top.filter((c) => c !== pick).map((c) => c.iid));
+  if (pick) {
+    moveTo(g, pick.iid, "battlefield", { tapped: true });
+    update(g, pick.iid, (c) => ({ ...c, eot: [...(c.eot ?? []), "Indestructible"] }));
+    if (g.combat) g.combat = { ...g.combat, attackers: [...g.combat.attackers, pick.iid] };
+    say(g, seat, `${faceName(source)}: ${who(seat)} ${verb(seat, "put")} ${pick.name} onto the battlefield tapped and attacking, indestructible this turn.`, pick);
+    entered(g, seat, pick, book, { cast: false });
+  } else say(g, seat, `${faceName(source)}: no ${w.type} among the top ${top.length}.`);
+  const lib = g.sides[seat].library;
+  g.sides[seat] = { ...g.sides[seat], library: [...lib.filter((c) => !rest.has(c.iid)), ...shuffled(lib.filter((c) => rest.has(c.iid)))] };
+}
+
+const isPermanentCard = (book: CardBook, c: PlayCard) => /\b(Artifact|Creature|Enchantment|Land|Planeswalker|Battle)\b/.test(frontLine(book, c));
+
+/** The Ur-Dragon: Dragons attacked, so draw that many, then put a permanent
+    card from the hand onto the battlefield: the AI its priciest; you choose
+    (or none). */
+function putFromHand(g: PracticeGame, seat: Seat, source: string, book: CardBook) {
+  const hand = g.sides[seat].hand.filter((c) => isPermanentCard(book, c));
+  if (!hand.length) return;
+  if (seat === "you") {
+    if (!g.choice) g.choice = { kind: "put", source, by: "you", decline: "None" };
+    return;
+  }
+  const pick = [...hand].sort((a, b) => Number(isLand(a)) - Number(isLand(b)) || (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0))[0]!;
+  moveTo(g, pick.iid, "battlefield");
+  say(g, "opp", `${source}: the opponent puts ${pick.name} onto the battlefield.`, pick);
+  if (isLand(pick)) landEntered(g, "opp", book);
+  else entered(g, "opp", pick, book, { cast: false });
+}
+
+const BRAIDS_TYPES = ["artifact", "creature", "enchantment", "land", "planeswalker"];
+const sharedTypes = (book: CardBook, c: PlayCard, types: string[]) => cardTypes(frontLine(book, c)).filter((t) => types.includes(t));
+
+/** Braids answered: the other player sacrifices a permanent sharing a type,
+    or loses the life and Braids's controller draws. The AI keeps what's
+    worth more than that; you choose (the game's choice). */
+function braidsAnswer(g: PracticeGame, by: Seat, types: string[], life: number, source: string, book: CardBook) {
+  const victim = other(by);
+  const options = g.sides[victim].battlefield.filter((c) => sharedTypes(book, c, types).length);
+  const pay = () => {
+    say(g, victim, `${victim === "you" ? "You don't sacrifice: you lose" : "The opponent doesn't sacrifice: it loses"} ${life} life, and ${by === "you" ? "you draw" : "the opponent draws"} a card.`);
+    loseLife(g, victim, life, book);
+    drawCards(g, by, 1);
+  };
+  if (!options.length) return pay();
+  if (victim === "you") {
+    g.choice = { kind: "sacrifice", source, by, types, decline: `Lose ${life} life`, braids: "theirs", life };
+    return;
+  }
+  // Fodder it won't miss; anything but its commander when the life hurts.
+  const lands = g.sides.opp.battlefield.filter(isLand).length;
+  const cheap = options.find((c) => c.token || c.copy || (isLand(c) && lands >= 6));
+  const low = g.sides.opp.life <= life + 4;
+  const pick = cheap ?? (low ? [...options].filter((c) => !c.commander).sort((a, b) => (infoOf(book, a)?.manaValue ?? 0) - (infoOf(book, b)?.manaValue ?? 0))[0] : undefined);
+  if (!pick) return pay();
+  moveTo(g, pick.iid, "graveyard");
+  say(g, "opp", `The opponent sacrifices ${pick.name} (${source}).`);
+}
+
+/** Your end step, with Braids: you may sacrifice an artifact, creature,
+    enchantment, land or planeswalker (the game's choice, with "Don't"). */
+export function playerEndStep(g0: PracticeGame, book: CardBook): PracticeGame {
+  if (g0.choice || g0.winner || g0.active !== "you") return g0;
+  const braids = g0.sides.you.battlefield.find((c) => braidsOf(book, c));
+  if (!braids || !g0.sides.you.battlefield.some((c) => sharedTypes(book, c, BRAIDS_TYPES).length)) return g0;
+  const g = structuredClone(g0);
+  g.choice = { kind: "sacrifice", source: faceName(braids), by: "you", types: BRAIDS_TYPES, decline: "Don't sacrifice", braids: "yours", life: braidsOf(book, braids)!.life };
+  return g;
+}
+
+/** The AI's end step: Inalla taps five Wizards for 7 life as often as it
+    can, and Braids sacrifices fodder (a copy about to be exiled, a token, a
+    spare land) for the player to answer. */
+export function aiEndStep(g0: PracticeGame, book: CardBook): PracticeGame {
+  if (g0.winner || g0.active !== "opp") return g0;
+  const g = structuredClone(g0);
+  for (const c of [...g.sides.opp.battlefield]) {
+    const t = tapTribeOf(book, c);
+    if (!t) continue;
+    for (let n = 0; n < 4 && !g.winner; n++) if (!tapTribe(g, "opp", c, t, book)) break;
+  }
+  const braids = g.sides.opp.battlefield.find((c) => braidsOf(book, c));
+  if (braids && !g.choice && !g.winner) {
+    const lands = g.sides.opp.battlefield.filter(isLand).length;
+    const fodder =
+      g.sides.opp.battlefield.find((c) => c.exileAtEnd) ??
+      g.sides.opp.battlefield.find((c) => c.token) ??
+      (lands >= 6 ? g.sides.opp.battlefield.find((c) => isLand(c) && /\bBasic\b/.test(c.typeLine ?? "")) : undefined);
+    if (fodder) {
+      const types = sharedTypes(book, fodder, BRAIDS_TYPES);
+      moveTo(g, fodder.iid, "graveyard");
+      say(g, "opp", `${faceName(braids)}: the opponent sacrifices ${fodder.name}. Sacrifice a ${types.join(" or ")}, or lose ${braidsOf(book, braids)!.life} life and it draws.`);
+      braidsAnswer(g, "opp", types, braidsOf(book, braids)!.life, faceName(braids), book);
+    }
+  }
+  checkState(g, book);
+  return g;
+}
+
+/** Inalla: tap untapped Wizards (copies and tokens first; sickness doesn't
+    matter, it isn't {T}) for the other player to lose the life. */
+function tapTribe(g: PracticeGame, seat: Seat, source: PlayCard, t: { count: number; type: string; life: number }, book: CardBook): boolean {
+  const ready = g.sides[seat].battlefield
+    .filter((c) => !c.tapped && isCreature(book, c) && isType(book, c, t.type))
+    .sort((a, b) => Number(!!b.exileAtEnd) - Number(!!a.exileAtEnd) || Number(!!b.token) - Number(!!a.token) || stats(book, a).power - stats(book, b).power);
+  if (ready.length < t.count) return false;
+  for (const c of ready.slice(0, t.count)) update(g, c.iid, (x) => ({ ...x, tapped: true }));
+  const foe = other(seat);
+  say(g, seat, `${faceName(source)}: ${who(seat)} ${verb(seat, "tap")} ${t.count} ${t.type}s; ${foe === "you" ? "you lose" : "the opponent loses"} ${t.life} life.`);
+  loseLife(g, foe, t.life, book);
+  checkState(g, book);
+  return true;
+}
+
+/** Your Inalla: "Tap five untapped Wizards you control: Target player loses 7 life." */
+export function playerTapTribe(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
+  const at = findCard(g0, iid);
+  const t = at && at.seat === "you" && at.zone === "battlefield" ? tapTribeOf(book, at.card) : null;
+  if (!at || !t) return g0;
+  const g = structuredClone(g0);
+  if (!tapTribe(g, "you", at.card, t, book)) say(g, "you", `(${faceName(at.card)}: you need ${t.count} untapped ${t.type}s.)`);
+  return g;
+}
+
+/** Beledros Witherbloom: pay 10 life, untap all your lands; once a turn. */
+function untapLands(g: PracticeGame, seat: Seat, card: PlayCard, life: number, book: CardBook): boolean {
+  if (g.once?.includes(card.iid)) return false;
+  g.once = [...(g.once ?? []), card.iid];
+  g.sides[seat] = { ...g.sides[seat], battlefield: g.sides[seat].battlefield.map((c) => (isLand(c) ? { ...c, tapped: false } : c)) };
+  say(g, seat, `${who(seat)} ${verb(seat, "pay")} ${life} life to untap ${seat === "you" ? "your" : "its"} lands (${faceName(card)}).`);
+  loseLife(g, seat, life, book);
+  checkState(g, book);
+  return true;
+}
+
+export function playerUntapLands(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
+  const at = findCard(g0, iid);
+  const u = at && at.seat === "you" && at.zone === "battlefield" ? untapLandsOf(book, at.card) : null;
+  if (!at || !u || g0.once?.includes(iid)) return g0;
+  const g = structuredClone(g0);
+  untapLands(g, "you", at.card, u.life, book);
+  return g;
+}
+
+/** The AI's casts from its graveyard this turn (Silas Renn), when it can
+    pay: as actions for the table to play out. */
+export function aiGraveyardCasts(g: PracticeGame, book: CardBook): PlanAction[] {
+  return (g.mayCast ?? []).flatMap((iid) => {
+    const c = g.sides.opp.graveyard.find((x) => x.iid === iid);
+    if (!c || !castable(g, "opp", c, book, "graveyard")) return [];
+    return [{ kind: "cast" as const, card: cardId(iid), x: null, tap_card: null, sacrifice_card: null, mana: null, life: null, effects: [] }];
+  });
+}
+
 // ── Your casts, paid for you; your searches ─────────────────────────────
 
 /** You cast a card: the mana it needs is tapped for you first (lands, then
@@ -819,11 +1382,10 @@ export function playerEdict(g0: PracticeGame, iid: number, book: CardBook): Prac
     can't pay for (tap by hand); X is left to you. Undo puts it all back. */
 export function playerCast(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
   const at = findCard(g0, iid);
-  if (!at || at.seat !== "you" || (at.zone !== "hand" && at.zone !== "command")) return g0;
+  if (!at || !playableZone(g0, at)) return g0;
   if (isLand(at.card) || g0.winner) return playerPlay(g0, iid, book);
   const info = infoOf(book, at.card);
-  const cost = parseCost(info?.manaCost ?? null);
-  if (at.zone === "command") cost.generic += 2 * g0.tax.you;
+  const cost = spellCost(g0, "you", at.card, book, at.zone);
   if (hasAltCost(info) || totalOf(cost) === 0) return playerPlay(g0, iid, book);
   const g = structuredClone(g0);
   payForYou(g, cost, at.card.name, book);
@@ -849,18 +1411,26 @@ function payForYou(g: PracticeGame, cost: Cost, what: string, book: CardBook) {
   // The tapped ones by name; a one-shot source (a Treasure) logs its own sacrifice.
   const names = paid.tap.filter((t) => t > 0 && !sources.find((x) => x.iid === t)?.sacrifice).map((t) => findCard(g, t)?.card.name ?? "");
   if (names.length || paid.life) say(g, "you", `You ${names.length ? `tap ${names.join(", ")}` : ""}${names.length && paid.life ? " and " : ""}${paid.life ? `pay ${paid.life} life` : ""} for ${what}${cost.xCount ? " (tap for X by hand)" : ""}.`);
-  spend(g, "you", paid.tap, sources);
+  spend(g, "you", paid, sources);
   loseLife(g, "you", paid.life, book);
 }
 
 /** One find of a search: from your library to your hand or the
     battlefield. ("On top" waits for finishSearch, after the shuffle.) */
-export function playerFind(g0: PracticeGame, iid: number, to: "hand" | "battlefield", tapped = false): PracticeGame {
+export function playerFind(g0: PracticeGame, iid: number, to: "hand" | "battlefield", tapped = false, book: CardBook = {}, attachTo?: number): PracticeGame {
   const at = findCard(g0, iid);
   if (!at || at.seat !== "you" || at.zone !== "library") return g0;
   const g = structuredClone(g0);
   moveTo(g, iid, to, { tapped });
-  say(g, "you", `You find ${at.card.name}${to === "hand" ? " (to your hand)" : ""}.`);
+  // An Aura found for Light-Paws goes on Light-Paws.
+  const host = attachTo !== undefined ? findCard(g, attachTo) : null;
+  if (to === "battlefield" && host?.zone === "battlefield") update(g, iid, (c) => ({ ...c, attachedTo: attachTo }));
+  say(g, "you", `You find ${at.card.name}${to === "hand" ? " (to your hand)" : host ? ` and put it on ${host.card.name}` : ""}.`);
+  if (to === "battlefield") {
+    if (isLand(at.card)) landEntered(g, "you", book);
+    else entered(g, "you", at.card, book, { cast: false });
+  }
+  checkState(g, book);
   return g;
 }
 
@@ -898,10 +1468,15 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
     moveTo(g, card.iid, "graveyard");
   } else {
     moveTo(g, card.iid, "battlefield");
+    // An Aura goes on what it targets, or where it helps most.
+    if (isType(book, card, "aura")) aiAttach(g, seat, card, action, book);
     // Kefka's discard is the table's to carry out, not the plan's.
     const auto = discardTriggerOf(book, card)?.enters;
-    applyEffects(g, seat, auto ? action.effects.filter((e) => e.type !== "discard" && e.type !== "draw") : action.effects, book, card.name);
+    const effects = auto ? action.effects.filter((e) => e.type !== "discard" && e.type !== "draw") : action.effects;
+    applyEffects(g, seat, effects, book, card.name);
     if (auto) discardTrigger(g, seat, card, book);
+    // Inalla's copy enters too: its enters ability happens again.
+    if (entered(g, seat, card, book, { cast: true }) && effects.length) applyEffects(g, seat, effects, book, `${card.name} (the copy)`);
   }
   checkState(g, book);
 }
@@ -920,7 +1495,7 @@ export function aiRemovalAction(g: PracticeGame, book: CardBook, targets: number
   if (!options.length) return null;
   const sources = availableMana(g, "opp", book);
   const affordable = options
-    .filter(({ c }) => aiPay(g, "opp", parseCost(infoOf(book, c)?.manaCost ?? null), sources, book) !== null)
+    .filter(({ c }) => aiPay(g, "opp", spellCost(g, "opp", c, book, "hand"), sources, book) !== null)
     .sort((a, b) => (infoOf(book, a.c)?.manaValue ?? 0) - (infoOf(book, b.c)?.manaValue ?? 0));
   if (!affordable.length) return null;
   const attacking = new Set(g.combat?.attackers ?? []);
@@ -1058,6 +1633,10 @@ function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: Ca
         moveTo(g, found.iid, e.to === "hand" ? "hand" : "battlefield", { tapped: !!e.tapped });
         g.sides[s] = { ...g.sides[s], library: shuffled(g.sides[s].library) };
         say(g, caster, `${source} finds ${found.name}${e.to === "hand" ? " (to hand)" : ""}.`);
+        if (e.to !== "hand") {
+          if (isLand(found)) landEntered(g, s, book);
+          else entered(g, s, found, book, { cast: false });
+        }
         break;
       }
       case "mana": {
@@ -1114,11 +1693,36 @@ export function declareAttackers(g0: PracticeGame, seat: Seat, iids: number[], b
   say(g, seat, `${who(seat)} attack${seat === "you" ? "" : "s"} with ${names.join(", ")}.`);
   const combat: Combat = { attacker: seat, attackers, blocks: {}, stage: "attack" };
   g.combat = combat;
+  g.attacked = [...(g.attacked ?? []), ...attackers];
   // "Whenever Kefka attacks": its discard, before blocks.
   for (const iid of attackers) {
     const card = findCard(g, iid)!.card;
     if (discardTriggerOf(book, card)?.attacks && !g.choice) discardTrigger(g, seat, card, book);
   }
+  // Winota: each non-Human attacker brings a Human in from the top six.
+  const winotas = g.sides[seat].battlefield.flatMap((c) => {
+    const w = winotaOf(book, c);
+    return w ? [{ c, w }] : [];
+  });
+  for (const iid of attackers) {
+    const a = findCard(g, iid)?.card;
+    if (!a) continue;
+    for (const { c, w } of winotas) if (!isType(book, a, w.notType)) winotaTrigger(g, seat, c, w, book);
+  }
+  // The Ur-Dragon: one card for each attacking Dragon, then a permanent from the hand.
+  for (const c of [...g.sides[seat].battlefield]) {
+    const t = tribeAttackOf(book, c);
+    if (!t) continue;
+    const n = attackers.filter((iid) => {
+      const a = findCard(g, iid)?.card;
+      return !!a && isType(book, a, t.type);
+    }).length;
+    if (!n) continue;
+    say(g, seat, `${faceName(c)}: ${n} ${t.type}${n === 1 ? "" : "s"} attack; ${seat === "you" ? "you draw" : "the opponent draws"} ${n}.`);
+    drawCards(g, seat, n);
+    putFromHand(g, seat, faceName(c), book);
+  }
+  checkState(g, book);
   return g;
 }
 
@@ -1259,6 +1863,18 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
     player, draw a card". */
 function hitTriggers(g: PracticeGame, seat: Seat, hitter: PlayCard, book: CardBook) {
   const foe = other(seat);
+  // Silas Renn: an artifact card from the graveyard may be cast this turn
+  // (the priciest; yours shows "Cast it" in its menu).
+  const kind = castFromGraveyardOnHitOf(book, hitter);
+  if (kind) {
+    const pick = g.sides[seat].graveyard
+      .filter((c) => cardTypes(frontLine(book, c)).includes(kind) && !(g.mayCast ?? []).includes(c.iid))
+      .sort((a, b) => (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0))[0];
+    if (pick) {
+      g.mayCast = [...(g.mayCast ?? []), pick.iid];
+      say(g, seat, `${faceName(hitter)}: ${seat === "you" ? "you" : "the opponent"} may cast ${pick.name} from ${seat === "you" ? "your" : "its"} graveyard this turn.`);
+    }
+  }
   for (const c of [...g.sides[seat].battlefield]) {
     for (const t of hitTriggersOf(book, c)) {
       if (t.ninjas ? !isNinja(book, hitter) : c.iid !== hitter.iid) continue;
@@ -1331,7 +1947,7 @@ export function ninjutsu(g0: PracticeGame, seat: Seat, ninjaIid: number, attacke
     const sources = availableMana(g, seat, book);
     const paid = aiPay(g, seat, parseCost(opt.cost), sources, book);
     if (!paid) return g0;
-    spend(g, seat, paid.tap, sources);
+    spend(g, seat, paid, sources);
     loseLife(g, seat, paid.life, book);
   }
   moveTo(g, attackerIid, "hand");

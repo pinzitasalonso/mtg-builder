@@ -9,11 +9,19 @@ import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHin
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
-import { parseCost } from "@/lib/practice/mana";
+import { tapTribeOf, untapLandsOf } from "@/lib/practice/abilities";
 import {
   addCounters,
   adjustLife,
+  aiEndStep,
+  aiGraveyardCasts,
   aiNinjutsu,
+  choiceTargets,
+  declineChoice,
+  playerEndStep,
+  playerTapTribe,
+  playerUntapLands,
+  spellCost,
   aiRemovalAction,
   aiResponds,
   createTokens,
@@ -128,7 +136,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const [tokenOpen, setTokenOpen] = useState(false);
   // A search of your library under way (a tutor you cast, a fetch you
   // cracked): what it may find, how many found, and what goes on top.
-  const [search, setSearch] = useState<{ source: string; spec: Search; found: number; top: number[] } | null>(null);
+  const [search, setSearch] = useState<{ source: string; spec: Search; found: number; top: number[]; attachTo?: number } | null>(null);
   // A phone held sideways: whether the hand is raised over the board.
   const [handUp, setHandUp] = useState(false);
   const lastOpponent = useRef<OpponentOption | null>(null);
@@ -168,7 +176,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   // A discard to choose raises your hand; a sacrifice lowers it, for the board.
   const choiceKind = game?.choice?.kind;
   useEffect(() => {
-    if (choiceKind) setHandUp(choiceKind === "discard");
+    if (choiceKind) setHandUp(choiceKind === "discard" || choiceKind === "put");
   }, [choiceKind]);
 
   // The history beside the board follows the newest line.
@@ -273,7 +281,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
 
   function keep() {
     if (!game || game.sides.you.toBottom > 0) return;
-    const g = startTurn(game);
+    const g = startTurn(game, book);
     setGame(g);
     setHistory([]);
     if (g.active === "opp") void runAi(g);
@@ -283,6 +291,13 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   async function endMyTurn() {
     if (!game || !setup) return;
     let g = game;
+    // Your end step: Braids asks first.
+    const braids = playerEndStep(g, setup.book);
+    if (braids !== g) {
+      setMode("ai");
+      g = await waitChoice(braids);
+      if (!alive.current || g.winner) return setMode(g.winner ? "over" : "main");
+    }
     // At the end of your turn the AI may answer your biggest threat.
     const removal = aiRemovalAction(g, setup.book, g.sides.you.battlefield.map((c) => c.iid), "end");
     if (removal) {
@@ -291,7 +306,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       g = await aiCast(g, removal, "ai");
       if (!alive.current || g.winner) return setMode(g.winner ? "over" : "main");
     }
-    g = endTurn(g);
+    g = endTurn(g, setup.book);
     setGame(g);
     if (!g.winner) void runAi(g);
   }
@@ -308,11 +323,43 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   }
   const choose = (iid: number) => {
     if (!game?.choice) return;
+    const choice = game.choice;
     const next = resolveChoice(game, iid, book);
     if (next === game) return;
+    // Light-Paws: the Aura you cast is on; now the search for the next one.
+    if (choice.kind === "attach" && choice.tutor !== undefined && choice.aura !== undefined) {
+      const aura = findCard(next, choice.aura)?.card;
+      const lightPaws = findCard(next, choice.tutor)?.card;
+      if (aura && lightPaws) {
+        const mv = infoOf(book, aura)?.manaValue ?? 0;
+        const names = new Set(next.sides.you.battlefield.filter((c) => /\bAura\b/.test(infoOf(book, c)?.typeLine ?? c.typeLine ?? "")).map((c) => c.name));
+        setSearch({
+          source: lightPaws.name,
+          spec: {
+            count: 1,
+            what: `Aura card with mana value ${mv} or less, and a name none of your Auras has, onto ${lightPaws.name.split(",")[0]}`,
+            to: [{ zone: "battlefield" }],
+            test: (typeLine, info) => /\bAura\b/.test(info?.typeLine ?? typeLine ?? "") && (info?.manaValue ?? 0) <= mv && !names.has(info?.name ?? ""),
+          },
+          found: 0,
+          top: [],
+          attachTo: lightPaws.iid,
+        });
+      }
+    }
     if (choiceRef.current) {
       setMenu(null);
       setZoom(null);
+      setGame(next);
+      choiceRef.current(next);
+    } else act(() => next);
+  };
+
+  /** Not doing an optional choice (Braids, The Ur-Dragon's permanent). */
+  const decline = () => {
+    if (!game?.choice?.decline) return;
+    const next = declineChoice(game, book);
+    if (choiceRef.current) {
       setGame(next);
       choiceRef.current(next);
     } else act(() => next);
@@ -330,7 +377,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     return g.sides.you.hand.some((c) => {
       if (!isInstantSpeed(setup.book, c)) return false;
       const info = infoOf(setup.book, c);
-      return hasAltCost(info) || youPay(g, parseCost(info?.manaCost ?? null), mana, setup.book) !== null;
+      return hasAltCost(info) || youPay(g, spellCost(g, "you", c, setup.book, "hand"), mana, setup.book) !== null;
     });
   };
 
@@ -494,9 +541,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     await afterCombat(g, afterCombatPlan.current);
   }
 
-  async function afterCombat(g0: PracticeGame, actions: PlanAction[]) {
+  async function afterCombat(g0: PracticeGame, actions0: PlanAction[]) {
     if (!setup) return;
     let g = g0;
+    // What Silas Renn let it cast from its graveyard comes first.
+    const actions = [...aiGraveyardCasts(g, setup.book), ...actions0];
     for (const a of actions) {
       if (a.kind === "cast") g = await aiCast(g, a, "ai");
       else {
@@ -507,9 +556,18 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       }
       if (!alive.current || g.winner) return;
     }
+    // Its end step: Inalla's Wizards, Braids (you may have to answer).
+    const end = aiEndStep(g, setup.book);
+    if (end !== g) {
+      g = end;
+      setGame(g);
+      await sleep(BEAT);
+      g = await waitChoice(g);
+      if (!alive.current || g.winner) return;
+    }
     g = await endStepStop(g);
     if (!alive.current) return;
-    g = endTurn(g);
+    g = endTurn(g, setup.book);
     setGame(g);
     setHistory([]);
     setMode(g.winner ? "over" : "main");
@@ -586,7 +644,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       }
     }
     // A discard or a sacrifice to choose: your click picks it.
-    if (game.choice && seat === "you" && zone === (game.choice.kind === "discard" ? "hand" : "battlefield")) {
+    if (game.choice && choiceTargets(game, setup.book).includes(card.iid)) {
       setHandUp(false);
       choose(card.iid);
       return;
@@ -661,6 +719,13 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     out.push(...counters);
     // A search it can do (crack a fetch land, Evolving Wilds, Sakura-Tribe Elder).
     const ability = zone === "battlefield" ? searchAbility(infoOf(book, card)) : null;
+    // Inalla: tap five Wizards. Beledros: pay 10 life, untap your lands.
+    const tribe = zone === "battlefield" ? tapTribeOf(book, card) : null;
+    if (tribe) out.unshift({ label: `Tap ${tribe.count} untapped ${tribe.type}s: the opponent loses ${tribe.life} life`, step: (g) => playerTapTribe(g, card.iid, book) });
+    const untap = zone === "battlefield" ? untapLandsOf(book, card) : null;
+    if (untap && !game?.once?.includes(card.iid)) out.unshift({ label: `Pay ${untap.life} life: untap your lands`, step: (g) => playerUntapLands(g, card.iid, book) });
+    // Silas Renn let you cast it from your graveyard this turn.
+    if (zone === "graveyard" && game?.mayCast?.includes(card.iid)) out.unshift({ label: "Cast it (this turn)", step: castStep(card.iid) });
     // An "each opponent sacrifices" ability (Kefka's {8}).
     const edict = zone === "battlefield" ? edictOf(book, card) : null;
     if (edict) {
@@ -718,7 +783,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!game || !setup) return false;
     if (mode === "ninjutsu") return ninjutsuOptions(game, "you", setup.book).some((o) => o.ninja.iid === card.iid);
     // A choice waiting: what you may pick glows.
-    if (game.choice) return zone === (game.choice.kind === "discard" ? "hand" : "battlefield") && !!game.sides.you[zone].some((c) => c.iid === card.iid);
+    if (game.choice) return choiceTargets(game, setup.book).includes(card.iid);
     if (zone === "battlefield") return mode === "attack" && !picked.includes(card.iid) && canAttack(game, "you", card, setup.book);
     if (zone !== "hand" && zone !== "command") return false;
     const yourMain = mode === "main" && game.active === "you";
@@ -728,8 +793,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (isLand(card)) return false;
     const info = infoOf(setup.book, card);
     if (hasAltCost(info)) return true;
-    const cost = parseCost(info?.manaCost ?? null);
-    if (zone === "command") cost.generic += 2 * game.tax.you;
+    const cost = spellCost(game, "you", card, setup.book, zone);
     return youPay(game, cost, availableMana(game, "you", setup.book), setup.book) !== null;
   };
   const cardProps = (seat: Seat) => (card: PlayCard, zone: Zone) => ({
@@ -942,7 +1006,19 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const pileCards = pile ? [...game.sides[pile.seat][pile.zone]].reverse() : [];
 
   const choicePrompt = game.choice
-    ? `${game.choice.source}: ${game.choice.kind === "discard" ? "choose a card from your hand to discard" : `choose a ${game.choice.what ?? "permanent"} of yours to sacrifice`}.`
+    ? `${game.choice.source}: ${
+        game.choice.kind === "discard"
+          ? "choose a card from your hand to discard"
+          : game.choice.kind === "put"
+            ? "choose a permanent card from your hand to put onto the battlefield"
+            : game.choice.kind === "attach"
+              ? "choose the creature it goes on"
+              : game.choice.braids === "yours"
+                ? "sacrifice an artifact, creature, enchantment, land or planeswalker? The opponent then sacrifices one that shares a type, or loses 2 life and you draw"
+                : game.choice.types
+                  ? `sacrifice a ${game.choice.types.join(" or ")}, or lose ${game.choice.life ?? 2} life and the opponent draws`
+                  : `choose a ${game.choice.what ?? "permanent"} of yours to sacrifice`
+      }.`
     : null;
   const status = choicePrompt
     ? choicePrompt
@@ -1132,6 +1208,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           {choicePrompt && (
             <div className="pt-choice" role="status">
               {choicePrompt}
+              {game.choice?.decline && (
+                <button type="button" className="pt-btn" onClick={decline}>
+                  {game.choice.decline}
+                </button>
+              )}
             </div>
           )}
           {/* The opponent's spell, big while it's cast. */}
@@ -1393,7 +1474,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
             const top = dest.zone === "top" ? [...search.top, c.iid] : search.top;
             const last = search.found + 1 >= spec.count;
             act((g) => {
-              const found = dest.zone === "top" ? g : playerFind(g, c.iid, dest.zone as "hand" | "battlefield", !!dest.tapped);
+              const found = dest.zone === "top" ? g : playerFind(g, c.iid, dest.zone as "hand" | "battlefield", !!dest.tapped, book, search.attachTo);
               return last ? finishSearch(found, top) : found;
             });
             setSearch(last ? null : { ...search, found: search.found + 1, top });
