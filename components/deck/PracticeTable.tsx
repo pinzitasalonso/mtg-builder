@@ -8,7 +8,7 @@ import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
-import { counterOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
+import { canPlayAsLand, counterOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
 import { parseCost, payCost } from "@/lib/practice/mana";
 import {
   addCounters,
@@ -77,6 +77,8 @@ type Step = (g: PracticeGame) => PracticeGame;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // The pause between the opponent's moves, so you can follow them.
 const BEAT = 700;
+// How long the opponent's spell stays big when you can't answer it.
+const SPOTLIGHT = 1400;
 
 export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: string; onClose: () => void; onSolo: () => void }) {
   const [mode, setMode] = useState<Mode>("pick");
@@ -100,7 +102,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const [zoom, setZoom] = useState<Zoom | null>(null);
   const [pile, setPile] = useState<{ seat: Seat; zone: "graveyard" | "exile" | "library" | "hand" } | null>(null);
   // The opponent's spell waiting for your answer, and how to give it.
-  const [pending, setPending] = useState<{ action: PlanAction; card: PlayCard; target?: string } | null>(null);
+  // What waits for your answer: the opponent's spell, or its end step.
+  const [pending, setPending] = useState<{ kind: "spell"; action: PlanAction; card: PlayCard; target?: string } | { kind: "end" } | null>(null);
+  // The opponent's spell, shown big while it's cast (as in Arena), and what it targets.
+  const [spotlight, setSpotlight] = useState<{ card: PlayCard; target?: string; targetIid?: number } | null>(null);
   const answerRef = useRef<((a: Answer) => void) | null>(null);
   // "Don't ask again": the opponent's spells resolve without a pause, this game.
   const noAsk = useRef(false);
@@ -273,52 +278,78 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       with (an instant, a card with flash), it waits: paid for and on the
       table's log, until you counter it, cast your own instants, or let it
       resolve. Returns the game after. */
+  /** Could you cast something now: an instant (or flash) you can pay for
+      with your untapped mana, or one with another way to cast it? */
+  const canAnswer = (g: PracticeGame) => {
+    if (!setup || noAsk.current) return false;
+    const mana = availableMana(g, "you", setup.book);
+    return g.sides.you.hand.some((c) => {
+      if (!isInstantSpeed(setup.book, c)) return false;
+      const info = infoOf(setup.book, c);
+      return hasAltCost(info) || payCost(parseCost(info?.manaCost ?? null), mana) !== null;
+    });
+  };
+
+  /** The opponent casts a spell: paid for and shown big, with what it
+      targets lit up. If you could answer, it waits until you counter it,
+      cast your own instants, or let it resolve; otherwise it resolves after
+      a moment, so you can read it. Returns the game after. */
   async function aiCast(g0: PracticeGame, a: PlanAction, back: Mode): Promise<PracticeGame> {
     if (!setup) return g0;
     const card = findCard(g0, parseCardId(a.card) ?? -1)?.card;
-    // Only when you could cast something now: an instant (or flash) you can
-    // pay for with your untapped mana, or one with another way to cast it.
-    const mana = availableMana(g0, "you", setup.book);
-    const canAnswer =
-      !noAsk.current &&
-      !!card &&
-      !isLand(card) &&
-      g0.sides.you.hand.some((c) => {
-        if (!isInstantSpeed(setup.book, c)) return false;
-        const info = infoOf(setup.book, c);
-        return hasAltCost(info) || payCost(parseCost(info?.manaCost ?? null), mana) !== null;
-      });
-    if (!canAnswer) {
+    if (!card || isLand(card)) {
       const g = applyAction(g0, "opp", a, setup.book).game;
       setGame(g);
       await sleep(BEAT);
       return g;
     }
+    const targetIid = a.effects.map((e) => parseCardId(e.target)).find((t) => t !== null) ?? undefined;
+    const target = targetIid !== undefined ? findCard(g0, targetIid)?.card.name : undefined;
+    const answerable = canAnswer(g0);
     const paid = applyAction(g0, "opp", a, setup.book, { stage: "pay" });
     setGame(paid.game);
     if (!paid.ok) {
       await sleep(BEAT);
       return paid.game;
     }
-    const targetIid = a.effects.map((e) => parseCardId(e.target)).find((t) => t !== null);
-    const target = targetIid !== undefined && targetIid !== null ? findCard(paid.game, targetIid)?.card.name : undefined;
-    setPending({ action: a, card: card!, target });
-    setMode("respond");
-    const answer = await new Promise<Answer>((resolve) => (answerRef.current = resolve));
-    answerRef.current = null;
-    setPending(null);
-    setMode(back);
+    setSpotlight({ card, target, targetIid });
+    let answer: Answer = { kind: "resolve", g: paid.game };
+    if (answerable) {
+      setPending({ kind: "spell", action: a, card, target });
+      setMode("respond");
+      answer = await new Promise<Answer>((resolve) => (answerRef.current = resolve));
+      answerRef.current = null;
+      setPending(null);
+      setMode(back);
+    } else {
+      await sleep(SPOTLIGHT);
+    }
+    setSpotlight(null);
     const g = answer.kind === "counter" ? answer.g : applyAction(answer.g, "opp", a, setup.book, { stage: "resolve" }).game;
     setGame(g);
     await sleep(BEAT);
     return g;
   }
 
+  /** The opponent's end step: if you could cast something, it stops for
+      you to (card draw, removal you'd rather cast now). */
+  async function endStepStop(g: PracticeGame): Promise<PracticeGame> {
+    if (!setup || g.winner || !canAnswer(g)) return g;
+    setGame(g);
+    setPending({ kind: "end" });
+    setMode("respond");
+    const answer = await new Promise<Answer>((resolve) => (answerRef.current = resolve));
+    answerRef.current = null;
+    setPending(null);
+    setMode("ai");
+    return answer.g;
+  }
+
   /** Your answer to the opponent's spell: counter it with a counterspell
       from your hand (cast as any spell, so the AI may counter that), or let
       it resolve. */
   const counterWith = (iid: number) => {
-    if (!game || !setup || !pending || !answerRef.current) return;
+    if (!game || !setup || pending?.kind !== "spell" || !answerRef.current) return;
     const name = findCard(game, iid)?.card.name ?? "A counterspell";
     const cast = playerCast(game, iid, setup.book);
     const answered = aiResponds(cast, iid, setup.book);
@@ -406,6 +437,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       }
       if (!alive.current || g.winner) return;
     }
+    g = await endStepStop(g);
+    if (!alive.current) return;
     g = endTurn(g);
     setGame(g);
     setHistory([]);
@@ -566,7 +599,28 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!changed && !card.damage) return null;
     return `${s.power}/${s.toughness}${card.damage ? ` · ${card.damage} dmg` : ""}`;
   };
+  // What you can do now, lit up as in Arena: on your turn, the cards you can
+  // afford (and a land, while your land drop is there); when you're
+  // answering or blocking, the instants and flash cards you can afford; when
+  // you're choosing attackers, the creatures that can attack.
+  const playableNow = (card: PlayCard, zone: Zone): boolean => {
+    if (!game || !setup) return false;
+    if (zone === "battlefield") return mode === "attack" && !picked.includes(card.iid) && canAttack(game, "you", card, setup.book);
+    if (zone !== "hand" && zone !== "command") return false;
+    const yourMain = mode === "main" && game.active === "you";
+    const answering = (mode === "respond" || mode === "block") && zone === "hand" && isInstantSpeed(setup.book, card);
+    if (!yourMain && !answering) return false;
+    if (zone === "hand" && canPlayAsLand(card) && yourMain && !game.landPlayed) return true;
+    if (isLand(card)) return false;
+    const info = infoOf(setup.book, card);
+    if (hasAltCost(info)) return true;
+    const cost = parseCost(info?.manaCost ?? null);
+    if (zone === "command") cost.generic += 2 * game.tax.you;
+    return payCost(cost, availableMana(game, "you", setup.book)) !== null;
+  };
   const cardProps = (seat: Seat) => (card: PlayCard, zone: Zone) => ({
+    playable: seat === "you" && playableNow(card, zone),
+    targeted: spotlight?.targetIid === card.iid,
     card,
     zone,
     onPrimary,
@@ -785,7 +839,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
             ? "Tap one of your creatures, then the attacker it blocks."
             : "Now tap the attacker it blocks."
           : mode === "respond" && pending
-            ? `The opponent casts ${pending.card.name}${pending.target ? ` on ${pending.target}` : ""}. Answer with an instant, or let it resolve.`
+            ? pending.kind === "end"
+              ? "The opponent's end step. Cast an instant now, or go on to your turn."
+              : `The opponent casts ${pending.card.name}${pending.target ? ` on ${pending.target}` : ""}. Answer with an instant, or let it resolve.`
             : mode === "ai"
             ? "The opponent is playing…"
             : mode === "combat"
@@ -853,7 +909,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           )}
           {mode === "respond" && pending && (
             <>
-              {you.hand
+              {pending.kind === "spell" &&
+                you.hand
                 .filter((c, i, all) => {
                   // One button per counterspell, however many copies you hold.
                   if (all.findIndex((x) => x.name === c.name) !== i) return false;
@@ -866,13 +923,13 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                     Counter with {c.name}
                   </button>
                 ))}
-              <button type="button" className="pt-btn" onClick={letResolve}>
-                Let it resolve
+              <button type="button" className={pending.kind === "end" ? "pt-btn pt-btn-gold" : "pt-btn"} onClick={letResolve}>
+                {pending.kind === "end" ? "Go to my turn" : "Let it resolve"}
               </button>
               <button
                 type="button"
                 className="pt-btn"
-                title="The opponent's spells resolve without asking, for the rest of this game"
+                title="No more stops for your answers, for the rest of this game"
                 onClick={() => {
                   noAsk.current = true;
                   letResolve();
@@ -917,6 +974,18 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       {/* The board and the hand; the column beside them where there's room. */}
       <div className="pt-body">
         <div className="pt-play">
+          {/* The opponent's spell, big while it's cast. */}
+          {spotlight && (
+            <div className="pt-spot" aria-live="polite">
+              <div className="pt-spot-card">
+                <CardArt name={spotlight.card.name} src={spotlight.card.imageUri || undefined} prefer="src" version="normal" loading="eager" radius={0} style={{ position: "absolute", inset: 0 }} />
+              </div>
+              <div className="pt-spot-caption">
+                The opponent casts {spotlight.card.name.split(" // ")[0]}
+                {spotlight.target ? ` → ${spotlight.target.split(" // ")[0]}` : ""}
+              </div>
+            </div>
+          )}
           <div className="pt-main">
             <aside className="pt-zones">
               {/* The opponent's piles and commander, then yours, as each side of the table. */}
