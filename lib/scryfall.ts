@@ -598,6 +598,8 @@ export interface CardFacts {
   toughness: number | null;
   keywords: string[];
   producedMana: string[];
+  /** A transforming card's back face: its stats (Kefka, Ruler of Ruin). */
+  back?: { power: number | null; toughness: number | null };
 }
 
 const parseStat = (raw: string | undefined): number | null => {
@@ -623,6 +625,7 @@ export function toCardFacts(c: ScryfallCard): CardFacts {
     toughness: parseStat(c.toughness ?? front?.toughness),
     keywords: Array.isArray(c.keywords) ? c.keywords : [],
     producedMana: Array.isArray(c.produced_mana) ? c.produced_mana : [],
+    ...(faces[1]?.power != null ? { back: { power: parseStat(faces[1].power), toughness: parseStat(faces[1].toughness) } } : {}),
   };
 }
 

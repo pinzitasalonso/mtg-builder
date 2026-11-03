@@ -3,8 +3,8 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { BASIC_COLOR, canPlayAsLand, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, stats } from "./cards";
-import { canAttack, canBlock, cardId, castable } from "./game";
+import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, stats } from "./cards";
+import { canAttack, canBlock, cardId, castable, lifeFor } from "./game";
 import { manaSources, parseCost, payCost } from "./mana";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
 
@@ -164,6 +164,25 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     sim.sides[seat] = { ...sim.sides[seat], hand: sim.sides[seat].hand.filter((c) => c !== land), battlefield: [...sim.sides[seat].battlefield, { ...land, enteredTurn: g.turn }] };
     sim.landPlayed = true;
   }
+  // Pay from the simulated table: tap what's used, and pay the life.
+  const payIn = (cost: ReturnType<typeof parseCost>) => {
+    const paid = payCost(cost, manaSources(sim.sides[seat], book, sim.turn), { lifeFor: lifeFor(sim, seat, book) });
+    if (!paid || (paid.life && sim.sides[seat].life - paid.life < 10)) return false;
+    sim = structuredClone(sim);
+    sim.sides[seat] = {
+      ...sim.sides[seat],
+      life: sim.sides[seat].life - paid.life,
+      battlefield: sim.sides[seat].battlefield.map((x) => (paid.tap.includes(x.iid) ? { ...x, tapped: true } : x)),
+    };
+    return true;
+  };
+  // An "each opponent sacrifices" ability (Kefka's {8}) comes first: it
+  // takes a permanent and transforms Kefka.
+  for (const c of sim.sides[seat].battlefield) {
+    const e = edictOf(book, c);
+    if (!e || c.flipped || !g.sides[other(seat)].battlefield.length) continue;
+    if (payIn(parseCost(e.mana))) main.push({ ...blankAction("activate", c.iid), mana: e.mana });
+  }
   const candidates = [
     ...sim.sides[seat].hand.map((c) => ({ c, zone: "hand" as const })),
     ...sim.sides[seat].command.map((c) => ({ c, zone: "command" as const })),
@@ -175,13 +194,7 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     if (!castable(sim, seat, c, book, zone)) continue;
     const cost = parseCost(infoOf(book, c)?.manaCost ?? null);
     if (zone === "command") cost.generic += 2 * sim.tax[seat];
-    const paid = payCost(cost, manaSources(sim.sides[seat], book, sim.turn));
-    if (!paid) continue;
-    sim = structuredClone(sim);
-    sim.sides[seat] = {
-      ...sim.sides[seat],
-      battlefield: sim.sides[seat].battlefield.map((x) => (paid.tap.includes(x.iid) ? { ...x, tapped: true } : x)),
-    };
+    if (!payIn(cost)) continue;
     const draws = drawOnly(book, c);
     main.push(draws ? { ...blankAction("cast", c.iid), effects: [drawEffect(draws)] } : blankAction("cast", c.iid));
   }

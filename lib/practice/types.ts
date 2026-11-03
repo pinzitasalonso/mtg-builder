@@ -20,6 +20,8 @@ export interface CardInfo {
   keywords: string[];
   /** Colours of mana it can add (W U B R G C), from Scryfall. */
   producedMana: string[];
+  /** A transforming card's back face: its stats, when it has them. */
+  back?: { power: number | null; toughness: number | null };
 }
 
 /** Card info by lowercased name. */
@@ -64,6 +66,24 @@ export interface PracticeGame {
       is tapped and emptied at the end of each phase: one colour letter a
       unit (W U B R G C). Missing in games started before it existed. */
   pool?: Record<Seat, string[]>;
+  /** A choice the player has to make before the game goes on (Kefka's
+      discard, a sacrifice). */
+  choice?: Choice | null;
+}
+
+/** What the player picks: a card from their hand to discard, or one of
+    their permanents to sacrifice. */
+export interface Choice {
+  kind: "discard" | "sacrifice";
+  /** The card asking, for the prompt. */
+  source: string;
+  /** Who controls it. */
+  by: Seat;
+  /** A discard: the cards already discarded the same way (the AI's), whose
+      card types count with yours for the draw after. */
+  discarded?: string[];
+  /** A sacrifice: what kind of permanent ("permanent", "creature"). */
+  what?: string;
 }
 
 // ── The AI's plan, as the model writes it (and the fallback planner). ──

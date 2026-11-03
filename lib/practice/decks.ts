@@ -30,6 +30,7 @@ function infoFrom(facts: CardFacts | undefined, fallback: { name: string; imageU
     toughness: facts?.toughness ?? null,
     keywords: facts?.keywords ?? [],
     producedMana: facts?.producedMana ?? [],
+    ...(facts?.back ? { back: facts.back } : {}),
   };
 }
 
