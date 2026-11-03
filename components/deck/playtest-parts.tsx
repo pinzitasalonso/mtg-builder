@@ -44,6 +44,8 @@ export function PtCard({
   onZoom,
   onTurn,
   selected,
+  playable,
+  targeted,
   badge,
   stat,
   stack,
@@ -58,6 +60,11 @@ export function PtCard({
   onTurn: (card: PlayCard) => void;
   /** Practice games: picked (as an attacker, or a blocker being placed). */
   selected?: boolean;
+  /** Practice games: something you can do now (a card you can afford, a
+      creature that can attack): it glows, as in Arena. */
+  playable?: boolean;
+  /** Practice games: the target of the opponent's spell. */
+  targeted?: boolean;
   /** Practice games: a word on the card ("Attacking", "Blocks X"). */
   badge?: string;
   /** Practice games: power/toughness now, when it isn't the printed one. */
@@ -97,6 +104,8 @@ export function PtCard({
       className="pt-card"
       data-tapped={card.tapped ? "true" : undefined}
       data-selected={selected ? "true" : undefined}
+      data-playable={playable ? "true" : undefined}
+      data-targeted={targeted ? "true" : undefined}
       data-stacked={stack}
       aria-label={card.name}
       onClick={(e) => {
@@ -195,9 +204,26 @@ export function PileZone({ label, cards, top, onOpen }: { label: string; cards: 
   );
 }
 
+/* A life total. A change shows: the counter flashes, and the difference
+   floats up from it ("−3", "+2"), so a hit is hard to miss. */
 export function LifeCounter({ label, value, onDelta }: { label: string; value: number; onDelta: (d: number) => void }) {
+  const was = useRef(value);
+  const [pop, setPop] = useState<{ delta: number; n: number } | null>(null);
+  useEffect(() => {
+    const delta = value - was.current;
+    was.current = value;
+    if (!delta) return;
+    setPop((p) => ({ delta, n: (p?.n ?? 0) + 1 }));
+    const t = setTimeout(() => setPop(null), 1400);
+    return () => clearTimeout(t);
+  }, [value]);
   return (
-    <div className="pt-life" title={`${label} life`}>
+    <div className="pt-life" title={`${label} life`} data-hit={pop ? (pop.delta < 0 ? "down" : "up") : undefined} key={pop ? `hit-${pop.n}` : "still"}>
+      {pop && (
+        <span className="pt-life-pop" aria-hidden>
+          {pop.delta > 0 ? `+${pop.delta}` : `−${-pop.delta}`}
+        </span>
+      )}
       <span className="pt-life-label">{label}</span>
       <button type="button" className="pt-life-5" onClick={() => onDelta(-5)} aria-label={`${label} minus five`}>
         −5

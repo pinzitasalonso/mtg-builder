@@ -136,6 +136,18 @@ side does.
    that the same way. When the game ends, the banner names what it held and
    "Its hand" shows the cards.
 
+   **Borrowed from Arena**, so the table reads at a glance:
+   - every opponent spell is shown big in the middle while it's cast (paid,
+     then resolved a moment later), its target pulsing red; while it waits
+     for your answer it stays up;
+   - what you can do glows: on your turn the cards you can afford and a
+     land while your drop is there; when answering or blocking, the
+     instants and flash cards you can afford; when attacking, the creatures
+     that can;
+   - a life total that changes flashes, and the difference floats from it;
+   - the opponent's end step stops for you when you could cast an instant
+     ("Go to my turn" to move on; "Don't ask again" ends the stops).
+
    Where there's room (a wide screen, or a phone held sideways) a column
    runs the full height beside the board and the hand: the opponent's
    table talk, **Last played** (the latest spells cast by either side, like
