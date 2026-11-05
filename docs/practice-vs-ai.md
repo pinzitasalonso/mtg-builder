@@ -93,7 +93,7 @@ side does.
    - any deck: a mirror match, and your other decks of the same format.
 
 5. **Limits**: AI routes need an account. Starting a game counts: free
-   accounts get a few practice games a day (`FREE_PRACTICE_PER_DAY` in
+   accounts get one practice game a day (`FREE_PRACTICE_PER_DAY` in
    `lib/limits.ts`), Pro is unlimited. Each game allows a fixed number of
    AI turns (`PracticeGame.turns`), so a game can't run up the bill.
 
