@@ -386,6 +386,7 @@ export default function DeckChat({
   fill = false,
   starters = STARTERS,
   intro,
+  focusSignal = 0,
 }: {
   chat: DeckChatController;
   /** One-tap prompts for the empty state. Defaults to the deck ones. */
@@ -397,6 +398,9 @@ export default function DeckChat({
   fill?: boolean;
   /** Reports when the user engages the chat (focus / conversation started). */
   onEngaged?: (engaged: boolean) => void;
+  /** Bumped when the user opens the chat: the input takes the focus (on
+   *  mount too, if it's already bumped). 0 never focuses. */
+  focusSignal?: number;
 }) {
   const {
     messages,
@@ -423,6 +427,10 @@ export default function DeckChat({
   } = chat;
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (focusSignal > 0) inputRef.current?.focus({ preventScroll: true });
+  }, [focusSignal]);
   // Whether the transcript is pinned to the bottom. While streaming we only
   // auto-scroll when it's true, so scrolling up to read isn't yanked back down.
   const pinnedRef = useRef(true);
@@ -572,6 +580,7 @@ export default function DeckChat({
         style={{ display: "flex", gap: 10, alignItems: "center" }}
       >
         <textarea
+          ref={inputRef}
           className="cc-paper"
           value={input}
           onChange={(e) => setInput(e.target.value)}

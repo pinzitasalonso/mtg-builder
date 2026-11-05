@@ -3,15 +3,15 @@
 // User.tier: "free" is the default; "pro" (the future paid tier) lifts
 // every cap.
 
-export const FREE_DECK_LIMIT = 5;
-export const FREE_AI_PER_DAY = 4;
+export const FREE_DECK_LIMIT = 10;
+export const FREE_AI_PER_DAY = 6;
 // Deck scans — the Score plus the AI's written analysis — are dearer than a
 // chat turn, so they have their own meter: one a day free, unlimited on Pro.
 export const FREE_SCANS_PER_DAY = 1;
 // Practice games against the AI: a few a day free, unlimited on Pro. Each
 // game allows this many AI turns, after which the opponent plays on its
 // built-in planner.
-export const FREE_PRACTICE_PER_DAY = 2;
+export const FREE_PRACTICE_PER_DAY = 3;
 export const PRACTICE_AI_TURNS = 40;
 
 export const DECK_LIMIT_MSG =

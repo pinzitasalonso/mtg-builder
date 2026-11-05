@@ -309,11 +309,16 @@ export default function AssistantProvider({ children }: { children: React.ReactN
   const setFocus = useCallback((f: AssistantFocus | null) => setFocusState(f), []);
   const availableRef = useRef(available);
   availableRef.current = available;
+  // Bumped each time you open it, so its input takes the focus; not when
+  // it reopens by itself after a reload (that would raise a phone's keyboard
+  // unasked).
+  const [focusSignal, setFocusSignal] = useState(0);
   const open = useCallback(() => {
     // Signed in since the page loaded: find out first.
     if (availableRef.current !== true) void load();
     setIsOpen(true);
     setUnseen(false);
+    setFocusSignal((n) => n + 1);
   }, [load]);
   const refresh = useCallback(() => void load(), [load]);
 
@@ -364,6 +369,7 @@ export default function AssistantProvider({ children }: { children: React.ReactN
           <DeckChat
             chat={chat}
             fill
+            focusSignal={focusSignal}
             starters={focus ? DECK_STARTERS : HOME_STARTERS}
             intro={
               focus ? undefined : (
