@@ -336,13 +336,6 @@ let setsCache: { at: number; value: RecentSet[] } | null = null;
 const cardsCache = new Map<string, { at: number; value: NewCard[] }>();
 const identityCache = new Map<string, string | null>();
 
-/* Test seam: drop everything cached. */
-export function resetRecentSetsCache(): void {
-  setsCache = null;
-  cardsCache.clear();
-  identityCache.clear();
-}
-
 async function fetchJson(url: string, timeoutMs = 6000): Promise<unknown | null> {
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), timeoutMs);

@@ -101,20 +101,12 @@ export async function currentUser(): Promise<AuthUser | null> {
   return { ...user, hasPassword: passwordHash !== null };
 }
 
-/* Access check for deck-scoped routes. Public decks (userId null) are open
+/* Access checks for deck-scoped routes. Public decks (userId null) are open
    to everyone — viewing AND editing, by design. Private decks only resolve
-   for their owner; for anyone else this returns null and callers 404 (never
+   for their owner; for anyone else these return null and callers 404 (never
    403), so private deck ids aren't probeable. */
-export async function accessibleDeck(deckId: number, userId: number | null) {
-  return prisma.deck.findFirst({
-    where:
-      userId === null
-        ? { id: deckId, userId: null }
-        : { id: deckId, OR: [{ userId: null }, { userId }] },
-  });
-}
 
-// Same access rules, resolved by the unguessable public id used in URLs.
+// Resolved by the unguessable public id used in URLs.
 // EDIT access — the owner (or anyone, for ownerless public decks).
 export async function accessibleDeckByPublicId(publicId: string, userId: number | null) {
   if (!publicId || typeof publicId !== "string") return null;

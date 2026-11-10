@@ -11,6 +11,8 @@
 // arbitrary they are named constants here and the divergence is a test failure
 // away from being noticed rather than a bug a player reports.
 
+import { normalizeCardKey } from "./scryfall";
+
 /** A card as both the bracket and the 8x8 count need it. */
 export interface InsightCard {
   name: string;
@@ -21,9 +23,7 @@ export interface InsightCard {
 }
 
 /** Same key the rest of the app matches names by. */
-export function nameKey(name: string): string {
-  return name.trim().replace(/\s+/g, " ").toLowerCase();
-}
+export const nameKey = normalizeCardKey;
 
 // ---------------------------------------------------------------------------
 // Bracket

@@ -692,11 +692,6 @@ function rememberFacts(id: string, entry: { at: number; facts: CardFacts }) {
 }
 const FACTS_TTL_MS = 24 * 60 * 60_000;
 
-/* Test seam. */
-export function resetCardFactsCache(): void {
-  factsCache.clear();
-}
-
 /**
  * Bulk id → facts via /cards/collection (75 per request).
  *
