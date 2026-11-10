@@ -34,9 +34,18 @@ export default function VersionsModal({
   const now: VersionCard[] = pool.map((c) => ({ name: c.name, quantity: c.quantity, board: c.board, scryfallId: c.id }));
   const deckNow = now.filter((c) => c.board === "deck").reduce((n, c) => n + c.quantity, 0);
 
+  // A failed load says so. It used to read as "No versions saved yet" (a
+  // server error) or "Loading…" for good (offline): either could make you
+  // think your versions were gone.
+  const [loadFailed, setLoadFailed] = useState(false);
   async function load() {
-    const res = await fetch(`/api/decks/${deckId}/versions`);
-    setVersions(res.ok ? await res.json() : []);
+    const res = await fetch(`/api/decks/${deckId}/versions`).catch(() => null);
+    if (!res?.ok) {
+      setLoadFailed(true);
+      return;
+    }
+    setLoadFailed(false);
+    setVersions(await res.json());
   }
   useEffect(() => {
     load();
@@ -157,7 +166,14 @@ export default function VersionsModal({
       {error && <div style={{ color: "var(--danger)", fontSize: 13.5, marginBottom: 10 }}>{error}</div>}
       {note && <div role="status" style={{ color: "#0d8a5f", fontSize: 13.5, marginBottom: 10 }}>{note}</div>}
 
-      {versions === null ? (
+      {versions === null && loadFailed ? (
+        <p role="alert" style={{ fontSize: 13.5, color: "var(--t3)" }}>
+          Couldn’t load this deck’s versions. They’re safe.{" "}
+          <button type="button" onClick={() => { setLoadFailed(false); load(); }} style={{ background: "none", border: "none", padding: 0, font: "inherit", color: "var(--gold)", cursor: "pointer", textDecoration: "underline" }}>
+            Try again
+          </button>
+        </p>
+      ) : versions === null ? (
         <p style={{ fontSize: 13.5, color: "var(--t3)" }}>Loading…</p>
       ) : versions.length === 0 ? (
         <p style={{ fontSize: 13.5, color: "var(--t3)" }}>No versions saved yet.</p>

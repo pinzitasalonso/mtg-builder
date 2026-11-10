@@ -108,7 +108,24 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const [cmdrState, setCmdrState] = useState<{ busy: boolean; error: string }>({ busy: false, error: "" });
   const [error, setError] = useState("");
   const [setup, setSetup] = useState<Setup | null>(null);
-  const [game, setGame] = useState<PracticeGame | null>(null);
+  const [game, setGameState] = useState<PracticeGame | null>(null);
+  // The game as it is right now, for the opponent's turn. That turn runs as
+  // one long async flow with pauses in it (the model's answer, the beats
+  // between its moves), and you can still act meanwhile: change a life
+  // total, exile its creature from the ⋯ menu. The flow used to carry its
+  // own copy across each pause and write it back, undoing whatever you'd
+  // done. Every set goes through here, and the flow picks the latest game
+  // up after each pause (`pause`).
+  const gameRef = useRef<PracticeGame | null>(null);
+  const setGame = (g: PracticeGame | null) => {
+    gameRef.current = g;
+    setGameState(g);
+  };
+  /** Wait, then go on from the game as it is by then. */
+  const pause = async (ms: number, g: PracticeGame): Promise<PracticeGame> => {
+    await sleep(ms);
+    return gameRef.current ?? g;
+  };
   const [history, setHistory] = useState<PracticeGame[]>([]);
   const [picked, setPicked] = useState<number[]>([]);
   const [blocks, setBlocksState] = useState<Record<number, number[]>>({});
@@ -391,18 +408,14 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!card || isLand(card)) {
       const g = applyAction(g0, "opp", a, setup.book).game;
       setGame(g);
-      await sleep(BEAT);
-      return g;
+      return pause(BEAT, g);
     }
     const targetIid = a.effects.map((e) => parseCardId(e.target)).find((t) => t !== null) ?? undefined;
     const target = targetIid !== undefined ? findCard(g0, targetIid)?.card.name : undefined;
     const answerable = canAnswer(g0);
     const paid = applyAction(g0, "opp", a, setup.book, { stage: "pay" });
     setGame(paid.game);
-    if (!paid.ok) {
-      await sleep(BEAT);
-      return paid.game;
-    }
+    if (!paid.ok) return pause(BEAT, paid.game);
     setSpotlight({ card, target, targetIid });
     let answer: Answer = { kind: "resolve", g: paid.game };
     if (answerable) {
@@ -413,14 +426,13 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       setPending(null);
       setMode(back);
     } else {
-      await sleep(SPOTLIGHT);
+      answer = { kind: "resolve", g: await pause(SPOTLIGHT, paid.game) };
     }
     setSpotlight(null);
     let g = answer.kind === "counter" ? answer.g : applyAction(answer.g, "opp", a, setup.book, { stage: "resolve" }).game;
     setGame(g);
     g = await waitChoice(g);
-    await sleep(BEAT);
-    return g;
+    return pause(BEAT, g);
   }
 
   /** The opponent's end step: if you could cast something, it stops for
@@ -491,14 +503,15 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       setAiNote(`The opponent played on instinct this turn (${why}).`);
     }
     if (!alive.current) return;
+    // The plan can take a while to arrive: go on from the game as it is now.
+    g = gameRef.current ?? g;
     if (plan.say) setSay(plan.say);
     for (const a of plan.main) {
       if (a.kind === "cast") g = await aiCast(g, a, "ai");
       else {
         g = applyAction(g, "opp", a, setup.book).game;
         setGame(g);
-        g = await waitChoice(g);
-        await sleep(BEAT);
+        g = await pause(BEAT, await waitChoice(g));
       }
       if (!alive.current || g.winner) return;
     }
@@ -525,19 +538,19 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     let g = setBlocks(game, chosen, setup.book);
     setGame(g);
     setMode("ai");
-    await sleep(BEAT);
+    g = await pause(BEAT, g);
     // Its ninjutsu, for an attacker you left unblocked (Yuriko).
     const ninja = aiNinjutsu(g, setup.book);
     if (ninja !== g) {
       g = ninja;
       setGame(g);
-      await sleep(SPOTLIGHT);
+      g = await pause(SPOTLIGHT, g);
       if (!alive.current) return;
     }
     g = resolveCombat(g, setup.book);
     setGame(g);
     if (g.winner) return;
-    await sleep(BEAT);
+    g = await pause(BEAT, g);
     await afterCombat(g, afterCombatPlan.current);
   }
 
@@ -551,8 +564,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       else {
         g = applyAction(g, "opp", a, setup.book).game;
         setGame(g);
-        g = await waitChoice(g);
-        await sleep(BEAT);
+        g = await pause(BEAT, await waitChoice(g));
       }
       if (!alive.current || g.winner) return;
     }
@@ -561,8 +573,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (end !== g) {
       g = end;
       setGame(g);
-      await sleep(BEAT);
-      g = await waitChoice(g);
+      g = await waitChoice(await pause(BEAT, g));
       if (!alive.current || g.winner) return;
     }
     g = await endStepStop(g);
@@ -596,7 +607,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (removal) {
       setGame(g);
       setMode("combat");
-      await sleep(BEAT);
+      g = await pause(BEAT, g);
       setSay("Not that one.");
       g = await aiCast(g, removal, "combat");
       if (!alive.current || g.winner) return;
@@ -613,10 +624,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       ninjaRef.current = null;
       if (!alive.current) return;
       setMode("combat");
-      await sleep(BEAT);
+      g = await pause(BEAT, g);
     } else {
       setMode("combat");
-      await sleep(1400);
+      g = await pause(1400, g);
     }
     if (!alive.current) return;
     g = resolveCombat(g, setup.book);

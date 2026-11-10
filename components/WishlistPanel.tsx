@@ -32,22 +32,36 @@ export default function WishlistPanel({ onChanged, onCollectionChanged }: { onCh
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"name" | "price" | "new">("name");
 
-  // Local edits keep the totals in step without another request.
-  const apply = (cards: WishlistCard[]) => {
-    setList({ cards, ...wishlistSummary(cards) });
-    onChanged?.(cards.length);
-  };
+  // The first load failed (offline, the server restarting): say so, with a
+  // way to try again, instead of "Loading…" for good.
+  const [failed, setFailed] = useState(false);
+  // Local edits keep the totals in step without another request. Each one
+  // changes the list as it is when it lands, not as it was when the button
+  // was pressed: two cards changed in quick succession both stick.
+  const mutate = (fn: (cards: WishlistCard[]) => WishlistCard[]) =>
+    setList((l) => {
+      const cards = fn(l.cards);
+      return { cards, ...wishlistSummary(cards) };
+    });
   async function load() {
     const w = await fetchWishlist();
-    if (!w) return;
+    if (!w) {
+      setFailed(true);
+      return;
+    }
+    setFailed(false);
     setLoaded(true);
     setList(w);
-    onChanged?.(w.unique);
   }
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // The tab's count, and the home page's, follow the list.
+  useEffect(() => {
+    if (loaded) onChanged?.(list.unique);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, list.unique]);
 
   async function add(raw: string) {
     const n = raw.trim();
@@ -68,19 +82,19 @@ export default function WishlistPanel({ onChanged, onCollectionChanged }: { onCh
   async function setQty(card: WishlistCard, next: number) {
     setRowBusy(card.name);
     if (await setWishlistQty(card.name, next)) {
-      apply(next <= 0 ? list.cards.filter((c) => c.name !== card.name) : list.cards.map((c) => (c.name === card.name ? { ...c, quantity: Math.min(next, 99) } : c)));
+      mutate((cards) => (next <= 0 ? cards.filter((c) => c.name !== card.name) : cards.map((c) => (c.name === card.name ? { ...c, quantity: Math.min(next, 99) } : c))));
     }
-    setRowBusy(null);
+    setRowBusy((b) => (b === card.name ? null : b));
   }
 
   async function got(card: WishlistCard) {
     setRowBusy(card.name);
     if (await gotWishlistCard(card.name)) {
-      apply(list.cards.filter((c) => c.name !== card.name));
+      mutate((cards) => cards.filter((c) => c.name !== card.name));
       setNote(`${card.name} is in your collection now.`);
       onCollectionChanged?.();
     }
-    setRowBusy(null);
+    setRowBusy((b) => (b === card.name ? null : b));
   }
 
   async function copy() {
@@ -103,7 +117,7 @@ export default function WishlistPanel({ onChanged, onCollectionChanged }: { onCh
     if (busy || !list.unique) return;
     if (!confirm("Clear your whole wishlist?")) return;
     setBusy(true);
-    if (await clearWishlist()) apply([]);
+    if (await clearWishlist()) mutate(() => []);
     setBusy(false);
   }
 
@@ -127,7 +141,9 @@ export default function WishlistPanel({ onChanged, onCollectionChanged }: { onCh
       <div style={{ padding: "12px clamp(16px, 4vw, 22px)", borderBottom: "1px solid var(--line)" }}>
         <div className="mn-label" style={{ color: "var(--text-muted)" }} data-testid="wishlist-summary">
           {!loaded
-            ? "loading…"
+            ? failed
+              ? "couldn’t load"
+              : "loading…"
             : list.unique === 0
               ? "empty"
               : `${list.unique} card${list.unique === 1 ? "" : "s"} · ${list.missing} cop${list.missing === 1 ? "y" : "ies"} still to get` +
@@ -186,7 +202,14 @@ export default function WishlistPanel({ onChanged, onCollectionChanged }: { onCh
       )}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "18px clamp(16px, 4vw, 22px) 40px" }}>
-        {!loaded ? (
+        {!loaded && failed ? (
+          <div role="alert" style={{ textAlign: "center", color: "var(--text-muted)", padding: "60px 20px", fontSize: 15 }}>
+            Couldn’t load your wishlist.{" "}
+            <button onClick={() => { setFailed(false); load(); }} style={{ background: "none", border: "none", color: "var(--accent)", fontWeight: 600, cursor: "pointer", textDecoration: "underline", fontSize: 15 }}>
+              Try again
+            </button>
+          </div>
+        ) : !loaded ? (
           <div style={{ textAlign: "center", color: "var(--text-muted)", padding: "60px 20px", fontSize: 15 }}>Loading your wishlist…</div>
         ) : list.unique === 0 ? (
           <div style={{ textAlign: "center", color: "var(--text-muted)", padding: "60px 20px", fontSize: 15, lineHeight: 1.5 }}>

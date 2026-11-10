@@ -369,17 +369,26 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   useEffect(() => {
     remember("owned-names", ownedNames);
   }, [ownedNames]);
-  const ownedSet = new Set(ownedNames.map((n) => n.toLowerCase()));
+  // Rebuilt only when the collection changes: this page re-renders on every
+  // keystroke, and a collection can be 20,000 names.
+  const ownedSet = useMemo(() => new Set(ownedNames.map((n) => n.toLowerCase())), [ownedNames]);
 
+  // Every change reloads the pool, and two changes in quick succession (two
+  // cards removed, a swipe session) overlap: the reload begun first can
+  // answer last, and its older list put a removed card back on screen until
+  // the next reload. Only the newest reload's answer is used.
+  const poolSeq = useRef(0);
   const loadPool = useCallback(async () => {
+    const seq = ++poolSeq.current;
     let res: Response;
     try {
       res = await fetch(`/api/decks/${deckId}/cards`);
     } catch {
       return; // offline with no cached response — keep current state
     }
-    if (!res.ok) return;
+    if (!res.ok || seq !== poolSeq.current) return;
     const data = await res.json();
+    if (seq !== poolSeq.current) return;
     const mapped: PoolCard[] = data.map((c: { id: number; scryfallId: string; name: string; imageUri: string; manaCost: string | null; typeLine: string | null; oracleText: string | null; quantity?: number; board?: string; role?: string | null; colorIdentity?: string | null; legalities?: string | null; printingPinned?: boolean }) => {
       let legalities: Record<string, string> | null = null;
       if (c.legalities) {
@@ -621,7 +630,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       // Singleton decks ignore a re-add; elsewhere the server increments the
       // existing row's quantity (another copy for the playset).
       if (singletonCapped(deck?.format ?? "commander", card.typeLine) && pool.some((c) => c.id === card.id)) return;
-      await fetch(`/api/decks/${deckId}/cards`, {
+      // A card that didn't go in says so (offline, or the server refused):
+      // it used to fail without a word, as an unhandled rejection.
+      const res = await fetch(`/api/decks/${deckId}/cards`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -634,7 +645,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           colorIdentity: card.colorIdentity,
           legalities: card.legalities,
         }),
-      });
+      }).catch(() => null);
+      if (!res?.ok) setSearchError(res ? `Couldn’t add ${card.name}. Try again.` : `Couldn’t add ${card.name}: you seem to be offline.`);
       loadPool();
     },
     [pool, deckId, loadPool, deck?.format]
@@ -1034,6 +1046,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             <div>
               <button
                 className="id-ghost"
+                aria-haspopup="menu"
+                aria-expanded={toolsOpen}
                 style={{ padding: "9px 15px" }}
                 onClick={(e) => {
                   if (toolsOpen) { setToolsOpen(false); return; }
@@ -1554,7 +1568,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   warning={warningOf(card)}
                   onOpen={() => startReview(card)}
                   trailing={
-                    <button className="id-add" title="Add to deck" onClick={(e) => { e.stopPropagation(); moveTo(card.dbId, "deck"); }}>+</button>
+                    <button className="id-add" title="Add to deck" aria-label={`Add ${card.name} to the deck`} onClick={(e) => { e.stopPropagation(); moveTo(card.dbId, "deck"); }}>+</button>
                   }
                 />
               ))
@@ -2134,6 +2148,24 @@ const deckTileGrid: React.CSSProperties = {
 
 /* Full card-image tile for the decklist: the card art with quantity / owned /
    warning badges, a hover remove (unless it's the commander), and click-to-review. */
+/* A card the mouse opens with a click opens from the keyboard too: it takes
+   the focus, and Enter or Space opens it. (Only when the key is pressed on
+   the card itself, not on a button inside it.) These tiles and rows are the
+   only way to the card's sheet: its printings, its moves, the wishlist. */
+function openable(onOpen: (() => void) | undefined, name: string) {
+  if (!onOpen) return {};
+  return {
+    role: "button" as const,
+    tabIndex: 0,
+    "aria-label": `Open ${name}`,
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+      e.preventDefault();
+      onOpen();
+    },
+  };
+}
+
 function DeckCardTile({
   card,
   owned,
@@ -2160,6 +2192,7 @@ function DeckCardTile({
     <div
       className="card-tile"
       onClick={onOpen}
+      {...openable(onOpen, card.name)}
       title={card.name}
       style={{ cursor: onOpen ? "pointer" : "default", transition: "transform .16s ease" }}
     >
@@ -2302,6 +2335,7 @@ function DeckCardRow({
     <div
       className="deck-row"
       onClick={onOpen}
+      {...openable(onOpen, card.name)}
       onPointerEnter={(e) => { if (e.pointerType === "mouse") onPreview(e.currentTarget.getBoundingClientRect()); }}
       onPointerLeave={(e) => { if (e.pointerType === "mouse") onPreview(null); }}
     >
@@ -2354,7 +2388,7 @@ function DeckRowPreview({ card, rect }: { card: PoolCard; rect: DOMRect }) {
   const top = Math.max(8, Math.min(rect.top + rect.height / 2 - H / 2, window.innerHeight - H - 8));
   return (
     <div style={{ position: "fixed", top, left, width: W, height: H, zIndex: 90, pointerEvents: "none", borderRadius: "4.8%/3.5%", overflow: "hidden", boxShadow: "0 18px 40px -12px rgba(0,0,0,.7)", animation: "sp-fade .12s ease" }}>
-      <CardArt name={card.name} src={card.imageUri || undefined} prefer="src" version="normal" radius={0} style={{ position: "absolute", inset: 0 }} />
+      <CardArt key={card.dbId} name={card.name} src={card.imageUri || undefined} prefer="src" version="normal" radius={0} style={{ position: "absolute", inset: 0 }} />
     </div>
   );
 }
@@ -2380,6 +2414,7 @@ function IdCardLine({
     <div
       className="id-card id-deckrow"
       onClick={onOpen}
+      {...openable(onOpen, card.name)}
       style={{ display: "flex", alignItems: "center", gap: 12, padding: 8, cursor: onOpen ? "pointer" : "default" }}
     >
       <div style={{ position: "relative", width: 44, height: 44, borderRadius: 8, overflow: "hidden", flex: "none" }}>
