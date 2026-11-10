@@ -67,6 +67,7 @@ import {
   upkeepTokenOf,
   winotaOf,
 } from "./abilities";
+import { triggersOf, type Outcome } from "./triggers";
 import { manaSources, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
 import { other, type CardBook, type Choice, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
@@ -184,7 +185,7 @@ function update(g: PracticeGame, iid: number, fn: (c: PlayCard) => PlayCard) {
   g.sides[at.seat] = { ...side, [at.zone]: side[at.zone].map((c) => (c.iid === iid ? fn(c) : c)) };
 }
 
-function drawCards(g: PracticeGame, seat: Seat, n: number) {
+function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook) {
   const side = g.sides[seat];
   if (side.library.length < n) {
     g.sides[seat] = draw(side, side.library.length);
@@ -195,6 +196,80 @@ function drawCards(g: PracticeGame, seat: Seat, n: number) {
     return;
   }
   g.sides[seat] = draw(side, n);
+  if (book && n > 0) opponentDrew(g, seat, n, book);
+}
+
+/** A seat drew cards: the other side's "whenever an opponent draws a card".
+    Nekusar deals its damage. Smothering Tithe makes a Treasure: the table
+    takes it that nobody pays the {2}, which is how it goes at most tables. */
+function opponentDrew(g: PracticeGame, seat: Seat, n: number, book: CardBook) {
+  const owner = other(seat);
+  for (const c of [...g.sides[owner].battlefield]) {
+    const t = triggersOf(book, c).oppDraws;
+    if (!t || g.winner) continue;
+    if (t.damage) {
+      say(g, owner, `${faceName(c)} deals ${t.damage * n} damage to ${seat === "you" ? "you" : "the opponent"}.`);
+      loseLife(g, seat, t.damage * n, book);
+    }
+    if (t.treasure) {
+      addTokens(g, owner, { name: "Treasure", power: 0, toughness: 0, keywords: [], kind: "artifact" }, n);
+      say(g, owner, `${faceName(c)}: ${seat === "you" ? "you don't" : "the opponent doesn't"} pay {${t.pay}}; ${owner === "you" ? "you make" : "the opponent makes"} ${n === 1 ? "a Treasure" : `${n} Treasures`}.`);
+    }
+  }
+}
+
+/** Carry out a trigger's outcome (lib/practice/triggers.ts) for its controller. */
+function applyOutcome(g: PracticeGame, seat: Seat, source: PlayCard, out: Outcome, book: CardBook) {
+  const name = faceName(source);
+  const foe = other(seat);
+  if (out.counters && findCard(g, source.iid)?.zone === "battlefield") {
+    update(g, source.iid, (x) => ({ ...x, counters: (x.counters ?? 0) + out.counters }));
+    say(g, seat, `${name} gets ${out.counters === 1 ? "a" : out.counters} +1/+1 counter${out.counters === 1 ? "" : "s"}.`);
+  }
+  for (const t of out.tokens) {
+    addTokens(g, seat, { name: t.name, power: t.power, toughness: t.toughness, keywords: t.keywords, kind: "creature" }, t.count);
+    say(g, seat, `${name}: ${seat === "you" ? "you create" : "the opponent creates"} ${t.count === 1 ? "a" : t.count} ${t.name} token${t.count === 1 ? "" : "s"} (${t.power}/${t.toughness}${t.keywords.length ? `, ${t.keywords.join(", ").toLowerCase()}` : ""}).`);
+  }
+  for (const a of out.artifacts) {
+    addTokens(g, seat, { name: a.name, power: 0, toughness: 0, keywords: [], kind: "artifact" }, a.count);
+    say(g, seat, `${name}: ${seat === "you" ? "you make" : "the opponent makes"} ${a.count === 1 ? `a ${a.name}` : `${a.count} ${a.name} tokens`}.`);
+  }
+  if (out.damage) {
+    say(g, seat, `${name} deals ${out.damage} damage to ${foe === "you" ? "you" : "the opponent"}.`);
+    loseLife(g, foe, out.damage, book);
+  }
+  if (out.drain) {
+    say(g, seat, `${foe === "you" ? "You lose" : "The opponent loses"} ${out.drain} life (${name}).`);
+    loseLife(g, foe, out.drain, book);
+  }
+  if (out.gain) {
+    g.sides[seat] = { ...g.sides[seat], life: g.sides[seat].life + out.gain };
+    say(g, seat, `${who(seat)} ${verb(seat, "gain")} ${out.gain} life (${name}).`);
+  }
+  if (out.lose) {
+    say(g, seat, `${who(seat)} ${verb(seat, "lose")} ${out.lose} life (${name}).`);
+    loseLife(g, seat, out.lose, book);
+  }
+  if (out.draw && !g.winner) {
+    say(g, seat, `${who(seat)} ${verb(seat, "draw")} ${out.draw === 1 ? "a card" : `${out.draw} cards`} (${name}).`);
+    // Never past the library's end: a trigger's draw doesn't lose the game.
+    const k = Math.min(out.draw, g.sides[seat].library.length);
+    if (k) drawCards(g, seat, k, book);
+  }
+}
+
+/** A creature died: "whenever another creature dies" on either side. */
+function creatureDied(g: PracticeGame, seat: Seat, dead: PlayCard, book: CardBook) {
+  for (const s of ["you", "opp"] as Seat[]) {
+    // The dead creature's own "this or another creature dies" counts: it saw itself die.
+    for (const c of [...g.sides[s].battlefield, ...(s === seat ? [dead] : [])]) {
+      const t = triggersOf(book, c).dies;
+      if (!t || g.winner) continue;
+      if (t.own && s !== seat) continue;
+      if (c.iid === dead.iid && t.another) continue;
+      applyOutcome(g, s, c, t.out, book);
+    }
+  }
 }
 
 /** State-based checks: creatures with lethal damage die, then life and
@@ -214,6 +289,7 @@ function checkState(g: PracticeGame, book: CardBook) {
           moveTo(g, c.iid, "graveyard");
           say(g, seat, `${c.name} dies.`);
           died = true;
+          creatureDied(g, seat, c, book);
         }
       }
     }
@@ -328,7 +404,7 @@ function loseLife(g: PracticeGame, seat: Seat, n: number, book: CardBook) {
     const k = Math.min(n, g.sides[turn].library.length);
     if (!k) continue;
     say(g, turn, `${faceName(c)}: ${turn === "you" ? "you draw" : "the opponent draws"} ${k}.`);
-    drawCards(g, turn, k);
+    drawCards(g, turn, k, book);
   }
 }
 
@@ -497,7 +573,12 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
       say(g, s, `${faceName(c)}: ${s === "you" ? "you create" : "the opponent creates"} ${t.count === 1 ? "a" : t.count} ${t.name} token${t.count === 1 ? "" : "s"} (${t.power}/${t.toughness}).`);
     }
   }
-  if (g.turn > 1) drawCards(g, seat, 1);
+  // "At the beginning of your upkeep, …" (Phyrexian Arena), before the draw.
+  for (const c of [...g.sides[seat].battlefield]) {
+    const out = triggersOf(book, c).upkeep;
+    if (out && !g.winner) applyOutcome(g, seat, c, out, book);
+  }
+  if (g.turn > 1 && !g.winner) drawCards(g, seat, 1, book);
   checkState(g, book);
   return g;
 }
@@ -527,6 +608,11 @@ export function endTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
     table runs it first: playerEndStep, aiEndStep.) */
 function endStep(g: PracticeGame, book: CardBook) {
   const seat = g.active;
+  // "At the beginning of your end step, …"
+  for (const c of [...g.sides[seat].battlefield]) {
+    const out = triggersOf(book, c).endStep;
+    if (out && !g.winner) applyOutcome(g, seat, c, out, book);
+  }
   for (const s of ["you", "opp"] as Seat[]) {
     for (const c of g.sides[s].battlefield) {
       if (!punishesIdleOf(book, c)) continue;
@@ -636,6 +722,16 @@ export function concede(g0: PracticeGame): PracticeGame {
   g.winner = "opp";
   g.choice = undefined;
   say(g, null, "You concede. The opponent wins.");
+  return g;
+}
+
+/** You draw by hand (the Draw button): through the engine, so what watches
+    your draws sees them (Nekusar, Smothering Tithe). */
+export function playerDraws(g0: PracticeGame, n: number, book: CardBook): PracticeGame {
+  if (g0.winner || n <= 0 || !g0.sides.you.library.length) return g0;
+  const g = structuredClone(g0);
+  drawCards(g, "you", Math.min(n, g.sides.you.library.length), book);
+  checkState(g, book);
   return g;
 }
 
@@ -924,11 +1020,48 @@ function castTriggers(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBo
     }
     if (t.draw) {
       say(g, seat, `${who(seat)} ${verb(seat, "draw")} ${t.draw} (${name}).`);
-      drawCards(g, seat, t.draw);
+      drawCards(g, seat, t.draw, book);
     }
     if (t.token) {
       addTokens(g, seat, { ...t.token, kind: "creature" }, 1);
       say(g, seat, `${name} makes a ${t.token.name} token (${t.token.power}/${t.token.toughness}).`);
+    }
+  }
+  castTaxes(g, seat, spell, book);
+}
+
+/** The most a player pays for a tax by itself: {1} for Rhystic Study, yes;
+    more than {2} is their call, so the table doesn't spend it for them. */
+const AUTO_PAY_MAX = 2;
+
+/** "Whenever an opponent casts a spell, you may draw a card unless that
+    player pays {1}" (Rhystic Study, Esper Sentinel), on the other side of
+    the table. The caster pays when it has the mana left after the spell:
+    the AI whenever it can, you up to {2}. Otherwise the other side draws. */
+function castTaxes(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBook) {
+  const owner = other(seat);
+  const creature = /\bCreature\b/.test((infoOf(book, spell)?.typeLine ?? spell.typeLine ?? "").split(" // ")[0]!);
+  for (const c of [...g.sides[owner].battlefield]) {
+    const t = triggersOf(book, c).tax;
+    if (!t || g.winner) continue;
+    if (t.noncreature && creature) continue;
+    // "Their first … spell each turn": once a turn for this permanent.
+    if (t.first) {
+      if (g.once?.includes(c.iid)) continue;
+      g.once = [...(g.once ?? []), c.iid];
+    }
+    const cost = t.cost === "power" ? stats(book, c).power : t.cost;
+    if (cost <= 0) continue;
+    const name = faceName(c);
+    const sources = availableMana(g, seat, book);
+    const price = parseCost(`{${cost}}`);
+    const paid = seat === "you" ? (cost <= AUTO_PAY_MAX ? youPay(g, price, sources, book) : null) : aiPay(g, seat, price, sources, book);
+    if (paid && !paid.life) {
+      spend(g, seat, paid, sources);
+      say(g, seat, `${who(seat)} ${verb(seat, "pay")} {${cost}} for ${name}.`);
+    } else {
+      say(g, owner, `${name}: ${seat === "you" ? "you don't" : "the opponent doesn't"} pay {${cost}}; ${owner === "you" ? "you draw" : "the opponent draws"} a card.`);
+      drawCards(g, owner, 1, book);
     }
   }
 }
@@ -969,7 +1102,7 @@ function drawForTypes(g: PracticeGame, choice: Choice, book: CardBook) {
   const types = [...new Set((choice.discarded ?? []).flatMap(cardTypes))];
   if (!types.length) return;
   say(g, choice.by, `${who(choice.by)} ${verb(choice.by, "draw")} ${types.length} for the card types discarded (${types.join(", ")}).`);
-  drawCards(g, choice.by, types.length);
+  drawCards(g, choice.by, types.length, book);
 }
 
 /** Can this permanent be sacrificed to "sacrifices a <what>"? */
@@ -1070,7 +1203,7 @@ export function declineChoice(g0: PracticeGame, book: CardBook): PracticeGame {
   if (c.braids === "theirs") {
     say(g, "you", `You don't sacrifice: you lose ${c.life ?? 2} life, and the opponent draws a card.`);
     loseLife(g, "you", c.life ?? 2, book);
-    drawCards(g, "opp", 1);
+    drawCards(g, "opp", 1, book);
   }
   checkState(g, book);
   return g;
@@ -1100,7 +1233,12 @@ export function playerEdict(g0: PracticeGame, iid: number, book: CardBook): Prac
 function landEntered(g: PracticeGame, seat: Seat, book: CardBook) {
   for (const c of [...g.sides[seat].battlefield]) {
     const t = landfallTokenOf(book, c);
-    if (!t) continue;
+    if (!t) {
+      // Any other landfall the table can do in full (life, a card, a Treasure).
+      const out = triggersOf(book, c).landfall;
+      if (out) applyOutcome(g, seat, c, out, book);
+      continue;
+    }
     addTokens(g, seat, { name: t.name, power: t.power, toughness: t.toughness, keywords: t.keywords, kind: "creature" }, t.count);
     say(g, seat, `${faceName(c)}: landfall, ${t.count === 1 ? "a" : t.count} ${t.name} token${t.count === 1 ? "" : "s"} (${t.power}/${t.toughness}).`);
   }
@@ -1114,6 +1252,24 @@ function entered(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, op
   const at = findCard(g, card.iid);
   if (!at || at.zone !== "battlefield") return false;
   const now = at.card;
+  // "When this enters, …": a card, tokens, life.
+  const own = triggersOf(book, now).enters;
+  if (own) applyOutcome(g, seat, now, own, book);
+  // "Whenever a creature [you control] enters, …" on either side.
+  if (isCreature(book, now)) {
+    for (const s of ["you", "opp"] as Seat[]) {
+      for (const c of [...g.sides[s].battlefield]) {
+        const t = triggersOf(book, c).creatureEnters;
+        if (!t || g.winner) continue;
+        if (!t.anyone && s !== seat) continue;
+        if (t.another && c.iid === now.iid) continue;
+        if (t.nontoken && now.token) continue;
+        if (t.minPower && stats(book, now).power < t.minPower) continue;
+        if (t.keyword && !has(book, now, t.keyword)) continue;
+        applyOutcome(g, s, c, t.out, book);
+      }
+    }
+  }
   // Selvala: "its controller may draw a card if its power is greater than
   // each other creature's power".
   if (isCreature(book, now)) {
@@ -1124,7 +1280,7 @@ function entered(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, op
         for (const c of g.sides[s].battlefield) {
           if (c.iid === now.iid || !drawsForBiggest(book, c)) continue;
           say(g, seat, `${faceName(c)}: ${now.name} is the biggest creature; ${seat === "you" ? "you draw" : "the opponent draws"} a card.`);
-          drawCards(g, seat, 1);
+          drawCards(g, seat, 1, book);
         }
       }
     }
@@ -1134,7 +1290,7 @@ function entered(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, op
     const l = lootOnEnterOf(book, c);
     if (!l || c.iid === now.iid || !isType(book, now, l.type) || (l.legendary && !isType(book, now, "legendary"))) continue;
     say(g, seat, `${faceName(c)}: ${seat === "you" ? "you draw" : "the opponent draws"} ${l.draw}, then discard${seat === "you" ? "" : "s"} a card.`);
-    drawCards(g, seat, l.draw);
+    drawCards(g, seat, l.draw, book);
     if (seat === "opp") {
       const pick = aiDiscardPick(g, "opp", book);
       if (pick) {
@@ -1273,7 +1429,7 @@ function braidsAnswer(g: PracticeGame, by: Seat, types: string[], life: number, 
   const pay = () => {
     say(g, victim, `${victim === "you" ? "You don't sacrifice: you lose" : "The opponent doesn't sacrifice: it loses"} ${life} life, and ${by === "you" ? "you draw" : "the opponent draws"} a card.`);
     loseLife(g, victim, life, book);
-    drawCards(g, by, 1);
+    drawCards(g, by, 1, book);
   };
   if (!options.length) return pay();
   if (victim === "you") {
@@ -1483,7 +1639,10 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
     if (isType(book, card, "aura")) aiAttach(g, seat, card, action, book);
     // Kefka's discard is the table's to carry out, not the plan's.
     const auto = discardTriggerOf(book, card)?.enters;
-    const effects = auto ? action.effects.filter((e) => e.type !== "discard" && e.type !== "draw") : action.effects;
+    // What it does as it enters is the table's to carry out when it can do
+    // all of it (lib/practice/triggers.ts): the plan's copy would do it twice.
+    const tabled = !!triggersOf(book, card).enters;
+    const effects = tabled ? [] : auto ? action.effects.filter((e) => e.type !== "discard" && e.type !== "draw") : action.effects;
     applyEffects(g, seat, effects, book, card.name);
     if (auto) discardTrigger(g, seat, card, book);
     // Inalla's copy enters too: its enters ability happens again.
@@ -1497,10 +1656,11 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
     an attacker when you attack, or your biggest threat at the end of your
     turn. Returns the cast, as an action for the table to play out (and for
     you to answer), or null when nothing is worth it or payable. */
-export function aiRemovalAction(g: PracticeGame, book: CardBook, targets: number[], when: "attack" | "end"): PlanAction | null {
+export function aiRemovalAction(g: PracticeGame, book: CardBook, targets: number[], when: "attack" | "end" | "main"): PlanAction | null {
   const opp = g.sides.opp;
+  // On its own turn ("main") it uses its sorceries: the instants wait for yours.
   const options = opp.hand.flatMap((c) => {
-    const r = removalOf(infoOf(book, c));
+    const r = removalOf(infoOf(book, c), when === "main" ? "sorcery" : "instant");
     return r ? [{ c, r }] : [];
   });
   if (!options.length) return null;
@@ -1523,13 +1683,25 @@ export function aiRemovalAction(g: PracticeGame, book: CardBook, targets: number
       if (r.attackingOnly && !attacking.has(target.iid)) return false;
       if (r.notColor && new RegExp(`\\{[^}]*${r.notColor}[^}]*\\}`).test(tInfo?.manaCost ?? "")) return false;
       if (r.notType && new RegExp(`\\b${r.notType}\\b`, "i").test(tInfo?.typeLine ?? target.typeLine ?? "")) return false;
+      if (r.minValue && (tInfo?.manaValue ?? 0) < r.minValue) return false;
       if (r.kind === "destroy" && indestructible(g, "you", target, book)) return false;
       if (r.kind === "damage" && (indestructible(g, "you", target, book) || r.amount < s.toughness - (target.damage ?? 0))) return false;
       return true;
     });
     if (!fit) continue;
     const effect: Effect = { type: fit.r.kind === "damage" ? "damage" : fit.r.kind, target: cardId(target.iid), player: null, amount: fit.r.amount || null, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: null };
-    const rider: Effect[] = fit.r.rider ? [{ ...effect, type: "note", target: null, amount: null, text: fit.r.rider }] : [];
+    // What its controller gets: a token (Beast Within) or life (Swords to
+    // Plowshares) is carried out; anything else is a note for you.
+    const token = /creates? an? (\d+)\/(\d+) (?:[a-z]+ )*?([a-z]+) creature token/i.exec(fit.r.rider);
+    const life = /gains life equal to its power/i.test(fit.r.rider);
+    const blank = { ...effect, target: null, amount: null };
+    const rider: Effect[] = !fit.r.rider
+      ? []
+      : token
+        ? [{ ...blank, type: "token", player: "player", amount: 1, name: token[3]![0]!.toUpperCase() + token[3]!.slice(1), power: Number(token[1]), toughness: Number(token[2]) }]
+        : life
+          ? [{ ...blank, type: "life", player: "player", amount: s.power }]
+          : [{ ...blank, type: "note", text: fit.r.rider }];
     return { kind: "cast", card: cardId(fit.c.iid), x: null, tap_card: null, sacrifice_card: null, mana: null, life: null, effects: [effect, ...rider] };
   }
   return null;
@@ -1585,7 +1757,7 @@ function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: Ca
       }
       case "draw": {
         const s = seatOf(caster, e.player);
-        drawCards(g, s, amount);
+        drawCards(g, s, amount, book);
         say(g, caster, `${s === "you" ? "You draw" : "The opponent draws"} ${amount}.`);
         break;
       }
@@ -1710,6 +1882,12 @@ export function declareAttackers(g0: PracticeGame, seat: Seat, iids: number[], b
     const card = findCard(g, iid)!.card;
     if (discardTriggerOf(book, card)?.attacks && !g.choice) discardTrigger(g, seat, card, book);
   }
+  // "Whenever this attacks, …": a token, a card, a drain.
+  for (const iid of attackers) {
+    const card = findCard(g, iid)?.card;
+    const out = card ? triggersOf(book, card).attacks : undefined;
+    if (card && out && !g.winner) applyOutcome(g, seat, card, out, book);
+  }
   // Winota: each non-Human attacker brings a Human in from the top six.
   const winotas = g.sides[seat].battlefield.flatMap((c) => {
     const w = winotaOf(book, c);
@@ -1730,7 +1908,7 @@ export function declareAttackers(g0: PracticeGame, seat: Seat, iids: number[], b
     }).length;
     if (!n) continue;
     say(g, seat, `${faceName(c)}: ${n} ${t.type}${n === 1 ? "" : "s"} attack; ${seat === "you" ? "you draw" : "the opponent draws"} ${n}.`);
-    drawCards(g, seat, n);
+    drawCards(g, seat, n, book);
     putFromHand(g, seat, faceName(c), book);
   }
   checkState(g, book);
@@ -1894,13 +2072,13 @@ function hitTriggers(g: PracticeGame, seat: Seat, hitter: PlayCard, book: CardBo
         const top = g.sides[seat].library[0];
         if (!top) continue;
         const mv = infoOf(book, top)?.manaValue ?? 0;
-        drawCards(g, seat, 1);
+        drawCards(g, seat, 1, book);
         say(g, seat, `${name}: ${seat === "you" ? "you reveal" : "the opponent reveals"} ${top.name} and ${verb(seat, "put")} it into ${seat === "you" ? "your" : "its"} hand${mv ? `; ${foe === "you" ? "you lose" : "the opponent loses"} ${mv} life` : ""}.`);
         loseLife(g, foe, mv, book);
       }
       if (t.draw) {
         say(g, seat, `${who(seat)} ${verb(seat, "draw")} ${t.draw} (${name}).`);
-        drawCards(g, seat, t.draw);
+        drawCards(g, seat, t.draw, book);
       }
     }
   }

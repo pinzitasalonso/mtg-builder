@@ -12,6 +12,8 @@ import {
   finishSearch,
   indestructible,
   playerCast,
+  playerDraws,
+  playerEnters,
   playerEdict,
   playerScry,
   ninjutsu,
@@ -84,6 +86,22 @@ const BOOK: CardBook = Object.fromEntries(
     info("Doom Blade", { typeLine: "Instant", manaCost: "{1}{B}", manaValue: 2, oracleText: "Destroy target nonblack creature." }),
     info("Into the Roil", { typeLine: "Instant", manaCost: "{1}{U}", manaValue: 2, oracleText: "Kicker {1}{U}\nReturn target nonland permanent to its owner's hand. If this spell was kicked, draw a card." }),
     info("Plains", { typeLine: "Basic Land — Plains", producedMana: ["W"] }),
+    // Cards whose triggers the table carries out (lib/practice/triggers.ts).
+    info("Baleful Strix", { typeLine: "Artifact Creature — Bird", manaCost: "{1}{U}", manaValue: 2, power: 1, toughness: 1, keywords: ["Flying", "Deathtouch"], oracleText: "Flying, deathtouch\nWhen this creature enters, draw a card." }),
+    info("Phyrexian Arena", { typeLine: "Enchantment", manaCost: "{1}{U}{U}", manaValue: 3, oracleText: "At the beginning of your upkeep, you draw a card and lose 1 life." }),
+    info("Nekusar, the Mindrazer", { typeLine: "Legendary Creature — Zombie Wizard", manaCost: "{2}{U}", manaValue: 3, power: 2, toughness: 4, oracleText: "At the beginning of each player's draw step, that player draws an additional card.\nWhenever an opponent draws a card, Nekusar deals 1 damage to that player." }),
+    info("Smothering Tithe", { typeLine: "Enchantment", manaCost: "{3}{W}", manaValue: 4, oracleText: "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token." }),
+    info("Rhystic Study", { typeLine: "Enchantment", manaCost: "{2}{U}", manaValue: 3, oracleText: "Whenever an opponent casts a spell, you may draw a card unless that player pays {1}." }),
+    info("Zulaport Cutthroat", { typeLine: "Creature — Human Rogue", manaCost: "{1}{B}", manaValue: 2, power: 1, toughness: 1, oracleText: "Whenever this creature or another creature you control dies, each opponent loses 1 life and you gain 1 life." }),
+    info("Soul Warden", { typeLine: "Creature — Human Cleric", manaCost: "{W}", manaValue: 1, power: 1, toughness: 1, oracleText: "Whenever another creature enters, you gain 1 life." }),
+    info("Goblin Rabblemaster", { typeLine: "Creature — Goblin", manaCost: "{2}{R}", manaValue: 3, power: 2, toughness: 2, oracleText: "Whenever Goblin Rabblemaster attacks, create a 1/1 red Goblin creature token with haste." }),
+    info("Beast Within", { typeLine: "Instant", manaCost: "{2}{G}", manaValue: 3, oracleText: "Destroy target permanent. Its controller creates a 3/3 green Beast creature token." }),
+    info("Anguished Unmaking", { typeLine: "Instant", manaCost: "{1}{W}{B}", manaValue: 3, oracleText: "Exile target nonland permanent. You lose 3 life." }),
+    info("Putrefy", { typeLine: "Instant", manaCost: "{1}{B}{G}", manaValue: 3, oracleText: "Destroy target artifact or creature. It can't be regenerated." }),
+    info("Rampant Growth", { typeLine: "Sorcery", manaCost: "{1}{G}", manaValue: 2, oracleText: "Search your library for a basic land card, put that card onto the battlefield tapped, then shuffle." }),
+    info("Cultivate", { typeLine: "Sorcery", manaCost: "{2}{G}", manaValue: 3, oracleText: "Search your library for up to two basic land cards, reveal those cards, put one onto the battlefield tapped and the other into your hand, then shuffle." }),
+    info("Feed the Swarm", { typeLine: "Sorcery", manaCost: "{1}{B}", manaValue: 2, oracleText: "Destroy target creature or enchantment an opponent controls. You lose life equal to that permanent's mana value." }),
+    info("Despark", { typeLine: "Instant", manaCost: "{W}{B}", manaValue: 2, oracleText: "Exile target permanent with mana value 4 or greater." }),
     info("Swamp", { typeLine: "Basic Land — Swamp", producedMana: ["B"] }),
     info("Shatterskull Smashing // Shatterskull, the Shattered", {
       typeLine: "Sorcery // Land",
@@ -724,7 +742,8 @@ describe("answering on the other's turn", () => {
     const g0 = { ...table({ youField: ["Hill Giant", "Serra Angel"], oppHand: ["Swords to Plowshares"], oppField: ["Plains"] }), active: "you" as const };
     const swords = aiRemovalAction(g0, BOOK, g0.sides.you.battlefield.map((c) => c.iid), "end")!;
     expect(swords.effects[0]).toMatchObject({ type: "exile", target: cardId(iidOf(g0, "you", "Serra Angel")) });
-    expect(swords.effects[1]).toMatchObject({ type: "note", text: "Its controller gains life equal to its power." });
+    // Its controller's life is the table's to give: the Angel's power.
+    expect(swords.effects[1]).toMatchObject({ type: "life", player: "player", amount: 4 });
     const small = { ...table({ youField: ["Hill Giant"], oppHand: ["Swords to Plowshares"], oppField: ["Plains"] }), active: "you" as const };
     expect(aiRemovalAction(small, BOOK, small.sides.you.battlefield.map((c) => c.iid), "end")).toBeNull();
   });
@@ -1132,5 +1151,179 @@ describe("conceding", () => {
     // A game that's over stays as it ended.
     const won = { ...g0, winner: "you" as const };
     expect(concede(won)).toBe(won);
+  });
+});
+
+describe("the triggers most decks are full of", () => {
+  const life = (g: PracticeGame) => [g.sides.you.life, g.sides.opp.life];
+  const count = (g: PracticeGame, seat: "you" | "opp", name: string) => g.sides[seat].battlefield.filter((c) => c.name === name).length;
+  const said = (g: PracticeGame, text: string) => g.log.some((l) => l.text.includes(text));
+
+  it("a creature that draws as it enters does, once, whatever the plan says", () => {
+    const g0 = table({ oppHand: ["Baleful Strix"], oppField: ["Island", "Island"] });
+    const hand = g0.sides.opp.hand.length;
+    // The model's plan also asks for the draw: the table does it once.
+    const g = applyAction(g0, "opp", action("cast", iidOf(g0, "opp", "Baleful Strix", "hand"), { effects: [effect({ type: "draw", amount: 1 })] }), BOOK).game;
+    expect(count(g, "opp", "Baleful Strix")).toBe(1);
+    expect(g.sides.opp.hand).toHaveLength(hand - 1 + 1);
+    expect(said(g, "The opponent draws a card (Baleful Strix).")).toBe(true);
+  });
+
+  it("yours draws too, as you cast it", () => {
+    let g = table({ youHand: ["Baleful Strix"], youField: ["Island", "Island"] });
+    g = { ...g, active: "you" };
+    const iid = iidOf(g, "you", "Baleful Strix", "hand");
+    const hand = g.sides.you.hand.length;
+    g = playerEnters(playerCast(g, iid, BOOK), iid, BOOK);
+    expect(g.sides.you.hand).toHaveLength(hand - 1 + 1);
+  });
+
+  it("your upkeep: Phyrexian Arena draws and costs a life, before the turn's draw", () => {
+    let g = table({ youField: ["Phyrexian Arena"] });
+    g = { ...g, active: "you", turn: 4 };
+    const before = g.sides.you.hand.length;
+    g = startTurn(g, BOOK);
+    expect(g.sides.you.hand).toHaveLength(before + 2);
+    expect(life(g)).toEqual([39, 40].map((n) => n - 20).map((n) => n + 0));
+    // Not on the other player's upkeep.
+    const theirs = startTurn({ ...table({ youField: ["Phyrexian Arena"] }), turn: 5 }, BOOK);
+    expect(theirs.sides.you.life).toBe(20);
+  });
+
+  it("an opponent's draws: Nekusar's damage, by the turn's draw and by the Draw button", () => {
+    let g = table({ oppField: ["Nekusar, the Mindrazer"] });
+    g = startTurn({ ...g, active: "you", turn: 4 }, BOOK);
+    expect(g.sides.you.life).toBe(19);
+    g = playerDraws(g, 2, BOOK);
+    expect(g.sides.you.life).toBe(17);
+    // Its own controller's draws don't hurt anyone.
+    expect(startTurn({ ...g, active: "opp", turn: 5 }, BOOK).sides.opp.life).toBe(20);
+  });
+
+  it("Smothering Tithe makes a Treasure for each card the other player draws", () => {
+    const g = startTurn({ ...table({ youField: ["Smothering Tithe"] }), turn: 5 }, BOOK);
+    expect(count(g, "you", "Treasure")).toBe(1);
+    expect(said(g, "Smothering Tithe: the opponent doesn't pay {2}; you make a Treasure.")).toBe(true);
+  });
+
+  it("Rhystic Study: the AI pays when it has the mana left, and you draw when it hasn't", () => {
+    const spare = table({ oppHand: ["Llanowar Elves"], oppField: ["Forest", "Forest"], youField: ["Rhystic Study"] });
+    const paid = applyAction(spare, "opp", action("cast", iidOf(spare, "opp", "Llanowar Elves", "hand")), BOOK).game;
+    expect(paid.sides.you.hand).toHaveLength(spare.sides.you.hand.length);
+    expect(paid.sides.opp.battlefield.filter((c) => c.name === "Forest" && c.tapped)).toHaveLength(2);
+    expect(said(paid, "The opponent pays {1} for Rhystic Study.")).toBe(true);
+
+    const tight = table({ oppHand: ["Llanowar Elves"], oppField: ["Forest"], youField: ["Rhystic Study"] });
+    const drew = applyAction(tight, "opp", action("cast", iidOf(tight, "opp", "Llanowar Elves", "hand")), BOOK).game;
+    expect(drew.sides.you.hand).toHaveLength(tight.sides.you.hand.length + 1);
+  });
+
+  it("the AI's Rhystic Study: you pay {1} by yourself when a land is left, else it draws", () => {
+    let g = table({ youHand: ["Llanowar Elves"], youField: ["Forest", "Forest"], oppField: ["Rhystic Study"] });
+    g = { ...g, active: "you" };
+    const paid = playerCast(g, iidOf(g, "you", "Llanowar Elves", "hand"), BOOK);
+    expect(paid.sides.you.battlefield.filter((c) => c.name === "Forest" && c.tapped)).toHaveLength(2);
+    expect(paid.sides.opp.hand).toHaveLength(g.sides.opp.hand.length);
+
+    let tight = table({ youHand: ["Llanowar Elves"], youField: ["Forest"], oppField: ["Rhystic Study"] });
+    tight = { ...tight, active: "you" };
+    const drew = playerCast(tight, iidOf(tight, "you", "Llanowar Elves", "hand"), BOOK);
+    expect(drew.sides.opp.hand).toHaveLength(tight.sides.opp.hand.length + 1);
+  });
+
+  it("a creature dying drains, for the side that has the trigger", () => {
+    // Your Bears dies in combat damage: your Cutthroat drains.
+    const g0 = table({ youField: ["Zulaport Cutthroat", "Grizzly Bears"], oppHand: ["Lightning Bolt"], oppField: ["Mountain"] });
+    const bolt = action("cast", iidOf(g0, "opp", "Lightning Bolt", "hand"), { effects: [effect({ type: "damage", target: cardId(iidOf(g0, "you", "Grizzly Bears")), amount: 3 })] });
+    const g = applyAction(g0, "opp", bolt, BOOK).game;
+    expect(count(g, "you", "Grizzly Bears")).toBe(0);
+    expect(life(g)).toEqual([21, 19]);
+    // The AI's creature dying doesn't trigger yours ("you control").
+    const theirs = table({ youField: ["Zulaport Cutthroat"], oppField: ["Grizzly Bears"] });
+    const dead = { ...theirs, sides: { ...theirs.sides, opp: { ...theirs.sides.opp, battlefield: theirs.sides.opp.battlefield.map((c) => ({ ...c, damage: 5 })) } } };
+    expect(life(addCounters(dead, iidOf(theirs, "you", "Zulaport Cutthroat"), 1, BOOK))).toEqual([20, 20]);
+  });
+
+  it("Soul Warden gains for any other creature entering, yours or theirs", () => {
+    const g0 = table({ youField: ["Soul Warden"], oppHand: ["Llanowar Elves"], oppField: ["Forest"] });
+    const g = applyAction(g0, "opp", action("cast", iidOf(g0, "opp", "Llanowar Elves", "hand")), BOOK).game;
+    expect(g.sides.you.life).toBe(21);
+  });
+
+  it("an attack trigger makes its token", () => {
+    const g0 = table({ oppField: ["Goblin Rabblemaster"] });
+    const g = declareAttackers(g0, "opp", [iidOf(g0, "opp", "Goblin Rabblemaster")], BOOK);
+    const token = g.sides.opp.battlefield.find((c) => c.name === "Goblin");
+    expect(token?.token).toMatchObject({ power: 1, toughness: 1, keywords: ["Haste"] });
+  });
+});
+
+describe("removal that names more than a creature", () => {
+  const card = (name: string) => BOOK[name.toLowerCase()];
+  it("is read: a permanent, a nonland permanent, an artifact or creature, a mana value", () => {
+    expect(removalOf(card("Beast Within"))).toMatchObject({ kind: "destroy", rider: "Its controller creates a 3/3 green Beast creature token." });
+    expect(removalOf(card("Anguished Unmaking"))).toMatchObject({ kind: "exile", notType: "land" });
+    expect(removalOf(card("Putrefy"))).toMatchObject({ kind: "destroy" });
+    expect(removalOf(card("Despark"))).toMatchObject({ kind: "exile", minValue: 4 });
+  });
+
+  it("Beast Within on your attacker leaves you its 3/3", () => {
+    let g = table({ oppHand: ["Beast Within"], oppField: ["Forest", "Forest", "Forest"], youField: ["Serra Angel"] });
+    g = { ...g, active: "you" };
+    const plan = aiRemovalAction(g, BOOK, [iidOf(g, "you", "Serra Angel")], "end");
+    expect(plan?.effects.map((e) => e.type)).toEqual(["destroy", "token"]);
+    const after = applyAction(g, "opp", plan!, BOOK).game;
+    expect(after.sides.you.battlefield.map((c) => c.name)).toEqual(["Beast"]);
+    expect(after.sides.you.battlefield[0]!.token).toMatchObject({ power: 3, toughness: 3 });
+  });
+
+  it("Despark leaves a cheap creature alone", () => {
+    let g = table({ oppHand: ["Despark"], oppField: ["Plains", "Swamp"], youField: ["Craw Wurm"] });
+    g = { ...g, active: "you" };
+    expect(aiRemovalAction(g, BOOK, [iidOf(g, "you", "Craw Wurm")], "end")?.effects[0]).toMatchObject({ type: "exile" });
+    let small = table({ oppHand: ["Despark"], oppField: ["Plains", "Swamp"], youField: ["Commander Guy"] });
+    small = { ...small, active: "you" };
+    const guy = small.sides.you.battlefield[0]!;
+    small = { ...small, sides: { ...small.sides, you: { ...small.sides.you, battlefield: [{ ...guy, commander: true }] } } };
+    expect(aiRemovalAction(small, BOOK, [guy.iid], "end")).toBeNull();
+  });
+});
+
+describe("the built-in planner and the most played spells", () => {
+  const casts = (g: PracticeGame, plan: { main: PlanAction[] }) => plan.main.map((a) => [a.kind, findCard(g, Number(a.card.slice(1)))!.card.name]);
+  const play = (g: PracticeGame, plan: { main: PlanAction[] }) => plan.main.reduce((x, a) => applyAction(x, "opp", a, BOOK).game, g);
+
+  it("casts a ramp spell, and the land comes in tapped", () => {
+    const g0 = table({ oppHand: ["Rampant Growth"], oppField: ["Forest", "Island"], oppLibrary: ["Mountain"] });
+    const plan = fallbackPlan(g0, BOOK);
+    expect(casts(g0, plan)).toEqual([["cast", "Rampant Growth"]]);
+    // The land its colours are missing, not another Island.
+    expect(plan.main[0]!.effects).toMatchObject([{ type: "search", name: "Mountain", to: "battlefield", tapped: true }]);
+    const g = play(g0, plan);
+    expect(g.sides.opp.battlefield.find((c) => c.name === "Mountain")?.tapped).toBe(true);
+    expect(g.sides.opp.graveyard.map((c) => c.name)).toEqual(["Rampant Growth"]);
+  });
+
+  it("Cultivate: one land onto the battlefield tapped, the other to its hand", () => {
+    const g0 = table({ oppHand: ["Cultivate"], oppField: ["Forest", "Forest", "Forest"], oppLibrary: ["Mountain"] });
+    const plan = fallbackPlan(g0, BOOK);
+    expect(plan.main[0]!.effects.map((e) => [e.name, e.to, e.tapped])).toEqual([
+      ["Mountain", "battlefield", true],
+      ["Island", "hand", null],
+    ]);
+    const g = play(g0, plan);
+    expect(g.sides.opp.hand.map((c) => c.name)).toEqual(["Island"]);
+    expect(g.sides.opp.battlefield.filter((c) => /Land/.test(c.typeLine ?? ""))).toHaveLength(4);
+  });
+
+  it("uses a sorcery to remove your biggest threat, and keeps its instants for your turn", () => {
+    const g0 = table({ oppHand: ["Feed the Swarm", "Swords to Plowshares"], oppField: ["Swamp", "Swamp", "Plains"], youField: ["Serra Angel", "Grizzly Bears"] });
+    const plan = fallbackPlan(g0, BOOK);
+    expect(casts(g0, plan)).toEqual([["cast", "Feed the Swarm"]]);
+    expect(plan.main[0]!.effects[0]).toMatchObject({ type: "destroy", target: cardId(iidOf(g0, "you", "Serra Angel")) });
+    expect(play(g0, plan).sides.you.battlefield.map((c) => c.name)).toEqual(["Grizzly Bears"]);
+    // Nothing worth a card: it keeps the sorcery.
+    const small = table({ oppHand: ["Feed the Swarm"], oppField: ["Swamp", "Swamp"], youField: ["Grizzly Bears"] });
+    expect(fallbackPlan(small, BOOK).main).toEqual([]);
   });
 });

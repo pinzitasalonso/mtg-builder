@@ -13,7 +13,7 @@ import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
 import { tapTribeOf, untapLandsOf } from "@/lib/practice/abilities";
-import { concede,
+import { playerDraws, concede,
   addCounters,
   adjustLife,
   aiEndStep,
@@ -1141,7 +1141,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               <button type="button" className="pt-btn" onClick={undo} disabled={!history.length} aria-label="Undo">
                 <Undo2 size={14} strokeWidth={2.25} /> <span className="pt-btn-label">Undo</span>
               </button>
-              <button type="button" className="pt-btn" onClick={() => act((g) => withYourSide(g, (s) => draw(s, 1)))} disabled={!you.library.length}>
+              <button type="button" className="pt-btn" onClick={() => act((g) => playerDraws(g, 1, book))} disabled={!you.library.length}>
                 Draw
               </button>
               <button type="button" className="pt-btn" onClick={() => setScryOpen(true)} disabled={!you.library.length || !!game.choice}>
