@@ -138,7 +138,12 @@ export default function HomePage() {
     setWishCount(await fetchWishlistCount());
   }
 
+  // Loads overlap (a pin, a delete, coming back online): only the newest
+  // one's answer is used, so an older, slower answer can't put back what a
+  // newer one already changed.
+  const loadSeq = useRef(0);
   async function loadAll() {
+    const seq = ++loadSeq.current;
     // Only the server saying "signed out" signs you out. No answer at all
     // (offline) or a server error keeps the last session, for a day — see
     // lib/offline-session.
@@ -169,6 +174,7 @@ export default function HomePage() {
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null);
     const [own, pub] = await Promise.all([user ? list("/api/decks") : Promise.resolve([]), list("/api/decks?public=1")]);
+    if (seq !== loadSeq.current) return;
     if (own) setDecks(own);
     if (pub) setPublicDecks(pub);
     setLoaded(true);
@@ -258,14 +264,15 @@ export default function HomePage() {
     const name = [...decks, ...publicDecks].find((d) => d.publicId === id)?.name ?? "this deck";
     if (!confirm(`Delete “${name}”? This can’t be undone.`)) return;
     setListError("");
-    const before = { decks, publicDecks };
     setDecks((ds) => ds.filter((d) => d.publicId !== id));
     setPublicDecks((ds) => ds.filter((d) => d.publicId !== id));
     const res = await fetch(`/api/decks/${id}`, { method: "DELETE" }).catch(() => null);
     // A 404 means it's already gone, which is what was asked for.
     if (!res || (!res.ok && res.status !== 404)) {
-      setDecks(before.decks);
-      setPublicDecks(before.publicDecks);
+      // The lists as the server has them: only this deck comes back. (Putting
+      // back a snapshot taken before the delete also restored decks deleted
+      // since.)
+      loadAll();
       setListError(res ? `Couldn’t delete “${name}”. Try again.` : `Couldn’t delete “${name}” — you seem to be offline.`);
       return;
     }
@@ -631,6 +638,16 @@ export default function HomePage() {
           onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-deck-title"
+            onKeyDown={(e) => {
+              // Escape closes it; the commander field's suggestion list uses
+              // Escape first and marks it handled.
+              if (e.key !== "Escape" || e.defaultPrevented) return;
+              setShowModal(false);
+              setCreateError("");
+            }}
             style={{
               ...LIGHT_VARS,
               background: "var(--bg)",
@@ -643,13 +660,13 @@ export default function HomePage() {
               animation: "sp-pop .18s ease",
             }}
           >
-            <h2 style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700, letterSpacing: "-.02em" }}>Begin a new deck</h2>
+            <h2 id="new-deck-title" style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700, letterSpacing: "-.02em" }}>Begin a new deck</h2>
             <p style={{ margin: "0 0 18px", fontSize: 14.5, color: "var(--t2)", lineHeight: 1.5 }}>
               Name your brew and choose a format.
             </p>
             <form onSubmit={createDeck} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              <input placeholder="Deck name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus style={modalInput} />
-              <select value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })} style={modalInput}>
+              <input placeholder="Deck name" aria-label="Deck name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus style={modalInput} />
+              <select aria-label="Format" value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })} style={modalInput}>
                 <option value="commander">Commander</option>
                 <option value="standard">Standard</option>
                 <option value="modern">Modern</option>

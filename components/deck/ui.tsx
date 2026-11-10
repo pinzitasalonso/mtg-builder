@@ -138,10 +138,15 @@ export function ModalShell({
     dismiss.current = onDismiss;
   });
 
+  const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const id = Symbol("modal");
     openShells.push(id);
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    // Focus moves into the dialog (it only came back to the opener on close),
+    // so Tab walks the dialog, not the page behind it. A field that asked for
+    // the focus itself (autoFocus) keeps it.
+    if (box.current && !box.current.contains(document.activeElement)) box.current.focus({ preventScroll: true });
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
@@ -165,10 +170,13 @@ export function ModalShell({
       onClick={(e) => e.target === e.currentTarget && onDismiss()}
     >
       <div
+        ref={box}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
         style={{
+          outline: "none",
           background: "var(--bg)",
           borderRadius: 20,
           boxShadow: "inset 0 0 0 1px rgba(255,255,255,.09), 0 30px 70px -20px rgba(0,0,0,.7)",

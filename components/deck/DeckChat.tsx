@@ -106,7 +106,7 @@ export function useDeckActions({
   pool: PoolEntry[];
   /** Card names from the player's collection — marks suggestions they own. */
   ownedNames: string[];
-  onPoolChanged: () => void;
+  onPoolChanged: () => void | Promise<void>;
   messages: ChatMessage[];
   streaming: boolean;
   onPickDeck?: (name: string, rect: DOMRect) => void;
@@ -187,11 +187,13 @@ export function useDeckActions({
     try {
       const entry = poolByLower.get(key);
       if (entry) {
-        if (await deleteCard(deckId, entry.dbId)) onPoolChanged();
+        // Busy until the pool has reloaded too: a quick second click used to
+        // find the card still "not in the pool" and add it again.
+        if (await deleteCard(deckId, entry.dbId)) await onPoolChanged();
         else setError(`Couldn't remove "${name}".`);
       } else {
         const result = await resolveAndAdd(deckId, name, 1, poolByName(pool));
-        if (result === "added") onPoolChanged();
+        if (result === "added") await onPoolChanged();
         else setError(result === "notfound" ? `Couldn't find "${name}" on Scryfall.` : `Couldn't add "${name}".`);
       }
     } finally {
@@ -275,7 +277,7 @@ export function useDeckChat({
   commander: string | null | undefined;
   /** Card names from the player's collection — marks suggestions they own. */
   ownedNames: string[];
-  onPoolChanged: () => void;
+  onPoolChanged: () => void | Promise<void>;
 }): DeckChatController {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");

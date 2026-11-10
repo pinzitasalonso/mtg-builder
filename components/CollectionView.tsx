@@ -117,6 +117,22 @@ export default function CollectionView({
     setCollection(c);
     return c;
   }
+  // A full-screen dialog: focus moves into it (Tab used to walk the home page
+  // hidden behind it), and Escape closes it, unless a card's own dialog is
+  // open on top, or a field's suggestion list took the key.
+  const shell = useRef<HTMLDivElement>(null);
+  const detailOpen = useRef(false);
+  detailOpen.current = detail !== null;
+  useEffect(() => {
+    shell.current?.focus({ preventScroll: true });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented && !detailOpen.current) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     load();
     fetchWishlistCount().then((n) => setWishCount((c) => c ?? n));
@@ -300,7 +316,13 @@ export default function CollectionView({
 
   return (
     <div
+      ref={shell}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Your collection and wishlist"
       style={{
+        outline: "none",
         position: "fixed",
         top: 0,
         left: 0,

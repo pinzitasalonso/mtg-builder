@@ -114,6 +114,9 @@ export default function CommanderInput({
           }
         }}
         placeholder={placeholder}
+        // The placeholder is the field's only visible label; say it to
+        // screen readers too.
+        aria-label={placeholder}
         autoFocus={autoFocus}
         autoComplete="off"
         style={style}
