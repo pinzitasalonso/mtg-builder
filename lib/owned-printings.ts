@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { scryfallIdFromImage } from "@/lib/scryfall";
+import { normalizeCardKey as key, scryfallIdFromImage } from "@/lib/scryfall";
 
 /* The printing a player owns of a card, from their collection, so a card
    they add to a deck shows the copy they actually have rather than
@@ -13,8 +13,6 @@ export interface OwnedPrinting {
   scryfallId: string;
   imageUri: string;
 }
-
-const key = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase();
 
 /** Owned printings for these card names (by lowercase name), for one player. */
 export async function ownedPrintingsFor(userId: number, names: string[]): Promise<Map<string, OwnedPrinting>> {

@@ -1,0 +1,31 @@
+# Typecheck and tests on every push and pull request. Railway deploys main on
+# its own, so this doesn't gate a deploy: it shows a red mark on a commit
+# that shouldn't have gone out.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # postinstall runs `prisma generate`, which the typecheck needs.
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run

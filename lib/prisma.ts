@@ -12,14 +12,17 @@ declare global {
  * running app and `prisma db push` use the SAME file. Falls back to a local
  * dev.db when unset. Without this the app always wrote to ./dev.db inside the
  * deploy directory, which Railway wipes on every deploy — losing all decks.
+ *
+ * (The turbopackIgnore comments: the path is the database's, not a file the
+ * build should trace. Without them the build traces the whole project.)
  */
 function resolveDbPath() {
   const url = process.env.DATABASE_URL;
   if (url && url.startsWith("file:")) {
     const raw = url.slice("file:".length);
-    return path.isAbsolute(raw) ? raw : path.resolve(process.cwd(), raw);
+    return path.isAbsolute(raw) ? raw : path.resolve(/*turbopackIgnore: true*/ process.cwd(), raw);
   }
-  return path.resolve(process.cwd(), "dev.db");
+  return path.resolve(/*turbopackIgnore: true*/ process.cwd(), "dev.db");
 }
 
 function makePrisma() {
