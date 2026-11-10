@@ -36,9 +36,8 @@ export async function GET(req: Request) {
   const [users, decks] = await Promise.all([prisma.user.count(), prisma.deck.count()]);
 
   // How this request arrived, as the server sees it: the forwarding headers
-  // the host's proxy set. The rate limits key on the client's address
-  // (clientIp), and which header carries it truthfully depends on the host;
-  // this shows the admin what's there.
+  // the host's proxy set, and the address the rate limits key on (clientIp).
+  // If the host ever changes what it sends, this is where it shows.
   const seen = {
     xForwardedFor: req.headers.get("x-forwarded-for"),
     xRealIp: req.headers.get("x-real-ip"),

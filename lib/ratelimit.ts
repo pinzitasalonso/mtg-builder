@@ -55,8 +55,16 @@ export function loginFailed(ip: string, email: string): void {
   rateLimit(`auth:login:addr:${email}`, ...LOGIN_ADDRESS);
 }
 
-/* Best-effort client IP, from the proxy's forwarded headers (Railway sets
-   x-forwarded-for). Only used as a rate-limit bucket key — never for auth. */
+/* The client's address, as a rate-limit bucket key (never for auth).
+
+   On Railway it's the FIRST x-forwarded-for entry. The edge writes both
+   forwarding headers itself, replacing anything the client sent, so a
+   caller can't pick its own bucket. What arrives is "client, edge": the
+   second entry is Railway's own hop (a 152.233.x address), the same for
+   every visitor, so keying on the last entry would put everyone in one
+   bucket. x-real-ip carries the client too, but it has been the edge's
+   address on some routes, so it's only the fallback. Checked on production
+   through the admin page's last line, November 2026. */
 export function clientIp(req: Request): string {
   const xff = req.headers.get("x-forwarded-for");
   if (xff) {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { authRateLimit, loginAllowed, loginFailed, rateLimit, rateLimitHasRoom } from "./ratelimit";
+import { authRateLimit, clientIp, loginAllowed, loginFailed, rateLimit, rateLimitHasRoom } from "./ratelimit";
 
 // The module holds process-wide buckets and exposes no reset — adding one
 // would be production surface existing only for tests — so every test uses a
@@ -111,5 +111,25 @@ describe("login limits per address", () => {
     const email = `${uniq()}@example.com`;
     for (let i = 0; i < 30; i++) loginFailed(uniq(), email);
     expect(loginAllowed(uniq(), email)).toBe(false);
+  });
+});
+
+describe("clientIp", () => {
+  const from = (headers: Record<string, string>) => clientIp(new Request("http://test.local/", { headers }));
+
+  // What Railway's edge sends: the client, then its own hop.
+  it("is the first x-forwarded-for entry, not Railway's hop after it", () => {
+    expect(from({ "x-forwarded-for": "203.0.113.7, 152.233.0.10", "x-real-ip": "203.0.113.7" })).toBe("203.0.113.7");
+    expect(from({ "x-forwarded-for": " 203.0.113.7 " })).toBe("203.0.113.7");
+  });
+
+  // The hop is the same for every visitor: two visitors must not share a key.
+  it("keeps two visitors behind the same hop apart", () => {
+    expect(from({ "x-forwarded-for": "203.0.113.7, 152.233.0.10" })).not.toBe(from({ "x-forwarded-for": "198.51.100.4, 152.233.0.10" }));
+  });
+
+  it("falls back to x-real-ip, then to one shared key", () => {
+    expect(from({ "x-real-ip": "203.0.113.7" })).toBe("203.0.113.7");
+    expect(from({})).toBe("unknown");
   });
 });
