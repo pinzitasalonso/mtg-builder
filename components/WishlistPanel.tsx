@@ -20,7 +20,6 @@ import { stillWanted, wishlistSummary, type WishlistCard } from "@/lib/wishlist"
    have yet. Add one by name, set how many you want, and when you get it,
    "Got it" moves it into your collection. A card you already own says so. */
 
-const namedImageUrl = (name: string) => `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}&format=image&version=normal`;
 const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function WishlistPanel({ onChanged, onCollectionChanged }: { onChanged?: (unique: number) => void; onCollectionChanged?: () => void }) {
@@ -212,11 +211,13 @@ export default function WishlistPanel({ onChanged, onCollectionChanged }: { onCh
 
 function WishTile({ card, busy, onInc, onDec, onDelete, onGot }: { card: WishlistCard; busy: boolean; onInc: () => void; onDec: () => void; onDelete: () => void; onGot: () => void }) {
   const [failed, setFailed] = useState(false);
-  const src = card.imageUri || namedImageUrl(card.name);
+  // Every card is resolved when it's added, so it has its scan; one that
+  // somehow hasn't shows its name. Never a lookup by name from the browser.
+  const src = card.imageUri;
   return (
     <div data-testid="wish-tile" aria-label={card.name} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ position: "relative", borderRadius: "4.8%/3.5%", overflow: "hidden", aspectRatio: "5 / 7", background: "rgba(0,0,0,.28)", boxShadow: "0 4px 12px -4px rgba(0,0,0,.45)" }}>
-        {failed ? (
+        {failed || !src ? (
           <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 10, textAlign: "center", fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,.82)" }}>{card.name}</div>
         ) : (
           // eslint-disable-next-line @next/next/no-img-element

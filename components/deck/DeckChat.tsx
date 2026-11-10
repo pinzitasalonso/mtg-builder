@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Plus, Sparkles, Square, X, ZoomIn } from "lucide-react";
 import { PoolEntry, addManyByName, deleteCard, poolByName, resolveAndAdd } from "@/lib/pool-client";
 import { Block, InlineToken, boldNamesIn, cardNamesIn, cutCandidates, flattenInline, normalizeCardKey, parseBlocks } from "@/lib/chat-markdown";
+import { CardArt } from "@/components/mtg";
 import { collectionByName } from "@/lib/scryfall";
 import { track } from "@/lib/track";
 import Link from "next/link";
@@ -21,14 +22,13 @@ export interface ChatMessage {
   deck?: { publicId: string; name: string } | null;
 }
 
-// Full-card image straight from Scryfall by name — used to preview cards that
-// aren't in the pool yet (pool cards reuse their stored image).
-function namedImageUrl(name: string): string {
-  return `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}&format=image&version=normal`;
-}
-
+// A card's preview: its stored scan when it's in the pool; otherwise CardArt
+// looks it up by name, which waits its turn in the Scryfall limiter. (An
+// <img> pointed straight at the API used to fire one request for every name
+// the mouse crossed.)
 interface Preview {
-  src: string;
+  name: string;
+  src: string | null;
   rect: DOMRect;
 }
 
@@ -725,13 +725,7 @@ function CardPreview({ preview, onDismiss }: { preview: Preview; onDismiss: () =
         }}
       >
         <div className="cc-black" style={{ padding: 6 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview.src}
-            alt=""
-            draggable={false}
-            style={{ width: "100%", height: "auto", display: "block", borderRadius: 8 }}
-          />
+          <CardArt key={preview.name} name={preview.name} src={preview.src ?? undefined} prefer="src" version="normal" loading="eager" radius={8} style={{ aspectRatio: "5 / 7" }} />
         </div>
       </div>
     </>,
@@ -1067,7 +1061,7 @@ function CardLink({
       ? `Add ${name} — you own a copy`
       : `Add ${name} to your pool`;
   const previewFrom = (el: Element) =>
-    onPreview({ src: imageUri || namedImageUrl(name), rect: el.getBoundingClientRect() });
+    onPreview({ name, src: imageUri || null, rect: el.getBoundingClientRect() });
   return (
     <span style={{ whiteSpace: "nowrap" }}>
       <button

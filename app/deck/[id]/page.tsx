@@ -220,6 +220,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // loads below then re-check it (see lib/client-cache).
   const [deck, setDeck] = useState<Deck | null>(() => peek<Deck>(`deck:${deckId}`) ?? null);
   const [deckMissing, setDeckMissing] = useState(false);
+  // The last load of the deck failed (offline, or the server's in trouble).
+  // With a deck on screen nothing changes; with none, the page says so.
+  const [deckFailed, setDeckFailed] = useState(false);
   const [pool, setPool] = useState<PoolCard[]>(() => peek<PoolCard[]>(`cards:${deckId}`) ?? []);
   const [searchResults, setSearchResults] = useState<SearchCard[]>([]);
   const [swipeOpen, setSwipeOpen] = useState(false);
@@ -437,10 +440,14 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // The deck itself: name, format, commander, primer.
   const loadDeck = useCallback(async () => {
     const r = await fetch(`/api/decks/${deckId}`).catch(() => null);
+    setDeckFailed(!r || (!r.ok && r.status !== 401 && r.status !== 404 && r.status !== 403));
     if (!r) return; // offline: keep what's on screen
     if (r.ok) setDeck((await r.json()) as Deck);
     else if (r.status === 401) router.replace("/login");
-    else setDeckMissing(true);
+    // Gone, or not yours to see. Anything else (a 502 while a deploy
+    // restarts the server, a 500) is the server's trouble, not a missing
+    // deck: what's on screen stays, and the next reload tries again.
+    else if (r.status === 404 || r.status === 403) setDeckMissing(true);
   }, [deckId, router]);
 
   // Something else may have changed the deck: an AI reply (which can also
@@ -980,6 +987,22 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           <Link href="/" className="cc-plate" style={{ ...plateBtn, display: "inline-flex", marginTop: 18, padding: "11px 24px", fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 16 }}>
             ‹ Back to decks
           </Link>
+        </div>
+      </main>
+    );
+  }
+
+  // Nothing to show and the load failed: say so, with a way to try again,
+  // instead of an endless skeleton.
+  if (!deck && deckFailed) {
+    return (
+      <main style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ textAlign: "center" }}>
+          <h1 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 26, fontWeight: 700, color: "var(--text)" }}>Couldn’t load this deck</h1>
+          <p style={{ fontStyle: "normal", color: "var(--text-muted)", marginTop: 8 }}>Spellpool didn’t answer. Your deck is safe; try again in a moment.</p>
+          <button onClick={() => void loadDeck()} className="cc-plate" style={{ ...plateBtn, display: "inline-flex", marginTop: 18, padding: "11px 24px", fontFamily: "var(--font-display)", fontWeight: 600, fontSize: 16, cursor: "pointer" }}>
+            Try again
+          </button>
         </div>
       </main>
     );

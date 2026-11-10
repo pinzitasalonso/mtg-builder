@@ -43,10 +43,6 @@ const COLORS: { code: string; label: string; bg: string }[] = [
 const TYPES = TYPE_ORDER.filter((t) => t !== "Other");
 const MVS = [0, 1, 2, 3, 4, 5, 6, 7];
 
-function namedImageUrl(name: string): string {
-  return `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}&format=image&version=normal`;
-}
-
 interface Preview {
   src: string;
   rect: DOMRect;
@@ -600,25 +596,27 @@ function CollectionTile({
   onDelete: () => void;
 }) {
   const [hover, setHover] = useState(false);
-  // Prefer the persisted CDN image (cards.scryfall.io) — it isn't rate-limited,
-  // so a screenful loading at once is fine. Fall back to the rate-limited
-  // by-name API endpoint only while a card is still awaiting enrichment.
-  const base = imageUri || namedImageUrl(name);
-  // Retry transient failures (e.g. a 429 burst while scrolling) a few times with
-  // backoff before giving up to the text fallback; a cache-buster forces reload.
+  // The persisted CDN image (cards.scryfall.io): it isn't rate-limited, so a
+  // screenful loading at once is fine. A card still being matched has none
+  // yet and shows its name; its picture arrives with the next poll. (It used
+  // to be looked up by name from Scryfall's API, one request a tile, which a
+  // big import turned into a burst far over the limit.)
+  const base = imageUri;
+  // Retry a failed CDN load a few times with backoff before giving up to the
+  // text fallback; a cache-buster forces the reload.
   const [attempt, setAttempt] = useState(0);
   const [imgFailed, setImgFailed] = useState(false);
   useEffect(() => {
     setAttempt(0);
     setImgFailed(false);
   }, [base]);
-  const src = attempt === 0 ? base : `${base}${base.includes("?") ? "&" : "?"}retry=${attempt}`;
+  const src = !base ? null : attempt === 0 ? base : `${base}${base.includes("?") ? "&" : "?"}retry=${attempt}`;
   return (
     <div
       onPointerEnter={(e) => {
         if (e.pointerType !== "mouse") return;
         setHover(true);
-        onPreview({ src: base, rect: e.currentTarget.getBoundingClientRect() });
+        if (base) onPreview({ src: base, rect: e.currentTarget.getBoundingClientRect() });
       }}
       onPointerLeave={(e) => {
         if (e.pointerType !== "mouse") return;
@@ -636,7 +634,7 @@ function CollectionTile({
         transition: "transform .16s ease, box-shadow .16s ease",
       }}
     >
-      {imgFailed ? (
+      {imgFailed || !src ? (
         <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: 10, textAlign: "center", fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,.82)" }}>
           {name}
         </div>

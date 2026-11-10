@@ -1,14 +1,11 @@
 "use client";
 
 import { Plus } from "lucide-react";
+import { CardArt } from "@/components/mtg";
 
 export interface AssistantDeckRef {
   publicId: string;
   name: string;
-}
-
-function namedImageUrl(name: string): string {
-  return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=normal`;
 }
 
 /* A card's menu: its image, and every deck to add it to. */
@@ -34,8 +31,8 @@ export default function AddMenu({
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 90 }} />
       <div role="menu" aria-label={`Add ${name} to a deck`} className="id-card" style={{ position: "fixed", top, left, width, zIndex: 91, padding: 8, display: "flex", flexDirection: "column", gap: 6, maxHeight: 380, background: "var(--bg)", borderRadius: 14, boxShadow: "0 18px 40px -12px rgba(0,0,0,.45), inset 0 0 0 1px var(--line)" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={namedImageUrl(name)} alt={name} style={{ width: 120, alignSelf: "center", borderRadius: "4.8% / 3.5%", aspectRatio: "5 / 7", objectFit: "cover", background: "rgba(0,0,0,.1)" }} />
+        {/* By name, through the Scryfall limiter (CardArt waits its turn). */}
+        <CardArt key={name} name={name} version="normal" loading="eager" style={{ width: 120, alignSelf: "center", borderRadius: "4.8% / 3.5%", aspectRatio: "5 / 7", background: "rgba(0,0,0,.1)" }} />
         <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--t3, var(--text-muted))", padding: "2px 6px" }}>Add to a deck’s pool</div>
         <div style={{ overflowY: "auto", display: "flex", flexDirection: "column" }}>
           {sorted.length === 0 ? (

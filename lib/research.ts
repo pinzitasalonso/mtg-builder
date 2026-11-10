@@ -539,12 +539,17 @@ export function buildCollectionBlock(names: string[]): string {
   );
 }
 
+// The longest card name is 141 characters ("Our Market Research Shows…"); a
+// two-faced name doubles it. Anything longer is not a card, and without a
+// cap one metered question could carry megabytes into the prompt.
+const MAX_NAME_CHARS = 200;
+
 // Parse a request body's `collection` (array of names) into a clean string list.
 export function parseCollection(collection: unknown): string[] {
   if (!Array.isArray(collection)) return [];
   return collection
     .filter((n): n is string => typeof n === "string" && n.trim().length > 0)
-    .map((n) => n.trim())
+    .map((n) => n.trim().slice(0, MAX_NAME_CHARS))
     .slice(0, MAX_COLLECTION_NAMES);
 }
 
@@ -552,14 +557,14 @@ export function parseCollection(collection: unknown): string[] {
 export function parseDeckContext(currentDeck: unknown): DeckContext {
   const cd = currentDeck as { commander?: unknown; cards?: unknown } | null | undefined;
   return {
-    commander: typeof cd?.commander === "string" ? cd.commander : null,
+    commander: typeof cd?.commander === "string" ? cd.commander.slice(0, MAX_NAME_CHARS * 2) : null,
     cards: Array.isArray(cd?.cards)
       ? (cd!.cards as { name?: unknown; manaCost?: unknown; typeLine?: unknown; quantity?: unknown; board?: unknown }[])
           .filter((c) => typeof c?.name === "string" && c.name)
           .map((c) => ({
-            name: c.name as string,
-            manaCost: typeof c.manaCost === "string" ? c.manaCost : null,
-            typeLine: typeof c.typeLine === "string" ? c.typeLine : null,
+            name: (c.name as string).slice(0, MAX_NAME_CHARS),
+            manaCost: typeof c.manaCost === "string" ? c.manaCost.slice(0, 80) : null,
+            typeLine: typeof c.typeLine === "string" ? c.typeLine.slice(0, MAX_NAME_CHARS) : null,
             quantity: typeof c.quantity === "number" && c.quantity > 0 ? Math.floor(c.quantity) : 1,
             // A client that doesn't send a board is an older build, whose whole
             // payload was the merged list. Calling that the decklist keeps its

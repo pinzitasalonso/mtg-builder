@@ -1,5 +1,6 @@
 // Plan limits — the DB half. Server-only (imports Prisma).
 
+import { randomUUID } from "node:crypto";
 import prisma from "@/lib/prisma";
 import { FREE_AI_PER_DAY, FREE_DECK_LIMIT, FREE_PRACTICE_PER_DAY, FREE_SCANS_PER_DAY, isPro, utcDay, type TierFields } from "@/lib/limits";
 
@@ -58,11 +59,20 @@ export async function refundScan(user: { id: number } & TierFields): Promise<voi
   });
 }
 
-/* Whether the user may start another practice game today: the games they
-   started since midnight UTC, against the free allowance. */
-export async function canStartPractice(user: { id: number } & TierFields): Promise<boolean> {
-  if (isPro(user)) return true;
+/* Claim a practice game for today: its row is created (empty, to be filled
+   once the decks have loaded) in the same transaction that counts the games
+   started since midnight UTC, so parallel requests can't all get under the
+   free allowance. Returns the game's id, or null when today's are used up.
+   A game that fails to start is deleted, which gives the claim back. */
+export async function claimPractice(user: { id: number } & TierFields): Promise<string | null> {
+  const id = randomUUID();
   const since = new Date(`${utcDay()}T00:00:00.000Z`);
-  const started = await prisma.practiceGame.count({ where: { userId: user.id, createdAt: { gte: since } } });
-  return started < FREE_PRACTICE_PER_DAY;
+  return prisma.$transaction(async (tx) => {
+    if (!isPro(user)) {
+      const started = await tx.practiceGame.count({ where: { userId: user.id, createdAt: { gte: since } } });
+      if (started >= FREE_PRACTICE_PER_DAY) return null;
+    }
+    await tx.practiceGame.create({ data: { id, userId: user.id, label: "", setup: "{}" } });
+    return id;
+  });
 }
