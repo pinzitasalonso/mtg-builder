@@ -376,6 +376,21 @@ model PracticeGame {
   setup     String
   // AI turns taken.
   turns     Int      @default(0)
+  // The player's deck (its public id), and the opponent as the picker's
+  // option (JSON): the picker offers the last few again, and a deck's record
+  // is counted from these rows.
+  deck      String?
+  opponent  String?
+  // A game against the basic bot (the built-in planner, no model call). Those
+  // are free and unlimited: they don't count toward the daily games.
+  bot       Boolean  @default(false)
+  // How it ended, once it has: "won" or "lost" (the player's side), and the
+  // turn it ended on.
+  result    String?
+  endTurn   Int?
+  // The AI's review of the finished game (markdown), written once on request.
+  review    String?
 
   @@index([userId, createdAt])
+  @@index([userId, deck])
 }

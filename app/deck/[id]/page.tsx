@@ -7,7 +7,8 @@ import Image from "next/image";
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, Copy, Crown, Dices, Download, Eye, Share2, History,
   LayoutGrid, List, ListChecks, Mountain, Plus, RefreshCw, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
-  type LucideIcon, PackageCheck } from "lucide-react";
+  type LucideIcon, PackageCheck, Swords,
+} from "lucide-react";
 import Logo from "@/components/Logo";
 import CommanderInput from "@/components/CommanderInput";
 import SwipeModal from "@/components/SwipeModal";
@@ -335,7 +336,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   >(null);
 
   // playtest table
-  const [playtestOpen, setPlaytestOpen] = useState(false);
+  // The playtest table: alone, or straight into a game against the AI.
+  const [playtestOpen, setPlaytestOpen] = useState<false | "solo" | "ai">(false);
   const [gameCodeOpen, setGameCodeOpen] = useState(false);
   // saved versions of the deck — runs in <VersionsModal> while open
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -1065,9 +1067,17 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 WITH a finished deck, not a thing you do to build one, so it
                 sits up here with Share and Tools — and the hero goes to the two
                 actions that actually build the deck. */}
-            <button className="id-ghost hdr-icon-btn" style={{ padding: "9px 15px" }} onClick={() => setPlaytestOpen(true)} disabled={deckCards.length === 0} aria-label="Playtest">
+            <button className="id-ghost hdr-icon-btn" style={{ padding: "9px 15px" }} onClick={() => setPlaytestOpen("solo")} disabled={deckCards.length === 0} aria-label="Playtest">
               <Dices size={16} strokeWidth={2} /> <span className="hdr-hide">Playtest</span>
             </button>
+            {/* Its own button: a game against the AI used to be a button inside
+                the playtest, which a phone held upright never got to (the
+                solo table asks to be turned sideways first). */}
+            {assistant.available === true && (
+              <button className="id-ghost hdr-icon-btn" style={{ padding: "9px 15px" }} onClick={() => setPlaytestOpen("ai")} disabled={deckCards.length === 0} aria-label="Play vs AI">
+                <Swords size={16} strokeWidth={2} /> <span className="hdr-hide">vs AI</span>
+              </button>
+            )}
             <button className="id-ghost hdr-icon-btn" style={{ padding: "9px 15px" }} onClick={shareDeck} disabled={sharing} aria-label={copied === "link" ? "Link copied" : "Share"}>
               {copied === "link" ? <Check size={16} strokeWidth={2.25} /> : <Share2 size={16} strokeWidth={2} />}{" "}
               <span className="hdr-hide">{copied === "link" ? "Copied!" : sharing ? "Sharing…" : "Share"}</span>
@@ -1116,6 +1126,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                         { label: "Add lands & staples", icon: Mountain, on: () => setTool("lands") },
                         { group: "At the table" },
                         { label: "Assemble deck", icon: PackageCheck, on: () => setAssembleOpen(true), disabled: deckCards.length === 0 },
+                        ...(assistant.available === true ? [{ label: "Play vs AI", icon: Swords, on: () => setPlaytestOpen("ai"), disabled: deckCards.length === 0 }] : []),
                         { label: "Game code", icon: Ticket, on: () => setGameCodeOpen(true) },
                         { group: "Write-ups" },
                         { label: "Primer", icon: BookOpen, on: () => { setPrimerOpen(true); setPane("stats"); } },
@@ -1875,6 +1886,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           format={deck?.format}
           deckId={deckId}
           aiAvailable={assistant.available === true}
+          startVsAi={playtestOpen === "ai"}
           onClose={() => setPlaytestOpen(false)}
         />
       )}

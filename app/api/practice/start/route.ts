@@ -5,7 +5,16 @@ import { recordEvent } from "@/lib/analytics";
 import { PRACTICE_AI_TURNS, PRACTICE_LIMIT_MSG } from "@/lib/limits";
 import { claimPractice } from "@/lib/limits-db";
 import { isEdhrecLevel } from "@/lib/edhrec";
-import { deckFromDb, deckFromEdhrec, deckFromMtgtop8 } from "@/lib/practice/decks";
+import { scanVersionURL } from "@/lib/scan-url";
+import { deckFromDb, deckFromEdhrec, deckFromMtgtop8, type PracticeDeck } from "@/lib/practice/decks";
+import { cleanOpponent } from "@/lib/practice/opponents";
+
+/** A picture for a deck: its commander's art. */
+function coverOf(deck: PracticeDeck): string | null {
+  const want = (deck.commander ?? "").split("+")[0]!.trim().toLowerCase();
+  const card = want ? deck.cards.find((c) => c.name.toLowerCase() === want) : null;
+  return card?.imageUri ? scanVersionURL(card.imageUri, "art_crop") : null;
+}
 
 export const runtime = "nodejs";
 
@@ -15,12 +24,9 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Sign in to play against the AI." }, { status: 401 });
-  const body = (await req.json().catch(() => null)) as {
-    deck?: unknown;
-    opponent?: { kind?: unknown; format?: unknown; archetype?: unknown; deck?: unknown; commander?: unknown; level?: unknown };
-  } | null;
-  const deckId = typeof body?.deck === "string" ? body.deck : "";
-  const o = body?.opponent;
+  const body = (await req.json().catch(() => null)) as { deck?: unknown; opponent?: unknown } | null;
+  const deckId = typeof body?.deck === "string" ? body.deck.slice(0, 80) : "";
+  const o = cleanOpponent(body?.opponent);
   if (!deckId || !o) return NextResponse.json({ error: "deck and opponent required" }, { status: 400 });
   // Today's game is claimed first, in one step with the count, so requests
   // sent together can't all pass the check while the decks load (that's
@@ -36,13 +42,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "That deck has no cards to play yet." }, { status: 400 });
   }
   const opp =
-    o.kind === "deck" && typeof o.deck === "string"
-      ? await deckFromDb(o.deck, user.id)
-      : o.kind === "mtgtop8" && typeof o.format === "string" && typeof o.archetype === "string"
-        ? await deckFromMtgtop8(o.format, o.archetype)
-        : o.kind === "edhrec" && typeof o.commander === "string" && o.commander.trim() && o.commander.length <= 200
-          ? await deckFromEdhrec(o.commander.trim(), isEdhrecLevel(o.level) ? o.level : null)
-          : null;
+    o.kind === "deck"
+      ? await deckFromDb(o.deck!, user.id)
+      : o.kind === "mtgtop8"
+        ? await deckFromMtgtop8(o.format!, o.archetype!)
+        : await deckFromEdhrec(o.commander!, isEdhrecLevel(o.level) ? o.level : null);
   if (!opp) {
     await giveBack();
     return NextResponse.json({ error: "Couldn't load that opponent's deck. Try another." }, { status: 502 });
@@ -54,6 +58,10 @@ export async function POST(req: Request) {
     where: { id },
     data: {
       label: `${opp.label} — ${opp.detail}`.slice(0, 200),
+      deck: deckId,
+      // The opponent as picked, for "play it again": its tile's words and
+      // picture, or the loaded deck's where the tile had none.
+      opponent: JSON.stringify({ ...o, label: o.label || opp.label, detail: o.detail || opp.detail, image: o.image ?? coverOf(opp) }),
       setup: JSON.stringify({ book, oppDeck: opp.cards.map((c) => ({ name: c.name, quantity: c.quantity })), oppCommander: opp.commander }),
     },
   });

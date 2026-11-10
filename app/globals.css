@@ -1011,6 +1011,15 @@ button {
     radial-gradient(120% 70% at 50% -10%, rgba(255, 255, 255, 0.07), transparent 60%),
     linear-gradient(180deg, #181327, #0d0a16);
   color: #fff;
+  /* The table is dark whatever the device's theme is, so the accent is the
+     dark palette's here: in light mode --gold is a deep blue, which on this
+     ground made its links (Graveyard, Library, Exile) all but unreadable. */
+  --accent: #fdf26f;
+  --accent-hover: #fdf58c;
+  --accent-ink: #181228;
+  --gold: #fdf26f;
+  --gold-bright: #fdf58c;
+  --gold-soft: #fdf26f;
   /* A card on the table at full size; a practice game shrinks a crowded
      side's cards below it (.pt-side-cards). */
   --pt-card-full: clamp(80px, 9vw, 140px);
@@ -1504,15 +1513,6 @@ button {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.75);
 }
-.pt-pick-group {
-  margin-bottom: 18px;
-}
-.pt-pick-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 8px;
-  margin-top: 8px;
-}
 .pt-pick-option {
   display: flex;
   flex-direction: column;
@@ -1538,73 +1538,471 @@ button {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.6);
 }
-.pt-foe {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-  max-width: 560px;
-}
-.pt-foe > div {
+/* ── The opponent picker (OpponentPicker.tsx) ───────────────────────────── */
+.pk {
   flex: 1;
-  min-width: 0;
-}
-.pt-foe-input {
-  width: 100%;
-  height: 40px;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.28);
-  color: #fff;
-  font-family: var(--font-ui);
-  font-size: 16px;
-}
-.pt-foe-input::placeholder {
-  color: rgba(255, 255, 255, 0.45);
-}
-.pt-foe-input:focus {
-  outline: none;
-  border-color: rgba(253, 242, 111, 0.6);
-}
-.pt-foe > .pt-btn {
-  height: 40px;
-  min-width: 64px;
-  justify-content: center;
-}
-.pt-foe-found {
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 12px;
 }
-.pt-foe-levels {
+.pk-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.pk-inner {
+  max-width: 1040px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 20px clamp(16px, 4vw, 40px) 32px;
+}
+.pk-head {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-bottom: 6px;
 }
-.pt-foe-level {
+.pk-title {
+  margin: 0;
+  font-size: 26px;
+  color: #fff;
+}
+.pk-free {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: rgba(253, 242, 111, 0.14);
+  color: #fdf26f;
+  font-size: 12.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pk-free[data-spent] {
+  background: rgba(255, 156, 134, 0.14);
+  color: #ff9c86;
+}
+.pk-spent {
+  color: #ffb9a8;
+}
+.pk-note {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.62);
+}
+.pk-recent {
+  margin-bottom: 16px;
+}
+.pk-recent-row {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  gap: 8px;
+  margin: 8px calc(-1 * clamp(16px, 4vw, 40px)) 0;
+  padding: 0 clamp(16px, 4vw, 40px) 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pk-recent-row::-webkit-scrollbar {
+  display: none;
+}
+.pk-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 240px;
+  padding: 4px 13px 4px 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
   font-family: var(--font-ui);
   font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pk-chip:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+.pk-chip[aria-pressed="true"] {
+  border-color: #fdf26f;
+}
+.pk-chip-art {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+.pk-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pk-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 calc(-1 * clamp(16px, 4vw, 40px)) 12px;
+  padding: 0 clamp(16px, 4vw, 40px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pk-tabs::-webkit-scrollbar {
+  display: none;
+}
+.pk-tab {
+  flex: none;
+  padding: 9px 14px 10px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: rgba(255, 255, 255, 0.62);
+  font-family: var(--font-ui);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pk-tab:hover {
+  color: #fff;
+}
+.pk-tab[aria-selected="true"] {
+  color: #fff;
+  border-bottom-color: #fdf26f;
+}
+.pk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+/* A tile: a card's art, its colours in the corner, its name over the foot. */
+.pk-tile {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(160deg, #2a2440, #171226);
+  color: #fff;
+  font-family: var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.pk-tile:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.pk-tile[aria-pressed="true"] {
+  border-color: #fdf26f;
+  box-shadow: 0 0 0 2px #fdf26f;
+}
+.pk-tile:disabled,
+.pk-chip:disabled,
+.pk-hit:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.pk-tile-art,
+.pk-tile-art img,
+.pk-chip-art img,
+.pk-bar-art img,
+.pk-hit-art img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pk-tile-art {
+  position: absolute;
+  inset: 0;
+}
+.pk-tile-art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10, 8, 18, 0) 34%, rgba(10, 8, 18, 0.9) 84%);
+}
+.pk-tile-pips {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: rgba(10, 8, 18, 0.62);
+}
+.pk-tile-text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+}
+.pk-tile-label {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+.pk-tile-detail {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pk-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.pk-solo {
+  margin-top: 26px;
+}
+/* The commander search. */
+.pk-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 560px;
+  height: 44px;
+  padding: 0 13px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.28);
+  color: rgba(255, 255, 255, 0.6);
+}
+.pk-search:focus-within {
+  border-color: rgba(253, 242, 111, 0.6);
+}
+.pk-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: none;
+  color: #fff;
+  font-family: var(--font-ui);
+  font-size: 16px;
+}
+.pk-search input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+.pk-search input::-webkit-search-cancel-button {
+  filter: invert(1);
+}
+.pk-hits {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pk-hit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 12px 6px 6px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-family: var(--font-ui);
   text-align: left;
   cursor: pointer;
 }
-.pt-foe-level span {
-  font-size: 11.5px;
-  color: rgba(255, 255, 255, 0.6);
+.pk-hit[data-active] {
+  background: rgba(255, 255, 255, 0.12);
 }
-.pt-foe-level[aria-checked="true"] {
-  border-color: rgba(253, 242, 111, 0.85);
-  background: rgba(253, 242, 111, 0.12);
+.pk-hits li[aria-selected="true"] .pk-hit {
+  border-color: #fdf26f;
+}
+.pk-hit-art {
+  flex: none;
+  width: 64px;
+  height: 46px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+}
+.pk-hit-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.pk-hit-name {
+  font-size: 15px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pk-hit-type {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The opponent picked, and Play: a bar along the foot of the screen. */
+.pk-bar {
+  flex: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  background: #141021;
+  box-shadow: 0 -14px 30px -18px rgba(0, 0, 0, 0.9);
+  animation: sp-fade 0.15s ease;
+}
+.pk-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 12px clamp(16px, 4vw, 40px) calc(12px + env(safe-area-inset-bottom, 0px));
+}
+.pk-bar-art {
+  flex: none;
+  width: 92px;
+  height: 68px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(160deg, #2a2440, #171226);
+}
+.pk-bar-text {
+  flex: 1;
+  min-width: 0;
+}
+.pk-bar-name {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+}
+.pk-bar-name > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pk-bar-detail {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.66);
+}
+.pk-levels {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.pk-levels::-webkit-scrollbar {
+  display: none;
+}
+.pk-level {
+  flex: none;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.86);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pk-level[aria-checked="true"] {
+  border-color: #fdf26f;
+  background: rgba(253, 242, 111, 0.14);
+  color: #fff;
+}
+.pk-bar-go {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.pk-play {
+  padding: 11px 26px;
+  font-size: 16px;
+}
+.pk-bar-free {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
+@media (max-width: 640px) {
+  .pk-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .pk-tile-label {
+    font-size: 13.5px;
+  }
+  .pk-bar-inner {
+    flex-wrap: wrap;
+    gap: 10px 12px;
+  }
+  .pk-bar-art {
+    width: 64px;
+    height: 48px;
+  }
+  .pk-bar-text {
+    flex: 1 1 0;
+  }
+  .pk-bar-go {
+    flex: 1 1 100%;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+  .pk-play {
+    flex: 1;
+    justify-content: center;
+  }
+}
+/* A phone held sideways: little height, so the bar is one thin row. */
+@media (max-height: 480px) {
+  .pk-inner {
+    padding-top: 12px;
+    padding-bottom: 16px;
+  }
+  .pk-bar-inner {
+    padding-top: 8px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+  .pk-bar-art {
+    width: 60px;
+    height: 44px;
+  }
+  .pk-bar-detail {
+    display: none;
+  }
+  .pk-levels {
+    margin-top: 5px;
+  }
 }
 /* Making a token (practice games). */
 .pt-tokens-count {
@@ -2636,9 +3034,12 @@ button {
   .pt-table .pt-tools-row .pt-narrow-only {
     display: inline-flex;
   }
+  /* The buttons come first: the status has what's left, at least a few
+     words' width. (It used to ask for 120px, and squeezed the row until
+     its last button, Token, was cut in half.) */
   .pt-table .pt-status {
-    flex: 1 1 120px;
-    min-width: 0;
+    flex: 1 1 0;
+    min-width: 64px;
     margin-left: 0;
     font-size: 12px;
     line-height: 1.3;

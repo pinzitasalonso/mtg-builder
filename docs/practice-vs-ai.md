@@ -82,15 +82,31 @@ side does.
    free. The opponent blocks to survive, blocks when its creature kills the
    attacker and lives, and trades when the attacker is worth more.
 
-4. **Opponents** (`/api/practice/opponents`):
-   - a constructed deck: the format's top archetypes on MTGTop8 (their best
-     recent list);
-   - a Commander deck: any commander you search for, playing EDHREC's
-     average deck for it (`lib/edhrec.ts`, `/api/practice/commander`),
-     overall or for one bracket. The bracket your deck scanned at is picked
-     first, and a bracket with no decks falls back to the overall average.
-     Also cEDH's most played commanders, and your own other Commander decks;
-   - any deck: a mirror match, and your other decks of the same format.
+4. **Opponents** (`/api/practice/opponents`, `lib/practice/opponents.ts`,
+   `components/deck/OpponentPicker.tsx`). Every opponent is a tile with a
+   card's art and its colours, in tabs:
+   - **For your deck** (a Commander deck): a few of the year's most played
+     commanders on EDHREC, a different few each day, each playing EDHREC's
+     average deck (`lib/edhrec.ts`);
+   - **Any commander**: a search that only offers cards that can be a
+     commander (`/api/practice/commanders`), the most played first;
+   - **cEDH / Tournament**: the format's top archetypes on MTGTop8, each with
+     its best recent list. A cEDH partner pair is named by its commanders
+     ("Kraum + Tymna", not "Partner WUBR"). A tile's picture needs that list
+     (two MTGTop8 pages), so those are fetched behind the first answer and
+     the picker asks again while `more` is true;
+   - **Your decks**: a mirror match, and your other decks of the format.
+
+   The last few opponents a deck played are offered on top ("Play again":
+   `PracticeGame.deck` and `.opponent`). Picking a tile doesn't start the
+   game: it goes to a bar at the foot with **Play**. For a commander the bar
+   asks which bracket (`/api/practice/commander`), with the deck's own Score
+   bracket picked first; a bracket with no decks falls back to the overall
+   average. A free account sees its games left today before it spends one.
+
+   The deck page opens the picker directly ("vs AI" in its header, "Play vs
+   AI" in Tools), so it's reachable on a phone held upright; the solo
+   playtest's "vs AI" still leads there too.
 
 5. **Limits**: AI routes need an account. Starting a game counts: free
    accounts get one practice game a day (`FREE_PRACTICE_PER_DAY` in

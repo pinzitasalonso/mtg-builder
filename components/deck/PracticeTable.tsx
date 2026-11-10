@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bot, Loader2, Plus, Swords, Undo2, X } from "lucide-react";
-import CommanderInput from "@/components/CommanderInput";
+import type { OpponentOption } from "@/app/api/practice/opponents/route";
+import OpponentPicker from "@/components/deck/OpponentPicker";
 import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
@@ -61,23 +62,6 @@ import type { CardBook, PlanAction, PracticeGame, Seat, TurnPlan } from "@/lib/p
    solo table; the opponent's turns come from /api/practice/<id>/turn and are
    played out here by the engine, which checks every move. */
 
-interface OpponentOption {
-  kind: "mtgtop8" | "deck" | "edhrec";
-  format?: string;
-  archetype?: string;
-  deck?: string;
-  /** edhrec: the commander, and the bracket's page (null: all decks). */
-  commander?: string;
-  level?: string | null;
-  label: string;
-  detail: string;
-}
-/** A commander EDHREC has decks for (/api/practice/commander). */
-interface CommanderInfo {
-  commander: string;
-  decks: number;
-  levels: { level: string; bracket: number; label: string; decks: number }[];
-}
 interface Setup {
   id: string;
   commanderGame: boolean;
@@ -99,13 +83,6 @@ const SPOTLIGHT = 1400;
 
 export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: string; onClose: () => void; onSolo: () => void }) {
   const [mode, setMode] = useState<Mode>("pick");
-  const [groups, setGroups] = useState<{ title: string; options: OpponentOption[] }[] | null>(null);
-  // Any commander, from EDHREC: shown for Commander decks.
-  const [cmdrPick, setCmdrPick] = useState<{ bracket: number | null } | null>(null);
-  const [cmdrName, setCmdrName] = useState("");
-  const [cmdr, setCmdr] = useState<CommanderInfo | null>(null);
-  const [cmdrLevel, setCmdrLevel] = useState<string | null>(null);
-  const [cmdrState, setCmdrState] = useState<{ busy: boolean; error: string }>({ busy: false, error: "" });
   const [error, setError] = useState("");
   const [setup, setSetup] = useState<Setup | null>(null);
   const [game, setGameState] = useState<PracticeGame | null>(null);
@@ -169,23 +146,6 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     return () => void (document.body.style.overflow = prev);
   }, []);
 
-  // Who can we play? Tournament decks and your own.
-  useEffect(() => {
-    let live = true;
-    fetch(`/api/practice/opponents?deck=${encodeURIComponent(deckId)}`)
-      .then(async (r) => ({ ok: r.ok, data: await r.json().catch(() => null) }))
-      .then(({ ok, data }) => {
-        if (!live) return;
-        if (!ok) setError(data?.error ?? "Couldn't load the opponents.");
-        else {
-          setGroups(data.groups);
-          if (data.commanderGame) setCmdrPick({ bracket: typeof data.bracket === "number" ? data.bracket : null });
-        }
-      })
-      .catch(() => live && setError("Couldn't load the opponents."));
-    return () => void (live = false);
-  }, [deckId]);
-
   useEffect(() => {
     if (game?.winner) setMode("over");
   }, [game?.winner]);
@@ -202,26 +162,6 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const el = sideLog.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [logLength]);
-
-  /** Does EDHREC have decks for this commander, and at which brackets?
-      The one matching your deck's Score bracket is picked first. */
-  async function findCommander(name: string) {
-    const q = name.trim();
-    if (!q) return;
-    setCmdr(null);
-    setCmdrState({ busy: true, error: "" });
-    const res = await fetch(`/api/practice/commander?name=${encodeURIComponent(q)}`).catch(() => null);
-    const data = res ? await res.json().catch(() => null) : null;
-    if (!alive.current) return;
-    if (!res?.ok || !data?.commander) {
-      setCmdrState({ busy: false, error: data?.error ?? "Couldn't look that commander up. Try again." });
-      return;
-    }
-    const info = data as CommanderInfo;
-    setCmdr(info);
-    setCmdrLevel(info.levels.find((l) => l.bracket === cmdrPick?.bracket)?.level ?? null);
-    setCmdrState({ busy: false, error: "" });
-  }
 
   // ── Game flow ─────────────────────────────────────────────────────────
 
@@ -856,102 +796,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     return (
       <div className="pt-root" role="dialog" aria-label="Play against the AI">
         {header}
-        <div className="pt-pick">
-          <h2 className="id-display" style={{ margin: "0 0 6px", fontSize: 26, color: "#fff" }}>Pick an opponent</h2>
-          <p className="pt-pick-note">
-            The AI pilots a real deck against yours. You play your side by hand; it plays lands, casts what it can pay for, attacks and blocks.
-          </p>
-          {error && <p className="pt-pick-error">{error}</p>}
-          {mode === "loading" ? (
-            <div className="pt-pick-wait">
-              <Loader2 size={18} className="spin" /> Shuffling up…
-            </div>
-          ) : !groups && !error ? (
-            <div className="pt-pick-wait">
-              <Loader2 size={18} className="spin" /> Finding opponents…
-            </div>
-          ) : (
-            <>
-              {cmdrPick && (
-                <section className="pt-pick-group">
-                  <div className="pt-zone-label">Any commander (EDHREC)</div>
-                  <div className="pt-foe">
-                    <CommanderInput
-                      value={cmdrName}
-                      onChange={(v) => {
-                        setCmdrName(v);
-                        if (cmdr) setCmdr(null);
-                      }}
-                      onPick={(v) => void findCommander(v)}
-                      placeholder="Search for a commander…"
-                      className="pt-foe-input"
-                    />
-                    <button type="button" className="pt-btn" disabled={!cmdrName.trim() || cmdrState.busy} onClick={() => void findCommander(cmdrName)}>
-                      {cmdrState.busy ? <Loader2 size={15} className="spin" /> : "Find"}
-                    </button>
-                  </div>
-                  {cmdrState.error && <p className="pt-pick-error" style={{ margin: "8px 0 0" }}>{cmdrState.error}</p>}
-                  {cmdr && (
-                    <div className="pt-foe-found">
-                      <p className="pt-pick-detail" style={{ margin: 0 }}>
-                        The AI plays EDHREC&apos;s average {cmdr.commander} deck: the cards most of its decks run. Pick a power level.
-                      </p>
-                      <div className="pt-foe-levels" role="radiogroup" aria-label="Power level">
-                        <button type="button" role="radio" aria-checked={cmdrLevel === null} className="pt-foe-level" onClick={() => setCmdrLevel(null)}>
-                          <b>Any bracket</b>
-                          {cmdr.decks > 0 && <span>{cmdr.decks.toLocaleString("en-US")} decks</span>}
-                        </button>
-                        {cmdr.levels.map((l) => (
-                          <button
-                            key={l.level}
-                            type="button"
-                            role="radio"
-                            aria-checked={cmdrLevel === l.level}
-                            className="pt-foe-level"
-                            onClick={() => setCmdrLevel(l.level)}
-                          >
-                            <b>
-                              {l.bracket} · {l.label}
-                            </b>
-                            <span>
-                              {l.decks.toLocaleString("en-US")} {l.decks === 1 ? "deck" : "decks"}
-                              {l.bracket === cmdrPick.bracket ? " · yours" : ""}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        className="pt-btn pt-btn-gold"
-                        onClick={() =>
-                          void start({ kind: "edhrec", commander: cmdr.commander, level: cmdrLevel, label: cmdr.commander, detail: "EDHREC average deck" })
-                        }
-                      >
-                        <Swords size={15} /> Play against {cmdr.commander}
-                      </button>
-                    </div>
-                  )}
-                </section>
-              )}
-              {(groups ?? []).map((grp) => (
-              <section key={grp.title} className="pt-pick-group">
-                <div className="pt-zone-label">{grp.title}</div>
-                <div className="pt-pick-list">
-                  {grp.options.map((o) => (
-                    <button key={`${o.kind}:${o.archetype ?? o.deck}`} type="button" className="pt-pick-option" onClick={() => void start(o)}>
-                      <span className="pt-pick-label">{o.label}</span>
-                      <span className="pt-pick-detail">{o.detail}</span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-              ))}
-            </>
-          )}
-          <button type="button" className="pt-btn" style={{ marginTop: 18 }} onClick={onSolo}>
-            Back to the solo table
-          </button>
-        </div>
+        <OpponentPicker deckId={deckId} starting={mode === "loading"} error={error} onStart={(o) => void start(o)} onSolo={onSolo} />
       </div>
     );
   }
