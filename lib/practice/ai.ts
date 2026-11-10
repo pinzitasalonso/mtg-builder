@@ -3,8 +3,8 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, stats } from "./cards";
-import { applyAction, availableMana, canAttack, canBlock, cardId, castable, lifeFor, spellCost } from "./game";
+import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, searchOnCast, stats } from "./cards";
+import { aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, lifeFor, spellCost } from "./game";
 import { manaSources, parseCost, payCost } from "./mana";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
 
@@ -208,8 +208,26 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     if (!e || c.flipped || !g.sides[other(seat)].battlefield.length) continue;
     if (payIn(parseCost(e.mana))) main.push({ ...blankAction("activate", c.iid), mana: e.mana });
   }
+  // A ramp spell (Cultivate, Rampant Growth, Farseek, Nature's Lore): the
+  // lands it finds, each where the card puts it. Before the creatures, so
+  // the mana is there next turn.
+  const taken = new Set<number>();
+  for (const c of sim.sides[seat].hand) {
+    const finds = landSearch(sim, seat, c, book, taken);
+    if (!finds || !castable(sim, seat, c, book, "hand")) continue;
+    if (!payIn(spellCost(sim, seat, c, book, "hand"))) continue;
+    main.push({ ...blankAction("cast", c.iid), effects: finds });
+  }
+  // A sorcery that removes a creature (Feed the Swarm), at the player's
+  // biggest threat. Its instants are kept for the player's turn.
+  if (seat === "opp") {
+    const kill = aiRemovalAction(sim, book, sim.sides.you.battlefield.map((c) => c.iid), "main");
+    const card = kill ? sim.sides.opp.hand.find((c) => cardId(c.iid) === kill.card) : undefined;
+    if (kill && card && payIn(spellCost(sim, "opp", card, book, "hand"))) main.push(kill);
+  }
+  const cast = new Set(main.map((a) => a.card));
   const candidates = [
-    ...sim.sides[seat].hand.map((c) => ({ c, zone: "hand" as const })),
+    ...sim.sides[seat].hand.filter((c) => !cast.has(cardId(c.iid))).map((c) => ({ c, zone: "hand" as const })),
     ...sim.sides[seat].command.map((c) => ({ c, zone: "command" as const })),
   ]
     .filter(({ c }) => !isLand(c) && (!/\b(Instant|Sorcery)\b/.test((c.typeLine ?? "").split(" // ")[0]!) || drawOnly(book, c) > 0))
@@ -227,6 +245,33 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     after_combat: [],
     say: "",
   };
+}
+
+/** A spell that only searches for lands, as the effects that carry it out:
+    each land found goes where the card says (the battlefield, tapped or
+    not, or the hand). Null for any other spell, or with no land to find.
+    Basics the hand's colours are missing are found first. */
+function landSearch(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, taken: Set<number>): Effect[] | null {
+  const info = infoOf(book, c);
+  if (isLand(c) || !/\b(Instant|Sorcery)\b/.test((info?.typeLine ?? c.typeLine ?? "").split(" // ")[0]!)) return null;
+  const spec = searchOnCast(info);
+  // Only a search and nothing else: "…, then shuffle." is the whole card.
+  if (!spec || !/^search your library for [^.]*\.(?: \([^)]*\))?$/i.test((info?.oracleText ?? "").trim())) return null;
+  const side = g.sides[seat];
+  const lands = side.library.filter((l) => !taken.has(l.iid) && isLand(l) && spec.test(l.typeLine, infoOf(book, l)));
+  if (!lands.length) return null;
+  const have = new Set(side.battlefield.flatMap((x) => landColors(book, x)));
+  const useful = (l: PlayCard) => landColors(book, l).filter((col) => !have.has(col)).length;
+  const picks = [...lands].sort((a, b) => useful(b) - useful(a)).slice(0, spec.count);
+  // Every find must be a land the card could find: otherwise it's not a ramp spell.
+  const effects: Effect[] = [];
+  for (const [i, l] of picks.entries()) {
+    taken.add(l.iid);
+    const to = spec.to[Math.min(i, spec.to.length - 1)] ?? { zone: "battlefield" as const, tapped: true };
+    if (to.zone === "top") return null;
+    effects.push({ type: "search", target: null, player: null, amount: null, name: l.name, power: null, toughness: null, keywords: [], to: to.zone, tapped: to.zone === "battlefield" ? !!to.tapped : null, text: null });
+  }
+  return effects.length ? effects : null;
 }
 
 /** A line of rules text that is an ability to use, other than one that only

@@ -29,6 +29,7 @@ import {
   upkeepTokenOf,
   winotaOf,
 } from "./abilities";
+import { hasTriggers } from "./triggers";
 import { manaSummary } from "./mana";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
@@ -176,6 +177,8 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (tribeAttackOf(book, front)) notes.push("when your Dragons attack, the app draws for them and puts your priciest permanent from your hand onto the battlefield");
     if (upkeepTokenOf(book, front)) notes.push("its upkeep tokens happen by itself");
     if (untapLandsOf(book, front)) notes.push(`to untap your lands, activate it with "life":${untapLandsOf(book, front)!.life} and no mana or effects`);
+    if (hasTriggers(book, front))
+      notes.push("its simple triggers (a card, life, tokens or counters when it enters or attacks, at your upkeep or end step, when lands or creatures enter, when creatures die, when the player draws or casts) happen by themselves: give it no effects for them");
     if (punishesIdleOf(book, front)) notes.push("the end-step damage for creatures that didn't attack happens by itself, to both players: attack with what you can");
     if (notes.length) out.push(`- ${info.name}: ${notes.join("; ")}.`);
   }

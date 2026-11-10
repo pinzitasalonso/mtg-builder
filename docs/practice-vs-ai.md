@@ -312,6 +312,44 @@ side does.
    Lords, Auras and "all creatures have" are worked out again after every
    move (`refreshStatics` in `checkState`) into each card's `boost`.
 
+   **The triggers most decks are full of** (`lib/practice/triggers.ts`),
+   on either side, for any card worded this way:
+   - when it **enters** or **attacks** (Baleful Strix, Breya, Omnath);
+   - at **your upkeep** or **your end step** (Phyrexian Arena, Oloro);
+   - **landfall**; a **creature entering**, with its conditions ("with
+     power 4 or greater": Garruk's Uprising, Temur Ascendancy; "with
+     defender": Arcades; any creature: Soul Warden);
+   - **another creature dying** (Zulaport Cutthroat);
+   - **an opponent drawing**: Nekusar's damage, and Smothering Tithe's
+     Treasure (the table takes it that nobody pays the {2}); the Draw
+     button counts (`playerDraws`);
+   - **an opponent casting**, unless they pay (Rhystic Study, Esper
+     Sentinel: `castTaxes`). The caster pays when it has the mana left after
+     the spell: the AI whenever it can, you up to {2} by yourself. Otherwise
+     the other side draws. Mystic Remora is left alone: its cumulative
+     upkeep isn't kept.
+
+   One rule keeps it honest: a trigger is carried out only when the table
+   can do **all** of what it says. Its vocabulary is small: draw, gain or
+   lose life, each opponent loses life, damage to each opponent, +1/+1
+   counters on itself, creature tokens with keywords, Treasure, Food and
+   Clue. Anything else in the sentence ("for each…", "if you control…", a
+   target) and the trigger is left to you, or to the model's plan, as
+   before. Two triggers of one kind on a card are both left alone.
+
+   **Removal** the AI casts on your turn (`removalOf`) reads the wider
+   targets a creature fits: a permanent (Beast Within, Generous Gift,
+   Assassin's Trophy), a nonland permanent (Anguished Unmaking, Void Rend),
+   an artifact or creature (Putrefy), a mana value (Despark). What its
+   controller gets is carried out when the table can: Beast Within's 3/3,
+   Swords to Plowshares' life.
+
+   **The built-in planner** (the basic bot, and any turn the model misses)
+   also casts ramp spells that only find lands (Cultivate, Kodama's Reach,
+   Rampant Growth, Farseek, Nature's Lore, Three Visits: each land goes
+   where the card puts it, the colour it's missing first), and uses a
+   sorcery to remove your biggest threat. Its instants wait for your turn.
+
    The model is told which of its deck's cards these are, so its plan
    leaves them out (`automatedNotes`); a plan's discard for Kefka's entry
    is dropped anyway.

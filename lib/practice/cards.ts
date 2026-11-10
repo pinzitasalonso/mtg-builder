@@ -306,12 +306,18 @@ export interface Removal {
   /** "nonblack": not this colour; "nonartifact": not this type. */
   notColor: string | null;
   notType: string | null;
+  /** "With mana value 4 or greater" (Despark). */
+  minValue: number;
   rider: string;
 }
-export function removalOf(info: CardInfo | undefined): Removal | null {
-  if (!info || !/\bInstant\b/.test(frontType(info.typeLine))) return null;
+export function removalOf(info: CardInfo | undefined, speed: "instant" | "sorcery" = "instant"): Removal | null {
+  // An instant, to answer on the player's turn; or a sorcery, for the AI's own.
+  if (!info || !new RegExp(`\\b${speed === "instant" ? "Instant" : "Sorcery"}\\b`).test(frontType(info.typeLine))) return null;
   const text = frontText(info);
-  const kill = /\b(destroy|exile) target (attacking |tapped )?(?:non(\w+) )?creature\b(?! card)/i.exec(text);
+  // "Target creature", and the wider targets a creature fits: a permanent
+  // (Beast Within), a nonland permanent (Anguished Unmaking), an artifact or
+  // creature (Putrefy), with or without "an opponent controls".
+  const kill = /\b(destroy|exile) target (attacking |tapped )?(?:non(\w+) )?(?:creature|permanent|artifact or creature|creature or artifact|creature or enchantment|creature or planeswalker|artifact, creature, or enchantment)\b(?! card)(?: an opponent controls| you don't control)?(?: with mana value (\d+) or greater)?/i.exec(text);
   const burn = /\bdeals? (\d+) damage to (any target|target creature|target attacking creature|target creature or planeswalker)\b/i.exec(text);
   const bounce = /\breturn target (attacking )?(?:creature|nonland permanent|permanent) to its owner's hand\b/i.exec(text);
   const m = kill ?? burn ?? bounce;
@@ -325,6 +331,7 @@ export function removalOf(info: CardInfo | undefined): Removal | null {
     attackingOnly: /attacking/i.test((kill?.[2] ?? "") + (burn?.[2] ?? "") + (bounce?.[1] ?? "")),
     notColor: pip ?? null,
     notType: not && !pip ? not : null,
+    minValue: Number(kill?.[4]) || 0,
     rider: /^its controller\b/i.test(after) ? after.split(/(?<=\.)\s/)[0]! : "",
   };
 }
