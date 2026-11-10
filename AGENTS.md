@@ -11,6 +11,7 @@ Next.js 16 (App Router, Turbopack) + Prisma 7 on better-sqlite3. **Railway auto-
 ## Commands
 
 - Typecheck: `npx tsc --noEmit` · Tests: `npx vitest run` · Dev: `npm run dev`
+- Start (`npm start`) runs `scripts/prestart.mjs` first: it copies the SQLite file to `<its folder>/backups` (when the schema changed or there's none from today; the newest 3 are kept), then `prisma db push` **without** `--accept-data-loss`. A schema change that would drop data (a rename is a drop plus an add) stops the boot and says what it would drop. Add the new column, move the data, and drop the old one in a later deploy; or set `ALLOW_DATA_LOSS=1` for one deploy when the loss is intended.
 - Styling changes: verify on a production build (`npm run build && npx next start -p 4310`) — Turbopack dev HMR can half-apply (server module updates while the client bundle stays stale).
 
 ## Architecture

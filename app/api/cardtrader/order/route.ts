@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { mapPool } from "@/lib/async";
+import { isAnalyticsAdmin } from "@/lib/analytics";
 import { currentUser } from "@/lib/auth";
 import { CtProduct, ct, ctConfigured, findBlueprintId } from "@/lib/cardtrader";
 import { ScryfallPrinting, defaultPrintingsByName, printingsOf } from "@/lib/scryfall";
@@ -25,14 +26,19 @@ interface AddedLine {
   seller: string | null;
 }
 
-/* Fill the user's CardTrader Zero cart with the deck:
+/* Fill the CardTrader Zero cart with the deck. The API token
+   (CARDTRADER_API_TOKEN) is a personal one, so the cart it fills is its
+   owner's: only the site's admin gets this. Everyone else is told it isn't
+   set up for them, and the modal falls back to copying the list and opening
+   CardTrader, where they order from their own account.
    names → printings (Scryfall) → blueprints (CardTrader catalog) → cheapest
    Zero-eligible listing per card → POST /cart/add with via_cardtrader_zero. */
 export async function POST(req: NextRequest) {
-  if (!(await currentUser())) {
+  const user = await currentUser();
+  if (!user) {
     return NextResponse.json({ error: "Sign in required" }, { status: 401 });
   }
-  if (!ctConfigured()) {
+  if (!ctConfigured() || !isAnalyticsAdmin(user.email)) {
     return NextResponse.json(
       { configured: false, error: "CardTrader is not configured — add CARDTRADER_API_TOKEN to .env (cardtrader.com → Settings → API)." },
       { status: 501 }

@@ -6,8 +6,10 @@
    - Everything else (auth, chat, search, mutations): network-only / passthrough.
    Mutations made offline aren't handled here — the app queues them and replays
    them on reconnect. */
-const STATIC = "sp-static-v3";
-const RUNTIME = "sp-runtime-v3";
+// v4: the runtime cache held answers from api.scryfall.com (see the fetch
+// handler); a new name throws those away.
+const STATIC = "sp-static-v4";
+const RUNTIME = "sp-runtime-v4";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -28,10 +30,11 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return; // mutations pass straight through
   const url = new URL(req.url);
 
-  // Scryfall card art — cache-first.
-  const isScryfallImage =
-    url.hostname.endsWith("scryfall.io") ||
-    (url.hostname === "api.scryfall.com" && url.searchParams.get("format") === "image");
+  // Scryfall card art, from its image CDN: cache-first. Not the API's
+  // image-by-name lookups: an <img> request is opaque, so a 429 or an error
+  // can't be told from a picture, and one cached here stayed that card's
+  // "art" on this device for good. Those go straight to the network.
+  const isScryfallImage = url.hostname.endsWith("scryfall.io");
   if (isScryfallImage) {
     event.respondWith(cacheFirst(req, RUNTIME));
     return;

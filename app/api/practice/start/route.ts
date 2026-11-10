@@ -1,10 +1,9 @@
-import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { recordEvent } from "@/lib/analytics";
 import { PRACTICE_AI_TURNS, PRACTICE_LIMIT_MSG } from "@/lib/limits";
-import { canStartPractice } from "@/lib/limits-db";
+import { claimPractice } from "@/lib/limits-db";
 import { isEdhrecLevel } from "@/lib/edhrec";
 import { deckFromDb, deckFromEdhrec, deckFromMtgtop8 } from "@/lib/practice/decks";
 
@@ -23,10 +22,19 @@ export async function POST(req: Request) {
   const deckId = typeof body?.deck === "string" ? body.deck : "";
   const o = body?.opponent;
   if (!deckId || !o) return NextResponse.json({ error: "deck and opponent required" }, { status: 400 });
-  if (!(await canStartPractice(user))) return NextResponse.json({ error: PRACTICE_LIMIT_MSG, code: "practice_limit" }, { status: 429 });
+  // Today's game is claimed first, in one step with the count, so requests
+  // sent together can't all pass the check while the decks load (that's
+  // slow: EDHREC, MTGTop8, Scryfall). If the game can't start, the claim is
+  // given back.
+  const id = await claimPractice(user);
+  if (!id) return NextResponse.json({ error: PRACTICE_LIMIT_MSG, code: "practice_limit" }, { status: 429 });
+  const giveBack = () => prisma.practiceGame.deleteMany({ where: { id, userId: user.id } }).catch(() => {});
 
   const you = await deckFromDb(deckId, user.id);
-  if (!you) return NextResponse.json({ error: "That deck has no cards to play yet." }, { status: 400 });
+  if (!you) {
+    await giveBack();
+    return NextResponse.json({ error: "That deck has no cards to play yet." }, { status: 400 });
+  }
   const opp =
     o.kind === "deck" && typeof o.deck === "string"
       ? await deckFromDb(o.deck, user.id)
@@ -35,15 +43,16 @@ export async function POST(req: Request) {
         : o.kind === "edhrec" && typeof o.commander === "string" && o.commander.trim() && o.commander.length <= 200
           ? await deckFromEdhrec(o.commander.trim(), isEdhrecLevel(o.level) ? o.level : null)
           : null;
-  if (!opp) return NextResponse.json({ error: "Couldn't load that opponent's deck. Try another." }, { status: 502 });
+  if (!opp) {
+    await giveBack();
+    return NextResponse.json({ error: "Couldn't load that opponent's deck. Try another." }, { status: 502 });
+  }
 
   const book = { ...you.book, ...opp.book };
   const commanderGame = !!(you.commander || opp.commander);
-  const id = randomUUID();
-  await prisma.practiceGame.create({
+  await prisma.practiceGame.update({
+    where: { id },
     data: {
-      id,
-      userId: user.id,
       label: `${opp.label} — ${opp.detail}`.slice(0, 200),
       setup: JSON.stringify({ book, oppDeck: opp.cards.map((c) => ({ name: c.name, quantity: c.quantity })), oppCommander: opp.commander }),
     },

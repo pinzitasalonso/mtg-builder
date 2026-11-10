@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
 import { extractJson, messageText } from "@/lib/ai";
+import { rateLimit } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,8 @@ type Role = (typeof ROLES)[number];
 // Cap one tagging batch — beyond this only abuse, and the client re-calls
 // anyway since rows stay role=null until tagged.
 const MAX_BATCH = 150;
+// AI tagging calls one account may make in an hour.
+const ROLE_CALLS_PER_HOUR = 30;
 
 const isRole = (v: unknown): v is Role => typeof v === "string" && (ROLES as readonly string[]).includes(v);
 
@@ -52,6 +55,10 @@ export async function POST(
   // The AI part is for signed-in players only (see /api/search). Lands above
   // were still tagged locally, so report what was done rather than fail.
   if (!user) return NextResponse.json({ tagged, aiSkipped: true });
+  // Tagging runs by itself as cards are added, so it doesn't cost a daily
+  // ask; it has its own ceiling, far above what building decks needs. Past
+  // it the cards just stay untagged until later.
+  if (!rateLimit(`roles:${user.id}`, ROLE_CALLS_PER_HOUR, 60 * 60_000)) return NextResponse.json({ tagged, aiSkipped: true });
 
   const list = needAi
     .map((c) => `- ${c.name} · ${c.typeLine ?? "?"} · ${(c.oracleText ?? "").slice(0, 220)}`)
@@ -83,8 +90,9 @@ export async function POST(
     }
     return NextResponse.json({ tagged });
   } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e);
+    // The SDK's message stays in the log, not in the response.
+    console.error("[roles] AI tagging failed:", e instanceof Error ? e.message : e);
     // Lands may already be tagged; report what happened.
-    return NextResponse.json({ tagged, error: "AI tagging failed", details: detail }, { status: 502 });
+    return NextResponse.json({ tagged, error: "AI tagging failed" }, { status: 502 });
   }
 }
