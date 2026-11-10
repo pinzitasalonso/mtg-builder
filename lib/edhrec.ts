@@ -114,3 +114,35 @@ export async function fetchAverageDeck(commander: string, level: EdhrecLevel | n
     clearTimeout(timer);
   }
 }
+
+/** The commanders most decks were built around this past year, most first.
+    The opponent picker offers a few of them. */
+export function parseTopCommanders(page: unknown): { name: string; decks: number }[] {
+  const lists = (page as { container?: { json_dict?: { cardlists?: unknown } } } | null)?.container?.json_dict?.cardlists;
+  const views = Array.isArray(lists) ? (lists[0] as { cardviews?: unknown } | undefined)?.cardviews : null;
+  if (!Array.isArray(views)) return [];
+  return views.flatMap((v) => {
+    const r = v as { name?: unknown; num_decks?: unknown } | null;
+    return typeof r?.name === "string" && r.name.trim() && r.name.length <= 200 ? [{ name: r.name.trim(), decks: typeof r.num_decks === "number" && r.num_decks > 0 ? r.num_decks : 0 }] : [];
+  });
+}
+
+let top: { at: number; list: { name: string; decks: number }[] } | null = null;
+
+export async function fetchTopCommanders(): Promise<{ name: string; decks: number }[]> {
+  if (top && Date.now() - top.at < TTL_MS) return top.list;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch("https://json.edhrec.com/pages/commanders/year.json", { headers: { "User-Agent": "Spellpool/1.0 (+https://www.spellpool.com)" }, signal: ctrl.signal, cache: "no-store" });
+    if (!res.ok) return top?.list ?? [];
+    const list = parseTopCommanders(await res.json());
+    // An empty answer isn't remembered: the next request asks again.
+    if (list.length) top = { at: Date.now(), list };
+    return list.length ? list : (top?.list ?? []);
+  } catch {
+    return top?.list ?? [];
+  } finally {
+    clearTimeout(timer);
+  }
+}

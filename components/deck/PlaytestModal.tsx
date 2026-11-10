@@ -55,6 +55,7 @@ export default function PlaytestModal({
   format,
   deckId,
   aiAvailable,
+  startVsAi,
   onClose,
 }: {
   cards: PoolEntry[];
@@ -64,9 +65,11 @@ export default function PlaytestModal({
   /** The deck, for a practice game against the AI (signed in only). */
   deckId?: string;
   aiAvailable?: boolean;
+  /** Open on the game against the AI (its opponent picker), not the solo table. */
+  startVsAi?: boolean;
   onClose: () => void;
 }) {
-  const [vsAi, setVsAi] = useState(false);
+  const [vsAi, setVsAi] = useState(!!startVsAi && !!aiAvailable);
   // A phone plays sideways: fullscreen and locked where the browser allows.
   useLandscapeLock();
   if (vsAi && deckId) return <PracticeTable deckId={deckId} onClose={onClose} onSolo={() => setVsAi(false)} />;
