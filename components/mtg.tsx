@@ -454,6 +454,20 @@ export function landProducedColors(
   }
   return WUBRG.filter((c) => found.has(c));
 }
+// Category accent colours: the deck's composition matrix and its section
+// heads, and the Assemble sheet's (matches the design).
+export const CAT_COLOR: Record<string, string> = {
+  Commander: "#e8c16a",
+  Creatures: "#fdf26f",
+  Instants: "#7fb8ff",
+  Sorceries: "#b5d6ff",
+  Artifacts: "#d7dbe2",
+  Enchantments: "#e3b3ff",
+  Planeswalkers: "#ffcf8a",
+  Lands: "#d9bd8a",
+  Other: "#cfd3da",
+};
+
 export const TYPE_ORDER = [
   "Creatures",
   "Instants",

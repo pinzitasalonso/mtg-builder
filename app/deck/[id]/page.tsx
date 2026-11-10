@@ -43,6 +43,7 @@ import {
   ClassicCard,
   ManaCurve,
   deckStats,
+  CAT_COLOR,
   categoryOf,
   colorsOf,
   landProducedColors,
@@ -53,17 +54,6 @@ import {
   MANA,
 } from "@/components/mtg";
 
-// Category accent colours for the composition matrix (matches the design).
-const CAT_COLOR: Record<string, string> = {
-  Creatures: "#fdf26f",
-  Instants: "#7fb8ff",
-  Sorceries: "#b5d6ff",
-  Artifacts: "#d7dbe2",
-  Enchantments: "#e3b3ff",
-  Planeswalkers: "#ffcf8a",
-  Lands: "#d9bd8a",
-  Other: "#cfd3da",
-};
 
 type SearchCard = OutCard;
 type PoolCard = PoolEntry;
@@ -1888,7 +1878,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {orderOpen && <OrderModal cards={deckCards} onClose={() => setOrderOpen(false)} />}
 
       {/* the deck in cardboard: tick the cards off, see where the rest are */}
-      {assembleOpen && <AssembleSheet deckId={deckId} cards={deckCards} owned={ownedCopies} onClose={() => setAssembleOpen(false)} />}
+      {assembleOpen && <AssembleSheet deckId={deckId} cards={deckCards} owned={ownedCopies} isCommander={isCommander} onClose={() => setAssembleOpen(false)} />}
 
       {/* saved versions — snapshot now, compare an earlier one with the current list */}
       {versionsOpen && <VersionsModal deckId={deckId} pool={pool} canEdit={canEdit} onClose={() => setVersionsOpen(false)} onRestored={loadPool} />}
