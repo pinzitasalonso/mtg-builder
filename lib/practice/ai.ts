@@ -4,7 +4,7 @@
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
 import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, stats } from "./cards";
-import { availableMana, canAttack, canBlock, cardId, castable, lifeFor, spellCost } from "./game";
+import { applyAction, availableMana, canAttack, canBlock, cardId, castable, lifeFor, spellCost } from "./game";
 import { manaSources, parseCost, payCost } from "./mana";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
 
@@ -227,6 +227,31 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     after_combat: [],
     say: "",
   };
+}
+
+/** A line of rules text that is an ability to use, other than one that only
+    makes mana ("{T}: Add {G}"). */
+const usableAbility = (text: string) => text.split("\n").some((line) => /^[^:"]{1,80}:\s+(?!Add\b)/.test(line.trim()));
+
+/** A turn with nothing to decide, or null. After its land drop the seat can
+    cast nothing, has no creature that could attack, and controls nothing
+    with an ability to use: all there is to do is play the land (or pass).
+    The table plays that without asking the model, which would take its
+    time to say the same. Early turns are mostly these. */
+export function simpleTurn(g: PracticeGame, book: CardBook, seat: Seat = "opp"): TurnPlan | null {
+  if (g.winner || g.choice || g.combat || g.active !== seat) return null;
+  const plan = fallbackPlan(g, book, seat);
+  if (plan.attack.length || plan.after_combat.length || plan.main.some((a) => a.kind !== "land")) return null;
+  // The table as it is once the land is down (a fetch land has fetched).
+  let after = g;
+  for (const a of plan.main) after = applyAction(after, seat, a, book).game;
+  if (after.winner || after.choice) return null;
+  const side = after.sides[seat];
+  const spells = [...side.hand.map((c) => ({ c, zone: "hand" as const })), ...side.command.map((c) => ({ c, zone: "command" as const }))].filter(({ c }) => !isLand(c));
+  if (spells.some(({ c, zone }) => castable(after, seat, c, book, zone))) return null;
+  if (side.battlefield.some((c) => canAttack(after, seat, c, book))) return null;
+  if (side.battlefield.some((c) => !isLand(c) && usableAbility(infoOf(book, c)?.oracleText ?? ""))) return null;
+  return plan;
 }
 
 /** The AI keeps 2–5 lands in seven; otherwise it mulligans once and puts

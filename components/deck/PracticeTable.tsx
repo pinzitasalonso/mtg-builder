@@ -2,16 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bot, Loader2, Plus, Swords, Undo2, X } from "lucide-react";
+import { Bot, Flag, Loader2, Plus, Sparkles, Swords, Undo2, X } from "lucide-react";
 import type { OpponentOption } from "@/app/api/practice/opponents/route";
+import { PrimerMarkdown } from "@/components/deck/DeckPrimer";
 import OpponentPicker from "@/components/deck/OpponentPicker";
 import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
+import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
 import { tapTribeOf, untapLandsOf } from "@/lib/practice/abilities";
-import {
+import { concede,
   addCounters,
   adjustLife,
   aiEndStep,
@@ -64,6 +66,8 @@ import type { CardBook, PlanAction, PracticeGame, Seat, TurnPlan } from "@/lib/p
 
 interface Setup {
   id: string;
+  /** Against the basic bot: its turns are the built-in planner's, no model. */
+  bot?: boolean;
   commanderGame: boolean;
   book: CardBook;
   you: { label: string; cards: DeckCard[]; commander: string | null };
@@ -134,6 +138,16 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   // A phone held sideways: whether the hand is raised over the board.
   const [handUp, setHandUp] = useState(false);
   const lastOpponent = useRef<OpponentOption | null>(null);
+  const lastBot = useRef(false);
+  // A game left unfinished (a reload, a closed tab), offered by the picker.
+  const [saved, setSaved] = useState<SavedGame<Setup> | null>(null);
+  // Picked up at the start of the opponent's turn: it plays once the table is back.
+  const [resumeAi, setResumeAi] = useState(false);
+  // This deck's finished games against the AI, once this one is counted.
+  const [record, setRecord] = useState<{ won: number; lost: number } | null>(null);
+  const reported = useRef<string | null>(null);
+  // The AI's review of the finished game.
+  const [review, setReview] = useState<{ open: boolean; busy: boolean; text: string; error: string } | null>(null);
   const afterCombatPlan = useRef<PlanAction[]>([]);
   const sideLog = useRef<HTMLOListElement>(null);
   const alive = useRef(true);
@@ -150,6 +164,40 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (game?.winner) setMode("over");
   }, [game?.winner]);
 
+  // A game in progress for this deck, from an earlier visit.
+  useEffect(() => setSaved(loadSaved<Setup>(deckId)), [deckId]);
+
+  // Keep the game at each steady point: your mulligan, and your turn as it
+  // stands. (The opponent's turn is kept once, as it starts: runAi.) A
+  // finished game is forgotten.
+  useEffect(() => {
+    if (!game || !setup) return;
+    if (game.winner) clearSaved(deckId);
+    else if (mode === "mulligan" || (mode === "main" && game.active === "you")) storeSaved(deckId, { setup, game, as: mode, option: lastOpponent.current });
+  }, [game, setup, mode, deckId]);
+
+  // The game is over: it goes on the deck's record, once.
+  const winner = game?.winner ?? null;
+  const overTurn = game?.turn ?? 0;
+  const gameId = setup?.id ?? null;
+  useEffect(() => {
+    if (!winner || !gameId || reported.current === gameId) return;
+    reported.current = gameId;
+    fetch(`/api/practice/${gameId}/result`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ result: winner === "you" ? "won" : "lost", turn: overTurn }) })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => alive.current && d?.record && setRecord(d.record))
+      .catch(() => {});
+  }, [winner, gameId, overTurn]);
+
+  // A game picked up at the start of the opponent's turn: it takes that turn.
+  useEffect(() => {
+    if (!resumeAi || !game || !setup) return;
+    setResumeAi(false);
+    void runAi(game);
+    // runAi is this render's: it reads the setup just restored.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeAi, game, setup]);
+
   // A discard to choose raises your hand; a sacrifice lowers it, for the board.
   const choiceKind = game?.choice?.kind;
   useEffect(() => {
@@ -165,13 +213,34 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
 
   // ── Game flow ─────────────────────────────────────────────────────────
 
-  async function start(option: OpponentOption) {
+  /** Pick an unfinished game up where it was left. */
+  function resume(s: SavedGame<Setup>) {
+    lastOpponent.current = s.option;
+    lastBot.current = !!s.setup.bot;
+    noAsk.current = false;
+    setSaved(null);
+    setError("");
+    setSetup(s.setup);
+    setGame(s.game);
+    setHistory([]);
+    setSay("");
+    setAiNote(s.as === "ai" ? "Picked up at the start of the opponent's turn." : "");
+    setPicked([]);
+    setRecord(null);
+    setReview(null);
+    if (s.as === "ai") {
+      setMode("ai");
+      setResumeAi(true);
+    } else setMode(s.as);
+  }
+
+  async function start(option: OpponentOption, bot = false) {
     setMode("loading");
     setError("");
     const res = await fetch("/api/practice/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deck: deckId, opponent: option }),
+      body: JSON.stringify({ deck: deckId, opponent: option, bot }),
     }).catch(() => null);
     const data = res ? await res.json().catch(() => null) : null;
     if (!alive.current) return;
@@ -181,7 +250,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       return;
     }
     lastOpponent.current = option;
+    lastBot.current = bot;
     noAsk.current = false;
+    setSaved(null);
+    setRecord(null);
+    setReview(null);
     const s = data as Setup;
     let g = newGame({
       you: { cards: s.you.cards, commander: s.you.commander },
@@ -426,6 +499,13 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     setAiNote("");
     let g = g0;
     let plan: TurnPlan;
+    // Kept as the turn starts: picked up again, the opponent plays it over.
+    storeSaved(deckId, { setup, game: g0, as: "ai", option: lastOpponent.current });
+    if (setup.bot) {
+      // The basic bot: the built-in planner, here in the browser.
+      plan = fallbackPlan(g, setup.book);
+      g = await pause(BEAT, g);
+    } else
     try {
       const res = await fetch(`/api/practice/${setup.id}/turn`, {
         method: "POST",
@@ -574,6 +654,43 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     setGame(g);
     setMode(g.winner ? "over" : "main");
   }
+
+  /** The AI's review of the finished game: asked for once, read as it's written. */
+  async function openReview() {
+    if (!game?.winner || !setup) return;
+    if (review?.text || review?.busy) return setReview({ ...review, open: true });
+    setReview({ open: true, busy: true, text: "", error: "" });
+    try {
+      const res = await fetch(`/api/practice/${setup.id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ game }) });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => null);
+        if (alive.current) setReview((r) => (r ? { ...r, busy: false, error: data?.error ?? "Couldn't write the review. Try again." } : r));
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let text = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+        if (!alive.current) return void reader.cancel().catch(() => {});
+        const soFar = text;
+        setReview((r) => (r ? { ...r, text: soFar } : r));
+      }
+      setReview((r) => (r ? { ...r, busy: false, error: text.trim() ? "" : "Couldn't write the review. Try again." } : r));
+    } catch {
+      if (alive.current) setReview((r) => (r ? { ...r, busy: false, error: r.text ? "" : "Couldn't write the review. Try again." } : r));
+    }
+  }
+
+  /** Give the game up: it counts as a loss. */
+  const giveUp = () => {
+    if (!game || game.winner || !confirm("Concede this game? It counts as a loss.")) return;
+    setMenu(null);
+    setHistory([]);
+    setGame(concede(game));
+  };
 
   // ── Card clicks and menus ─────────────────────────────────────────────
 
@@ -796,11 +913,24 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     return (
       <div className="pt-root" role="dialog" aria-label="Play against the AI">
         {header}
-        <OpponentPicker deckId={deckId} starting={mode === "loading"} error={error} onStart={(o) => void start(o)} onSolo={onSolo} />
+        <OpponentPicker
+          deckId={deckId}
+          starting={mode === "loading"}
+          error={error}
+          onStart={(o, bot) => void start(o, bot)}
+          onSolo={onSolo}
+          saved={saved ? { opponent: saved.setup.opp.label, turn: saved.game.turn, bot: !!saved.setup.bot } : null}
+          onResume={() => saved && resume(saved)}
+          onDiscard={() => {
+            clearSaved(deckId);
+            setSaved(null);
+          }}
+        />
       </div>
     );
   }
 
+  const recordLine = record && record.won + record.lost > 0 ? `This deck against the AI: ${record.won} ${record.won === 1 ? "win" : "wins"}, ${record.lost} ${record.lost === 1 ? "loss" : "losses"}.` : "";
   const you = game.sides.you;
   const opp = game.sides.opp;
   const yourTurn = game.active === "you";
@@ -899,9 +1029,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
             : mode === "combat"
               ? "Combat…"
               : mode === "over"
-                ? game.winner === "you"
-                  ? "You win!"
-                  : "The opponent wins."
+                ? `${game.winner === "you" ? "You win!" : "The opponent wins."}${recordLine ? ` ${recordLine}` : ""}`
                 : `Your turn · land drop ${game.landPlayed ? "used" : "available"}`;
 
   // Your answer, offered where you're looking: under the opponent's spell
@@ -1007,7 +1135,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           {mode === "respond" && pending?.kind === "end" && answerButtons}
           {mode === "over" && (
             <>
-              <button type="button" className="pt-btn pt-btn-gold" onClick={() => lastOpponent.current && void start(lastOpponent.current)}>
+              <button type="button" className="pt-btn pt-btn-gold" onClick={() => void openReview()}>
+                <Sparkles size={14} strokeWidth={2.25} /> Review the game
+              </button>
+              <button type="button" className="pt-btn" onClick={() => lastOpponent.current && void start(lastOpponent.current, lastBot.current)}>
                 Play again
               </button>
               {opp.hand.length > 0 && (
@@ -1033,6 +1164,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           <button type="button" className="pt-btn" onClick={() => setLogOpen(true)}>
             Log
           </button>
+          {mode === "main" && yourTurn && !game.choice && (
+            <button type="button" className="pt-btn" onClick={giveUp} title="Give the game up: it counts as a loss">
+              <Flag size={13} strokeWidth={2.25} /> <span className="pt-btn-label">Concede</span>
+            </button>
+          )}
         </div>
         <span className="pt-status">{status}</span>
       </div>
@@ -1375,7 +1511,31 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           <div className="id-display">{game.winner === "you" ? "You win!" : "The opponent wins"}</div>
           <p>{game.log.at(-1)?.text}</p>
           {opp.hand.length > 0 && <p className="pt-over-hand">It was holding {opp.hand.map((c) => c.name).join(", ")}.</p>}
+          {recordLine && <p className="pt-over-record">{recordLine}</p>}
         </div>
+      )}
+
+      {review?.open && (
+        <Panel title="The game, reviewed" onClose={() => setReview((r) => (r ? { ...r, open: false } : r))}>
+          <div className="pt-review">
+            {review.error ? (
+              <p className="pt-pick-error" role="alert">
+                {review.error}
+              </p>
+            ) : review.text ? (
+              <PrimerMarkdown text={review.text} />
+            ) : (
+              <p className="pt-pick-wait">
+                <Loader2 size={16} className="spin" /> Reading the game…
+              </p>
+            )}
+            {review.busy && review.text && (
+              <p className="pt-pick-wait" style={{ marginTop: 10 }}>
+                <Loader2 size={14} className="spin" /> Writing…
+              </p>
+            )}
+          </div>
+        </Panel>
       )}
     </div>
   );

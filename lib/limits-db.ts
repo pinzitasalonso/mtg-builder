@@ -75,16 +75,18 @@ export async function refundScan(user: { id: number } & TierFields): Promise<voi
    once the decks have loaded) in the same transaction that counts the games
    started since midnight UTC, so parallel requests can't all get under the
    free allowance. Returns the game's id, or null when today's are used up.
-   A game that fails to start is deleted, which gives the claim back. */
-export async function claimPractice(user: { id: number } & TierFields): Promise<string | null> {
+   A game that fails to start is deleted, which gives the claim back.
+   A game against the basic bot (no model call) is free: it isn't counted,
+   and doesn't count. */
+export async function claimPractice(user: { id: number } & TierFields, bot = false): Promise<string | null> {
   const id = randomUUID();
   const since = new Date(`${utcDay()}T00:00:00.000Z`);
   return prisma.$transaction(async (tx) => {
-    if (!isPro(user)) {
-      const started = await tx.practiceGame.count({ where: { userId: user.id, createdAt: { gte: since } } });
+    if (!bot && !isPro(user)) {
+      const started = await tx.practiceGame.count({ where: { userId: user.id, bot: false, createdAt: { gte: since } } });
       if (started >= FREE_PRACTICE_PER_DAY) return null;
     }
-    await tx.practiceGame.create({ data: { id, userId: user.id, label: "", setup: "{}" } });
+    await tx.practiceGame.create({ data: { id, userId: user.id, label: "", setup: "{}", bot } });
     return id;
   });
 }

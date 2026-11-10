@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseBlocks, aiMulligan, fallbackPlan } from "./ai";
+import { chooseBlocks, aiMulligan, fallbackPlan, simpleTurn } from "./ai";
 import { counterOf, fetchOf, has, hitTriggersOf, isCreature, isInstantSpeed, isNinja, manaOutput, ninjutsuOf, removalOf, searchAbility, searchOnCast, stats } from "./cards";
 import { automatedNotes } from "./brief";
 import {
@@ -19,6 +19,7 @@ import {
   resolveChoice,
   playerFind,
   cardId,
+  concede,
   declareAttackers,
   endTurn,
   findCard,
@@ -1081,5 +1082,55 @@ describe("scry", () => {
     expect(g.sides.you.library).toHaveLength(g0.sides.you.library.length);
     expect(g.log.at(-1)!.text).toBe("You scry 3: 2 on top, 1 on the bottom.");
     expect(playerScry(g0, [99_999], [])).toBe(g0);
+  });
+});
+
+describe("a turn with nothing to decide", () => {
+  const names = (g: PracticeGame, plan: { main: PlanAction[] } | null) => plan?.main.map((a) => [a.kind, findCard(g, Number(a.card.slice(1)))!.card.name]);
+
+  it("is its land drop when it can cast nothing and has nothing to attack with", () => {
+    // Two lands after the drop, and a hand of four- and five-drops.
+    const g = table({ oppHand: ["Forest", "Hill Giant", "Serra Angel"], oppField: ["Forest"] });
+    expect(names(g, simpleTurn(g, BOOK))).toEqual([["land", "Forest"]]);
+    // No land to play either: it passes.
+    const empty = table({ oppHand: ["Hill Giant"], oppField: ["Forest"] });
+    expect(simpleTurn(empty, BOOK)).toMatchObject({ main: [], attack: [] });
+  });
+
+  it("isn't one when a spell is castable, even one the planner wouldn't cast", () => {
+    // The planner leaves instants to the model: this turn is the model's.
+    const bolt = table({ oppHand: ["Mountain", "Lightning Bolt"], oppField: [] });
+    expect(simpleTurn(bolt, BOOK)).toBeNull();
+    const bears = table({ oppHand: ["Forest", "Grizzly Bears"], oppField: ["Forest"] });
+    expect(simpleTurn(bears, BOOK)).toBeNull();
+  });
+
+  it("isn't one with a creature that could attack, or a permanent with an ability to use", () => {
+    expect(simpleTurn(table({ oppHand: ["Forest"], oppField: ["Forest", "Hill Giant"], youField: ["Craw Wurm"] }), BOOK)).toBeNull();
+    // A mana rock's ability only makes mana: nothing to decide.
+    expect(simpleTurn(table({ oppHand: ["Hill Giant", "Serra Angel"], oppField: ["Sol Ring"] }), BOOK)).not.toBeNull();
+    const book: CardBook = { ...BOOK, "prodigal sorcerer": info("Prodigal Sorcerer", { typeLine: "Artifact", oracleText: "{T}: Prodigal Sorcerer deals 1 damage to any target." }) };
+    const g = table({ oppHand: ["Serra Angel"], oppField: ["Forest"] });
+    const pinger = { ...g.sides.opp.battlefield[0]!, iid: 99_001, name: "Prodigal Sorcerer", typeLine: "Artifact" };
+    expect(simpleTurn({ ...g, sides: { ...g.sides, opp: { ...g.sides.opp, battlefield: [...g.sides.opp.battlefield, pinger] } } }, book)).toBeNull();
+  });
+
+  it("isn't one on your turn, or once the game is over", () => {
+    const g = table({ oppHand: ["Forest"], oppField: [] });
+    expect(simpleTurn({ ...g, active: "you" }, BOOK)).toBeNull();
+    expect(simpleTurn({ ...g, winner: "you" }, BOOK)).toBeNull();
+  });
+});
+
+describe("conceding", () => {
+  it("ends the game for the opponent, and says so", () => {
+    const g0 = table();
+    const g = concede(g0);
+    expect(g.winner).toBe("opp");
+    expect(g.log.at(-1)!.text).toBe("You concede. The opponent wins.");
+    expect(g0.winner).toBeNull();
+    // A game that's over stays as it ended.
+    const won = { ...g0, winner: "you" as const };
+    expect(concede(won)).toBe(won);
   });
 });

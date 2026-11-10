@@ -108,10 +108,43 @@ side does.
    AI" in Tools), so it's reachable on a phone held upright; the solo
    playtest's "vs AI" still leads there too.
 
-5. **Limits**: AI routes need an account. Starting a game counts: free
-   accounts get one practice game a day (`FREE_PRACTICE_PER_DAY` in
+5. **Limits**: AI routes need an account. Starting a game against the AI
+   counts: free accounts get one a day (`FREE_PRACTICE_PER_DAY` in
    `lib/limits.ts`), Pro is unlimited. Each game allows a fixed number of
    AI turns (`PracticeGame.turns`), so a game can't run up the bill.
+
+   **The basic bot** is the other pilot (the picker's bar: "AI" or "Basic
+   bot"): the built-in planner plays every turn, in the browser, with no
+   model call. Those games are free and unlimited (`PracticeGame.bot`; they
+   aren't counted, and don't count), and they're what a free account plays
+   once its day's game is spent.
+
+   **A turn with nothing to decide** skips the model too (`simpleTurn` in
+   `lib/practice/ai.ts`, asked by the turn route before it spends a turn):
+   after its land drop the opponent can cast nothing, has no creature that
+   could attack, and controls nothing with an ability to use. Early turns
+   are mostly these, and they're played at once.
+
+   **Resume.** The game lives in the browser, so it's kept there
+   (`lib/practice/save.ts`, localStorage, one per deck) at each steady
+   point: your mulligan, your turn as it stands, and the start of the
+   opponent's turn. A reload or a closed tab loses nothing: the picker
+   offers "A game in progress… Resume". Picked up in the opponent's turn,
+   that turn is played again from its start. A finished game is forgotten.
+
+   **Results.** When a game ends the table reports it once
+   (`/api/practice/<id>/result`: `result` "won" or "lost", `endTurn`), and
+   the deck's record (wins and losses against the AI) shows in the picker
+   and on the end-of-game banner. "Concede" (on your turn) ends a game as
+   a loss.
+
+   **The review.** "Review the game" on a finished game
+   (`/api/practice/<id>/review`, `lib/practice/review.ts`): the model reads
+   the player's decklist, the result, the final board and the log, and
+   writes what decided it, what the deck did well and lacked, and a change
+   or two to try. Streamed, then kept on the game (`PracticeGame.review`),
+   so asking again costs nothing. It's part of a game against the AI; for
+   a bot game it spends one of the day's AI questions.
 
 6. **The table** (`components/deck/PracticeTable.tsx`, opened from the
    playtest's "vs AI"):

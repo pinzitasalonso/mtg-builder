@@ -194,7 +194,7 @@ export default function DeckPrimer({
 
 /* Headings, bullets, paragraphs and bold, with [[Card Name]] tokens picked out
    in the accent colour. The same tokenizer the AI chat uses. */
-function PrimerMarkdown({ text }: { text: string }) {
+export function PrimerMarkdown({ text }: { text: string }) {
   const blocks = useMemo(() => parseBlocks(text), [text]);
 
   const renderInline = (tokens: InlineToken[], keyPrefix: string): React.ReactNode =>

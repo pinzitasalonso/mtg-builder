@@ -28,6 +28,8 @@ export interface OpponentsAnswer {
   tabs: OpponentTab[];
   /** The last few opponents this deck played. */
   recent: OpponentOption[];
+  /** This deck's finished games against the AI. */
+  record: { won: number; lost: number };
   /** The free plan's games against the AI today (null on Pro: no limit). */
   free: { perDay: number; left: number } | null;
   /** Pictures are still being fetched: ask again in a few seconds. */
@@ -53,13 +55,15 @@ export async function GET(req: Request) {
   const f = mtgtop8FormatFor(deck.format);
 
   // Each source answers on its own: one that's down leaves its tab out.
-  const [suggested, meta, mine, recent, startedToday] = await Promise.all([
+  const [suggested, meta, mine, recent, startedToday, results] = await Promise.all([
     commanderGame ? suggestedCommanders(`${utcDay()}:${deck.publicId}`, deck.commander ? [deck.commander] : []).catch(() => []) : Promise.resolve([]),
     f ? fetchMetagame(f).catch(() => null) : Promise.resolve(null),
     ownDeckOptions(user.id, { publicId: deck.publicId, name: deck.name, format: deck.format }),
     recentOpponents(user.id, deck.publicId),
     isPro(user) ? Promise.resolve(0) : prisma.practiceGame.count({ where: { userId: user.id, bot: false, createdAt: { gte: new Date(`${utcDay()}T00:00:00.000Z`) } } }),
+    prisma.practiceGame.groupBy({ by: ["result"], where: { userId: user.id, deck: deck.publicId, result: { not: null } }, _count: true }),
   ]);
+  const count = (r: string) => results.find((x) => x.result === r)?._count ?? 0;
   const tournament = f && meta ? await tournamentOptions(f, MTGTOP8_FORMATS[f]!.label, meta.period.id, meta.meta.archetypes.slice(0, 12)) : { options: [], more: false };
 
   const tabs: OpponentTab[] = [];
@@ -87,6 +91,7 @@ export async function GET(req: Request) {
     bracket,
     tabs,
     recent,
+    record: { won: count("won"), lost: count("lost") },
     free: isPro(user) ? null : { perDay: FREE_PRACTICE_PER_DAY, left: Math.max(0, FREE_PRACTICE_PER_DAY - startedToday) },
     more: tournament.more,
   };

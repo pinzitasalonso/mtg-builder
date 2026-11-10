@@ -1020,6 +1020,16 @@ button {
   --gold: #fdf26f;
   --gold-bright: #fdf58c;
   --gold-soft: #fdf26f;
+  --text: #ffffff;
+  --t1: #ffffff;
+  --text-muted: #9a98a3;
+  --t2: #9a98a3;
+  --text-dim: rgba(255, 255, 255, 0.5);
+  --t3: rgba(255, 255, 255, 0.5);
+  --frame-ink: #ffffff;
+  --w-1: #ffffff;
+  --w-2: rgba(255, 255, 255, 0.78);
+  --w-3: rgba(255, 255, 255, 0.55);
   /* A card on the table at full size; a practice game shrinks a crowded
      side's cards below it (.pt-side-cards). */
   --pt-card-full: clamp(80px, 9vw, 140px);
@@ -1592,6 +1602,56 @@ button {
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.62);
 }
+.pk-record {
+  color: #fff;
+  font-weight: 600;
+}
+/* A game left unfinished. */
+.pk-saved {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(253, 242, 111, 0.45);
+  background: rgba(253, 242, 111, 0.08);
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 14px;
+}
+.pk-saved b {
+  color: #fff;
+}
+.pk-saved-go {
+  display: flex;
+  gap: 8px;
+}
+/* Who pilots the opponent: the AI or the basic bot. */
+.pk-pilot {
+  display: flex;
+  padding: 2px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.25);
+}
+.pk-pilot button {
+  padding: 4px 11px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: rgba(255, 255, 255, 0.66);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pk-pilot button[aria-checked="true"] {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
 .pk-recent {
   margin-bottom: 16px;
 }
@@ -1976,7 +2036,13 @@ button {
   .pk-bar-go {
     flex: 1 1 100%;
     flex-direction: row;
+    flex-wrap: wrap;
     justify-content: space-between;
+    gap: 8px;
+  }
+  .pk-bar-free {
+    flex: 1 1 100%;
+    text-align: center;
   }
   .pk-play {
     flex: 1;
@@ -2003,6 +2069,14 @@ button {
   .pk-levels {
     margin-top: 5px;
   }
+}
+/* The AI's review of a finished game. */
+.pt-review {
+  max-width: 640px;
+}
+.pt-over-record {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.86);
 }
 /* Making a token (practice games). */
 .pt-tokens-count {
