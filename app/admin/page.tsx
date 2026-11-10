@@ -29,6 +29,8 @@ interface Events {
   users: number;
   decks: number;
   types: string[];
+  /** The forwarding headers this request carried, and the address the rate limits used. */
+  seen?: { xForwardedFor: string | null; xRealIp: string | null; usedForLimits: string };
 }
 
 const LABELS: Record<string, string> = {
@@ -147,6 +149,13 @@ export default function AdminPage() {
         {status === "error" && <p style={{ color: "var(--danger)" }}>Couldn&apos;t load the numbers.</p>}
 
         {status === "ok" && events && acc && <Dashboard events={events} acc={acc} onAccountsChanged={load} />}
+        {/* Your own request, as the server saw it: which header carries the
+            visitor's address decides what the rate limits key on. */}
+        {status === "ok" && events?.seen && (
+          <p className="id-mono" style={{ margin: "28px 0 0", fontSize: 11.5, color: "var(--w-3)", lineHeight: 1.6, wordBreak: "break-all" }}>
+            Your connection as the server sees it: x-forwarded-for = {events.seen.xForwardedFor ?? "(none)"} · x-real-ip = {events.seen.xRealIp ?? "(none)"} · rate limits use {events.seen.usedForLimits}
+          </p>
+        )}
       </div>
     </main>
   );

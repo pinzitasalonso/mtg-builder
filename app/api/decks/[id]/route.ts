@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DECK_TEXT_MAX, jsonBody } from "@/lib/api";
 import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, canEditDeck, currentUser, viewableDeckByPublicId } from "@/lib/auth";
@@ -30,12 +31,12 @@ export async function PATCH(
   const user = await currentUser();
   const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
-  const body = await req.json();
+  const body = await jsonBody(req);
   const data: { name?: string; format?: string; commander?: string | null; primer?: string | null; shared?: boolean; pinned?: boolean; gamesPlayed?: number; gamesWon?: number } = {};
-  if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim();
-  if (typeof body.format === "string" && body.format.trim()) data.format = body.format.trim();
+  if (typeof body.name === "string" && body.name.trim()) data.name = body.name.trim().slice(0, DECK_TEXT_MAX.name);
+  if (typeof body.format === "string" && body.format.trim()) data.format = body.format.trim().slice(0, DECK_TEXT_MAX.format);
   if ("commander" in body) {
-    const c = typeof body.commander === "string" ? body.commander.trim() : "";
+    const c = typeof body.commander === "string" ? body.commander.trim().slice(0, DECK_TEXT_MAX.commander) : "";
     data.commander = c || null;
   }
   // The primer is a document, not a field — an AI-drafted one runs several

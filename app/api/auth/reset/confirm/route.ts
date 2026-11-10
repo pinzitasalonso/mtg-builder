@@ -43,6 +43,12 @@ export async function POST(req: Request) {
     );
   }
 
+  // An address nobody had proven until now: whoever linked a Google or Apple
+  // sign-in to this account did it without showing they own the address
+  // (a provider that didn't vouch for it). The inbox's owner is here, so
+  // those links go. A verified account keeps its links.
+  if (!user.emailVerifiedAt) await prisma.account.deleteMany({ where: { userId: user.id } });
+
   await prisma.user.update({
     where: { id: user.id },
     data: {

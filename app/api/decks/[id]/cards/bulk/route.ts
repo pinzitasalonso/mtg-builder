@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cleanCardInput } from "@/lib/api";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
 import { singletonCapped } from "@/lib/commander";
@@ -31,7 +32,6 @@ export async function POST(
         : c
     );
   }
-  const str = (v: unknown) => (typeof v === "string" ? v : null);
 
   // Which of these are already in the pool — a capped (singleton) card that
   // is already there adds no copies, and the response says so.
@@ -42,14 +42,12 @@ export async function POST(
   );
   let copies = 0;
   const ops = [];
-  for (const c of list) {
-    if (
-      typeof c?.scryfallId !== "string" || !c.scryfallId ||
-      typeof c?.name !== "string" || !c.name ||
-      typeof c?.imageUri !== "string" || !c.imageUri
-    ) {
-      continue;
-    }
+  for (const raw of list) {
+    // Its id, name and a card image (Scryfall's), each no longer than a
+    // card's; anything else is skipped, as a nameless entry always was.
+    const clean = cleanCardInput(raw);
+    if (!clean) continue;
+    const c = { ...raw, ...clean };
     const reqQty = Math.min(MAX_QTY, Number.isFinite(c.quantity) && c.quantity > 0 ? Math.floor(c.quantity) : 1);
     const capped = singletonCapped(deck.format, c.typeLine);
     const qty = capped ? 1 : reqQty;
@@ -71,9 +69,9 @@ export async function POST(
           scryfallId: c.scryfallId,
           name: c.name,
           imageUri: c.imageUri,
-          manaCost: str(c.manaCost),
-          typeLine: str(c.typeLine),
-          oracleText: str(c.oracleText),
+          manaCost: c.manaCost,
+          typeLine: c.typeLine,
+          oracleText: c.oracleText,
           colorIdentity,
           legalities,
           board,

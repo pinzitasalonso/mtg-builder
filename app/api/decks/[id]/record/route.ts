@@ -1,3 +1,4 @@
+import { jsonBody } from "@/lib/api";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
@@ -35,7 +36,7 @@ export async function POST(
   const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
 
-  const body = await req.json().catch(() => ({}));
+  const body = await jsonBody(req);
   const won = body.won === true;
 
   const updated = await prisma.deck.update({

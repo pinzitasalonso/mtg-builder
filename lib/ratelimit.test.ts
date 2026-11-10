@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { authRateLimit, rateLimit } from "./ratelimit";
+import { authRateLimit, loginAllowed, loginFailed, rateLimit, rateLimitHasRoom } from "./ratelimit";
 
 // The module holds process-wide buckets and exposes no reset — adding one
 // would be production surface existing only for tests — so every test uses a
@@ -39,33 +39,32 @@ describe("rateLimit", () => {
 describe("authRateLimit", () => {
   it("throttles repeated logins from one IP", () => {
     const ip = uniq();
-    // The per-IP login cap is 10 in 5 minutes, each on a different address so
-    // the per-email bucket never fires first.
+    // The per-IP login cap is 10 in 5 minutes.
     for (let i = 0; i < 10; i++) {
       expect(authRateLimit("login", ip, `${i}@example.com`)).toBe(true);
     }
     expect(authRateLimit("login", ip, "another@example.com")).toBe(false);
   });
 
-  it("throttles one address across different IPs", () => {
+  it("throttles one address across different IPs (signup's per-address bucket)", () => {
     const email = `${uniq()}@example.com`;
-    // Per-email login cap is 5 in 15 minutes. Fresh IP each time, so only the
+    // Per-address signup cap is 3 an hour. Fresh IP each time, so only the
     // subject bucket can be what stops this.
-    for (let i = 0; i < 5; i++) {
-      expect(authRateLimit("login", uniq(), email)).toBe(true);
+    for (let i = 0; i < 3; i++) {
+      expect(authRateLimit("signup", uniq(), email)).toBe(true);
     }
-    expect(authRateLimit("login", uniq(), email)).toBe(false);
+    expect(authRateLimit("signup", uniq(), email)).toBe(false);
   });
 
   // The IP bucket is consumed first on purpose: an abusive client is turned
-  // away without spending the budget belonging to the address it is guessing.
+  // away without spending the budget belonging to the address it is using.
   it("spends the IP budget before the subject's", () => {
     const ip = uniq();
     const victim = `${uniq()}@example.com`;
-    for (let i = 0; i < 10; i++) authRateLimit("login", ip, `filler${i}@example.com`);
-    expect(authRateLimit("login", ip, victim)).toBe(false);
-    // The victim's own budget is untouched, so they can still sign in.
-    expect(authRateLimit("login", uniq(), victim)).toBe(true);
+    for (let i = 0; i < 5; i++) authRateLimit("signup", ip, `filler${i}@example.com`);
+    expect(authRateLimit("signup", ip, victim)).toBe(false);
+    // The victim's own budget is untouched.
+    expect(authRateLimit("signup", uniq(), victim)).toBe(true);
   });
 
   it("keys actions separately", () => {
@@ -79,5 +78,38 @@ describe("authRateLimit", () => {
     const ip = uniq();
     for (let i = 0; i < 20; i++) expect(authRateLimit("oauth-exchange", ip)).toBe(true);
     expect(authRateLimit("oauth-exchange", ip)).toBe(false);
+  });
+});
+
+describe("login limits per address", () => {
+  it("looking doesn't spend a slot", () => {
+    const key = uniq();
+    for (let i = 0; i < 10; i++) expect(rateLimitHasRoom(key, 1, 60_000)).toBe(true);
+    expect(rateLimit(key, 1, 60_000)).toBe(true);
+    expect(rateLimitHasRoom(key, 1, 60_000)).toBe(false);
+  });
+
+  it("only wrong passwords count: signing in right, any number of times, never locks the address", () => {
+    const ip = uniq();
+    const email = `${uniq()}@example.com`;
+    for (let i = 0; i < 50; i++) expect(loginAllowed(ip, email)).toBe(true);
+  });
+
+  it("five wrong passwords from one place lock that place out, not the address's owner elsewhere", () => {
+    const attacker = uniq();
+    const email = `${uniq()}@example.com`;
+    for (let i = 0; i < 5; i++) {
+      expect(loginAllowed(attacker, email)).toBe(true);
+      loginFailed(attacker, email);
+    }
+    expect(loginAllowed(attacker, email)).toBe(false);
+    // The owner, from their own connection, still gets in.
+    expect(loginAllowed(uniq(), email)).toBe(true);
+  });
+
+  it("thirty wrong passwords an hour across many places stop the guessing", () => {
+    const email = `${uniq()}@example.com`;
+    for (let i = 0; i < 30; i++) loginFailed(uniq(), email);
+    expect(loginAllowed(uniq(), email)).toBe(false);
   });
 });

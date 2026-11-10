@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { DECK_TEXT_MAX, jsonBody } from "@/lib/api";
 import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
@@ -84,11 +85,11 @@ export async function POST(req: Request) {
   if (!(await canCreateDeck(user))) {
     return NextResponse.json({ error: DECK_LIMIT_MSG, code: "deck_limit" }, { status: 403 });
   }
-  const body = await req.json();
-  const name = typeof body.name === "string" ? body.name.trim() : "";
+  const body = await jsonBody(req);
+  const name = typeof body.name === "string" ? body.name.trim().slice(0, DECK_TEXT_MAX.name) : "";
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
-  const format = typeof body.format === "string" && body.format.trim() ? body.format.trim() : "commander";
-  const commander = typeof body.commander === "string" && body.commander.trim() ? body.commander.trim() : null;
+  const format = typeof body.format === "string" && body.format.trim() ? body.format.trim().slice(0, DECK_TEXT_MAX.format) : "commander";
+  const commander = typeof body.commander === "string" && body.commander.trim() ? body.commander.trim().slice(0, DECK_TEXT_MAX.commander) : null;
   const deck = await createDeckIfRoom(user, (tx) => tx.deck.create({ data: { name, format, commander, userId: user.id, publicId: newPublicId() } }));
   if (!deck) return NextResponse.json({ error: DECK_LIMIT_MSG, code: "deck_limit" }, { status: 403 });
   await recordEvent("deck_created");

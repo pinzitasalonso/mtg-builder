@@ -1,3 +1,4 @@
+import { jsonBody } from "@/lib/api";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { normalizePlayCode, PLAY_CODE_REPORT_WINDOW_MS } from "@/lib/play-code";
@@ -33,7 +34,7 @@ export async function POST(
     return NextResponse.json({ error: "code not found" }, { status: 404 });
   }
 
-  const body = await req.json().catch(() => ({}));
+  const body = await jsonBody(req);
   const won = body.won === true;
 
   // Claim the single report slot atomically: only the request that flips

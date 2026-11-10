@@ -7,6 +7,7 @@ import {
   googleClientId,
   googleConfigured,
   newVerifier,
+  oauthStateCookie,
 } from "@/lib/google-auth";
 import { authRateLimit, clientIp } from "@/lib/ratelimit";
 
@@ -55,7 +56,7 @@ export async function GET(req: Request) {
     },
   });
 
-  return NextResponse.redirect(
+  const res = NextResponse.redirect(
     authorizeUrl({
       clientId: googleClientId(),
       redirectUri: googleCallbackUrl(origin),
@@ -65,6 +66,21 @@ export async function GET(req: Request) {
     }),
     303
   );
+  // On the web, tie the sign-in to this browser: a cookie named after the
+  // state, checked when Google sends the browser back. Without it, a link to
+  // a finished callback (someone else's code and state) would sign whoever
+  // opened it into that someone's account. The app's flow has no cookie jar
+  // of its own to tie to (it trades a one-time code instead).
+  if (mode === "web") {
+    res.cookies.set(oauthStateCookie(tokenHash(state)), "1", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/api/auth/oauth",
+      maxAge: STATE_MINUTES * 60,
+    });
+  }
+  return res;
 }
 
 /* iOS is waiting inside ASWebAuthenticationSession; the only way to end it is

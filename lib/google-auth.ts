@@ -19,6 +19,10 @@ export const GOOGLE_ISS = ["https://accounts.google.com", "accounts.google.com"]
 /* The redirect_uri, which Google compares byte for byte against the console
    entry and against the value sent at authorize time. Defined once so those
    three can't drift apart. */
+/** The cookie that ties a web sign-in to the browser that started it: named
+    after the state's digest, so two tabs signing in don't trip each other. */
+export const oauthStateCookie = (stateHash: string) => `sp_oauth_${stateHash.slice(0, 16)}`;
+
 export const googleCallbackUrl = (origin: string) => `${origin}/api/auth/oauth/google/callback`;
 
 export const googleClientId = () => process.env.GOOGLE_CLIENT_ID ?? "";

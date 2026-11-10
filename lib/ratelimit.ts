@@ -32,6 +32,29 @@ export function rateLimit(key: string, max: number, windowMs: number): boolean {
   return true;
 }
 
+/* Whether `key` has a slot left, without taking it. For limits that should
+   only be charged when something goes wrong (a wrong password). */
+export function rateLimitHasRoom(key: string, max: number, windowMs: number): boolean {
+  const now = Date.now();
+  return (buckets.get(key) ?? []).filter((t) => now - t < windowMs).length < max;
+}
+
+/* Wrong passwords for one address, charged on failure only. Two buckets:
+   per address and IP (5 in 15 minutes), so someone hammering an address
+   from one place locks out only themselves, not its owner; and per address
+   across every IP (30 an hour), which a spread-out guesser still hits.
+   Before, every attempt, right or wrong, spent the address's five: anyone
+   could keep a known address locked out with five requests a quarter hour. */
+const LOGIN_PAIR: [number, number] = [5, 15 * 60_000];
+const LOGIN_ADDRESS: [number, number] = [30, 60 * 60_000];
+export function loginAllowed(ip: string, email: string): boolean {
+  return rateLimitHasRoom(`auth:login:pair:${email}|${ip}`, ...LOGIN_PAIR) && rateLimitHasRoom(`auth:login:addr:${email}`, ...LOGIN_ADDRESS);
+}
+export function loginFailed(ip: string, email: string): void {
+  rateLimit(`auth:login:pair:${email}|${ip}`, ...LOGIN_PAIR);
+  rateLimit(`auth:login:addr:${email}`, ...LOGIN_ADDRESS);
+}
+
 /* Best-effort client IP, from the proxy's forwarded headers (Railway sets
    x-forwarded-for). Only used as a rate-limit bucket key — never for auth. */
 export function clientIp(req: Request): string {
@@ -71,7 +94,8 @@ export type AuthAction =
 // [per-IP max, per-IP window, per-subject max, per-subject window]. A subject
 // bucket of 0 means the action has no meaningful subject to key on.
 const AUTH_LIMITS: Record<AuthAction, [number, number, number, number]> = {
-  login: [10, 5 * 60_000, 5, 15 * 60_000],
+  // Per IP only here; the per-address limits are loginAllowed/loginFailed.
+  login: [10, 5 * 60_000, 0, 0],
   signup: [5, 15 * 60_000, 3, 60 * 60_000],
   resend: [5, 15 * 60_000, 3, 60 * 60_000],
   "reset-request": [5, 15 * 60_000, 3, 60 * 60_000],

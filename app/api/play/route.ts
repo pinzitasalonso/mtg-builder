@@ -1,3 +1,4 @@
+import { isCardImage, jsonBody } from "@/lib/api";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
@@ -12,16 +13,14 @@ export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "auth required" }, { status: 401 });
 
-  const body = await req.json().catch(() => ({}));
+  const body = await jsonBody(req);
   const publicId = typeof body.deckPublicId === "string" ? body.deckPublicId : "";
   // Codes record results onto the deck, so only the OWNER can mint one.
   const deck = await prisma.deck.findFirst({ where: { publicId, userId: user.id } });
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
 
-  const commanderImageUri =
-    typeof body.commanderImageUri === "string" && body.commanderImageUri.startsWith("https://")
-      ? body.commanderImageUri.slice(0, 500)
-      : null;
+  // A card image (Scryfall's): it's shown to whoever joins with the code.
+  const commanderImageUri = isCardImage(body.commanderImageUri) ? body.commanderImageUri : null;
 
   // Housekeeping: a row lives past its join expiry so the seated game can
   // still report its result — only codes past the report window are swept.
