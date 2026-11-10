@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowDownToLine, ArrowUpFromLine, Check, ExternalLink, Minus, Plus, Trash2, TriangleAlert, X } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, Check, ExternalLink, Heart, Minus, Plus, Trash2, TriangleAlert, X } from "lucide-react";
 import CardInDecks from "@/components/CardInDecks";
 import FlippableArt from "@/components/FlippableArt";
 import { ModalShell } from "@/components/deck/ui";
@@ -9,6 +9,7 @@ import { ManaCost, Pip, parseSymbols } from "@/components/mtg";
 import { fetchPrintings, type CardPrinting } from "@/lib/collection-client";
 import { idFromImageUri } from "@/lib/printing";
 import { deleteCard, moveCard, setPrinting, setQuantity, type PoolEntry } from "@/lib/pool-client";
+import { addToWishlist } from "@/lib/wishlist-client";
 
 /* A card in the deck, opened: the printing in the deck, large, with what the
    card does (cost, type, rules text), what it costs, whether you own it — and,
@@ -55,6 +56,21 @@ export default function DeckCardSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("");
+  // Adding a card you don't own to your wishlist: where it stands.
+  const [wish, setWish] = useState<"idle" | "busy" | "added" | "already">("idle");
+  useEffect(() => setWish("idle"), [card.name]);
+  async function wishFor() {
+    if (wish !== "idle") return;
+    setWish("busy");
+    // The copies the deck needs and you don't have, in this printing.
+    const r = await addToWishlist([{ name: card.name, quantity: Math.max(1, card.quantity - (owned?.quantity ?? 0)), imageUri: card.imageUri, typeLine: card.typeLine, manaCost: card.manaCost, colorIdentity: card.colorIdentity }]);
+    if (!r.ok) {
+      setWish("idle");
+      setError(r.error ?? "Couldn’t add it to your wishlist.");
+      return;
+    }
+    setWish(r.added || r.raised ? "added" : "already");
+  }
 
   useEffect(() => {
     let live = true;
@@ -136,6 +152,18 @@ export default function DeckCardSheet({
                 </Chip>
               ) : (
                 <Chip>Not in your collection</Chip>
+              )}
+              {/* Short of what the deck needs: one tap puts it on the wishlist. */}
+              {(owned?.quantity ?? 0) < card.quantity && (
+                <button
+                  type="button"
+                  onClick={wishFor}
+                  disabled={wish !== "idle"}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 10px", borderRadius: 999, border: "none", fontSize: 12.5, fontWeight: 600, cursor: wish === "idle" ? "pointer" : "default", background: wish === "idle" ? "var(--accent)" : "var(--bg3)", color: wish === "idle" ? "var(--accent-ink)" : "var(--text-muted)" }}
+                >
+                  {wish === "added" || wish === "already" ? <Check size={12} strokeWidth={3} /> : <Heart size={12} strokeWidth={2.75} />}
+                  {wish === "added" ? "On your wishlist" : wish === "already" ? "Already on your wishlist" : wish === "busy" ? "Adding…" : "Add to wishlist"}
+                </button>
               )}
               {current && (
                 <Chip>

@@ -34,7 +34,7 @@ export default function PrivacyPage() {
         the password itself). Sessions are kept with a single first-party cookie.
       </p>
       <p style={P}>
-        <b>Your content.</b>{" "}Decks, pools, notes, your collection, and win/loss records you log. Signed-out
+        <b>Your content.</b>{" "}Decks, pools, notes, your collection and wishlist, and win/loss records you log. Signed-out
         visitors on the web can build public decks, which aren&apos;t tied to an identity.
       </p>
       <p style={P}>
@@ -71,7 +71,7 @@ export default function PrivacyPage() {
 
       <h2 style={H2}>Deleting your data</h2>
       <p style={P}>
-        Deleting your account removes your email, decks, collection, records, and sessions from our
+        Deleting your account removes your email, decks, collection, wishlist, records, and sessions from our
         servers. Email <a href="mailto:pinzitasalonso@gmail.com" style={{ color: "var(--gold)" }}>pinzitasalonso@gmail.com</a>{" "}and
         we&apos;ll remove your account and its data promptly.
       </p>

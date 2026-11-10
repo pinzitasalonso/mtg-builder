@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, ChevronDown, Copy, Dices, Gauge, History, Library, Link2, LogOut, Pin, Plus, ShoppingCart, Smartphone, Sparkles, Trash2, type LucideIcon } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Copy, Dices, Gauge, Heart, History, Library, Link2, LogOut, Pin, Plus, ShoppingCart, Smartphone, Sparkles, Trash2, type LucideIcon } from "lucide-react";
 import { LANDING_FAQ, LANDING_FEATURES, landingJsonLd, type LandingFeature } from "@/lib/landing";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,6 +14,7 @@ import LandingVisual from "@/components/LandingVisual";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollection } from "@/lib/collection-client";
+import { fetchWishlistCount } from "@/lib/wishlist-client";
 import { track } from "@/lib/track";
 import { rememberAfterSignIn, takeAfterSignIn } from "@/lib/after-sign-in";
 import { getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
@@ -107,7 +108,10 @@ export default function HomePage() {
   // The server couldn't be reached: what's shown is the last saved copy.
   const [offline, setOffline] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [showCollection, setShowCollection] = useState(false);
+  // The collection screen, and which of its two lists it opens on.
+  const [showCollection, setShowCollection] = useState<false | "collection" | "wishlist">(false);
+  // How many cards are on the wishlist, for the home block's button.
+  const [wishCount, setWishCount] = useState(0);
   // The app's one assistant (components/assistant): its conversation lives on
   // the server and follows the player from page to page.
   const assistant = useAssistant();
@@ -128,6 +132,7 @@ export default function HomePage() {
       [names[i], names[j]] = [names[j], names[i]];
     }
     setCollection({ unique: c.unique, total: c.total, pending: c.pending, sample: names.slice(0, 7) });
+    setWishCount(await fetchWishlistCount());
   }
 
   async function loadAll() {
@@ -165,7 +170,10 @@ export default function HomePage() {
     if (pub) setPublicDecks(pub);
     setLoaded(true);
     if (user && reached) loadCollection();
-    else if (!user) setCollection({ unique: 0, total: 0, pending: 0, sample: [] });
+    else if (!user) {
+      setCollection({ unique: 0, total: 0, pending: 0, sample: [] });
+      setWishCount(0);
+    }
   }
 
   useEffect(() => {
@@ -386,7 +394,7 @@ export default function HomePage() {
                 </span>
                 {/* The collection sits below every deck; this is the way to it
                     without scrolling past them all. */}
-                <button onClick={() => setShowCollection(true)} className="id-ghost home-icon-btn" style={{ padding: "9px 16px" }} aria-label="Collection">
+                <button onClick={() => setShowCollection("collection")} className="id-ghost home-icon-btn" style={{ padding: "9px 16px" }} aria-label="Collection">
                   <Library size={16} strokeWidth={2.25} /> <span className="home-hide">Collection</span>
                 </button>
                 <button onClick={signOut} className="id-ghost home-icon-btn" style={{ padding: "9px 16px" }} aria-label="Sign out">
@@ -491,7 +499,7 @@ export default function HomePage() {
             </button>
           )}
           <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onPin={pinDeck} onNew={newDeck} showNew={loaded} />
-          <CollectionBlock unique={collection.unique} total={collection.total} pending={collection.pending} sample={collection.sample} onOpen={() => setShowCollection(true)} />
+          <CollectionBlock unique={collection.unique} total={collection.total} pending={collection.pending} sample={collection.sample} wishlist={wishCount} onOpen={() => setShowCollection("collection")} onWishlist={() => setShowCollection("wishlist")} />
           <div style={{ height: 64 }} />
         </div>
       )}
@@ -598,7 +606,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {showCollection && <CollectionView onClose={() => setShowCollection(false)} onChanged={loadCollection} />}
+      {showCollection && <CollectionView initialTab={showCollection} onClose={() => setShowCollection(false)} onChanged={loadCollection} onWishlistChanged={setWishCount} />}
 
       {showModal && (
         <div
@@ -804,13 +812,17 @@ function CStat({ n, label, accent }: { n: number; label: string; accent?: boolea
 }
 
 /* ---------- "Your collection" home block ---------- */
-function CollectionBlock({ unique, total, pending, sample, onOpen }: { unique: number; total: number; pending: number; sample: string[]; onOpen: () => void }) {
+function CollectionBlock({ unique, total, pending, sample, wishlist, onOpen, onWishlist }: { unique: number; total: number; pending: number; sample: string[]; wishlist: number; onOpen: () => void; onWishlist: () => void }) {
   return (
     <div style={{ marginTop: 56 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 14, paddingBottom: 20, borderBottom: "1px solid var(--line)" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 14, rowGap: 10, flexWrap: "wrap", paddingBottom: 20, borderBottom: "1px solid var(--line)" }}>
         <h2 className="id-display" style={{ margin: 0, fontSize: "clamp(24px, 4vw, 32px)", color: "var(--t1)" }}>Your collection</h2>
         <span className="id-mono" style={{ fontSize: 12.5, color: "var(--t3)" }}>{unique > 0 ? `${unique} unique · ${total} total${pending > 0 ? ` · matching ${pending}…` : ""}` : "nothing yet"}</span>
-        <button onClick={onOpen} className="id-ghost" style={{ marginLeft: "auto", padding: "9px 18px" }}>
+        {/* The cards you want and don't have: the collection's other list. */}
+        <button onClick={onWishlist} className="id-ghost" style={{ marginLeft: "auto", padding: "9px 18px" }} aria-label={`Wishlist${wishlist ? `, ${wishlist} cards` : ""}`}>
+          <Heart size={15} strokeWidth={2.25} /> Wishlist{wishlist > 0 ? <span className="id-mono" style={{ fontSize: 12.5, color: "var(--t3)" }}>{wishlist}</span> : null}
+        </button>
+        <button onClick={onOpen} className="id-ghost" style={{ padding: "9px 18px" }}>
           {unique > 0 ? "Browse" : "Import"} <ArrowRight size={15} strokeWidth={2.25} />
         </button>
       </div>
