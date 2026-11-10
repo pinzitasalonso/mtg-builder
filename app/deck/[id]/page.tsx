@@ -7,8 +7,7 @@ import Image from "next/image";
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, Copy, Crown, Dices, Download, Eye, Share2, History,
   LayoutGrid, List, ListChecks, Mountain, Plus, RefreshCw, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
-  type LucideIcon,
-} from "lucide-react";
+  type LucideIcon, PackageCheck } from "lucide-react";
 import Logo from "@/components/Logo";
 import CommanderInput from "@/components/CommanderInput";
 import SwipeModal from "@/components/SwipeModal";
@@ -24,6 +23,7 @@ import { useAssistant, useAssistantFocus, type AssistantFocus } from "@/componen
 import DeckPrimer from "@/components/deck/DeckPrimer";
 import DeckStatsPane from "@/components/deck/DeckStatsPane";
 import OrderModal from "@/components/deck/OrderModal";
+import AssembleSheet from "@/components/deck/AssembleSheet";
 import VersionsModal from "@/components/deck/VersionsModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, dangerBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamedDetailed } from "@/lib/scryfall";
@@ -349,6 +349,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
   // "Order on CardTrader" — runs in <OrderModal> while open
   const [orderOpen, setOrderOpen] = useState(false);
+  // "Assemble deck": ticking the cards off as the deck is built in cardboard.
+  const [assembleOpen, setAssembleOpen] = useState(false);
 
   // commander's color identity (resolved from Scryfall) for legality checks
   const [cmdrIdentity, setCmdrIdentity] = useState<string | null>(null);
@@ -1086,6 +1088,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       ...(canEdit ? [
                         { label: "Add lands & staples", icon: Mountain, on: () => setTool("lands") },
                         { group: "At the table" },
+                        { label: "Assemble deck", icon: PackageCheck, on: () => setAssembleOpen(true), disabled: deckCards.length === 0 },
                         { label: "Game code", icon: Ticket, on: () => setGameCodeOpen(true) },
                         { group: "Write-ups" },
                         { label: "Primer", icon: BookOpen, on: () => { setPrimerOpen(true); setPane("stats"); } },
@@ -1860,6 +1863,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
 
       {/* CardTrader order */}
       {orderOpen && <OrderModal cards={deckCards} onClose={() => setOrderOpen(false)} />}
+
+      {/* the deck in cardboard: tick the cards off, see where the rest are */}
+      {assembleOpen && <AssembleSheet deckId={deckId} cards={deckCards} owned={ownedCopies} onClose={() => setAssembleOpen(false)} />}
 
       {/* saved versions — snapshot now, compare an earlier one with the current list */}
       {versionsOpen && <VersionsModal deckId={deckId} pool={pool} canEdit={canEdit} onClose={() => setVersionsOpen(false)} onRestored={loadPool} />}

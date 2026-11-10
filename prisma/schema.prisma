@@ -53,6 +53,7 @@ model User {
   accounts     Account[]
   authCodes    AuthCode[]
   collection   CollectionCard[]
+  wishlist     WishlistCard[]
   playCodes    PlayCode[]
   assistantThreads AssistantThread[]
   practiceGames    PracticeGame[]
@@ -63,6 +64,28 @@ model User {
 // only (no Scryfall resolution) so importing a large collection stays instant;
 // ownership is matched by name. nameKey is the lowercased name for case-insensitive
 // dedupe and lookups.
+// Cards a player wants and doesn't have yet. Kept next to the collection:
+// the list shows which ones they've since got (by name, against
+// CollectionCard), and "Got it" moves a card from here into the collection.
+model WishlistCard {
+  id       Int      @id @default(autoincrement())
+  userId   Int
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name     String
+  nameKey  String
+  // Copies wanted.
+  quantity Int      @default(1)
+  // Resolved against Scryfall when it's added (the image is a printing, so
+  // it carries the price), so the list shows and filters without lookups.
+  imageUri      String?
+  typeLine      String?
+  manaCost      String?
+  colorIdentity String?
+  addedAt  DateTime @default(now())
+
+  @@unique([userId, nameKey])
+}
+
 model CollectionCard {
   id       Int    @id @default(autoincrement())
   userId   Int
@@ -267,6 +290,8 @@ model PoolCard {
   // card follows their collection: it shows the printing they own, switched
   // automatically when the deck is opened (lib/owned-printings).
   printingPinned Boolean @default(false)
+  // "Assemble deck": the physical card has been pulled and put in the deck.
+  assembled     Boolean @default(false)
   addedAt       DateTime @default(now())
 
   @@unique([deckId, scryfallId])

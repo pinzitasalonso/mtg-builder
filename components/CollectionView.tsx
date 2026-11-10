@@ -15,6 +15,8 @@ import {
 } from "@/lib/collection-client";
 import { parseCollectionText } from "@/lib/collection-csv";
 import CollectionCardModal from "@/components/CollectionCardModal";
+import WishlistPanel from "@/components/WishlistPanel";
+import { fetchWishlistCount } from "@/lib/wishlist-client";
 import type { CardPrinting } from "@/lib/collection-client";
 import { categoryOf, manaValue, TYPE_ORDER } from "@/components/mtg";
 
@@ -55,7 +57,22 @@ interface Preview {
    server-resolved Scryfall metadata (color/type/mana value) so the filters work
    on the whole collection; while the server is still resolving newer cards the
    `pending` count drives a short poll. */
-export default function CollectionView({ onClose, onChanged }: { onClose: () => void; onChanged?: () => void }) {
+export default function CollectionView({
+  onClose,
+  onChanged,
+  initialTab = "collection",
+  onWishlistChanged,
+}: {
+  onClose: () => void;
+  onChanged?: () => void;
+  /** Open on the wishlist (the cards you want and don't have). */
+  initialTab?: "collection" | "wishlist";
+  /** The wishlist's size changed. */
+  onWishlistChanged?: (unique: number) => void;
+}) {
+  const [tab, setTab] = useState<"collection" | "wishlist">(initialTab);
+  // The wishlist's size, for its tab; null until it has loaded once.
+  const [wishCount, setWishCount] = useState<number | null>(null);
   const [collection, setCollection] = useState<Collection>(EMPTY_COLLECTION);
   // Server is still resolving metadata for some cards; filters fill in as it does.
   const indexing = collection.pending > 0;
@@ -105,6 +122,7 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
   }
   useEffect(() => {
     load();
+    fetchWishlistCount().then((n) => setWishCount((c) => c ?? n));
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -303,23 +321,69 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
           while cards resolve, which used to run under the buttons). */}
       <div style={{ padding: "14px clamp(16px, 4vw, 22px) 12px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <h1 style={{ margin: 0, minWidth: 0, fontFamily: "var(--font-display)", fontSize: "clamp(19px, 6vw, 24px)", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".02em", color: "var(--text)" }}>
-            Collection
-          </h1>
+          {/* Two lists, one screen: what you have, and what you want. */}
+          <div role="tablist" aria-label="Collection or wishlist" style={{ display: "flex", alignItems: "baseline", gap: "clamp(12px, 3vw, 22px)", minWidth: 0 }}>
+            {(["collection", "wishlist"] as const).map((t) => (
+              <button
+                key={t}
+                role="tab"
+                aria-selected={tab === t}
+                onClick={() => setTab(t)}
+                style={{
+                  margin: 0,
+                  padding: "0 0 3px",
+                  border: "none",
+                  borderBottom: `2px solid ${tab === t ? "var(--accent)" : "transparent"}`,
+                  background: "none",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-display)",
+                  fontSize: "clamp(17px, 5vw, 24px)",
+                  fontWeight: 800,
+                  textTransform: "uppercase",
+                  letterSpacing: ".02em",
+                  color: tab === t ? "var(--text)" : "var(--text-dim)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {t === "collection" ? "Collection" : "Wishlist"}
+                {t === "wishlist" && wishCount ? <span style={{ marginLeft: 6, fontSize: "0.6em", color: "var(--text-muted)" }}>{wishCount}</span> : null}
+              </button>
+            ))}
+          </div>
           <div style={{ display: "flex", gap: 8, flex: "none" }}>
-            <button onClick={() => setImportOpen((v) => !v)} className="mn-btn coll-head-btn" style={{ padding: "9px 18px", fontSize: 14 }}>
-              Import
-            </button>
+            {tab === "collection" && (
+              <button onClick={() => setImportOpen((v) => !v)} className="mn-btn coll-head-btn" style={{ padding: "9px 18px", fontSize: 14 }}>
+                Import
+              </button>
+            )}
             <button onClick={onClose} aria-label="Close collection" className="mn-ghost coll-close" style={{ padding: "9px 16px", fontSize: 14 }}>
               <X size={15} strokeWidth={2.5} /> <span className="coll-close-label">Close</span>
             </button>
           </div>
         </div>
-        <div className="mn-label" style={{ marginTop: 4, color: "var(--text-muted)" }}>
-          {collection.unique > 0 ? `${collection.unique} unique · ${collection.total} total` : loaded ? "empty" : "loading…"}
-          {indexing ? ` · indexing ${collection.pending} left…` : ""}
-        </div>
+        {tab === "collection" && (
+          <div className="mn-label" style={{ marginTop: 4, color: "var(--text-muted)" }}>
+            {collection.unique > 0 ? `${collection.unique} unique · ${collection.total} total` : loaded ? "empty" : "loading…"}
+            {indexing ? ` · indexing ${collection.pending} left…` : ""}
+          </div>
+        )}
       </div>
+
+      {tab === "wishlist" && (
+        <WishlistPanel
+          onChanged={(n) => {
+            setWishCount(n);
+            onWishlistChanged?.(n);
+          }}
+          onCollectionChanged={() => {
+            // "Got it" moved a card into the collection.
+            load();
+            onChanged?.();
+          }}
+        />
+      )}
+      {tab === "collection" && (
+      <>
 
       {/* import panel */}
       {importOpen && (
@@ -496,6 +560,9 @@ export default function CollectionView({ onClose, onChanged }: { onClose: () => 
           </>
         )}
       </div>
+
+      </>
+      )}
 
       {preview && <CardPreview preview={preview} />}
       {detailCard && (
