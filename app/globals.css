@@ -2070,6 +2070,145 @@ button {
     margin-top: 5px;
   }
 }
+/* ── The practice table: whose turn and where in it, life by each side ──── */
+.pt-phase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pt-phase-who {
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: #fdf26f;
+}
+.pt-phase[data-seat="opp"] .pt-phase-who {
+  color: #ff9c86;
+}
+/* The steps show where there's room for them (a wide screen). */
+.pt-phase-steps {
+  display: none;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.pt-phase-steps span {
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.42);
+  white-space: nowrap;
+}
+.pt-phase-steps span[data-on] {
+  background: #fdf26f;
+  color: #181228;
+}
+.pt-phase[data-seat="opp"] .pt-phase-steps span[data-on] {
+  background: #ff9c86;
+}
+.pt-top-life {
+  display: contents;
+}
+.pt-side-life {
+  display: none;
+}
+@media (min-width: 1100px) {
+  .pt-phase-steps {
+    display: flex;
+  }
+}
+/* A phone, upright or sideways: the turn's number is enough in the bar. */
+@media (max-width: 760px), (orientation: landscape) and (max-height: 500px) and (pointer: coarse) {
+  .pt-phase-who {
+    display: none;
+  }
+}
+
+/* With a mouse and room for the piles column (not a phone, not a tablet):
+   each side's life sits under its name, large, and leaves the top bar; and
+   the hand is a strip of card tops along the foot, so the board has the
+   room. A card rises whole when the mouse is on it, and a crowded hand
+   overlaps to fit. The mulligan, and a choice from your hand, show it whole
+   as before ([data-up]). */
+@media (min-width: 761px) and (hover: hover) and (pointer: fine) {
+  .pt-vs .pt-top-life {
+    display: none;
+  }
+  .pt-vs .pt-side-life {
+    display: flex;
+    margin: 3px 0 2px -4px;
+  }
+  .pt-vs .pt-side-life .pt-life {
+    padding: 2px 3px;
+    gap: 2px;
+    background: none;
+  }
+  .pt-vs .pt-side-life .pt-life-label {
+    display: none;
+  }
+  .pt-vs .pt-side-life .pt-life-value {
+    min-width: 42px;
+    font-size: 26px;
+    line-height: 1;
+    color: #fff;
+  }
+  .pt-vs .pt-side-life .pt-life button {
+    min-width: 24px;
+    height: 24px;
+    padding: 0 5px;
+    font-size: 11px;
+  }
+  .pt-vs .pt-zones-title {
+    max-width: none;
+  }
+
+  .pt-vs .pt-hand:not([data-up]) {
+    /* How far a card rises: about half its height. */
+    --pt-lift: calc(var(--pt-hand) * 0.72);
+    position: relative;
+    z-index: 6;
+    align-items: flex-start;
+    gap: 0;
+    min-height: 0;
+    /* The box is the rise plus a whole card. It overlaps the board by the
+       rise (nothing there takes the mouse but the cards), and hangs off the
+       foot of the screen by the same, so what shows is the cards' top half. */
+    height: calc(var(--pt-hand) * 1.4 + var(--pt-lift) + 10px);
+    margin-top: calc(var(--pt-lift) * -1);
+    margin-bottom: calc(var(--pt-lift) * -1);
+    padding: calc(var(--pt-lift) + 10px) 16px 0;
+    border-top: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    pointer-events: none;
+  }
+  .pt-vs .pt-hand:not([data-up])::-webkit-scrollbar {
+    display: none;
+  }
+  .pt-vs .pt-hand:not([data-up]) .pt-card {
+    pointer-events: auto;
+    /* Side by side while they fit; closer, then overlapping, as the hand grows. */
+    margin-left: clamp(calc(var(--pt-hand) * -0.55), calc((100% - var(--pt-n) * var(--pt-hand)) / max(calc(var(--pt-n) - 1), 1)), 10px);
+    transition: transform 0.14s ease;
+  }
+  .pt-vs .pt-hand:not([data-up]) .pt-card:first-child {
+    margin-left: 0;
+  }
+  .pt-vs .pt-hand:not([data-up]) .pt-card:hover,
+  .pt-vs .pt-hand:not([data-up]) .pt-card:focus-within {
+    transform: translateY(calc(var(--pt-lift) * -1));
+    z-index: 3;
+  }
+  /* The line the hand used to draw above itself. */
+  .pt-vs .pt-main {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+}
+
 /* The AI's review of a finished game. */
 .pt-review {
   max-width: 640px;

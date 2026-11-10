@@ -79,6 +79,10 @@ type Mode = "pick" | "loading" | "mulligan" | "main" | "attack" | "combat" | "ai
 type Answer = { kind: "resolve" | "counter"; g: PracticeGame };
 type Step = (g: PracticeGame) => PracticeGame;
 
+type Phase = "main" | "combat" | "main2" | "end";
+const PHASES: Phase[] = ["main", "combat", "main2", "end"];
+const PHASE_LABEL: Record<Phase, string> = { main: "Main", combat: "Combat", main2: "Main 2", end: "End" };
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // The pause between the opponent's moves, so you can follow them.
 const BEAT = 700;
@@ -146,6 +150,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   // This deck's finished games against the AI, once this one is counted.
   const [record, setRecord] = useState<{ won: number; lost: number } | null>(null);
   const reported = useRef<string | null>(null);
+  // Whether this turn's combat is behind it, for the phase strip.
+  const [fought, setFought] = useState(false);
   // The AI's review of the finished game.
   const [review, setReview] = useState<{ open: boolean; busy: boolean; text: string; error: string } | null>(null);
   const afterCombatPlan = useRef<PlanAction[]>([]);
@@ -163,6 +169,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   useEffect(() => {
     if (game?.winner) setMode("over");
   }, [game?.winner]);
+
+  // A new turn starts before its combat.
+  const turnNow = game?.turn ?? 0;
+  useEffect(() => setFought(false), [turnNow]);
 
   // A game in progress for this deck, from an earlier visit.
   useEffect(() => setSaved(loadSaved<Setup>(deckId)), [deckId]);
@@ -576,6 +586,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
 
   async function afterCombat(g0: PracticeGame, actions0: PlanAction[]) {
     if (!setup) return;
+    setFought(true);
     let g = g0;
     // What Silas Renn let it cast from its graveyard comes first.
     const actions = [...aiGraveyardCasts(g, setup.book), ...actions0];
@@ -652,6 +663,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!alive.current) return;
     g = resolveCombat(g, setup.book);
     setGame(g);
+    setFought(true);
     setMode(g.winner ? "over" : "main");
   }
 
@@ -883,6 +895,19 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
 
   // ── Screens ───────────────────────────────────────────────────────────
 
+  // The step of the turn, for the strip in the bar: your mulligan has none.
+  const phaseStep: Phase | null =
+    !game || mode === "mulligan" || mode === "over" || mode === "pick" || mode === "loading"
+      ? null
+      : pending?.kind === "end"
+        ? "end"
+        : mode === "attack" || mode === "combat" || mode === "block" || mode === "ninjutsu"
+          ? "combat"
+          : fought
+            ? "main2"
+            : "main";
+  const phaseWho = !game ? "" : mode === "mulligan" ? "Mulligan" : game.active === "you" ? "Your turn" : "Opponent’s turn";
+
   const header = (
     <header className="pt-top">
       <div className="pt-title">
@@ -894,9 +919,25 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       <div className="pt-top-right">
         {game && (
           <>
-            <span className="pt-turn">Turn {game.turn}</span>
-            <LifeCounter label="Opp" value={game.sides.opp.life} onDelta={(d) => act((g) => adjustLife(g, "opp", d, book))} />
-            <LifeCounter label="You" value={game.sides.you.life} onDelta={(d) => act((g) => adjustLife(g, "you", d, book))} />
+            {/* Whose turn, and where in it. */}
+            <div className="pt-phase" data-seat={game.active} role="status" aria-label={`Turn ${game.turn}, ${phaseWho}${phaseStep ? `, ${PHASE_LABEL[phaseStep]}` : ""}`}>
+              <span className="pt-turn">Turn {game.turn}</span>
+              {mode !== "over" && <span className="pt-phase-who">{phaseWho}</span>}
+              {phaseStep && (
+                <span className="pt-phase-steps" aria-hidden="true">
+                  {PHASES.map((p) => (
+                    <span key={p} data-on={p === phaseStep || undefined}>
+                      {PHASE_LABEL[p]}
+                    </span>
+                  ))}
+                </span>
+              )}
+            </div>
+            {/* Life: here on a phone, beside each side's name where the piles column shows. */}
+            <span className="pt-top-life">
+              <LifeCounter label="Opp" value={game.sides.opp.life} onDelta={(d) => act((g) => adjustLife(g, "opp", d, book))} />
+              <LifeCounter label="You" value={game.sides.you.life} onDelta={(d) => act((g) => adjustLife(g, "you", d, book))} />
+            </span>
           </>
         )}
         <button type="button" className="pt-btn pt-wide-only" onClick={onSolo}>
@@ -1227,6 +1268,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               {/* The opponent's piles and commander, then yours, as each side of the table. */}
               <div className="pt-zones-title pt-zones-title-opp">
                 <b>{setup.opp.label}</b>
+                <div className="pt-side-life">
+                  <LifeCounter label="Opp" value={opp.life} onDelta={(d) => act((g) => adjustLife(g, "opp", d, book))} />
+                </div>
                 <span>
                   Hand {opp.hand.length} · Library {opp.library.length}
                   {opp.exile.length > 0 && (
@@ -1244,6 +1288,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               {commandPile("opp")}
               <div className="pt-zones-title">
                 <b>You</b>
+                <div className="pt-side-life">
+                  <LifeCounter label="You" value={you.life} onDelta={(d) => act((g) => adjustLife(g, "you", d, book))} />
+                </div>
                 {game.commanderGame && <span>Cmdr → opp {game.cmdDamage.opp}</span>}
               </div>
               <div className="pt-zone">
@@ -1344,7 +1391,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
 
           </div>
 
-          <footer className="pt-hand" style={{ ["--pt-hand" as string]: "var(--pt-hand-max)" }} data-up={handUp || mode === "mulligan" ? "true" : undefined}>
+          <footer className="pt-hand" style={{ ["--pt-hand" as string]: "var(--pt-hand-max)", ["--pt-n" as string]: Math.max(1, you.hand.length) }} data-up={handUp || mode === "mulligan" ? "true" : undefined}>
             {mode !== "mulligan" && <HandToggle up={handUp} count={you.hand.length} onToggle={setHandUp} />}
             <div className="pt-hand-cards">
               {you.hand.length === 0 ? <div className="pt-empty">No cards in hand.</div> : you.hand.map((c) => <PtCard key={c.iid} {...cardProps("you")(c, "hand")} />)}

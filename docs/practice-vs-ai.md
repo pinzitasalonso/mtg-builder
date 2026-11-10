@@ -325,6 +325,15 @@ side does.
    ("the AI took too long", "AI error 529", "no answer in time"), so a
    player can report it.
 
+   **With a mouse** (a computer: not a phone, not a tablet) the table is
+   laid out for the board. The hand is a strip of card tops along the foot:
+   a card rises whole when the mouse is on it, and a crowded hand overlaps
+   to fit (`.pt-hand:not([data-up])` in `globals.css`; the mulligan, and a
+   choice from your hand, show it whole). Each side's life sits under its
+   name in the piles column, large, instead of in the top bar. The bar says
+   whose turn it is and where in it: Main, Combat, Main 2, End
+   (`phaseStep` in the table).
+
    **Phones play it sideways**, like the solo table (the `.pt-table`
    landscape block in `app/globals.css`). One bar on top; each side is one
    row of cards that scrolls sideways, with its counts in a column to its
