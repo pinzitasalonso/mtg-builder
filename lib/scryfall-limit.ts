@@ -70,10 +70,16 @@ export async function scryfallTurn(url: string): Promise<boolean> {
   return Date.now() >= state.closedUntil;
 }
 
+const SCRYFALL_TIMEOUT_MS = 15_000;
+
 /** fetch(), for api.scryfall.com, within its rate limits. */
 export async function scryfallFetch(url: string, init?: RequestInit): Promise<Response> {
   if (!(await scryfallTurn(url))) return closedResponse();
-  const res = await fetch(url, init);
+  // A Scryfall that accepts the connection and then stalls would hold the
+  // caller for minutes (Node waits 300s for headers): give up after 15s,
+  // unless the caller brought its own signal. (Browsers and Node both have
+  // AbortSignal.timeout.)
+  const res = await fetch(url, { ...init, signal: init?.signal ?? AbortSignal.timeout(SCRYFALL_TIMEOUT_MS) });
   if (res.status === 429) {
     const after = Number(res.headers.get("Retry-After"));
     const ms = Math.max(LOCKOUT_MS, Number.isFinite(after) ? after * 1000 : 0);

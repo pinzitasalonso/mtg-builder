@@ -33,7 +33,7 @@ export interface Run {
 }
 
 // On globalThis so a dev-server module reload doesn't orphan running answers.
-const g = globalThis as unknown as { __spAssistantRuns?: Map<number, Run> };
+const g = globalThis as unknown as { __spAssistantRuns?: Map<number, Run>; __spAssistantStarting?: Set<number> };
 const runs: Map<number, Run> = (g.__spAssistantRuns ??= new Map());
 
 export function getRun(messageId: number): Run | undefined {
@@ -43,6 +43,22 @@ export function getRun(messageId: number): Run | undefined {
 export function runningForUser(userId: number): Run | undefined {
   for (const r of runs.values()) if (r.userId === userId && r.status === "running") return r;
   return undefined;
+}
+
+// Users whose question has been accepted but whose run hasn't started yet:
+// the route does several awaits in between (the meter, the thread, two
+// rows), and a double tap or a second tab got through in that gap, costing
+// two asks and writing two answers into one thread.
+const starting: Set<number> = (g.__spAssistantStarting ??= new Set());
+/** Take the user's one slot. False when an answer is running or starting. */
+export function reserveRun(userId: number): boolean {
+  if (starting.has(userId) || runningForUser(userId)) return false;
+  starting.add(userId);
+  return true;
+}
+/** Give the slot back: the run has started (it holds it now), or never will. */
+export function releaseRun(userId: number): void {
+  starting.delete(userId);
 }
 
 // Model passes per question: pause_turn resumes plus rounds of tool calls.
@@ -218,6 +234,9 @@ export function startRun(opts: {
         // and hand the results back for the next pass.
         const results: Anthropic.ToolResultBlockParam[] = [];
         for (const use of final.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use")) {
+          // Stop means stop: the tools the model had lined up (deck edits
+          // among them) don't run after it.
+          if (stopped) break;
           const out = await runAssistantTool(user, use.name, use.input);
           if (out.note) append(`\n\n**${out.note}**\n\n`);
           if (out.changed) {
@@ -226,6 +245,7 @@ export function startRun(opts: {
           }
           results.push({ type: "tool_result", tool_use_id: use.id, content: out.result, is_error: out.isError || undefined });
         }
+        if (stopped) break;
         convo.push({ role: "assistant", content: final.content });
         convo.push({ role: "user", content: results });
       }

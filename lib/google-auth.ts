@@ -102,6 +102,7 @@ export interface ExchangeInput {
 export async function exchangeCode(input: ExchangeInput): Promise<GoogleIdentity | null> {
   const res = await fetch(TOKEN_URL, {
     method: "POST",
+    signal: AbortSignal.timeout(10_000),
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code: input.code,

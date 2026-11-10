@@ -29,6 +29,8 @@ async function send({ to, subject, text, html }: Message): Promise<void> {
   }
   const res = await fetch(RESEND_URL, {
     method: "POST",
+    // A slow Resend mustn't hold a sign-up or a reset request open for minutes.
+    signal: AbortSignal.timeout(10_000),
     headers: {
       Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
       "Content-Type": "application/json",

@@ -13,7 +13,7 @@ import { forgetOfflineData, forgetSession, offlineSession, rememberSession } fro
 import LandingVisual from "@/components/LandingVisual";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
-import { fetchCollection } from "@/lib/collection-client";
+import { fetchCollectionSummary } from "@/lib/collection-client";
 import { fetchWishlistCount } from "@/lib/wishlist-client";
 import { track } from "@/lib/track";
 import { rememberAfterSignIn, takeAfterSignIn } from "@/lib/after-sign-in";
@@ -76,11 +76,16 @@ const FEATURES: { n: string; t: string; d: string; v: "prompt" | "swipe" | "curv
   { v: "curve", n: "03", t: "Brew to 100", d: "Watch your curve, color identity, and type balance update live. Export to your deck builder the moment it's legal." },
 ];
 
+/** A card the home block shows: its name and its stored scan. (An older
+    cached copy holds bare names.) */
+type CollectionSample = { name: string; imageUri: string | null };
+const asSample = (s: CollectionSample | string): CollectionSample => (typeof s === "string" ? { name: s, imageUri: null } : s);
+
 interface HomeCache {
   me: Me | null;
   decks: Deck[];
   publicDecks: Deck[];
-  collection: { unique: number; total: number; pending: number; sample: string[] };
+  collection: { unique: number; total: number; pending: number; sample: CollectionSample[] };
 }
 
 export default function HomePage() {
@@ -124,14 +129,12 @@ export default function HomePage() {
   const [creating, setCreating] = useState(false);
 
   async function loadCollection() {
-    const c = await fetchCollection();
-    // Randomize which cards headline the home block so it feels fresh each visit.
-    const names = c.cards.map((x) => x.name);
-    for (let i = names.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [names[i], names[j]] = [names[j], names[i]];
-    }
-    setCollection({ unique: c.unique, total: c.total, pending: c.pending, sample: names.slice(0, 7) });
+    // The counts and a few cards, not the whole collection: this runs on
+    // every visit, and after every change made in the collection screen.
+    const c = await fetchCollectionSummary();
+    // A failed request keeps what's shown: "nothing yet" for a collection of
+    // thousands was worse than a stale count.
+    if (c) setCollection({ unique: c.unique, total: c.total, pending: c.pending, sample: c.sample });
     setWishCount(await fetchWishlistCount());
   }
 
@@ -812,7 +815,7 @@ function CStat({ n, label, accent }: { n: number; label: string; accent?: boolea
 }
 
 /* ---------- "Your collection" home block ---------- */
-function CollectionBlock({ unique, total, pending, sample, wishlist, onOpen, onWishlist }: { unique: number; total: number; pending: number; sample: string[]; wishlist: number; onOpen: () => void; onWishlist: () => void }) {
+function CollectionBlock({ unique, total, pending, sample, wishlist, onOpen, onWishlist }: { unique: number; total: number; pending: number; sample: CollectionSample[]; wishlist: number; onOpen: () => void; onWishlist: () => void }) {
   return (
     <div style={{ marginTop: 56 }}>
       <div style={{ display: "flex", alignItems: "baseline", gap: 14, rowGap: 10, flexWrap: "wrap", paddingBottom: 20, borderBottom: "1px solid var(--line)" }}>
@@ -833,9 +836,10 @@ function CollectionBlock({ unique, total, pending, sample, wishlist, onOpen, onW
           className="coll-sample"
           style={{ marginTop: 20, padding: 0, border: "none", background: "transparent", cursor: "pointer", width: "100%" }}
         >
-          {sample.map((name) => (
-            <div key={name} style={{ minWidth: 0, borderRadius: 10, overflow: "hidden", boxShadow: "0 6px 16px -8px rgba(0,0,0,.5)" }}>
-              <CardArt name={name} colors={["C"]} version="normal" radius={10} style={{ aspectRatio: "5 / 7" }} />
+          {/* The stored scans, from the image CDN: not seven lookups by name. */}
+          {sample.map(asSample).map((s) => (
+            <div key={s.name} style={{ minWidth: 0, borderRadius: 10, overflow: "hidden", boxShadow: "0 6px 16px -8px rgba(0,0,0,.5)" }}>
+              <CardArt name={s.name} src={s.imageUri ?? undefined} prefer="src" colors={["C"]} version="normal" radius={10} style={{ aspectRatio: "5 / 7" }} />
             </div>
           ))}
         </button>

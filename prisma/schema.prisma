@@ -166,6 +166,8 @@ model AuthCode {
   createdAt  DateTime @default(now())
   expiresAt  DateTime
   consumedAt DateTime?
+
+  @@index([userId])
 }
 
 model Deck {
@@ -212,6 +214,9 @@ model Deck {
   assistantMessages AssistantMessage[]
   playCodes PlayCode[]
   games     GameLog[]
+
+  // The owner's decks: the home list, the plan's deck limit, the assistant.
+  @@index([userId])
 }
 
 // One played game against one deck. `Deck.gamesPlayed` / `gamesWon` is the
@@ -265,6 +270,11 @@ model PlayCode {
   // Set the first time a result is reported for this code, so a game records
   // exactly once — a code can't be replayed to inflate the deck's record.
   reportedAt        DateTime?
+
+  // Deleting a deck or a user looks its codes up; minting sweeps old ones by age.
+  @@index([deckId])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model PoolCard {
@@ -346,6 +356,9 @@ model AssistantMessage {
   createdAt DateTime        @default(now())
 
   @@index([threadId])
+
+  // Deleting a deck clears it from the messages that were about it.
+  @@index([deckId])
 }
 
 // A practice game against the AI (docs/practice-vs-ai.md). Started games are

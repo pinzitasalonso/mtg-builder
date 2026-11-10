@@ -25,7 +25,7 @@ describe("planEnrichment", () => {
     const full = "Delver of Secrets // Insectile Aberration";
     const ops = planEnrichment([row(5, "Delver of Secrets", 2)], new Map([[5, card(full)]]), new Set(), [{ id: 9, nameKey: full.toLowerCase(), quantity: 3 }]);
     expect(ops).toEqual([
-      { kind: "quantity", id: 9, quantity: 5 },
+      { kind: "add", id: 9, add: 2 },
       { kind: "delete", id: 5 },
     ]);
   });
@@ -39,7 +39,7 @@ describe("planEnrichment", () => {
       []
     );
     expect(ops.filter((o) => o.kind !== "update")).toEqual([
-      { kind: "quantity", id: 7, quantity: 3 },
+      { kind: "add", id: 7, add: 1 },
       { kind: "delete", id: 6 },
     ]);
   });

@@ -472,7 +472,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
     void loadDeck();
     loadPool();
     // Null when it couldn't be fetched (offline): keep the names we have.
-    tryFetchCollection().then((c) => {
+    tryFetchCollection({ prices: false }).then((c) => {
       if (!c) return;
       setOwnedNames(c.cards.map((card) => card.name));
       setOwnedCopies(new Map(c.cards.map((card) => [card.name.toLowerCase(), { quantity: card.quantity, imageUri: card.imageUri ?? null }])));

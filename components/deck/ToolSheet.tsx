@@ -95,7 +95,7 @@ export default function ToolSheet({
   useEffect(() => {
     if (tool !== "export") return;
     // null when signed out or offline: the setting then isn't offered.
-    void tryFetchCollection().then((c) => setOwned(c && c.cards.length ? c.cards.map((x) => ({ name: x.name, quantity: x.quantity })) : null));
+    void tryFetchCollection({ prices: false }).then((c) => setOwned(c && c.cards.length ? c.cards.map((x) => ({ name: x.name, quantity: x.quantity })) : null));
   }, [tool]);
   const leaveOut = (rows: PoolEntry[]) => (skipOwned && owned ? withoutOwned(rows, owned) : rows);
   const deckRows = leaveOut(pool.filter((c) => c.board === "deck"));

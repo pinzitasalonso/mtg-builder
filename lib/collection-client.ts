@@ -23,19 +23,39 @@ export interface Collection {
   // The server's matching job: running, or paused after Scryfall stopped
   // answering (it restarts on its own after a cool-down).
   indexing?: { running: boolean; paused: boolean };
+  // Some prices are still being fetched on the server (a big collection
+  // after a deploy): ask again in a while to get them.
+  pricing?: boolean;
+}
+
+/** The counts and a few cards to show (the home page): GET ?summary=1. */
+export interface CollectionSummary {
+  unique: number;
+  total: number;
+  pending: number;
+  sample: { name: string; imageUri: string | null }[];
 }
 
 export const EMPTY_COLLECTION: Collection = { cards: [], unique: 0, total: 0, pending: 0 };
 
-export async function fetchCollection(): Promise<Collection> {
-  return (await tryFetchCollection()) ?? EMPTY_COLLECTION;
+/** Null when the request failed: keep what's on screen. */
+export async function fetchCollectionSummary(): Promise<CollectionSummary | null> {
+  try {
+    const res = await fetch("/api/collection?summary=1", { cache: "no-store" });
+    if (!res.ok) return null;
+    const d = (await res.json()) as Partial<CollectionSummary>;
+    return { unique: d.unique ?? 0, total: d.total ?? 0, pending: d.pending ?? 0, sample: Array.isArray(d.sample) ? d.sample : [] };
+  } catch {
+    return null;
+  }
 }
 
 // Null when the request failed, so a caller showing a collection can keep it
-// rather than blank the screen over one dropped request.
-export async function tryFetchCollection(): Promise<Collection | null> {
+// rather than blank the screen over one dropped request. `prices: false`
+// leaves the prices out, for pages that only need what you own (a deck).
+export async function tryFetchCollection(opts: { prices?: boolean } = {}): Promise<Collection | null> {
   try {
-    const res = await fetch("/api/collection");
+    const res = await fetch(opts.prices === false ? "/api/collection?prices=0" : "/api/collection");
     if (!res.ok) return null;
     return (await res.json()) as Collection;
   } catch {

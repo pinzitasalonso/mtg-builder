@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { AI_LIMIT_MSG } from "@/lib/limits";
 import { consumeAi } from "@/lib/limits-db";
-import { INTERRUPTED_NOTE, getRun, runningForUser, startRun } from "@/lib/assistant-runner";
+import { INTERRUPTED_NOTE, getRun, releaseRun, reserveRun, runningForUser, startRun } from "@/lib/assistant-runner";
 
 export const runtime = "nodejs";
 
@@ -68,9 +68,12 @@ export async function POST(req: Request) {
   const content = typeof body?.content === "string" ? body.content.trim().slice(0, MAX_MESSAGE_CHARS) : "";
   if (!content) return NextResponse.json({ error: "Say something first." }, { status: 400 });
   // One answer at a time: the next question waits for it, or for Stop.
-  if (runningForUser(user.id)) {
+  // The slot is taken here, before anything is awaited, and held by the run
+  // from startRun on.
+  if (!reserveRun(user.id)) {
     return NextResponse.json({ error: "Still answering — wait for it or press Stop." }, { status: 409 });
   }
+  try {
   const focus =
     typeof body?.deckId === "string"
       ? await prisma.deck.findFirst({ where: { publicId: body.deckId, userId: user.id }, select: { id: true } })
@@ -91,6 +94,9 @@ export async function POST(req: Request) {
   });
   startRun({ user, threadId: thread.id, messageId: reply.id, focusDeckId: focus?.id ?? null, latestUser: content });
   return NextResponse.json({ user: shape(asked), assistant: shape(reply) });
+  } finally {
+    releaseRun(user.id);
+  }
 }
 
 export async function DELETE() {

@@ -42,6 +42,8 @@ export async function isProOnRevenueCat(
   try {
     const res = await fetch(`${RC_API}/subscribers/${encodeURIComponent(appUserId)}`, {
       headers: { Authorization: `Bearer ${secretKey}`, Accept: "application/json" },
+      // A stalled RevenueCat is "indeterminate" (the catch below), not a hang.
+      signal: AbortSignal.timeout(10_000),
     });
     // 404 = RevenueCat has never seen this user: definitively not entitled.
     // Anything else non-2xx (401/403 bad key, 5xx outage) is indeterminate.
