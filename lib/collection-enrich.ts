@@ -32,7 +32,11 @@ export interface CardMeta {
 
 export type EnrichOp =
   | { kind: "update"; id: number; data: Partial<CardMeta> & { nameKey?: string; enriched: true } }
-  | { kind: "quantity"; id: number; quantity: number }
+  // Copies folded into another row: added to whatever it holds when the
+  // plan is applied (an increment), not written as a total worked out from
+  // the snapshot the plan was made from. A pass takes seconds; a quantity
+  // the player changed meanwhile would be overwritten by a total.
+  | { kind: "add"; id: number; add: number }
   | { kind: "delete"; id: number };
 
 /**
@@ -76,7 +80,7 @@ export function planEnrichment(
     if (h && h.id !== r.id) {
       // Another row already is this card: fold this one into it.
       h.quantity += r.quantity;
-      ops.push({ kind: "quantity", id: h.id, quantity: h.quantity });
+      ops.push({ kind: "add", id: h.id, add: r.quantity });
       ops.push({ kind: "delete", id: r.id });
       continue;
     }

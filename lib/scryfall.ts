@@ -163,7 +163,7 @@ export async function lookupCollection(names: string[]): Promise<CollectionLooku
       const card = toOutCard(c);
       // The same response has the card's facts (stats, keywords, mana): keep
       // them, so cardFactsByIds on these cards asks Scryfall nothing more.
-      factsCache.set(c.id, { at: Date.now(), facts: toCardFacts(c) });
+      rememberFacts(c.id, { at: Date.now(), facts: toCardFacts(c) });
       const keys = asked.length === cards.length ? [normalizeCardKey(asked[i]!), ...nameKeys(c.name)] : nameKeys(c.name);
       for (const k of keys) if (!found.has(k)) found.set(k, card);
     });
@@ -281,21 +281,45 @@ export async function resolveNamed(name: string): Promise<OutCard | null> {
 
 export { NAMED_GAP_MS };
 
-// Market price (USD) for a single card by Scryfall id, memoized for the page's
-// lifetime so the swipe review doesn't refetch the same card. Returns the raw
-// price string (e.g. "1.23") or null when Scryfall has no USD price.
-const usdPriceCache = new Map<string, string | null>();
+// Market prices (USD) by Scryfall id. Kept a day: prices move, and a card with
+// no price yet (a new printing) gets one. Capped, oldest out first, so pricing
+// big collections can't grow it without end. Lost on a deploy, like every
+// in-memory cache here.
+const PRICE_TTL_MS = 24 * 60 * 60_000;
+const PRICE_CACHE_MAX = 60_000;
+const usdPriceCache = new Map<string, { at: number; usd: string | null }>();
+function cachedPrice(id: string): { usd: string | null } | undefined {
+  const hit = usdPriceCache.get(id);
+  if (!hit) return undefined;
+  if (Date.now() - hit.at > PRICE_TTL_MS) {
+    usdPriceCache.delete(id);
+    return undefined;
+  }
+  return hit;
+}
+function rememberPrice(id: string, usd: string | null) {
+  usdPriceCache.delete(id); // re-inserted at the young end
+  usdPriceCache.set(id, { at: Date.now(), usd });
+  if (usdPriceCache.size > PRICE_CACHE_MAX) usdPriceCache.delete(usdPriceCache.keys().next().value!);
+}
+
+// Market price (USD) for a single card by Scryfall id, memoized so the swipe
+// review doesn't refetch the same card. Returns the raw price string (e.g.
+// "1.23") or null when Scryfall has no USD price.
 export async function fetchUsdPrice(scryfallId: string): Promise<string | null> {
-  if (usdPriceCache.has(scryfallId)) return usdPriceCache.get(scryfallId)!;
+  const hit = cachedPrice(scryfallId);
+  if (hit) return hit.usd;
   try {
     const res = await scryfallFetch(`https://api.scryfall.com/cards/${scryfallId}`, { headers: SCRYFALL_HEADERS });
     if (!res.ok) {
-      usdPriceCache.set(scryfallId, null);
+      // "No such card" is an answer worth keeping; a throttle or an outage
+      // isn't, or the card would read "no price" until the next deploy.
+      if (res.status === 404) rememberPrice(scryfallId, null);
       return null;
     }
     const c = (await res.json()) as { prices?: { usd?: string | null } };
     const usd = typeof c?.prices?.usd === "string" ? c.prices.usd : null;
-    usdPriceCache.set(scryfallId, usd);
+    rememberPrice(scryfallId, usd);
     return usd;
   } catch {
     return null;
@@ -321,9 +345,9 @@ export async function usdPricesByIds(ids: string[]): Promise<Map<string, string>
   const out = new Map<string, string>();
   const missing: string[] = [];
   for (const id of new Set(ids)) {
-    if (usdPriceCache.has(id)) {
-      const cached = usdPriceCache.get(id)!;
-      if (cached) out.set(id, cached);
+    const hit = cachedPrice(id);
+    if (hit) {
+      if (hit.usd) out.set(id, hit.usd);
     } else {
       missing.push(id);
     }
@@ -343,16 +367,42 @@ export async function usdPricesByIds(ids: string[]): Promise<Map<string, string>
       const seen = new Set<string>();
       for (const c of data.data ?? []) {
         const usd = typeof c.prices?.usd === "string" ? c.prices.usd : null;
-        usdPriceCache.set(c.id, usd);
+        rememberPrice(c.id, usd);
         seen.add(c.id);
         if (usd) out.set(c.id, usd);
       }
-      for (const id of chunk) if (!seen.has(id)) usdPriceCache.set(id, null);
+      for (const id of chunk) if (!seen.has(id)) rememberPrice(id, null);
     } catch {
       // Network hiccup — leave the chunk uncached so the next GET can retry.
     }
   }
   return out;
+}
+
+/** The prices already known for these ids, without asking Scryfall, and the
+    ids that would need a request. */
+export function cachedUsdPrices(ids: string[]): { prices: Map<string, string>; missing: string[] } {
+  const prices = new Map<string, string>();
+  const missing: string[] = [];
+  for (const id of new Set(ids)) {
+    const hit = cachedPrice(id);
+    if (!hit) missing.push(id);
+    else if (hit.usd) prices.set(id, hit.usd);
+  }
+  return { prices, missing };
+}
+
+// Pricing under way in the background, by key (a user's collection): asked
+// for twice, it runs once.
+const warming = new Map<string, Promise<void>>();
+/** Fetch these ids' prices into the cache without making anyone wait. */
+export function warmUsdPrices(key: string, ids: string[]): void {
+  if (!ids.length || warming.has(key)) return;
+  const job = usdPricesByIds(ids)
+    .then(() => undefined)
+    .catch(() => undefined)
+    .finally(() => warming.delete(key));
+  warming.set(key, job);
 }
 
 // A concrete printing of a card — what's needed to locate it in another
@@ -632,6 +682,14 @@ export function toCardFacts(c: ScryfallCard): CardFacts {
 // Per-process, a day: a card's rules text does not change, and the same deck
 // is scored on every visit to its Stats pane.
 const factsCache = new Map<string, { at: number; facts: CardFacts }>();
+// Every card a collection import resolves lands here with its full text, so
+// it's capped: the oldest entry goes when a new one would pass the cap.
+const FACTS_CACHE_MAX = 20_000;
+function rememberFacts(id: string, entry: { at: number; facts: CardFacts }) {
+  factsCache.delete(id);
+  factsCache.set(id, entry);
+  if (factsCache.size > FACTS_CACHE_MAX) factsCache.delete(factsCache.keys().next().value!);
+}
 const FACTS_TTL_MS = 24 * 60 * 60_000;
 
 /* Test seam. */
@@ -668,7 +726,7 @@ export async function cardFactsByIds(ids: string[]): Promise<Map<string, CardFac
       for (const c of (data.data ?? []) as ScryfallCard[]) {
         if (!c?.id) continue;
         const facts = toCardFacts(c);
-        factsCache.set(c.id, { at: now, facts });
+        rememberFacts(c.id, { at: now, facts });
         out.set(c.id, facts);
       }
     } catch {

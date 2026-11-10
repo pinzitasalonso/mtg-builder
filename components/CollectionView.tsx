@@ -29,6 +29,7 @@ const PAGE = 120;
 const POLL_MS = 2000;
 const POLL_PAUSED_MS = 15000;
 const POLL_OFFLINE_MS = 10000;
+const POLL_PRICING_MS = 8000;
 
 const theme = getIdentityTheme(null);
 
@@ -130,8 +131,10 @@ export default function CollectionView({
   // Poll for progress until every card is matched. Never gives up: a paused
   // job restarts on the server, and the view picks it up.
   useEffect(() => {
-    if (collection.pending <= 0) return;
-    const t = setTimeout(load, offline.current ? POLL_OFFLINE_MS : paused ? POLL_PAUSED_MS : POLL_MS);
+    // Also while the server is still fetching prices (a big collection,
+    // after a deploy): a slower poll picks them up.
+    if (collection.pending <= 0 && !collection.pricing) return;
+    const t = setTimeout(load, offline.current ? POLL_OFFLINE_MS : collection.pending <= 0 ? POLL_PRICING_MS : paused ? POLL_PAUSED_MS : POLL_MS);
     return () => clearTimeout(t);
     // The collection object changes on every load, success or not.
     // eslint-disable-next-line react-hooks/exhaustive-deps

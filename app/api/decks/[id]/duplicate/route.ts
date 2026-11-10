@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import { currentUser, viewableDeckByPublicId } from "@/lib/auth";
 import { newPublicId } from "@/lib/deck-id";
 import { DECK_LIMIT_MSG, SIGN_IN_FOR_DECKS_MSG } from "@/lib/limits";
-import { canCreateDeck } from "@/lib/limits-db";
+import { canCreateDeck, createDeckIfRoom } from "@/lib/limits-db";
 import { recordEvent } from "@/lib/analytics";
 
 // Copy a deck (any deck the caller can see — their own or a public one) into a
@@ -26,7 +26,7 @@ export async function POST(
 
   const cards = await prisma.poolCard.findMany({ where: { deckId: source.id } });
 
-  const copy = await prisma.deck.create({
+  const copy = await createDeckIfRoom(user, (tx) => tx.deck.create({
     data: {
       name: `${source.name} (copy)`,
       format: source.format,
@@ -50,7 +50,8 @@ export async function POST(
         })),
       },
     },
-  });
+  }));
+  if (!copy) return NextResponse.json({ error: DECK_LIMIT_MSG, code: "deck_limit" }, { status: 403 });
 
   await recordEvent("deck_duplicated");
   return NextResponse.json(copy, { status: 201 });

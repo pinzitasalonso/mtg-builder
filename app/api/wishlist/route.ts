@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
-import { lookupCollection, normalizeCardKey, scryfallIdFromImage, usdPricesByIds } from "@/lib/scryfall";
+import { cachedUsdPrices, lookupCollection, normalizeCardKey, scryfallIdFromImage, usdPricesByIds, warmUsdPrices } from "@/lib/scryfall";
 import { MAX_WANTED, MAX_WISHLIST, parseWishlistAdd, wishlistSummary, type WishlistCard } from "@/lib/wishlist";
 
 export const runtime = "nodejs";
@@ -24,8 +24,13 @@ export async function GET(req: Request) {
     select: { nameKey: true, quantity: true },
   });
   const ownedBy = new Map(owned.map((o) => [o.nameKey, o.quantity]));
-  // Priced by the printing shown, as the collection is.
-  const prices = await usdPricesByIds(rows.map((r) => scryfallIdFromImage(r.imageUri)).filter((id): id is string => id !== null));
+  // Priced by the printing shown, as the collection is: at once when it's a
+  // request or two, otherwise from what's cached while the rest is fetched
+  // in the background (the list can hold 2,000 cards).
+  const ids = rows.map((r) => scryfallIdFromImage(r.imageUri)).filter((id): id is string => id !== null);
+  const known = cachedUsdPrices(ids);
+  const prices = known.missing.length <= 150 ? await usdPricesByIds(ids) : known.prices;
+  if (known.missing.length > 150) warmUsdPrices(`wishlist:${user.id}`, known.missing);
   const cards: WishlistCard[] = rows.map((r) => {
     const id = scryfallIdFromImage(r.imageUri);
     return {

@@ -50,7 +50,7 @@ export async function getJwks(url: string): Promise<JsonWebKey[]> {
   if (hit && Date.now() < hit.expiresAt) return hit.keys;
 
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const res = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10_000) });
     if (!res.ok) throw new Error(`JWKS ${res.status}`);
     const keys = parseKeys(await res.json());
     if (!keys?.length) throw new Error("JWKS had no keys");

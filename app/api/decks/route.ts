@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { newPublicId } from "@/lib/deck-id";
 import { DECK_LIMIT_MSG, SIGN_IN_FOR_DECKS_MSG } from "@/lib/limits";
-import { canCreateDeck } from "@/lib/limits-db";
+import { canCreateDeck, createDeckIfRoom } from "@/lib/limits-db";
 import { recordEvent } from "@/lib/analytics";
 import { scanSummary } from "@/lib/deck-analysis";
 import { sweepEmptyPublicDecks } from "@/lib/public-sweep";
@@ -89,9 +89,8 @@ export async function POST(req: Request) {
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
   const format = typeof body.format === "string" && body.format.trim() ? body.format.trim() : "commander";
   const commander = typeof body.commander === "string" && body.commander.trim() ? body.commander.trim() : null;
-  const deck = await prisma.deck.create({
-    data: { name, format, commander, userId: user.id, publicId: newPublicId() },
-  });
+  const deck = await createDeckIfRoom(user, (tx) => tx.deck.create({ data: { name, format, commander, userId: user.id, publicId: newPublicId() } }));
+  if (!deck) return NextResponse.json({ error: DECK_LIMIT_MSG, code: "deck_limit" }, { status: 403 });
   await recordEvent("deck_created");
   return NextResponse.json(deck, { status: 201 });
 }

@@ -5,7 +5,7 @@ import { newPublicId } from "@/lib/deck-id";
 import { singletonCapped } from "@/lib/commander";
 import { canBeCommander, fitsIdentity, isBackground } from "@/lib/format";
 import { DECK_LIMIT_MSG, type TierFields } from "@/lib/limits";
-import { canCreateDeck } from "@/lib/limits-db";
+import { canCreateDeck, createDeckIfRoom } from "@/lib/limits-db";
 import { snapshotDeck } from "@/lib/deck-versions";
 import { lookupCollection, NAMED_GAP_MS, normalizeCardKey, resolveNamedDetailed, SCRYFALL_HEADERS, type OutCard } from "@/lib/scryfall";
 import { scryfallFetch } from "@/lib/scryfall-limit";
@@ -409,10 +409,13 @@ async function createDeck(user: { id: number } & TierFields, input: Record<strin
     identity = headCards.map((c) => c!.colorIdentity ?? "").join("");
   }
 
-  const deck = await prisma.deck.create({
-    data: { name, format, commander, userId: user.id, publicId: newPublicId() },
-    select: { id: true, publicId: true, name: true, format: true },
-  });
+  const deck = await createDeckIfRoom(user, (tx) =>
+    tx.deck.create({
+      data: { name, format, commander, userId: user.id, publicId: newPublicId() },
+      select: { id: true, publicId: true, name: true, format: true },
+    })
+  );
+  if (!deck) return { result: DECK_LIMIT_MSG, isError: true, note: `Couldn’t create “${name}”: ${DECK_LIMIT_MSG}` };
   const resolved = cards
     .map((c) => ({ card: found.get(normalizeCardKey(c.name)), quantity: c.quantity, board: c.board }))
     .filter((x): x is { card: OutCard; quantity: number; board: Board } => Boolean(x.card));

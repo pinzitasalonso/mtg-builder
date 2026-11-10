@@ -41,6 +41,7 @@ export async function ct<T>(path: string, init?: RequestInit & { json?: unknown 
   if (!token) throw new Error("CARDTRADER_API_TOKEN is not set");
   const { json, ...rest } = init ?? {};
   const res = await fetch(`${BASE}${path}`, {
+    signal: AbortSignal.timeout(15_000),
     ...rest,
     headers: {
       Authorization: `Bearer ${token}`,

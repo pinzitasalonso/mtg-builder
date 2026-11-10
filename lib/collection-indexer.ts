@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { lookupCollection, lookupPrintings, NAMED_GAP_MS, normalizeCardKey, resolveNamedDetailed, scryfallIdFromImage, usdPricesByIds, type OutCard } from "@/lib/scryfall";
+import { cachedUsdPrices, lookupCollection, lookupPrintings, NAMED_GAP_MS, normalizeCardKey, resolveNamedDetailed, scryfallIdFromImage, warmUsdPrices, type OutCard } from "@/lib/scryfall";
 import { canonicalName, planEnrichment, type CardMeta } from "@/lib/collection-enrich";
 
 // Server-side collection indexing: matching imported rows to Scryfall.
@@ -82,8 +82,8 @@ export async function enrichBatch(userId: number) {
     ops.map((op) =>
       op.kind === "delete"
         ? prisma.collectionCard.delete({ where: { id: op.id } })
-        : op.kind === "quantity"
-          ? prisma.collectionCard.update({ where: { id: op.id }, data: { quantity: op.quantity } })
+        : op.kind === "add"
+          ? prisma.collectionCard.update({ where: { id: op.id }, data: { quantity: { increment: op.add } } })
           : prisma.collectionCard.update({ where: { id: op.id }, data: { ...op.data, printing: null } })
     )
   );
@@ -131,7 +131,7 @@ async function run(userId: number) {
 // served from the price cache instead of ~35 Scryfall calls for a big import.
 async function warmPrices(userId: number) {
   const rows = await prisma.collectionCard.findMany({ where: { userId }, select: { imageUri: true } });
-  await usdPricesByIds(rows.map((r) => scryfallIdFromImage(r.imageUri)).filter((id): id is string => id !== null)).catch(() => {});
+  warmUsdPrices(`collection:${userId}`, cachedUsdPrices(rows.map((r) => scryfallIdFromImage(r.imageUri)).filter((id): id is string => id !== null)).missing);
 }
 
 /** Start the user's indexing job if cards are pending and none is running.
@@ -141,6 +141,10 @@ export async function ensureIndexing(userId: number, pending?: number): Promise<
   if (jobs.has(userId)) return { running: true, paused: false };
   const left = pending ?? (await pendingCount(userId));
   if (left === 0) return { running: false, paused: false };
+  // Checked again: another request may have started the job while this one
+  // waited for the count. From here to jobs.set there's no await, so two
+  // callers can't both start one.
+  if (jobs.has(userId)) return { running: true, paused: false };
   const paused = pausedAt.get(userId);
   if (paused && Date.now() - paused < RESTART_COOLDOWN_MS) return { running: false, paused: true };
   pausedAt.delete(userId);

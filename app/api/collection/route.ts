@@ -4,22 +4,59 @@ import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { parseCollectionText } from "@/lib/collection-csv";
 import { encodePrinting } from "@/lib/printing";
-import { scryfallIdFromImage, usdPricesByIds } from "@/lib/scryfall";
+import { cachedUsdPrices, scryfallIdFromImage, usdPricesByIds, warmUsdPrices } from "@/lib/scryfall";
 import { isUnrecognised } from "@/lib/collection-enrich";
 import { ensureIndexing } from "@/lib/collection-indexer";
 
 export const runtime = "nodejs";
 
 const MAX_ENTRIES = 20000;
+// Prices not yet known are fetched before answering only when that's a
+// request or two; more are fetched in the background, and the answer says so.
+const PRICE_NOW_MAX = 150;
+// Cards the summary shows.
+const SAMPLE = 7;
+// Rows per transaction when an import adds to what's there.
+const UPDATE_CHUNK = 500;
 
 // The signed-in user's owned-card collection. Guests have none — GET returns an
 // empty collection so deck pages can fetch it unconditionally. Cards an import
 // added are matched to Scryfall by a background job (lib/collection-indexer.ts);
 // a GET only makes sure that job is running, and `pending` / `indexing` let the
 // client show progress. It returns at once, even mid-import.
+//
+// Three sizes of answer, so a page asks only for what it shows:
+//   ?summary=1  the counts and a few cards with their images (the home page);
+//               no rows are loaded beyond those few.
+//   ?prices=0   every card, unpriced (a deck page: what you own, and how many).
+//   (neither)   every card with its price (the collection screen, the iOS app).
+//               Prices come from an in-memory cache that's empty after each
+//               deploy; filling it for a big collection takes many Scryfall
+//               requests, so beyond PRICE_NOW_MAX missing prices the answer
+//               doesn't wait: it carries the prices already known, says
+//               `pricing: true`, and the rest are fetched in the background
+//               for the next request.
 export async function GET(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ cards: [], unique: 0, total: 0, pending: 0 });
+  const query = new URL(req.url).searchParams;
+
+  if (query.get("summary")) {
+    const where = { userId: user.id };
+    const [unique, sum, pending] = await Promise.all([
+      prisma.collectionCard.count({ where }),
+      prisma.collectionCard.aggregate({ where, _sum: { quantity: true } }),
+      prisma.collectionCard.count({ where: { ...where, enriched: false } }),
+    ]);
+    // A few cards to show, from a different place in the collection each time.
+    const withArt = { ...where, imageUri: { not: null } };
+    const pictured = unique ? await prisma.collectionCard.count({ where: withArt }) : 0;
+    const sample = pictured
+      ? await prisma.collectionCard.findMany({ where: withArt, select: { name: true, imageUri: true }, orderBy: { id: "asc" }, skip: Math.floor(Math.random() * Math.max(1, pictured - SAMPLE + 1)), take: SAMPLE })
+      : [];
+    const indexing = await ensureIndexing(user.id, pending);
+    return NextResponse.json({ unique, total: sum._sum.quantity ?? 0, pending, sample, indexing });
+  }
 
   const rows = await prisma.collectionCard.findMany({
     where: { userId: user.id },
@@ -27,13 +64,21 @@ export async function GET(req: Request) {
     orderBy: { name: "asc" },
   });
 
-  // Price every resolved card server-side, the same way deck pages do — the
-  // owned printing's id is in its image URL. Batched + memoized in fetchUsdPrice's
-  // cache, so a warm cache serves this for free and the client never has to
-  // fetch prices itself (which is fragile on device).
-  const priceMap = await usdPricesByIds(
-    rows.map((r) => scryfallIdFromImage(r.imageUri)).filter((id): id is string => id !== null)
-  );
+  // Price every resolved card server-side, the same way deck pages do: the
+  // owned printing's id is in its image URL, so the client never has to fetch
+  // prices itself (which is fragile on device).
+  let priceMap = new Map<string, string>();
+  let pricing = false;
+  if (query.get("prices") !== "0") {
+    const ids = rows.map((r) => scryfallIdFromImage(r.imageUri)).filter((id): id is string => id !== null);
+    const known = cachedUsdPrices(ids);
+    if (known.missing.length <= PRICE_NOW_MAX) priceMap = await usdPricesByIds(ids);
+    else {
+      priceMap = known.prices;
+      pricing = true;
+      warmUsdPrices(`collection:${user.id}`, known.missing);
+    }
+  }
   const cards = rows.map((r) => {
     const id = scryfallIdFromImage(r.imageUri);
     return { ...r, usdPrice: (id && priceMap.get(id)) || null };
@@ -44,7 +89,7 @@ export async function GET(req: Request) {
   const total = rows.reduce((s, r) => s + r.quantity, 0);
   // Names Scryfall had no card for, so the player can fix or retry them.
   const unrecognised = pending > 0 ? [] : rows.filter(isUnrecognised).map((r) => r.name);
-  return jsonWithEtag(req, { cards, unique: rows.length, total, pending, unrecognised, indexing });
+  return jsonWithEtag(req, { cards, unique: rows.length, total, pending, unrecognised, indexing, ...(pricing ? { pricing } : {}) });
 }
 
 // Import a pasted list or a CSV export (Moxfield, ManaBox, Deckbox, TCGplayer…
@@ -93,32 +138,34 @@ export async function POST(req: Request) {
     });
     const byKey = new Map(existing.map((r) => [r.nameKey, r]));
     const creates: { userId: number; name: string; nameKey: string; quantity: number; printing: string | null }[] = [];
-    const updates: { id: number; data: { quantity: number; printing?: string; enriched?: boolean } }[] = [];
+    const updates: { id: number; data: { quantity: { increment: number }; printing?: string; enriched?: boolean } }[] = [];
     for (const e of entries) {
       const key = e.name.toLowerCase();
       const ex = byKey.get(key);
       const printing = encodePrinting(e.printing);
       // A printing named in the file is what the player owns: it replaces the
       // one shown, and the row resolves again to pick it up.
-      if (ex) updates.push({ id: ex.id, data: printing ? { quantity: ex.quantity + e.qty, printing, enriched: false } : { quantity: ex.quantity + e.qty } });
+      // Added to the row as it is when this is written, not to the quantity
+      // read above: the matching job or another edit may have changed it.
+      if (ex) updates.push({ id: ex.id, data: printing ? { quantity: { increment: e.qty }, printing, enriched: false } : { quantity: { increment: e.qty } } });
       else creates.push({ userId: user.id, name: e.name, nameKey: key, quantity: e.qty, printing });
     }
-    await prisma.$transaction([
-      prisma.collectionCard.createMany({ data: creates }),
-      ...updates.map((u) => prisma.collectionCard.update({ where: { id: u.id }, data: u.data })),
-    ]);
+    // In transactions of a few hundred rows: one of 20,000 statements held
+    // the database's only writer for the whole import.
+    await prisma.collectionCard.createMany({ data: creates });
+    for (let i = 0; i < updates.length; i += UPDATE_CHUNK) {
+      // A row the matching job merged away meanwhile is skipped (updateMany).
+      await prisma.$transaction(updates.slice(i, i + UPDATE_CHUNK).map((u) => prisma.collectionCard.updateMany({ where: { id: u.id, userId: user.id }, data: u.data })));
+    }
   }
 
   // Start matching now, so it runs whether or not anyone polls.
   await ensureIndexing(user.id);
 
-  const rows = await prisma.collectionCard.findMany({
-    where: { userId: user.id },
-    select: { quantity: true },
-  });
+  const after = await prisma.collectionCard.aggregate({ where: { userId: user.id }, _count: true, _sum: { quantity: true } });
   return NextResponse.json({
-    unique: rows.length,
-    total: rows.reduce((s, r) => s + r.quantity, 0),
+    unique: after._count,
+    total: after._sum.quantity ?? 0,
     imported: entries.length,
     // Different cards past the cap, which weren't saved — said out loud rather
     // than dropped silently.
