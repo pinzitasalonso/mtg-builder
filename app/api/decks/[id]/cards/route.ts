@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cleanCardInput, jsonBody } from "@/lib/api";
 import { applyOwnedPrintings, asOwned, ownedPrintingsFor } from "@/lib/owned-printings";
 import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
@@ -33,17 +34,12 @@ export async function POST(
   const deck = await accessibleDeckByPublicId((await params).id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const deckId = deck.id;
-  const body = await req.json();
-  const { manaCost, typeLine, oracleText } = body;
-  let { scryfallId, imageUri } = body;
-  const { name } = body;
-  if (
-    typeof scryfallId !== "string" || !scryfallId ||
-    typeof name !== "string" || !name ||
-    typeof imageUri !== "string" || !imageUri
-  ) {
-    return NextResponse.json({ error: "scryfallId, name, imageUri required" }, { status: 400 });
-  }
+  const body = await jsonBody(req);
+  // Its id, name and a card image (Scryfall's), each no longer than a card's.
+  const clean = cleanCardInput(body);
+  if (!clean) return NextResponse.json({ error: "scryfallId, name, imageUri required" }, { status: 400 });
+  const { name, manaCost, typeLine, oracleText } = clean;
+  let { scryfallId, imageUri } = clean;
   // A card the player owns goes in as the printing they own.
   if (user) {
     const owned = asOwned({ name, scryfallId, imageUri }, await ownedPrintingsFor(user.id, [name]));

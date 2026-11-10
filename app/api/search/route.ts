@@ -1,3 +1,4 @@
+import { jsonBody } from "@/lib/api";
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { currentUser } from "@/lib/auth";
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
   // Anthropic budget, and an account gives it a daily meter.
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: SIGN_IN_FOR_AI_MSG, code: "sign_in" }, { status: 401 });
-  const { prompt, filters, mode, currentDeck } = await req.json();
+  const { prompt, filters, mode, currentDeck } = await jsonBody(req);
   if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return NextResponse.json({ error: "prompt required" }, { status: 400 });
   }

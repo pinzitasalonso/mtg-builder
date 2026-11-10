@@ -1,3 +1,4 @@
+import { clientIp, rateLimit } from "@/lib/ratelimit";
 import { NextResponse } from "next/server";
 import { SCRYFALL_HEADERS } from "@/lib/scryfall";
 import { scryfallFetch } from "@/lib/scryfall-limit";
@@ -37,14 +38,25 @@ interface ScryfallPrint {
 }
 
 const TTL_MS = 60 * 60 * 1000;
+// Capped, oldest out first: every name asked for (a made-up one too: it's
+// remembered as having no printings) takes an entry.
+const CACHE_MAX = 2000;
 const cache = new Map<string, { at: number; printings: CardPrinting[] }>();
+// Uncached lookups one address may start a minute. Each is one or two
+// Scryfall searches in the slow lane, which the whole server shares: without
+// a limit, a burst of made-up names queued everyone's searches behind it.
+const LOOKUPS_PER_MINUTE = 30;
 
 export async function GET(req: Request) {
   const name = new URL(req.url).searchParams.get("name")?.trim() ?? "";
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
   const key = name.toLowerCase();
+  if (name.length > 300) return NextResponse.json({ error: "name too long" }, { status: 400 });
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return NextResponse.json({ printings: hit.printings });
+  if (!rateLimit(`printings:${clientIp(req)}`, LOOKUPS_PER_MINUTE, 60_000)) {
+    return NextResponse.json({ error: "Too many lookups. Try again in a minute." }, { status: 429 });
+  }
 
   // Exact name, every print, paper only. A double-faced card is searched by
   // its front face, which Scryfall matches to the whole card.
@@ -84,6 +96,8 @@ export async function GET(req: Request) {
     url = data.has_more && data.next_page ? data.next_page : null;
   }
 
+  cache.delete(key);
   cache.set(key, { at: Date.now(), printings });
+  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value!);
   return NextResponse.json({ printings });
 }

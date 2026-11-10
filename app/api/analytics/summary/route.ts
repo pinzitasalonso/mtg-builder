@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { EVENT_TYPES, isAnalyticsAdmin } from "@/lib/analytics";
+import { clientIp } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
 // Admin-only analytics summary: lifetime totals per event, a last-30-day daily
 // series, and live counts of users/decks. Gated to ANALYTICS_ADMIN_EMAIL.
-export async function GET() {
+export async function GET(req: Request) {
   const user = await currentUser();
   if (!isAnalyticsAdmin(user?.email)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
@@ -34,5 +35,14 @@ export async function GET() {
 
   const [users, decks] = await Promise.all([prisma.user.count(), prisma.deck.count()]);
 
-  return NextResponse.json({ totals, series, users, decks, types: EVENT_TYPES });
+  // How this request arrived, as the server sees it: the forwarding headers
+  // the host's proxy set. The rate limits key on the client's address
+  // (clientIp), and which header carries it truthfully depends on the host;
+  // this shows the admin what's there.
+  const seen = {
+    xForwardedFor: req.headers.get("x-forwarded-for"),
+    xRealIp: req.headers.get("x-real-ip"),
+    usedForLimits: clientIp(req),
+  };
+  return NextResponse.json({ totals, series, users, decks, types: EVENT_TYPES, seen });
 }

@@ -57,9 +57,12 @@ export async function applyLinkDecision(
               // No password: the account can only be reached through this
               // provider until its owner sets one via the reset flow.
               passwordHash: null,
-              // The provider vouched for the address, so asking for our own
-              // verification email on top would be theatre.
-              emailVerifiedAt: new Date(),
+              // When the provider vouched for the address, asking for our own
+              // verification email on top would be theatre. When it didn't
+              // (decideLink's rule 3 still lets a new account be made), the
+              // address stays unverified: it is not proof that this person
+              // owns it, and a password reset by its real owner unlinks them.
+              emailVerifiedAt: identity.emailVerified ? new Date() : null,
               displayName: identity.displayName,
             },
             select: { id: true },

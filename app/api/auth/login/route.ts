@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createSession, normalizeEmail, verifyPassword } from "@/lib/auth";
 import { recordEvent } from "@/lib/analytics";
-import { AUTH_LIMIT_MSG, authRateLimit, clientIp } from "@/lib/ratelimit";
+import { AUTH_LIMIT_MSG, authRateLimit, clientIp, loginAllowed, loginFailed } from "@/lib/ratelimit";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,8 @@ export async function POST(req: Request) {
   }
   const email = normalizeEmail(body.email);
   const password = typeof body.password === "string" ? body.password : "";
-  if (!authRateLimit("login", clientIp(req), email)) {
+  const ip = clientIp(req);
+  if (!authRateLimit("login", ip) || (email && !loginAllowed(ip, email))) {
     return NextResponse.json({ error: AUTH_LIMIT_MSG }, { status: 429 });
   }
 
@@ -26,6 +27,7 @@ export async function POST(req: Request) {
   const user = email ? await prisma.user.findUnique({ where: { email } }) : null;
   const ok = verifyPassword(password, user?.passwordHash ?? null);
   if (!user || !ok) {
+    if (email) loginFailed(ip, email);
     return NextResponse.json({ error: "Wrong email or password." }, { status: 401 });
   }
 

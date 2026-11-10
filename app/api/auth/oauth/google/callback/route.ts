@@ -1,7 +1,8 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createSession, newToken, requestOrigin, tokenHash } from "@/lib/auth";
-import { exchangeCode, googleCallbackUrl } from "@/lib/google-auth";
+import { exchangeCode, googleCallbackUrl, oauthStateCookie } from "@/lib/google-auth";
 import { applyLinkDecision, readExistingState } from "@/lib/oauth-link-db";
 import { decideLink, type ProviderIdentity } from "@/lib/oauth-link";
 import { recordEvent } from "@/lib/analytics";
@@ -43,10 +44,19 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${origin}/login?oauth=expired`, 303);
   }
   const isApp = pending.mode === "app";
+  // The cookie /start set in the browser that began this sign-in.
+  const stateCookie = oauthStateCookie(pending.id);
+  const clear = (res: NextResponse) => {
+    if (!isApp) res.cookies.set(stateCookie, "", { path: "/api/auth/oauth", maxAge: 0 });
+    return res;
+  };
   const fail = (slug: string) =>
     isApp
       ? appRedirect(`error=${encodeURIComponent(slug)}`)
-      : NextResponse.redirect(`${origin}/login?oauth=${slug}`, 303);
+      : clear(NextResponse.redirect(`${origin}/login?oauth=${slug}`, 303));
+
+  // A web sign-in ends in the browser it started in, or not at all.
+  if (!isApp && !(await cookies()).get(stateCookie)) return fail("expired");
 
   if (params.get("error")) return fail("cancelled");
   const code = params.get("code");
@@ -93,5 +103,5 @@ export async function GET(req: Request) {
   }
 
   await createSession(user.id);
-  return NextResponse.redirect(`${origin}${pending.next ?? "/"}`, 303);
+  return clear(NextResponse.redirect(`${origin}${pending.next ?? "/"}`, 303));
 }

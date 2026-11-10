@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { isProOnRevenueCat, userIdFromAppUserId } from "@/lib/revenuecat";
 import prisma from "@/lib/prisma";
@@ -22,7 +23,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "not configured" }, { status: 503 });
   }
   // RevenueCat sends exactly the Authorization header you configure for it.
-  if (req.headers.get("authorization") !== token) {
+  // Compared by digest, in constant time: equal lengths for timingSafeEqual,
+  // and no hint from the response time of how much of a guess matched.
+  const digest = (v: string) => createHash("sha256").update(v).digest();
+  if (!timingSafeEqual(digest(req.headers.get("authorization") ?? ""), digest(token))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

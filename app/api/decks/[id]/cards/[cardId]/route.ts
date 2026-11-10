@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ownedPrintingsFor } from "@/lib/owned-printings";
 import prisma from "@/lib/prisma";
-import { parseId } from "@/lib/api";
+import { CARD_TEXT_MAX, isCardImage, jsonBody, parseId } from "@/lib/api";
 import { accessibleDeckByPublicId, currentUser } from "@/lib/auth";
 import { isCommanderCard, singletonCapped } from "@/lib/commander";
 
@@ -21,7 +21,7 @@ export async function PATCH(
   const deck = await accessibleDeckByPublicId(id, user?.id ?? null);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   const deckId = deck.id;
-  const body = await req.json();
+  const body = await jsonBody(req);
 
   const data: { board?: string; quantity?: number; scryfallId?: string; imageUri?: string; printingPinned?: boolean } = {};
   if (body.board !== undefined) {
@@ -43,13 +43,14 @@ export async function PATCH(
     // version). The card's identity — name, types, oracle text — is unchanged,
     // so only the Scryfall id and its image move; the DELETE-then-add path
     // can't do this for a commander, which the server refuses to delete.
-    if (typeof body.scryfallId !== "string" || !body.scryfallId.trim()) {
+    if (typeof body.scryfallId !== "string" || !body.scryfallId.trim() || body.scryfallId.length > CARD_TEXT_MAX.id) {
       return NextResponse.json({ error: "scryfallId must be a non-empty string" }, { status: 400 });
     }
     data.scryfallId = body.scryfallId;
     if (body.imageUri !== undefined) {
-      if (typeof body.imageUri !== "string" || !body.imageUri) {
-        return NextResponse.json({ error: "imageUri must be a non-empty string" }, { status: 400 });
+      // A card image (Scryfall's): it's shown to everyone who sees the deck.
+      if (!isCardImage(body.imageUri)) {
+        return NextResponse.json({ error: "imageUri must be a card image" }, { status: 400 });
       }
       data.imageUri = body.imageUri;
     }
