@@ -125,12 +125,16 @@ export function ModalShell({
   maxWidth,
   zIndex = 72,
   labelledBy,
+  fullScreen,
   children,
 }: {
   onDismiss: () => void;
   maxWidth: number;
   zIndex?: number;
   labelledBy?: string;
+  /** The whole screen (beside the assistant's column), with no frame: the
+      child lays itself out and scrolls itself. */
+  fullScreen?: boolean;
   children: React.ReactNode;
 }) {
   const dismiss = useRef(onDismiss);
@@ -163,6 +167,21 @@ export function ModalShell({
       if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
+
+  if (fullScreen) {
+    return (
+      <div
+        ref={box}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={labelledBy}
+        style={{ position: "fixed", top: 0, left: 0, bottom: 0, right: "var(--assistant-w, 0px)", zIndex, outline: "none", background: "var(--bg)", display: "flex", flexDirection: "column", animation: "sp-fade .15s ease" }}
+      >
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div
