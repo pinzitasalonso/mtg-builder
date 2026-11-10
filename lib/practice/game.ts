@@ -628,6 +628,17 @@ export function adjustLife(g0: PracticeGame, seat: Seat, delta: number, book: Ca
   return g;
 }
 
+/** You give the game up: the opponent wins, and the game is over (it counts
+    as a loss in the deck's record). */
+export function concede(g0: PracticeGame): PracticeGame {
+  if (g0.winner) return g0;
+  const g = structuredClone(g0);
+  g.winner = "opp";
+  g.choice = undefined;
+  say(g, null, "You concede. The opponent wins.");
+  return g;
+}
+
 /** Replace your side (a solo-table move: draw, mulligan, shuffle…). */
 export function withYourSide(g0: PracticeGame, fn: (s: PlaytestState) => PlaytestState): PracticeGame {
   const next = fn(g0.sides.you);

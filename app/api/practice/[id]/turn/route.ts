@@ -5,9 +5,10 @@ import { extractJson } from "@/lib/ai";
 import { recordEvent } from "@/lib/analytics";
 import { currentUser } from "@/lib/auth";
 import { PRACTICE_AI_TURNS } from "@/lib/limits";
-import { fallbackPlan } from "@/lib/practice/ai";
+import { fallbackPlan, simpleTurn } from "@/lib/practice/ai";
 import { cleanPlan, PLAN_SCHEMA, sinceLastTurn, systemPrompt, turnBrief, type DeckLine } from "@/lib/practice/brief";
-import type { CardBook, PracticeGame, TurnPlan } from "@/lib/practice/types";
+import type { CardBook, TurnPlan } from "@/lib/practice/types";
+import { asGame } from "@/lib/practice/wire";
 
 export const runtime = "nodejs";
 
@@ -27,40 +28,11 @@ interface Setup {
   oppCommander: string | null;
 }
 
-const ZONES = ["library", "hand", "battlefield", "graveyard", "exile", "command"] as const;
-// A double-faced card's full name and type line fit well inside this.
-const MAX_TEXT = 300;
-const MAX_LOG_LINES = 200;
-
-/** The game the browser sent, if it has the shape of one. */
-function asGame(v: unknown): PracticeGame | null {
-  const g = v as PracticeGame | null;
-  if (!g || typeof g !== "object" || typeof g.turn !== "number" || !g.sides) return null;
-  for (const seat of ["you", "opp"] as const) {
-    const side = g.sides[seat];
-    if (!side || typeof side.life !== "number") return null;
-    for (const z of ZONES) {
-      if (!Array.isArray(side[z]) || side[z].length > 400) return null;
-      // Card names and type lines go into the prompt: no longer than a card's.
-      for (const c of side[z]) {
-        if (!c || typeof c !== "object" || typeof c.name !== "string" || c.name.length > MAX_TEXT) return null;
-        if (c.typeLine != null && (typeof c.typeLine !== "string" || c.typeLine.length > MAX_TEXT)) return null;
-      }
-    }
-  }
-  // The log is the browser's: only its last lines are read, each cut short.
-  g.log = (Array.isArray(g.log) ? g.log : [])
-    .filter((l) => !!l && typeof l === "object" && typeof l.text === "string")
-    .slice(-MAX_LOG_LINES)
-    .map((l) => ({ ...l, text: l.text.slice(0, MAX_TEXT) }));
-  return g;
-}
-
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Sign in to play against the AI." }, { status: 401 });
   const id = (await params).id;
-  const row = await prisma.practiceGame.findFirst({ where: { id, userId: user.id }, select: { setup: true } });
+  const row = await prisma.practiceGame.findFirst({ where: { id, userId: user.id }, select: { setup: true, bot: true } });
   if (!row) return NextResponse.json({ error: "game not found" }, { status: 404 });
   const body = (await req.json().catch(() => null)) as { game?: unknown } | null;
   const game = asGame(body?.game);
@@ -74,6 +46,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ plan: fallbackPlan(game, setup.book), source: "fallback", note });
   };
   const instinct = (why: string) => fallback(`The opponent played on instinct this turn (${why}).`);
+
+  // The basic bot is the built-in planner: no model, no count. (The table
+  // plans those turns itself; this answers a client that asks anyway.)
+  if (row.bot) return NextResponse.json({ plan: fallbackPlan(game, setup.book), source: "bot" });
+  // A turn with nothing to decide (a land, and nothing it could cast or
+  // attack with) is played at once: the model would take its time to say
+  // the same. It isn't one of the game's AI turns.
+  const simple = simpleTurn(game, setup.book);
+  if (simple) return NextResponse.json({ plan: simple, source: "simple" });
 
   // One more AI turn, if the game has any left.
   const spent = await prisma.practiceGame.updateMany({ where: { id, userId: user.id, turns: { lt: PRACTICE_AI_TURNS } }, data: { turns: { increment: 1 } } });

@@ -37,14 +37,22 @@ export default function OpponentPicker({
   error,
   onStart,
   onSolo,
+  saved,
+  onResume,
+  onDiscard,
 }: {
   deckId: string;
   /** The game is loading: nothing can be picked. */
   starting: boolean;
   /** Why the last start failed. */
   error: string;
-  onStart: (option: OpponentOption) => void;
+  /** Play: against the AI, or (bot) the basic bot. */
+  onStart: (option: OpponentOption, bot: boolean) => void;
   onSolo: () => void;
+  /** A game with this deck left unfinished. */
+  saved: { opponent: string; turn: number; bot: boolean } | null;
+  onResume: () => void;
+  onDiscard: () => void;
 }) {
   const [data, setData] = useState<OpponentsAnswer | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -53,6 +61,8 @@ export default function OpponentPicker({
   const [picked, setPicked] = useState<OpponentOption | null>(null);
   const [levels, setLevels] = useState<LevelsState | null>(null);
   const [level, setLevel] = useState<string | null>(null);
+  // Who pilots it: the AI (a model plans each turn), or the basic bot.
+  const [pilot, setPilot] = useState<"ai" | "bot">("ai");
   const alive = useRef(true);
   useEffect(() => () => void (alive.current = false), []);
 
@@ -123,11 +133,14 @@ export default function OpponentPicker({
 
   const free = data?.free ?? null;
   const spent = !!free && free.left <= 0;
-  const blocked = starting || spent || (picked?.kind === "edhrec" && (!levels || levels.busy || !!levels.error));
+  // With today's game spent, the basic bot is what's left: it's free.
+  const bot = pilot === "bot" || spent;
+  const blocked = starting || (picked?.kind === "edhrec" && (!levels || levels.busy || !!levels.error));
   const play = () => {
     if (!picked || blocked) return;
-    onStart(picked.kind === "edhrec" ? { ...picked, level, detail: picked.detail || "EDHREC average deck" } : picked);
+    onStart(picked.kind === "edhrec" ? { ...picked, level, detail: picked.detail || "EDHREC average deck" } : picked, bot);
   };
+  const record = data?.record;
 
   return (
     <div className="pk">
@@ -141,8 +154,38 @@ export default function OpponentPicker({
               </span>
             )}
           </div>
-          <p className="pt-pick-note">The AI pilots a real deck against yours. You play your side by hand; it plays lands, casts what it can pay for, attacks and blocks.</p>
-          {spent && <p className="pt-pick-note pk-spent">A free account plays one game against the AI a day. It’s back tomorrow, and unlimited with Spellpool Pro in the iOS app.</p>}
+          <p className="pt-pick-note">
+            The AI pilots a real deck against yours. You play your side by hand; it plays lands, casts what it can pay for, attacks and blocks.
+            {record && record.won + record.lost > 0 && (
+              <>
+                {" "}
+                <b className="pk-record">
+                  This deck so far: {record.won} {record.won === 1 ? "win" : "wins"}, {record.lost} {record.lost === 1 ? "loss" : "losses"}.
+                </b>
+              </>
+            )}
+          </p>
+          {spent && (
+            <p className="pt-pick-note pk-spent">
+              A free account plays one game against the AI a day: it’s back tomorrow, and unlimited with Spellpool Pro in the iOS app. The basic bot is free, as often as you like.
+            </p>
+          )}
+          {saved && (
+            <div className="pk-saved" role="region" aria-label="A game in progress">
+              <span>
+                <b>A game in progress</b> against {saved.opponent}
+                {saved.bot ? " (basic bot)" : ""}, turn {saved.turn}.
+              </span>
+              <span className="pk-saved-go">
+                <button type="button" className="pt-btn pt-btn-gold" disabled={starting} onClick={onResume}>
+                  Resume
+                </button>
+                <button type="button" className="pt-btn" disabled={starting} onClick={() => confirm("Discard the game in progress?") && onDiscard()}>
+                  Discard
+                </button>
+              </span>
+            </div>
+          )}
           {(error || loadError) && (
             <p className="pt-pick-error" role="alert">
               {error || loadError}
@@ -246,10 +289,21 @@ export default function OpponentPicker({
               )}
             </div>
             <div className="pk-bar-go">
+              {/* Who pilots it. The basic bot makes no AI call: it's free and its turns are instant. */}
+              {!spent && (
+                <div className="pk-pilot" role="radiogroup" aria-label="Who plays the opponent">
+                  <button type="button" role="radio" aria-checked={pilot === "ai"} onClick={() => setPilot("ai")} title="A model plans each of its turns">
+                    AI
+                  </button>
+                  <button type="button" role="radio" aria-checked={pilot === "bot"} onClick={() => setPilot("bot")} title="Plays its lands and creatures and attacks. It doesn’t plan ahead. Free, and its turns are instant.">
+                    Basic bot
+                  </button>
+                </div>
+              )}
               <button type="button" className="pt-btn pt-btn-gold pk-play" disabled={blocked} onClick={play}>
-                {starting ? <Loader2 size={16} className="spin" /> : <Swords size={16} />} {starting ? "Shuffling up…" : "Play"}
+                {starting ? <Loader2 size={16} className="spin" /> : <Swords size={16} />} {starting ? "Shuffling up…" : bot ? "Play the bot" : "Play"}
               </button>
-              {free && !spent && <span className="pk-bar-free">Uses today’s free game</span>}
+              <span className="pk-bar-free">{bot ? "Free: the bot doesn’t plan ahead" : free ? "Uses today’s free game" : "A model plans its turns"}</span>
             </div>
           </div>
         </div>

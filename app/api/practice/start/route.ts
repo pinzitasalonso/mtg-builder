@@ -5,6 +5,7 @@ import { recordEvent } from "@/lib/analytics";
 import { PRACTICE_AI_TURNS, PRACTICE_LIMIT_MSG } from "@/lib/limits";
 import { claimPractice } from "@/lib/limits-db";
 import { isEdhrecLevel } from "@/lib/edhrec";
+import { rateLimit } from "@/lib/ratelimit";
 import { scanVersionURL } from "@/lib/scan-url";
 import { deckFromDb, deckFromEdhrec, deckFromMtgtop8, type PracticeDeck } from "@/lib/practice/decks";
 import { cleanOpponent } from "@/lib/practice/opponents";
@@ -24,7 +25,10 @@ export const runtime = "nodejs";
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Sign in to play against the AI." }, { status: 401 });
-  const body = (await req.json().catch(() => null)) as { deck?: unknown; opponent?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as { deck?: unknown; opponent?: unknown; bot?: unknown } | null;
+  // Against the basic bot (the built-in planner, no model call): free, and
+  // not one of the day's games. Each start still loads two decks.
+  const bot = body?.bot === true;
   const deckId = typeof body?.deck === "string" ? body.deck.slice(0, 80) : "";
   const o = cleanOpponent(body?.opponent);
   if (!deckId || !o) return NextResponse.json({ error: "deck and opponent required" }, { status: 400 });
@@ -32,7 +36,8 @@ export async function POST(req: Request) {
   // sent together can't all pass the check while the decks load (that's
   // slow: EDHREC, MTGTop8, Scryfall). If the game can't start, the claim is
   // given back.
-  const id = await claimPractice(user);
+  if (bot && !rateLimit(`practice-bot:${user.id}`, 30, 60 * 60_000)) return NextResponse.json({ error: "That's a lot of games. Try again in a little while." }, { status: 429 });
+  const id = await claimPractice(user, bot);
   if (!id) return NextResponse.json({ error: PRACTICE_LIMIT_MSG, code: "practice_limit" }, { status: 429 });
   const giveBack = () => prisma.practiceGame.deleteMany({ where: { id, userId: user.id } }).catch(() => {});
 
@@ -68,6 +73,7 @@ export async function POST(req: Request) {
   void recordEvent("practice_game");
   return NextResponse.json({
     id,
+    bot,
     commanderGame,
     aiTurns: PRACTICE_AI_TURNS,
     book,
