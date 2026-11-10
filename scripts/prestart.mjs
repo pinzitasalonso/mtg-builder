@@ -1,5 +1,5 @@
-// Before the server starts (npm start): back the database up, then bring its
-// schema up to date.
+// Before the server starts (npm start runs scripts/start.mjs, which calls
+// this first): back the database up, then bring its schema up to date.
 //
 // There are no migrations here: `prisma db push` makes the SQLite file match
 // prisma/schema.prisma at every boot. It used to run with --accept-data-loss,
@@ -99,7 +99,7 @@ function push(acceptDataLoss) {
   return { ok: res.status === 0, dataLoss: /--accept-data-loss/.test(out) };
 }
 
-async function main() {
+export async function main() {
   const file = dbPath();
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const saved = await backup(file, path.resolve("prisma/schema.prisma"));
