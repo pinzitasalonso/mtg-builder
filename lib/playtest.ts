@@ -51,6 +51,10 @@ export interface PlayCard {
   copy?: boolean;
   /** Exiled at the beginning of the next end step (Inalla's copies). */
   exileAtEnd?: boolean;
+  /** A planeswalker's loyalty counters. */
+  loyalty?: number;
+  /** Chrome Mox: the colours of the card exiled with it. */
+  imprint?: string[];
 }
 
 export interface PlaytestState {
@@ -189,6 +193,8 @@ export function moveCard(
     delete card.boost;
     delete card.attachedTo;
     delete card.exileAtEnd;
+    delete card.loyalty;
+    delete card.imprint;
   }
   const next = { ...state, [from]: state[from].filter((c) => c.iid !== iid) } as PlaytestState;
   const target = [...next[to]];

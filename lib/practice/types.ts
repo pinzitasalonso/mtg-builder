@@ -22,6 +22,8 @@ export interface CardInfo {
   producedMana: string[];
   /** A transforming card's back face: its stats, when it has them. */
   back?: { power: number | null; toughness: number | null };
+  /** A planeswalker's starting loyalty. */
+  loyalty?: number;
 }
 
 /** Card info by lowercased name. */
@@ -98,8 +100,9 @@ export interface PendingTax {
 export interface Choice {
   /** discard: a card from your hand. sacrifice: one of your permanents.
       put: a permanent card from your hand onto the battlefield (The
-      Ur-Dragon). attach: the creature your Aura goes on. */
-  kind: "discard" | "sacrifice" | "put" | "attach";
+      Ur-Dragon). attach: the creature your Aura goes on. imprint: a
+      nonartifact, nonland card from your hand, exiled with Chrome Mox. */
+  kind: "discard" | "sacrifice" | "put" | "attach" | "imprint";
   /** The card asking, for the prompt. */
   source: string;
   /** Who controls it. */
@@ -121,6 +124,13 @@ export interface Choice {
   braids?: "yours" | "theirs";
   /** Braids: the life not sacrificing costs. */
   life?: number;
+  /** A discard: only this kind of card ("land": Mox Diamond). */
+  only?: "land";
+  /** The permanent asking (Mox Diamond, Chrome Mox): not discarding sends
+      Mox Diamond to the graveyard. */
+  card?: number;
+  /** A discard at the end of your turn, down to seven cards. */
+  cleanup?: boolean;
   /** attach: the Aura, and whether Light-Paws searches for another after. */
   aura?: number;
   tutor?: number;

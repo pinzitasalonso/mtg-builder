@@ -5,7 +5,7 @@
 
 import type { PlayCard } from "../playtest";
 import { canPlayAsLand, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats } from "./cards";
-import { availableMana, castable, cardId, lifeFor } from "./game";
+import { availableMana, castable, cardId, lifeFor, loyaltyOf } from "./game";
 import {
   affinityOf,
   auraTutorOf,
@@ -30,7 +30,7 @@ import {
   winotaOf,
 } from "./abilities";
 import { hasTriggers } from "./triggers";
-import { manaSummary } from "./mana";
+import { manaSummary, manaTotal } from "./mana";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
 const EFFECT_TYPES: EffectType[] = ["damage", "life", "destroy", "exile", "bounce", "tap", "untap", "draw", "discard", "mill", "token", "counters", "pump", "search", "mana", "note"];
@@ -94,6 +94,8 @@ HOW THIS TABLE WORKS
 - Fetch lands crack themselves when you play them: the app finds the land that suits your hand. Shock lands enter untapped for 2 life while you can afford it.
 - On the player's turn the app plays for you. It blocks, and it casts your hard counterspells (marked "counterspell" in your hand) at the player's spells that are worth it, if you left their mana untapped. Nothing else of yours is cast on their turn, so cards that only work in response (protection, redirecting a spell, combat tricks) are rarely worth casting on your own turn.
 - Creatures that are summoning sick (marked in the brief) can't attack.
+- The app follows each mana source's own rules: Mana Vault and the Monoliths stay tapped once used, Mox Opal needs three artifacts, Mox Amber a legendary creature or planeswalker, Mox Diamond a land card in your hand to discard (the app picks it), Chrome Mox a coloured card to exile (the app picks it), and Jeweled Lotus pays only for your commander.
+- Your commander goes back to your command zone when it dies or is exiled: cast it again for {2} more each time. At the end of your turn you discard down to seven cards.
 
 HOW TO PLAY WELL
 - Use your mana every turn. A turn where you only play a land is a wasted turn, unless you're holding mana open on purpose for a counterspell.
@@ -153,7 +155,13 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (drawsOnLifeLoss(book, back) || drawsOnLifeLoss(book, front)) notes.push("drawing when the player loses life on your turn happens by itself");
     if (indestructibleOnYourTurn(book, front)) notes.push("it's indestructible on your turn");
     const ninja = ninjutsuOf(book, front);
-    if (ninja)
+    if (ninja?.sneak) {
+      // The app sneaks creatures in; a sneaked instant or sorcery is cast the usual way.
+      if (isCreature(book, front))
+        notes.push(
+          `its sneak cost ${ninja.cost} is used in combat, after the player's blocks: the app casts it for that cost, returns one of your unblocked attackers to your hand, and it enters tapped and attacking. Attack with cheap or evasive creatures to set it up, and keep ${ninja.cost} untapped`
+        );
+    } else if (ninja)
       notes.push(
         `its ${ninja.commander ? "commander " : ""}ninjutsu ${ninja.cost} is used in combat, after the player's blocks, for one of your unblocked attackers (from your hand${ninja.commander ? " or the command zone, with no tax" : ""}) when you have the mana: attack with cheap or evasive creatures to set it up, and keep ${ninja.cost} untapped`
       );
@@ -207,6 +215,8 @@ const describe = (g: PracticeGame, book: CardBook, c: PlayCard, opts: { text?: b
   bits.push(c.tapped ? "tapped" : "untapped");
   if (isCreature(book, c) && isSick(book, c, g.turn) && g.active === "opp") bits.push("summoning sick");
   if (c.counters) bits.push(`${c.counters > 0 ? "+" : ""}${c.counters} counters`);
+  const loyalty = loyaltyOf(book, c);
+  if (loyalty !== null) bits.push(`loyalty ${loyalty}`);
   if (c.commander) bits.push("commander");
   if (c.flipped && c.name.includes(" // ")) bits.push(`transformed: ${c.name.split(" // ")[1]!.trim()}`);
   const kind = c.token ? "token" : isLand(c) ? "land" : (infoOf(book, c)?.typeLine ?? c.typeLine ?? "").split(" — ")[0];
@@ -219,6 +229,8 @@ export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[]):
   const me = g.sides.opp;
   const them = g.sides.you;
   const sources = availableMana(g, "opp", book);
+  // Jeweled Lotus: mana for the commander only.
+  const commanderOnly = manaTotal(availableMana(g, "opp", book, [], { commander: true })) - manaTotal(sources);
   const hand = me.hand.map((c) => {
     const info = infoOf(book, c);
     if (isLand(c)) return `- ${cardId(c.iid)} ${c.name} (land)${g.landPlayed ? "" : " — you can play it"}`;
@@ -239,7 +251,7 @@ export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[]):
       (g.commanderGame ? ` Commander damage taken: you ${g.cmdDamage.opp}, the player ${g.cmdDamage.you}.` : ""),
     `Your library: ${me.library.length} cards. The player has ${them.hand.length} cards in hand and ${them.library.length} in library.`,
     `Land drop: ${g.landPlayed ? "already used this turn" : "available"}.`,
-    `YOUR MANA RIGHT NOW: ${manaSummary(sources)}.${lifeFor(g, "opp", book).length ? ` You may also pay 2 life for each {${lifeFor(g, "opp", book).join("}/{")}}: the app does it when your mana runs short, keeping your life above what the player's creatures could hit for.` : ""}`,
+    `YOUR MANA RIGHT NOW: ${manaSummary(sources)}.${commanderOnly > 0 ? ` Plus ${commanderOnly} more that pays only for your commander.` : ""}${lifeFor(g, "opp", book).length ? ` You may also pay 2 life for each {${lifeFor(g, "opp", book).join("}/{")}}: the app does it when your mana runs short, keeping your life above what the player's creatures could hit for.` : ""}`,
     sinceLast.length ? `SINCE YOUR LAST TURN:\n${sinceLast.map((t) => `- ${t}`).join("\n")}` : "",
     `YOUR HAND:\n${hand.join("\n") || "(empty)"}`,
     command.length ? `YOUR COMMAND ZONE:\n${command.join("\n")}` : "",

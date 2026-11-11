@@ -31,6 +31,7 @@ function infoFrom(facts: CardFacts | undefined, fallback: { name: string; imageU
     keywords: facts?.keywords ?? [],
     producedMana: facts?.producedMana ?? [],
     ...(facts?.back ? { back: facts.back } : {}),
+    ...(facts?.loyalty != null ? { loyalty: facts.loyalty } : {}),
   };
 }
 

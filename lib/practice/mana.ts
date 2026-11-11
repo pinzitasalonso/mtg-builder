@@ -2,10 +2,11 @@
 // it. Colours are paid first (each from the source with the fewest other
 // uses), then the generic part. A source that makes two ({C}{C}) gives both
 // to the same payment; what's left over is lost, which is close enough.
+// A source that hurts (Ancient Tomb) is used after the ones that don't.
 
-import type { PlaytestState } from "../playtest";
+import type { PlayCard, PlaytestState } from "../playtest";
 import { infoOf, isCreature, isSick, manaOutput } from "./cards";
-import type { CardBook } from "./types";
+import type { CardBook, CardInfo } from "./types";
 
 export interface Cost {
   generic: number;
@@ -50,11 +51,26 @@ export interface Source {
   also?: number[];
   /** Makes all its mana at once: what the payment doesn't use floats. */
   float?: boolean;
+  /** The life using it costs (Ancient Tomb: 2). */
+  pain?: number;
 }
 
-/** Untapped permanents that can tap for mana now (creatures not summoning sick). */
-export function manaSources(side: PlaytestState, book: CardBook, turn: number, exclude: number[] = []): Source[] {
+/** A card's colours, from its mana cost. */
+export const colorsOfCost = (info: CardInfo | undefined): string[] => [...new Set([...(info?.manaCost ?? "").split(" // ")[0]!.matchAll(/[WUBRG]/g)].map((m) => m[0]))];
+
+/** Untapped permanents that can tap for mana now (creatures not summoning
+    sick). Each card's own conditions are checked: Mox Opal needs three
+    artifacts, Mox Amber a legendary creature or planeswalker (and gives its
+    colours), Chrome Mox the card exiled with it, Springleaf Drum a creature
+    to tap. Jeweled Lotus counts only with `commander` (the mana is for the
+    commander). */
+export function manaSources(side: PlaytestState, book: CardBook, turn: number, exclude: number[] = [], opts: { commander?: boolean } = {}): Source[] {
   const out: Source[] = [];
+  const typeOf = (c: PlayCard) => (c.token ? (c.typeLine ?? "") : (infoOf(book, c)?.typeLine ?? c.typeLine ?? "").split(" // ")[0]!);
+  const isArtifact = (c: PlayCard) => (c.token ? c.token.kind === "artifact" : /\bArtifact\b/.test(typeOf(c)));
+  const count = (what: string) =>
+    side.battlefield.filter((c) => (what === "creature" ? isCreature(book, c) : what === "artifact" ? isArtifact(c) : new RegExp(`\\b${what}\\b`, "i").test(typeOf(c)))).length;
+  const drums: PlayCard[] = [];
   for (const c of side.battlefield) {
     if (c.tapped || exclude.includes(c.iid)) continue;
     // A Treasure is one mana of any colour, used up when it's spent.
@@ -63,12 +79,33 @@ export function manaSources(side: PlaytestState, book: CardBook, turn: number, e
       continue;
     }
     const info = infoOf(book, c);
-    const made = manaOutput(info, c.typeLine);
+    const made = manaOutput(info, c.typeLine, !!c.flipped);
     if (!made) continue;
     if (isCreature(book, c) && isSick(book, c, turn)) continue;
-    // Lion's Eye Diamond costs the hand: not a source to pay with.
-    if (made.sacrifice && /discard your hand/i.test(info?.oracleText ?? "")) continue;
-    out.push({ iid: c.iid, name: c.name, colors: made.colors, amount: made.amount, sacrifice: made.sacrifice || undefined });
+    if (made.commanderOnly && !opts.commander) continue;
+    if (made.metalcraft && count("artifact") < 3) continue;
+    let colors = made.colors;
+    if (made.from === "legends") {
+      const legends = side.battlefield.filter((x) => /\bLegendary\b/.test(typeOf(x)) && /\b(Creature|Planeswalker)\b/.test(typeOf(x)));
+      colors = [...new Set(legends.flatMap((x) => colorsOfCost(infoOf(book, x))))];
+    } else if (made.from === "imprint") colors = c.imprint ?? [];
+    if (!colors.length) continue;
+    const amount = made.per ? count(made.per) - (made.input ?? 0) : made.amount;
+    if (amount <= 0) continue;
+    if (made.tapCreature) {
+      drums.push(c);
+      continue;
+    }
+    out.push({ iid: c.iid, name: c.name, colors, amount, sacrifice: made.sacrifice || undefined, pain: made.pain });
+  }
+  // Springleaf Drum: an untapped creature of yours is tapped with it (one
+  // that makes no mana itself, and a new one for each Drum).
+  const taken = new Set<number>();
+  for (const drum of drums) {
+    const helper = side.battlefield.find((c) => !c.tapped && !exclude.includes(c.iid) && isCreature(book, c) && !taken.has(c.iid) && !out.some((s) => s.iid === c.iid));
+    if (!helper) continue;
+    taken.add(helper.iid);
+    out.push({ iid: drum.iid, name: drum.name, colors: ["W", "U", "B", "R", "G"], amount: 1, also: [helper.iid] });
   }
   return out;
 }
@@ -89,6 +126,8 @@ export interface Payment {
   life: number;
   /** Units used of each source, by iid. */
   used: Record<number, number>;
+  /** The life the sources themselves cost (Ancient Tomb). */
+  pain: number;
 }
 
 export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?: number; lifeFor?: string[] } = {}): Payment | null {
@@ -104,7 +143,7 @@ export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?
 /** One try: `byLife` of the pips `lifeFor` covers are paid with life first;
     any of them mana can't pay is paid with life too. */
 function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: number }, lifeFor: string[], byLife: number): Payment | null {
-  const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors, sacrifice: !!s.sacrifice })));
+  const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors, sacrifice: !!s.sacrifice, pain: s.pain ?? 0 })));
   const used = new Set<number>();
   const take = (i: number) => used.add(i);
   const pick = (ok: (colors: string[]) => boolean) => {
@@ -116,7 +155,7 @@ function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: numbe
     units.forEach((u, i) => {
       if (used.has(i) || !ok(u.colors)) return;
       const tappedAlready = u.iid < 0 || [...used].some((j) => units[j]!.iid === u.iid);
-      const score = (u.iid < 0 ? -100 : 0) + (tappedAlready ? 0 : 100) + (u.sacrifice ? 50 : 0) + u.colors.length;
+      const score = (u.iid < 0 ? -100 : 0) + (tappedAlready ? 0 : 100) + (u.sacrifice ? 50 : 0) + (u.pain && !tappedAlready ? 30 : 0) + u.colors.length;
       if (score < bestScore) {
         best = i;
         bestScore = score;
@@ -155,7 +194,9 @@ function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: numbe
   }
   const counts: Record<number, number> = {};
   for (const i of used) counts[units[i]!.iid] = (counts[units[i]!.iid] ?? 0) + 1;
-  return { tap: [...new Set([...used].map((i) => units[i]!.iid))], life, used: counts };
+  const tap = [...new Set([...used].map((i) => units[i]!.iid))];
+  const pain = tap.reduce((n, iid) => n + (sources.find((x) => x.iid === iid)?.pain ?? 0), 0);
+  return { tap, life, used: counts, pain };
 }
 
 /** "5 mana: G G U C C" — for the AI's brief. */

@@ -2605,6 +2605,19 @@ button {
 .pt-card:has(+ .pt-card[data-stacked="same"]) .pt-card-btn {
   display: none;
 }
+/* A land under a different land shows only its left strip: its buttons go
+   there, one under the other. At the card's right edge they sat on top of
+   the land above it and looked like that land's. */
+.pt-card:has(+ .pt-card[data-stacked="other"]) .pt-card-btn {
+  left: 3px;
+  right: auto;
+}
+.pt-card:has(+ .pt-card[data-stacked="other"]) .pt-card-zoom {
+  top: calc(12% + 26px);
+}
+.pt-card:has(+ .pt-card[data-stacked="other"]) .pt-card-turn {
+  top: calc(12% + 52px);
+}
 /* The column of piles: the opponent's group, then yours. */
 .pt-vs {
   --pt-pile: calc(var(--pt-card) * 0.6);
@@ -3008,6 +3021,20 @@ button {
   }
   .pt-card[data-stacked] {
     margin-left: 0;
+  }
+  /* No pile here: every land keeps its buttons, where they always are. */
+  .pt-card:has(+ .pt-card[data-stacked]) .pt-card-menu,
+  .pt-card:has(+ .pt-card[data-stacked]) .pt-card-turn {
+    display: flex;
+    left: auto;
+    right: 4px;
+  }
+  .pt-card:has(+ .pt-card[data-stacked]) .pt-card-turn {
+    top: calc(12% + 26px);
+  }
+  .pt-card:has(+ .pt-card[data-stacked="other"]) .pt-card-zoom {
+    left: 4px;
+    top: 12%;
   }
   .pt-opp > .pt-side-cards,
   .pt-vs .pt-mine > .pt-side-cards {
@@ -3556,6 +3583,35 @@ button {
   }
   .pt-table .pt-hand[data-up]:has(.pt-hand-handle) {
     padding-top: 40px;
+  }
+  /* The mulligan: your hand stays up, and nothing is on the board yet. Each
+     side is one short line above the hand (the counts in a row, the
+     commander small), so the hand doesn't cut your side in half. */
+  .pt-table[data-mode="mulligan"] .pt-main {
+    padding-bottom: calc(clamp(84px, 12vw, 110px) * 1.4 + 26px);
+    align-content: start;
+  }
+  .pt-table[data-mode="mulligan"] .pt-opp,
+  .pt-table[data-mode="mulligan"] .pt-mine {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pt-table[data-mode="mulligan"] .pt-side-cards {
+    display: none;
+  }
+  .pt-table[data-mode="mulligan"] .pt-meta {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 2px 14px;
+  }
+  .pt-table[data-mode="mulligan"] .pt-cmdzone {
+    flex-direction: row;
+    gap: 6px;
+  }
+  .pt-table.pt-vs[data-mode="mulligan"] .pt-field .pt-cmdzone .pt-card {
+    width: 32px;
+  }
+  .pt-table[data-mode="mulligan"] .pt-cmdzone .pt-card-btn {
+    display: none;
   }
   .pt-table .pt-hand[data-up] .pt-hand-cards {
     align-items: flex-end;
