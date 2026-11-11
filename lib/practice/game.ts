@@ -69,7 +69,7 @@ import {
 } from "./abilities";
 import { triggersOf, type Outcome } from "./triggers";
 import { manaSources, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
-import { other, type CardBook, type Choice, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
+import { type PendingTax, other, type CardBook, type Choice, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
   name: string;
@@ -201,7 +201,8 @@ function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook) {
 
 /** A seat drew cards: the other side's "whenever an opponent draws a card".
     Nekusar deals its damage. Smothering Tithe makes a Treasure: the table
-    takes it that nobody pays the {2}, which is how it goes at most tables. */
+    asks you (payTax, declineTax) when you could pay; the AI never pays
+    it, which is how it goes at most tables. */
 function opponentDrew(g: PracticeGame, seat: Seat, n: number, book: CardBook) {
   const owner = other(seat);
   for (const c of [...g.sides[owner].battlefield]) {
@@ -211,11 +212,72 @@ function opponentDrew(g: PracticeGame, seat: Seat, n: number, book: CardBook) {
       say(g, owner, `${faceName(c)} deals ${t.damage * n} damage to ${seat === "you" ? "you" : "the opponent"}.`);
       loseLife(g, seat, t.damage * n, book);
     }
-    if (t.treasure) {
+    if (t.treasure && seat === "you" && canPayTax(g, t.pay, book)) {
+      // Yours to decide, a card at a time: pay {2}, or it makes a Treasure.
+      owe(g, { source: faceName(c), cost: t.pay, count: n, gives: "treasure" });
+    } else if (t.treasure) {
       addTokens(g, owner, { name: "Treasure", power: 0, toughness: 0, keywords: [], kind: "artifact" }, n);
       say(g, owner, `${faceName(c)}: ${seat === "you" ? "you don't" : "the opponent doesn't"} pay {${t.pay}}; ${owner === "you" ? "you make" : "the opponent makes"} ${n === 1 ? "a Treasure" : `${n} Treasures`}.`);
     }
   }
+}
+
+/** Could you pay this much now, from your untapped mana (no life)? */
+function canPayTax(g: PracticeGame, cost: number, book: CardBook): boolean {
+  const paid = youPay(g, parseCost(`{${cost}}`), availableMana(g, "you", book), book);
+  return !!paid && !paid.life;
+}
+
+/** A tax waits for your answer: one line per card asking. */
+function owe(g: PracticeGame, tax: PendingTax) {
+  const had = (g.taxes ?? []).find((t) => t.source === tax.source && t.cost === tax.cost && t.gives === tax.gives);
+  if (had) had.count += tax.count;
+  else g.taxes = [...(g.taxes ?? []), tax];
+}
+
+/** A tax goes unpaid, `times` over: the opponent draws, or makes Treasures. */
+function unpaid(g: PracticeGame, tax: PendingTax, times: number, book: CardBook) {
+  if (tax.gives === "draw") {
+    const k = Math.min(times, g.sides.opp.library.length);
+    say(g, "opp", `${tax.source}: you don't pay {${tax.cost}}; the opponent draws ${k === 1 ? "a card" : `${k} cards`}.`);
+    if (k) drawCards(g, "opp", k, book);
+  } else {
+    addTokens(g, "opp", { name: "Treasure", power: 0, toughness: 0, keywords: [], kind: "artifact" }, times);
+    say(g, "opp", `${tax.source}: you don't pay {${tax.cost}}; the opponent makes ${times === 1 ? "a Treasure" : `${times} Treasures`}.`);
+  }
+}
+
+/** Can the tax that's waiting be paid right now? */
+export const canPayNextTax = (g: PracticeGame, book: CardBook) => !!g.taxes?.[0] && canPayTax(g, g.taxes[0].cost, book);
+
+/** You pay the tax that's waiting, once: its mana is tapped. */
+export function payTax(g0: PracticeGame, book: CardBook): PracticeGame {
+  const tax = g0.taxes?.[0];
+  if (!tax || g0.winner) return g0;
+  const g = structuredClone(g0);
+  const sources = availableMana(g, "you", book);
+  const paid = youPay(g, parseCost(`{${tax.cost}}`), sources, book);
+  if (!paid || paid.life) return g0;
+  spend(g, "you", paid, sources);
+  say(g, "you", `You pay {${tax.cost}} for ${tax.source}.`);
+  const left = g.taxes![0]!;
+  left.count -= 1;
+  if (left.count <= 0) g.taxes = g.taxes!.slice(1);
+  if (!g.taxes!.length) delete g.taxes;
+  checkState(g, book);
+  return g;
+}
+
+/** You don't pay the tax that's waiting (all it's owed): the opponent gets it. */
+export function declineTax(g0: PracticeGame, book: CardBook): PracticeGame {
+  const tax = g0.taxes?.[0];
+  if (!tax) return g0;
+  const g = structuredClone(g0);
+  g.taxes = g.taxes!.slice(1);
+  if (!g.taxes.length) delete g.taxes;
+  if (!g.winner) unpaid(g, tax, tax.count, book);
+  checkState(g, book);
+  return g;
 }
 
 /** Carry out a trigger's outcome (lib/practice/triggers.ts) for its controller. */
@@ -589,6 +651,9 @@ export function endTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   if (g0.winner) return g0;
   const g = structuredClone(g0);
   g.combat = null;
+  // A tax left unanswered wasn't paid.
+  for (const tax of g.taxes ?? []) unpaid(g, tax, tax.count, book);
+  delete g.taxes;
   // Damage and "until end of turn" wear off (the cleanup, here before the
   // end step's checks, which only touch players and copies).
   for (const seat of ["you", "opp"] as Seat[]) {
@@ -1030,14 +1095,11 @@ function castTriggers(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBo
   castTaxes(g, seat, spell, book);
 }
 
-/** The most a player pays for a tax by itself: {1} for Rhystic Study, yes;
-    more than {2} is their call, so the table doesn't spend it for them. */
-const AUTO_PAY_MAX = 2;
-
 /** "Whenever an opponent casts a spell, you may draw a card unless that
     player pays {1}" (Rhystic Study, Esper Sentinel), on the other side of
-    the table. The caster pays when it has the mana left after the spell:
-    the AI whenever it can, you up to {2}. Otherwise the other side draws. */
+    the table. The AI pays whenever it has the mana left after the spell.
+    You are asked (payTax, declineTax), when you could pay; when you
+    couldn't, the other side draws at once. */
 function castTaxes(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBook) {
   const owner = other(seat);
   const creature = /\bCreature\b/.test((infoOf(book, spell)?.typeLine ?? spell.typeLine ?? "").split(" // ")[0]!);
@@ -1055,7 +1117,11 @@ function castTaxes(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBook)
     const name = faceName(c);
     const sources = availableMana(g, seat, book);
     const price = parseCost(`{${cost}}`);
-    const paid = seat === "you" ? (cost <= AUTO_PAY_MAX ? youPay(g, price, sources, book) : null) : aiPay(g, seat, price, sources, book);
+    if (seat === "you" && canPayTax(g, cost, book)) {
+      owe(g, { source: name, cost, count: 1, gives: "draw" });
+      continue;
+    }
+    const paid = seat === "you" ? null : aiPay(g, seat, price, sources, book);
     if (paid && !paid.life) {
       spend(g, seat, paid, sources);
       say(g, seat, `${who(seat)} ${verb(seat, "pay")} {${cost}} for ${name}.`);

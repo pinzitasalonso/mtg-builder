@@ -13,7 +13,7 @@ import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
 import { tapTribeOf, untapLandsOf } from "@/lib/practice/abilities";
-import { playerDraws, concede,
+import { canPayNextTax, declineTax, payTax, playerDraws, concede,
   addCounters,
   adjustLife,
   aiEndStep,
@@ -1032,6 +1032,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const zoomLive = zoom !== null && !!findCard(game, zoom.card.iid);
   const pileCards = pile ? [...game.sides[pile.seat][pile.zone]].reverse() : [];
 
+  const tax = game.taxes?.[0] ?? null;
   const choicePrompt = game.choice
     ? `${game.choice.source}: ${
         game.choice.kind === "discard"
@@ -1234,6 +1235,22 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                 ))}
               <button type="button" className="pt-btn" onClick={() => game && ninjaRef.current?.(game)}>
                 To damage
+              </button>
+            </div>
+          )}
+          {/* The opponent's card asks you to pay, or it gets something
+              (Rhystic Study, Smothering Tithe): yours to decide. */}
+          {tax && mode !== "over" && (
+            <div className="pt-choice pt-tax" role="group" aria-label={`${tax.source}: pay or not`}>
+              <span>
+                <b>{tax.source}</b>: pay {`{${tax.cost}}`}
+                {tax.count > 1 ? ` (${tax.count} times owed)` : ""}, or the opponent {tax.gives === "draw" ? "draws a card" : "makes a Treasure"}.
+              </span>
+              <button type="button" className="pt-btn pt-btn-gold" disabled={!canPayNextTax(game, book)} onClick={() => act((g) => payTax(g, book))}>
+                Pay {`{${tax.cost}}`}
+              </button>
+              <button type="button" className="pt-btn" onClick={() => act((g) => declineTax(g, book))}>
+                Don&apos;t pay
               </button>
             </div>
           )}
