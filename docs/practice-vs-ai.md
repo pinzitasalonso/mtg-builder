@@ -321,13 +321,20 @@ side does.
      defender": Arcades; any creature: Soul Warden);
    - **another creature dying** (Zulaport Cutthroat);
    - **an opponent drawing**: Nekusar's damage, and Smothering Tithe's
-     Treasure (the table takes it that nobody pays the {2}); the Draw
-     button counts (`playerDraws`);
+     Treasure; the Draw button counts (`playerDraws`);
    - **an opponent casting**, unless they pay (Rhystic Study, Esper
-     Sentinel: `castTaxes`). The caster pays when it has the mana left after
-     the spell: the AI whenever it can, you up to {2} by yourself. Otherwise
-     the other side draws. Mystic Remora is left alone: its cumulative
+     Sentinel: `castTaxes`). Mystic Remora is left alone: its cumulative
      upkeep isn't kept.
+
+   **Paying, or not, is yours to decide.** When the AI's card says "unless
+   that player pays", the table asks: "Rhystic Study: pay {1}, or the
+   opponent draws a card", with **Pay {1}** and **Don't pay**
+   (`PracticeGame.taxes`, `payTax`, `declineTax`). Smothering Tithe asks
+   for each card you draw, and you can pay for some of them. There's
+   nothing to ask when you couldn't pay: it happens at once. A payment left
+   unanswered when the turn ends wasn't made. The AI decides for itself:
+   it pays Rhystic Study when it has the mana left after its spell, and
+   never pays Smothering Tithe.
 
    One rule keeps it honest: a trigger is carried out only when the table
    can do **all** of what it says. Its vocabulary is small: draw, gain or

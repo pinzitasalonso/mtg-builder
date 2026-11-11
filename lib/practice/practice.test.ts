@@ -11,6 +11,9 @@ import {
   createTokens,
   finishSearch,
   indestructible,
+  canPayNextTax,
+  declineTax,
+  payTax,
   playerCast,
   playerDraws,
   playerEnters,
@@ -1218,17 +1221,58 @@ describe("the triggers most decks are full of", () => {
     expect(drew.sides.you.hand).toHaveLength(tight.sides.you.hand.length + 1);
   });
 
-  it("the AI's Rhystic Study: you pay {1} by yourself when a land is left, else it draws", () => {
+  it("the AI's Rhystic Study asks you: pay {1}, or it draws", () => {
     let g = table({ youHand: ["Llanowar Elves"], youField: ["Forest", "Forest"], oppField: ["Rhystic Study"] });
     g = { ...g, active: "you" };
-    const paid = playerCast(g, iidOf(g, "you", "Llanowar Elves", "hand"), BOOK);
+    const asked = playerCast(g, iidOf(g, "you", "Llanowar Elves", "hand"), BOOK);
+    // Nothing happens until you answer.
+    expect(asked.taxes).toEqual([{ source: "Rhystic Study", cost: 1, count: 1, gives: "draw" }]);
+    expect(asked.sides.opp.hand).toHaveLength(g.sides.opp.hand.length);
+    expect(canPayNextTax(asked, BOOK)).toBe(true);
+
+    const paid = payTax(asked, BOOK);
+    expect(paid.taxes).toBeUndefined();
     expect(paid.sides.you.battlefield.filter((c) => c.name === "Forest" && c.tapped)).toHaveLength(2);
     expect(paid.sides.opp.hand).toHaveLength(g.sides.opp.hand.length);
+    expect(said(paid, "You pay {1} for Rhystic Study.")).toBe(true);
 
+    const refused = declineTax(asked, BOOK);
+    expect(refused.taxes).toBeUndefined();
+    expect(refused.sides.you.battlefield.filter((c) => c.name === "Forest" && c.tapped)).toHaveLength(1);
+    expect(refused.sides.opp.hand).toHaveLength(g.sides.opp.hand.length + 1);
+  });
+
+  it("with nothing to pay it with, there's nothing to ask: it draws", () => {
     let tight = table({ youHand: ["Llanowar Elves"], youField: ["Forest"], oppField: ["Rhystic Study"] });
     tight = { ...tight, active: "you" };
     const drew = playerCast(tight, iidOf(tight, "you", "Llanowar Elves", "hand"), BOOK);
+    expect(drew.taxes).toBeUndefined();
     expect(drew.sides.opp.hand).toHaveLength(tight.sides.opp.hand.length + 1);
+  });
+
+  it("the AI's Smothering Tithe asks you for each card you draw, and you can pay for some", () => {
+    let g = table({ youField: ["Forest", "Forest", "Forest"], oppField: ["Smothering Tithe"] });
+    g = startTurn({ ...g, active: "you", turn: 4 }, BOOK);
+    expect(g.taxes).toEqual([{ source: "Smothering Tithe", cost: 2, count: 1, gives: "treasure" }]);
+    g = playerDraws(g, 1, BOOK);
+    expect(g.taxes).toEqual([{ source: "Smothering Tithe", cost: 2, count: 2, gives: "treasure" }]);
+    // Pay for one (two of the three lands), and leave the other.
+    g = payTax(g, BOOK);
+    expect(g.taxes?.[0]?.count).toBe(1);
+    expect(canPayNextTax(g, BOOK)).toBe(false);
+    expect(payTax(g, BOOK)).toBe(g);
+    g = declineTax(g, BOOK);
+    expect(count(g, "opp", "Treasure")).toBe(1);
+    expect(g.taxes).toBeUndefined();
+  });
+
+  it("a payment left unanswered at the end of the turn wasn't made", () => {
+    let g = table({ youHand: ["Llanowar Elves"], youField: ["Forest", "Forest"], oppField: ["Rhystic Study"] });
+    g = { ...g, active: "you" };
+    const asked = playerCast(g, iidOf(g, "you", "Llanowar Elves", "hand"), BOOK);
+    const after = endTurn(asked, BOOK);
+    expect(after.taxes).toBeUndefined();
+    expect(said(after, "Rhystic Study: you don't pay {1}; the opponent draws a card.")).toBe(true);
   });
 
   it("a creature dying drains, for the side that has the trigger", () => {

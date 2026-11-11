@@ -2411,6 +2411,19 @@ button {
   pointer-events: none;
   animation: pt-spot-in 0.18s ease-out;
 }
+/* A payment the opponent's card asks for: under a choice, when both wait. */
+.pt-tax {
+  top: 160px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 2px;
+  max-width: min(92%, 640px);
+}
+.pt-tax b {
+  color: #fdf26f;
+}
 .pt-choice .pt-btn {
   margin-left: 10px;
   padding: 4px 12px;
@@ -3493,6 +3506,9 @@ button {
     top: 6px;
     font-size: 12px;
     padding: 6px 12px;
+  }
+  .pt-table .pt-tax {
+    top: 44px;
   }
 
   /* The hand: a strip of card tops, raised over the board by a tap. */

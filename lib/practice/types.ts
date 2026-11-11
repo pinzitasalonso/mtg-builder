@@ -75,6 +75,22 @@ export interface PracticeGame {
   attacked?: number[];
   once?: number[];
   mayCast?: number[];
+  /** What the player may pay to stop the opponent's card (Rhystic Study,
+      Smothering Tithe), waiting for their answer: pay, or don't. */
+  taxes?: PendingTax[];
+}
+
+/** "…unless that player pays {1}": the player's to decide. Unanswered at
+    the end of the turn, it wasn't paid. */
+export interface PendingTax {
+  /** The opponent's card asking. */
+  source: string;
+  /** Generic mana, each time. */
+  cost: number;
+  /** How many times it's owed (a card drawn each, for Smothering Tithe). */
+  count: number;
+  /** What the opponent gets each time it isn't paid. */
+  gives: "draw" | "treasure";
 }
 
 /** What the player picks: a card from their hand to discard, or one of
