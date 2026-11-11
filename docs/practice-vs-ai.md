@@ -257,6 +257,15 @@ side does.
      does it after your blocks (`aiNinjutsu`): a ninja with a hit trigger
      first, for its least valuable unblocked attacker. Ninjutsu isn't a
      cast: no commander tax, no counterspell;
+   - **Sneak** (the Turtles: "Sneak {W}") is the same moment and the same
+     buttons ("Sneak X for Y"), read by `ninjutsuOf` too. It's a cast, for
+     the sneak cost: your cast triggers and the other side's taxes see it,
+     a creature enters tapped and attacking and its "when this enters"
+     happens, and from the command zone the tax is paid and goes up. A
+     sneaked instant or sorcery (Splinter's Technique) goes to your
+     graveyard for you to resolve (a tutor opens the library search), the
+     attacker goes back, and nothing attacks in its place. The AI sneaks
+     creatures only. The AI doesn't counter a sneaked spell;
    - "Whenever a Ninja you control deals combat damage to a player"
      (`hitTriggersOf`): Yuriko's reveal (the card goes to its owner's hand
      and the other player loses its mana value) and a card (Ingenious
@@ -343,6 +352,61 @@ side does.
    Clue. Anything else in the sentence ("for each…", "if you control…", a
    target) and the trigger is left to you, or to the model's plan, as
    before. Two triggers of one kind on a card are both left alone.
+
+   **Fast mana follows each card's own rules** (`manaOutput` in
+   `lib/practice/cards.ts`, `manaSources` in `lib/practice/mana.ts`). A
+   permanent is a mana source only for an ability of its own, "cost: add
+   …", that taps or sacrifices it: reminder text and the abilities it gives
+   to other things don't count, so Dockside Extortionist, Smothering Tithe
+   and Wild Growth make nothing by themselves. What it makes is what the
+   ability adds, less what goes in: Black Lotus and Jeweled Lotus three, a
+   Signet one, Gaea's Cradle one for each creature, Cabal Coffers one for
+   each Swamp less its {2}. Then the conditions:
+   - **Mana Vault, Grim Monolith, Basalt Monolith** don't untap in the
+     untap step (`staysTapped`); a tapped Mana Vault deals 1 at the draw
+     step. Paying to untap them is left to you; the AI doesn't;
+   - **Mana Crypt** flips its coin at each upkeep (`coin.flip`);
+   - **Mox Opal** needs three artifacts; **Mox Amber** makes the colours of
+     your legendary creatures and planeswalkers, and nothing without one;
+   - **Mox Diamond** asks you for a land card ("Don't discard" sends it to
+     the graveyard); the AI discards the land it has most of, and doesn't
+     cast it with no land in hand;
+   - **Chrome Mox** asks you for a nonartifact, nonland card to exile, and
+     makes that card's colours (`PlayCard.imprint`); the AI exiles its most
+     expensive coloured card;
+   - **Jeweled Lotus** pays only for a commander (`availableMana`'s
+     `commander` option);
+   - **Springleaf Drum** needs an untapped creature that makes no mana
+     itself, and taps it;
+   - **Ancient Tomb** deals its 2 each time it's tapped for mana, and is
+     tapped after the lands that don't hurt (`Source.pain`). A card with a
+     painless ability as well (a Talisman, a pain land) never hurts;
+   - **City of Traitors** is sacrificed when its controller plays another
+     land;
+   - **Lion's Eye Diamond** and the **Spirit Guides** aren't sources. A card
+     with no mana cost (**Lotus Bloom**, Mox Tantalite) can't be cast by the
+     AI: suspend isn't played.
+
+   **Planeswalkers** show their loyalty on the card (`loyaltyOf`: the
+   starting loyalty from Scryfall until it changes). The ⋯ menu has "+1
+   loyalty" and "−1 loyalty" for yours and the opponent's (`addLoyalty`);
+   with none left it goes to the graveyard. Loyalty abilities themselves
+   are yours to resolve, and attacks only go at players.
+
+   **The hand at the end of the turn.** With more than seven cards when
+   you end your turn, the table asks for a discard, one card at a time,
+   until you hold seven (`playerCleanup`), after the AI's end-of-turn
+   removal. The AI discards down by itself in `endTurn`. "You have no
+   maximum hand size" (Reliquary Tower, Thought Vessel) on a side's
+   battlefield lifts it for that side (`maxHandSize`).
+
+   **A commander that dies or is exiled goes to its command zone** instead
+   (`moveTo`), from wherever it was sent: combat, removal, a sacrifice, or
+   your "Destroy" and "Exile" in the ⋯ menu of the opponent's commander. The
+   log says so after the line that tells of the move. It's cast again from
+   there for {2} more each time, as before. Returned to hand, it stays in
+   hand. Your own commander goes where you put it when you move it by hand
+   (the ⋯ menu still has "Command zone").
 
    **Removal** the AI casts on your turn (`removalOf`) reads the wider
    targets a creature fits: a permanent (Beast Within, Generous Gift,

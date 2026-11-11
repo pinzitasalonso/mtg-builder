@@ -17,6 +17,7 @@ export interface ScryfallCard {
     type_line?: string;
     power?: string;
     toughness?: string;
+    loyalty?: string;
   }[];
   mana_cost?: string;
   type_line?: string;
@@ -31,6 +32,7 @@ export interface ScryfallCard {
   toughness?: string;
   keywords?: string[];
   produced_mana?: string[];
+  loyalty?: string;
 }
 
 // The card shape the rest of the app speaks — API responses, pool rows, UI.
@@ -650,6 +652,8 @@ export interface CardFacts {
   producedMana: string[];
   /** A transforming card's back face: its stats (Kefka, Ruler of Ruin). */
   back?: { power: number | null; toughness: number | null };
+  /** A planeswalker's starting loyalty. */
+  loyalty?: number;
 }
 
 const parseStat = (raw: string | undefined): number | null => {
@@ -676,6 +680,7 @@ export function toCardFacts(c: ScryfallCard): CardFacts {
     keywords: Array.isArray(c.keywords) ? c.keywords : [],
     producedMana: Array.isArray(c.produced_mana) ? c.produced_mana : [],
     ...(faces[1]?.power != null ? { back: { power: parseStat(faces[1].power), toughness: parseStat(faces[1].toughness) } } : {}),
+    ...((c.loyalty ?? front?.loyalty) != null ? { loyalty: parseStat(c.loyalty ?? front?.loyalty) ?? 0 } : {}),
   };
 }
 

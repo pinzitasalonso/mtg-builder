@@ -14,16 +14,20 @@ import {
   canPlayAsLand,
   cardTypes,
   castTriggerOf,
+  coinFlipPainOf,
   counterOf,
   discardTriggerOf,
   drawsOnLifeLoss,
   edictOf,
+  entersForALand,
   entersTapped,
   faceText,
   fetchOf,
+  goesWhenALandIsPlayed,
   has,
   hasAltCost,
   hitTriggersOf,
+  imprintsFromHand,
   indestructibleOnYourTurn,
   infoOf,
   isBlue,
@@ -34,9 +38,12 @@ import {
   lifeForMana,
   manaOutput,
   ninjutsuOf,
+  noMaxHandSize,
   removalOf,
   shockLife,
   stats,
+  staysTapped,
+  tappedPainOf,
   type Edict,
   type SearchAbility,
 } from "./cards";
@@ -68,7 +75,7 @@ import {
   winotaOf,
 } from "./abilities";
 import { triggersOf, type Outcome } from "./triggers";
-import { manaSources, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
+import { colorsOfCost, manaSources, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
 import { type PendingTax, other, type CardBook, type Choice, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
@@ -144,8 +151,18 @@ export function newGame(input: {
 
 function say(g: PracticeGame, seat: Seat | null, text: string, card?: PlayCard) {
   g.log.push(card ? { seat, text, card: { iid: card.iid, name: card.name, imageUri: card.imageUri } } : { seat, text });
+  // What a move had to add goes after the line that tells of the move.
+  const notes = afterNext.get(g);
+  if (notes) {
+    afterNext.delete(g);
+    for (const n of notes) g.log.push(n);
+  }
   if (g.log.length > LOG_CAP) g.log.splice(0, g.log.length - LOG_CAP);
 }
+
+/** Log lines a move adds after the line that tells of it ("X dies." then
+    "X goes to the command zone"): held until the next line is written. */
+const afterNext = new WeakMap<PracticeGame, { seat: Seat | null; text: string }[]>();
 
 export function findCard(g: PracticeGame, iid: number): { seat: Seat; zone: Zone; card: PlayCard } | null {
   for (const seat of ["you", "opp"] as Seat[]) {
@@ -157,10 +174,18 @@ export function findCard(g: PracticeGame, iid: number): { seat: Seat; zone: Zone
   return null;
 }
 
-/** Move a card within its owner's zones; a token leaving play is gone. */
-function moveTo(g: PracticeGame, iid: number, to: Zone, opts: { tapped?: boolean; bottom?: boolean } = {}) {
+/** Move a card within its owner's zones; a token leaving play is gone. A
+    commander that would go to a graveyard or to exile goes to the command
+    zone instead (its owner may, and almost always does): it's cast again
+    from there, for {2} more each time. `exact`: put it where asked (your
+    own commander, moved by hand). */
+function moveTo(g: PracticeGame, iid: number, to: Zone, opts: { tapped?: boolean; bottom?: boolean; exact?: boolean } = {}) {
   const at = findCard(g, iid);
   if (!at) return;
+  if (at.card.commander && !at.card.copy && !opts.exact && g.commanderGame && (to === "graveyard" || to === "exile") && at.zone !== "command") {
+    afterNext.set(g, [...(afterNext.get(g) ?? []), { seat: at.seat, text: `${at.card.name} goes to the command zone instead of ${to === "exile" ? "exile" : "the graveyard"}.` }]);
+    to = "command";
+  }
   // The Auras on a permanent that leaves go to the graveyard.
   if (at.zone === "battlefield" && to !== "battlefield") {
     for (const s of ["you", "opp"] as Seat[]) for (const a of g.sides[s].battlefield.filter((c) => c.attachedTo === iid)) moveTo(g, a.iid, "graveyard");
@@ -258,7 +283,7 @@ export function payTax(g0: PracticeGame, book: CardBook): PracticeGame {
   const sources = availableMana(g, "you", book);
   const paid = youPay(g, parseCost(`{${tax.cost}}`), sources, book);
   if (!paid || paid.life) return g0;
-  spend(g, "you", paid, sources);
+  spend(g, "you", paid, sources, book);
   say(g, "you", `You pay {${tax.cost}} for ${tax.source}.`);
   const left = g.taxes![0]!;
   left.count -= 1;
@@ -356,6 +381,14 @@ function checkState(g: PracticeGame, book: CardBook) {
       }
     }
     if (!died) break;
+  }
+  // A planeswalker with no loyalty left goes to the graveyard.
+  for (const seat of ["you", "opp"] as Seat[]) {
+    for (const c of [...g.sides[seat].battlefield]) {
+      if (c.loyalty === undefined || c.loyalty > 0) continue;
+      moveTo(g, c.iid, "graveyard");
+      say(g, seat, `${c.name} has no loyalty left: it goes to the graveyard.`);
+    }
   }
   if (g.winner) return;
   for (const seat of ["you", "opp"] as Seat[]) {
@@ -474,11 +507,11 @@ function loseLife(g: PracticeGame, seat: Seat, n: number, book: CardBook) {
 
 /** What a seat can pay with now: its floating mana, then its untapped
     sources. */
-export function availableMana(g: PracticeGame, seat: Seat, book: CardBook, exclude: number[] = []): Source[] {
+export function availableMana(g: PracticeGame, seat: Seat, book: CardBook, exclude: number[] = [], opts: { commander?: boolean } = {}): Source[] {
   const side = g.sides[seat];
   // Vivi and Selvala make mana their own way (below), not by tapping for one.
   const special = (c: PlayCard) => !!powerManaOf(book, c) || !!greatestPowerManaOf(book, c);
-  const all = manaSources(side, book, g.turn, exclude).filter((s) => !special(side.battlefield.find((c) => c.iid === s.iid) ?? ({} as PlayCard)));
+  const all = manaSources(side, book, g.turn, exclude, opts).filter((s) => !special(side.battlefield.find((c) => c.iid === s.iid) ?? ({} as PlayCard)));
   const ready = (c: PlayCard) => !c.tapped && !exclude.includes(c.iid) && !(isCreature(book, c) && isSick(book, c, g.turn));
   // 'Other Elves you control have "{T}: Add {G} or {U}."' (Thranduil the Strategist)
   for (const granter of side.battlefield) {
@@ -515,7 +548,7 @@ export function availableMana(g: PracticeGame, seat: Seat, book: CardBook, exclu
 
 /** Pay: tap the sources (sacrificing the one-shot ones) and spend the
     floating mana that was used. */
-function spend(g: PracticeGame, seat: Seat, paid: Payment, sources: Source[]) {
+function spend(g: PracticeGame, seat: Seat, paid: Payment, sources: Source[], book: CardBook) {
   const floating = new Set(paid.tap.filter((t) => t < 0).map((t) => -t - 1));
   if (floating.size && g.pool) g.pool[seat] = g.pool[seat].filter((_, i) => !floating.has(i));
   for (const t of paid.tap) {
@@ -528,6 +561,11 @@ function spend(g: PracticeGame, seat: Seat, paid: Payment, sources: Source[]) {
     } else if (src?.once) g.once = [...(g.once ?? []), t];
     else update(g, t, (c) => ({ ...c, tapped: true }));
     for (const a of src?.also ?? []) update(g, a, (c) => ({ ...c, tapped: true }));
+    // Ancient Tomb: the mana hurts.
+    if (src?.pain) {
+      say(g, seat, `${src.name} deals ${src.pain} damage to ${seat === "you" ? "you" : "the opponent"}.`);
+      loseLife(g, seat, src.pain, book);
+    }
     // Vivi, Selvala: all of it at once; what this payment leaves floats.
     if (src?.float) {
       const left = src.amount - (paid.used[t] ?? 0);
@@ -555,7 +593,9 @@ function lifeFloor(g: PracticeGame, seat: Seat, book: CardBook): number {
 function aiPay(g: PracticeGame, seat: Seat, cost: Cost, sources: Source[], book: CardBook, opts: { x?: number; life?: number } = {}) {
   const paid = payCost(cost, sources, { ...opts, lifeFor: lifeFor(g, seat, book) });
   if (!paid) return null;
-  if (paid.life > (opts.life ?? 0) && g.sides[seat].life - paid.life < lifeFloor(g, seat, book)) return null;
+  // The life its lands cost (Ancient Tomb) counts too.
+  const life = paid.life + paid.pain;
+  if (life > (opts.life ?? 0) && g.sides[seat].life - life < lifeFloor(g, seat, book)) return null;
   return paid;
 }
 
@@ -573,7 +613,7 @@ function aiLandEnters(g: PracticeGame, seat: Seat, land: PlayCard, book: CardBoo
   const shock = shockLife(info);
   const untappedShock = shock > 0 && g.sides[seat].life > 6;
   moveTo(g, land.iid, "battlefield", { tapped: shock > 0 ? !untappedShock : entersTapped(info) });
-  landEntered(g, seat, book);
+  landEntered(g, seat, book, land.iid);
   if (untappedShock) {
     say(g, seat, `${who(seat)} pay${seat === "you" ? "" : "s"} ${shock} life for ${land.name} to enter untapped.`);
     loseLife(g, seat, shock, book);
@@ -619,7 +659,8 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   const g = structuredClone(g0);
   const seat = g.active;
   const side = g.sides[seat];
-  g.sides[seat] = { ...side, battlefield: side.battlefield.map((c) => ({ ...c, tapped: false })) };
+  // Untap, but not what "doesn't untap during your untap step" (Mana Vault).
+  g.sides[seat] = { ...side, battlefield: side.battlefield.map((c) => (c.tapped && staysTapped(book, c) ? c : { ...c, tapped: false })) };
   g.landPlayed = false;
   g.attacked = [];
   g.once = [];
@@ -640,8 +681,43 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
     const out = triggersOf(book, c).upkeep;
     if (out && !g.winner) applyOutcome(g, seat, c, out, book);
   }
+  for (const c of [...g.sides[seat].battlefield]) {
+    // Mana Crypt: "flip a coin. If you lose the flip, it deals 3 damage to you."
+    const flip = coinFlipPainOf(book, c);
+    if (!flip || g.winner) continue;
+    if (coin.flip()) say(g, seat, `${c.name}: ${seat === "you" ? "you win" : "the opponent wins"} the flip.`);
+    else {
+      say(g, seat, `${c.name}: ${seat === "you" ? "you lose" : "the opponent loses"} the flip, and it deals ${flip} damage to ${seat === "you" ? "you" : "the opponent"}.`);
+      loseLife(g, seat, flip, book);
+    }
+  }
   if (g.turn > 1 && !g.winner) drawCards(g, seat, 1, book);
+  // Mana Vault, still tapped at the draw step.
+  for (const c of g.sides[seat].battlefield) {
+    const pain = c.tapped ? tappedPainOf(book, c) : 0;
+    if (!pain || g.winner) continue;
+    say(g, seat, `${c.name} is tapped: it deals ${pain} damage to ${seat === "you" ? "you" : "the opponent"}.`);
+    loseLife(g, seat, pain, book);
+  }
   checkState(g, book);
+  return g;
+}
+
+/** The coin for Mana Crypt: true wins the flip. A test sets it. */
+export const coin = { flip: () => Math.random() < 0.5 };
+
+/** The most cards a seat may keep at the end of its turn: seven, or none
+    to speak of with "You have no maximum hand size" (Reliquary Tower). */
+export const maxHandSize = (g: PracticeGame, seat: Seat, book: CardBook) => (g.sides[seat].battlefield.some((c) => noMaxHandSize(book, c)) ? Infinity : 7);
+
+/** The end of your turn with more than seven cards in hand: the game asks
+    for a discard (call it again until it changes nothing). */
+export function playerCleanup(g0: PracticeGame, book: CardBook): PracticeGame {
+  if (g0.winner || g0.choice || g0.active !== "you") return g0;
+  const over = g0.sides.you.hand.length - maxHandSize(g0, "you", book);
+  if (over <= 0) return g0;
+  const g = structuredClone(g0);
+  g.choice = { kind: "discard", source: "The end of your turn", by: "you", loot: true, cleanup: true };
   return g;
 }
 
@@ -662,6 +738,18 @@ export function endTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   }
   endStep(g, book);
   if (g.winner) return g;
+  // The AI discards down to seven (you're asked: playerCleanup).
+  if (g.active === "opp") {
+    const max = maxHandSize(g, "opp", book);
+    const gone: string[] = [];
+    while (g.sides.opp.hand.length > max) {
+      const pick = aiDiscardPick(g, "opp", book);
+      if (!pick) break;
+      moveTo(g, pick.iid, "graveyard");
+      gone.push(pick.name);
+    }
+    if (gone.length) say(g, "opp", `The opponent discards down to ${max} cards: ${gone.join(", ")}.`);
+  }
   emptyPool(g);
   g.active = other(g.active);
   g.turn += 1;
@@ -724,7 +812,7 @@ export function playerPlay(g0: PracticeGame, iid: number, book: CardBook = {}): 
     say(g, "you", `You ${isLand(card) ? "play" : "cast"} ${card.name}.`, isLand(card) ? undefined : card);
     triggers?.();
     moveTo(g, iid, "battlefield");
-    if (isLand(card)) landEntered(g, "you", book);
+    if (isLand(card)) landEntered(g, "you", book, at.zone === "hand" ? iid : undefined);
   }
   checkState(g, book);
   return g;
@@ -755,7 +843,9 @@ export function moveAnyCard(g0: PracticeGame, iid: number, to: Zone, opts: { bot
   const at = findCard(g0, iid);
   if (!at || (at.zone === to && to !== "library")) return g0;
   const g = structuredClone(g0);
-  moveTo(g, iid, to, opts);
+  // Your own commander goes where you put it; the opponent's goes back to
+  // its command zone when you destroy or exile it.
+  moveTo(g, iid, to, { ...opts, exact: at.seat === "you" });
   if (at.seat === "opp") {
     const verb = to === "graveyard" ? "destroy" : to === "exile" ? "exile" : to === "hand" ? "return" : "move";
     say(g, "you", `You ${verb} ${at.card.name}${to === "hand" ? " to its owner's hand" : ""}.`);
@@ -814,11 +904,22 @@ export interface Step {
   ok: boolean;
 }
 
+/** Why the AI can't cast a card it could pay for: it has no mana cost
+    (Lotus Bloom is suspended, not cast), or it's a Mox Diamond with no
+    land card to discard. */
+function uncastable(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook): string | null {
+  const info = infoOf(book, card);
+  if (info && !info.manaCost && /^suspend \d+/im.test(info.oracleText ?? "")) return `${card.name} has no mana cost: it can only be suspended.`;
+  if (entersForALand(book, card) && !g.sides[seat].hand.some(isLand)) return `The opponent has no land card to discard for ${card.name}.`;
+  return null;
+}
+
 /** Whether a card in the AI's hand (or command zone) can be cast now, and
     what it costs including commander tax. */
 export function castable(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, zone: Zone): boolean {
   if (isLand(card)) return zone === "hand" && !g.landPlayed && g.active === seat;
-  return aiPay(g, seat, spellCost(g, seat, card, book, zone), availableMana(g, seat, book), book) !== null;
+  if (uncastable(g, seat, card, book)) return false;
+  return aiPay(g, seat, spellCost(g, seat, card, book, zone), availableMana(g, seat, book, [], { commander: card.commander }), book) !== null;
 }
 
 /** A cast in stages, so the player can answer it: "pay" pays and announces
@@ -870,11 +971,13 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
       resolveCast(g, seat, card, action, book);
       return { game: g, ok: true };
     }
+    const no = uncastable(g, seat, card, book);
+    if (no) return fail(`(${no})`);
     const cost = spellCost(g, seat, card, book, at.zone);
-    const sources = availableMana(g, seat, book);
+    const sources = availableMana(g, seat, book, [], { commander: card.commander });
     const paid = aiPay(g, seat, cost, sources, book, { x: action.x ?? 0 });
     if (!paid) return fail(`The opponent can't pay for ${card.name} yet.`);
-    spend(g, seat, paid, sources);
+    spend(g, seat, paid, sources, book);
     if (at.zone === "command") g.tax[seat] += 1;
     if (fromGrave) g.mayCast = g.mayCast!.filter((i) => i !== card.iid);
     const x = cost.xCount ? ` (X = ${action.x ?? 0})` : "";
@@ -914,7 +1017,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     const sources = availableMana(g, seat, book);
     const paid = aiPay(g, seat, parseCost(edict.mana), sources, book);
     if (!paid) return fail(`The opponent can't pay for ${faceName(card)}'s ability.`);
-    spend(g, seat, paid, sources);
+    spend(g, seat, paid, sources, book);
     loseLife(g, seat, paid.life, book);
     say(g, seat, `${who(seat)} ${verb(seat, "activate")} ${faceName(card)}.`, card);
     edictResolve(g, seat, card, edict, book);
@@ -929,7 +1032,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   const sources = availableMana(g, seat, book, action.tap_card ? [card.iid] : []);
   const paid = aiPay(g, seat, cost, sources, book, { life: action.life ?? 0 });
   if (!paid) return fail(`The opponent can't pay for ${card.name}'s ability.`);
-  spend(g, seat, paid, sources);
+  spend(g, seat, paid, sources, book);
   if (action.tap_card) update(g, card.iid, (c) => ({ ...c, tapped: true }));
   loseLife(g, seat, paid.life, book);
   if (action.sacrifice_card) moveTo(g, card.iid, "graveyard");
@@ -975,7 +1078,7 @@ export function aiResponds(g0: PracticeGame, iid: number, book: CardBook): Pract
     if (!paid && !free) continue;
     const g = structuredClone(g0);
     if (paid) {
-      spend(g, "opp", paid, sources);
+      spend(g, "opp", paid, sources, book);
       loseLife(g, "opp", paid.life, book);
     }
     if (pitched) {
@@ -1046,6 +1149,27 @@ export function addCounters(g0: PracticeGame, iid: number, n: number, book: Card
   const g = structuredClone(g0);
   update(g, iid, (c) => ({ ...c, counters: (c.counters ?? 0) + n }));
   say(g, at.seat, `${at.card.name} gets ${Math.abs(n) === 1 ? "a" : Math.abs(n)} ${n > 0 ? "+1/+1" : "-1/-1"} counter${Math.abs(n) === 1 ? "" : "s"}.`);
+  checkState(g, book);
+  return g;
+}
+
+/** A planeswalker now: by the type line of the face that's up. */
+export const isPlaneswalker = (book: CardBook, card: PlayCard) =>
+  !card.token && /\bPlaneswalker\b/.test(faceUpType({ typeLine: infoOf(book, card)?.typeLine ?? card.typeLine, flipped: card.flipped }));
+
+/** A planeswalker's loyalty now: its counters, or what it starts with. */
+export const loyaltyOf = (book: CardBook, card: PlayCard): number | null =>
+  card.loyalty ?? (isPlaneswalker(book, card) ? (infoOf(book, card)?.loyalty ?? 0) : null);
+
+/** Add loyalty counters to a planeswalker (n > 0), or remove them (n < 0:
+    an ability's cost, or damage). With none left it goes to the graveyard. */
+export function addLoyalty(g0: PracticeGame, iid: number, n: number, book: CardBook): PracticeGame {
+  const at = findCard(g0, iid);
+  if (!at || at.zone !== "battlefield" || !n) return g0;
+  const g = structuredClone(g0);
+  const now = Math.max(0, (loyaltyOf(book, at.card) ?? 0) + n);
+  update(g, iid, (c) => ({ ...c, loyalty: now }));
+  say(g, at.seat, `${at.card.name}: ${n > 0 ? "+" : "−"}${Math.abs(n)} loyalty (now ${now}).`);
   checkState(g, book);
   return g;
 }
@@ -1123,7 +1247,7 @@ function castTaxes(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBook)
     }
     const paid = seat === "you" ? null : aiPay(g, seat, price, sources, book);
     if (paid && !paid.life) {
-      spend(g, seat, paid, sources);
+      spend(g, seat, paid, sources, book);
       say(g, seat, `${who(seat)} ${verb(seat, "pay")} {${cost}} for ${name}.`);
     } else {
       say(g, owner, `${name}: ${seat === "you" ? "you don't" : "the opponent doesn't"} pay {${cost}}; ${owner === "you" ? "you draw" : "the opponent draws"} a card.`);
@@ -1218,7 +1342,9 @@ export function choiceTargets(g: PracticeGame, book: CardBook): number[] {
   const you = g.sides.you;
   switch (c.kind) {
     case "discard":
-      return you.hand.map((x) => x.iid);
+      return you.hand.filter((x) => c.only !== "land" || isLand(x)).map((x) => x.iid);
+    case "imprint":
+      return imprintable(g, "you", book).map((x) => x.iid);
     case "sacrifice":
       return you.battlefield.filter((x) => (c.types ? sharedTypes(book, x, c.types).length > 0 : sacrificable(book, x, c.what ?? "permanent"))).map((x) => x.iid);
     case "put":
@@ -1239,8 +1365,11 @@ export function resolveChoice(g0: PracticeGame, iid: number, book: CardBook): Pr
   g.choice = null;
   if (choice.kind === "discard") {
     moveTo(g, iid, "graveyard");
-    say(g, "you", `You discard ${at.card.name}.`);
+    say(g, "you", `You discard ${at.card.name}${choice.card !== undefined ? ` for ${choice.source}` : ""}.`);
     if (!choice.loot) drawForTypes(g, { ...choice, discarded: [...(choice.discarded ?? []), infoOf(book, at.card)?.typeLine ?? at.card.typeLine ?? ""] }, book);
+  } else if (choice.kind === "imprint") {
+    const mox = choice.card !== undefined ? findCard(g, choice.card) : null;
+    if (mox?.zone === "battlefield") imprint(g, "you", mox.card, at.card, book);
   } else if (choice.kind === "sacrifice") {
     moveTo(g, iid, "graveyard");
     say(g, "you", `You sacrifice ${at.card.name}${choice.braids ? ` (${choice.source})` : ""}.`);
@@ -1271,6 +1400,12 @@ export function declineChoice(g0: PracticeGame, book: CardBook): PracticeGame {
     loseLife(g, "you", c.life ?? 2, book);
     drawCards(g, "opp", 1, book);
   }
+  // Mox Diamond, with no land discarded: into the graveyard.
+  if (c.kind === "discard" && c.only === "land" && c.card !== undefined && findCard(g, c.card)?.zone === "battlefield") {
+    moveTo(g, c.card, "graveyard");
+    say(g, "you", `You discard no land: ${c.source} goes to the graveyard.`);
+  }
+  if (c.kind === "imprint") say(g, "you", `You exile nothing with ${c.source}: it makes no mana.`);
   checkState(g, book);
   return g;
 }
@@ -1296,7 +1431,14 @@ export function playerEdict(g0: PracticeGame, iid: number, book: CardBook): Prac
 // The Ur-Dragon, Silas Renn, Braids, Beledros): see lib/practice/abilities.
 
 /** A land entered under a seat's control: its landfall tokens (Thranduil). */
-function landEntered(g: PracticeGame, seat: Seat, book: CardBook) {
+function landEntered(g: PracticeGame, seat: Seat, book: CardBook, played?: number) {
+  // "When you play another land, sacrifice this land" (City of Traitors).
+  if (played !== undefined) {
+    for (const c of g.sides[seat].battlefield.filter((x) => x.iid !== played && goesWhenALandIsPlayed(book, x))) {
+      moveTo(g, c.iid, "graveyard");
+      say(g, seat, `${who(seat)} ${verb(seat, "sacrifice")} ${c.name}: another land was played.`);
+    }
+  }
   for (const c of [...g.sides[seat].battlefield]) {
     const t = landfallTokenOf(book, c);
     if (!t) {
@@ -1310,6 +1452,17 @@ function landEntered(g: PracticeGame, seat: Seat, book: CardBook) {
   }
 }
 
+/** The cards in a seat's hand Chrome Mox may exile: nonartifact, nonland. */
+const imprintable = (g: PracticeGame, seat: Seat, book: CardBook) => g.sides[seat].hand.filter((c) => !isLand(c) && !/\b(Artifact|Land)\b/.test(frontLine(book, c)));
+
+/** Chrome Mox's imprint: the card is exiled, and the Mox makes its colours. */
+function imprint(g: PracticeGame, seat: Seat, mox: PlayCard, card: PlayCard, book: CardBook) {
+  const colors = colorsOfCost(infoOf(book, card));
+  moveTo(g, card.iid, "exile");
+  update(g, mox.iid, (c) => ({ ...c, imprint: colors }));
+  say(g, seat, `${who(seat)} ${verb(seat, "exile")} ${card.name} with ${mox.name}: it makes ${colors.length ? colors.map((c) => `{${c}}`).join(" or ") : "no mana (the card has no colour)"}.`);
+}
+
 /** A permanent entered under a seat's control: Selvala's draw for the
     biggest creature, the Elvenking's loot, Inalla's copy (paid, {1}), and
     the AI's Light-Paws search. Returns whether a copy was made, so the AI's
@@ -1318,6 +1471,31 @@ function entered(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, op
   const at = findCard(g, card.iid);
   if (!at || at.zone !== "battlefield") return false;
   const now = at.card;
+  // Mox Diamond: a land card discarded, or it goes to the graveyard.
+  if (entersForALand(book, now)) {
+    const lands = g.sides[seat].hand.filter(isLand);
+    if (!lands.length) {
+      moveTo(g, now.iid, "graveyard");
+      say(g, seat, `${now.name} goes to the graveyard: ${seat === "you" ? "you have" : "the opponent has"} no land card to discard.`);
+      return false;
+    }
+    if (seat === "opp") {
+      // The land it needs least: one it has more of, then a basic.
+      const count = (c: PlayCard) => lands.filter((x) => x.name === c.name).length;
+      const pick = [...lands].sort((a, b) => count(b) - count(a) || Number(/\bBasic\b/.test(frontLine(book, b))) - Number(/\bBasic\b/.test(frontLine(book, a))))[0]!;
+      moveTo(g, pick.iid, "graveyard");
+      say(g, "opp", `The opponent discards ${pick.name} for ${now.name}.`);
+    } else if (!g.choice) g.choice = { kind: "discard", source: now.name, by: "you", loot: true, only: "land", card: now.iid, decline: "Don't discard" };
+  }
+  // Chrome Mox: a nonartifact, nonland card exiled from hand gives it its colours.
+  if (imprintsFromHand(book, now)) {
+    const fits = imprintable(g, seat, book);
+    if (seat === "opp") {
+      // The card it would cast last: the most expensive one with a colour.
+      const pick = fits.filter((c) => colorsOfCost(infoOf(book, c)).length).sort((a, b) => (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0))[0];
+      if (pick) imprint(g, "opp", now, pick, book);
+    } else if (fits.length && !g.choice) g.choice = { kind: "imprint", source: now.name, by: "you", card: now.iid, decline: "Exile nothing" };
+  }
   // "When this enters, …": a card, tokens, life.
   const own = triggersOf(book, now).enters;
   if (own) applyOutcome(g, seat, now, own, book);
@@ -1378,7 +1556,7 @@ function entered(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, op
         say(g, seat, `(${faceName(c)}: no mana left for a copy of ${now.name}.)`);
         break;
       }
-      spend(g, seat, paid, sources);
+      spend(g, seat, paid, sources, book);
       loseLife(g, seat, paid.life, book);
       const { counters: _c, damage: _d, attachedTo: _a, pump: _p, boost: _b, ...base } = now;
       const copy: PlayCard = { ...base, iid: g.nextIid++, copy: true, exileAtEnd: true, eot: ["Haste"], commander: false, enteredTurn: g.turn, tapped: false };
@@ -1621,7 +1799,7 @@ export function playerCast(g0: PracticeGame, iid: number, book: CardBook): Pract
   const cost = spellCost(g0, "you", at.card, book, at.zone);
   if (hasAltCost(info) || totalOf(cost) === 0) return playerPlay(g0, iid, book);
   const g = structuredClone(g0);
-  payForYou(g, cost, at.card.name, book);
+  payForYou(g, cost, at.card.name, book, at.card.commander);
   return playerPlay(g, iid, book);
 }
 
@@ -1629,13 +1807,13 @@ export function playerCast(g0: PracticeGame, iid: number, book: CardBook): Pract
     {B} the mana can't cover, but never the life you have left. */
 export function youPay(g: PracticeGame, cost: Cost, sources: Source[], book: CardBook) {
   const paid = payCost(cost, sources, { x: 0, lifeFor: lifeFor(g, "you", book) });
-  return paid && paid.life < g.sides.you.life ? paid : null;
+  return paid && paid.life + paid.pain < g.sides.you.life ? paid : null;
 }
 
 /** Pay a cost of yours from your untapped mana (and, with K'rrik, 2 life
     for each {B} the mana can't cover), or say to tap by hand. */
-function payForYou(g: PracticeGame, cost: Cost, what: string, book: CardBook) {
-  const sources = availableMana(g, "you", book);
+function payForYou(g: PracticeGame, cost: Cost, what: string, book: CardBook, commander = false) {
+  const sources = availableMana(g, "you", book, [], { commander });
   const paid = youPay(g, cost, sources, book);
   if (!paid) {
     say(g, "you", `(Not enough untapped mana for ${what}: tap what you use by hand.)`);
@@ -1644,7 +1822,7 @@ function payForYou(g: PracticeGame, cost: Cost, what: string, book: CardBook) {
   // The tapped ones by name; a one-shot source (a Treasure) logs its own sacrifice.
   const names = paid.tap.filter((t) => t > 0 && !sources.find((x) => x.iid === t)?.sacrifice).map((t) => findCard(g, t)?.card.name ?? "");
   if (names.length || paid.life) say(g, "you", `You ${names.length ? `tap ${names.join(", ")}` : ""}${names.length && paid.life ? " and " : ""}${paid.life ? `pay ${paid.life} life` : ""} for ${what}${cost.xCount ? " (tap for X by hand)" : ""}.`);
-  spend(g, "you", paid, sources);
+  spend(g, "you", paid, sources, book);
   loseLife(g, "you", paid.life, book);
 }
 
@@ -2150,18 +2328,33 @@ function hitTriggers(g: PracticeGame, seat: Seat, hitter: PlayCard, book: CardBo
   }
 }
 
-// ── Ninjutsu (Yuriko) ──────────────────────────────────────────────────
+// ── Ninjutsu (Yuriko) and sneak ────────────────────────────────────────
 
 export interface NinjutsuOption {
   ninja: PlayCard;
   zone: "hand" | "command";
+  /** What it costs now (a sneak from the command zone has the tax in it). */
   cost: string;
   /** The unblocked attackers it can replace. */
   unblocked: PlayCard[];
+  /** Sneak: the card is cast for this cost. */
+  sneak?: boolean;
+  /** Sneak on an instant or sorcery: the spell is cast, nothing attacks in
+      the returned creature's place. */
+  spell?: boolean;
 }
 
+/** A cost with commander tax added to its generic part. */
+const withTax = (cost: string, tax: number) => {
+  if (!tax) return cost;
+  const m = /^\{(\d+)\}/.exec(cost);
+  return m ? `{${Number(m[1]) + tax}}${cost.slice(m[0].length)}` : `{${tax}}${cost}`;
+};
+
 /** After blocks: the ninjas a seat can bring in now, from its hand (or
-    its command zone, for commander ninjutsu), that it can pay for. */
+    its command zone, for commander ninjutsu), that it can pay for. The
+    same moment is sneak's: a card cast for its sneak cost, from the hand
+    or (a commander, with its tax) the command zone. */
 export function ninjutsuOptions(g: PracticeGame, seat: Seat, book: CardBook): NinjutsuOption[] {
   const combat = g.combat;
   if (!combat || combat.attacker !== seat || combat.stage !== "blocked" || g.winner) return [];
@@ -2171,7 +2364,6 @@ export function ninjutsuOptions(g: PracticeGame, seat: Seat, book: CardBook): Ni
     .map((a) => side.battlefield.find((c) => c.iid === a))
     .filter((c): c is PlayCard => !!c);
   if (!unblocked.length) return [];
-  const sources = availableMana(g, seat, book);
   const out: NinjutsuOption[] = [];
   for (const [zone, cards] of [
     ["hand", side.hand],
@@ -2179,10 +2371,12 @@ export function ninjutsuOptions(g: PracticeGame, seat: Seat, book: CardBook): Ni
   ] as const) {
     for (const card of cards) {
       const n = ninjutsuOf(book, card);
-      if (!n || (zone === "command" && !n.commander)) continue;
-      const cost = parseCost(n.cost);
+      if (!n || (zone === "command" && !n.commander && !n.sneak)) continue;
+      const text = withTax(n.cost, n.sneak && zone === "command" ? 2 * g.tax[seat] : 0);
+      const cost = parseCost(text);
+      const sources = availableMana(g, seat, book, [], { commander: !!n.sneak && card.commander });
       const paid = seat === "you" ? youPay(g, cost, sources, book) : aiPay(g, seat, cost, sources, book);
-      if (paid) out.push({ ninja: card, zone, cost: n.cost, unblocked });
+      if (paid) out.push({ ninja: card, zone, cost: text, unblocked, ...(n.sneak ? { sneak: true, spell: resolvesToGraveyard(faceUpType(card)) } : {}) });
     }
   }
   return out;
@@ -2190,25 +2384,48 @@ export function ninjutsuOptions(g: PracticeGame, seat: Seat, book: CardBook): Ni
 
 /** Ninjutsu: pay, return an unblocked attacker to its owner's hand, and
     put the ninja onto the battlefield tapped and attacking in its place.
-    It isn't cast: no commander tax, and nothing counters it. */
+    It isn't cast: no commander tax, and nothing counters it. Sneak is the
+    same swap, but the card is cast: what watches your spells sees it, a
+    creature's "when this enters" happens, and an instant or sorcery goes to
+    the graveyard (you resolve it, as any spell of yours). */
 export function ninjutsu(g0: PracticeGame, seat: Seat, ninjaIid: number, attackerIid: number, book: CardBook): PracticeGame {
   const opt = ninjutsuOptions(g0, seat, book).find((o) => o.ninja.iid === ninjaIid);
   const attacker = opt?.unblocked.find((a) => a.iid === attackerIid);
   if (!opt || !attacker) return g0;
   const g = structuredClone(g0);
   const name = faceName(opt.ninja);
-  if (seat === "you") payForYou(g, parseCost(opt.cost), `${name}'s ninjutsu`, book);
+  const commander = !!opt.sneak && opt.ninja.commander;
+  if (seat === "you") payForYou(g, parseCost(opt.cost), opt.sneak ? `${name}'s sneak cost` : `${name}'s ninjutsu`, book, commander);
   else {
-    const sources = availableMana(g, seat, book);
+    const sources = availableMana(g, seat, book, [], { commander });
     const paid = aiPay(g, seat, parseCost(opt.cost), sources, book);
     if (!paid) return g0;
-    spend(g, seat, paid, sources);
+    spend(g, seat, paid, sources, book);
     loseLife(g, seat, paid.life, book);
   }
+  const hand = seat === "you" ? "your" : "its";
   moveTo(g, attackerIid, "hand");
-  moveTo(g, ninjaIid, "battlefield", { tapped: true });
-  g.combat = { ...g.combat!, attackers: g.combat!.attackers.map((a) => (a === attackerIid ? ninjaIid : a)) };
-  say(g, seat, `${who(seat)} ${seat === "you" ? "use" : "uses"} ninjutsu: ${name} attacks in place of ${attacker.name}, which goes back to ${seat === "you" ? "your" : "its"} hand.`, opt.ninja);
+  if (!opt.sneak) {
+    moveTo(g, ninjaIid, "battlefield", { tapped: true });
+    g.combat = { ...g.combat!, attackers: g.combat!.attackers.map((a) => (a === attackerIid ? ninjaIid : a)) };
+    say(g, seat, `${who(seat)} ${seat === "you" ? "use" : "uses"} ninjutsu: ${name} attacks in place of ${attacker.name}, which goes back to ${hand} hand.`, opt.ninja);
+    return g;
+  }
+  if (opt.zone === "command") g.tax[seat] += 1;
+  if (opt.spell) {
+    g.combat = { ...g.combat!, attackers: g.combat!.attackers.filter((a) => a !== attackerIid) };
+    say(g, seat, `${who(seat)} ${verb(seat, "cast")} ${name} for its sneak cost (${opt.cost}): ${attacker.name} goes back to ${hand} hand.`, opt.ninja);
+    castTriggers(g, seat, opt.ninja, book);
+    moveTo(g, ninjaIid, "graveyard");
+  } else {
+    moveTo(g, ninjaIid, "battlefield", { tapped: true });
+    g.combat = { ...g.combat!, attackers: g.combat!.attackers.map((a) => (a === attackerIid ? ninjaIid : a)) };
+    say(g, seat, `${who(seat)} ${verb(seat, "cast")} ${name} for its sneak cost (${opt.cost}): it enters tapped and attacking in place of ${attacker.name}, which goes back to ${hand} hand.`, opt.ninja);
+    castTriggers(g, seat, opt.ninja, book);
+    const now = findCard(g, ninjaIid);
+    if (now?.zone === "battlefield") entered(g, seat, now.card, book, { cast: true });
+  }
+  checkState(g, book);
   return g;
 }
 
@@ -2221,7 +2438,8 @@ export function aiNinjutsu(g0: PracticeGame, book: CardBook): PracticeGame {
   const worth = (c: PlayCard) => (c.token ? 0.5 : (infoOf(book, c)?.manaValue ?? 0));
   const triggers = (c: PlayCard) => hitTriggersOf(book, c).some((t) => t.ninjas) || g.sides.opp.battlefield.some((x) => hitTriggersOf(book, x).some((t) => t.ninjas));
   for (let i = 0; i < 3; i++) {
-    const options = ninjutsuOptions(g, "opp", book);
+    // The AI sneaks creatures in; a sneaked instant or sorcery is left to its turn's plan.
+    const options = ninjutsuOptions(g, "opp", book).filter((o) => !o.spell);
     if (!options.length) break;
     const score = (o: NinjutsuOption) => (hitTriggersOf(book, o.ninja).length ? 100 : 0) + stats(book, o.ninja).power + (o.zone === "command" ? 1 : 0);
     const best = options.reduce((a, b) => (score(b) > score(a) ? b : a));

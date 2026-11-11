@@ -17,9 +17,13 @@ import { canPayNextTax, declineTax, payTax, playerDraws, concede,
   addCounters,
   adjustLife,
   aiEndStep,
+  addLoyalty,
   aiGraveyardCasts,
   aiNinjutsu,
   choiceTargets,
+  isPlaneswalker,
+  loyaltyOf,
+  playerCleanup,
   declineChoice,
   playerEndStep,
   playerTapTribe,
@@ -211,7 +215,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   // A discard to choose raises your hand; a sacrifice lowers it, for the board.
   const choiceKind = game?.choice?.kind;
   useEffect(() => {
-    if (choiceKind) setHandUp(choiceKind === "discard" || choiceKind === "put");
+    if (choiceKind) setHandUp(choiceKind === "discard" || choiceKind === "put" || choiceKind === "imprint");
   }, [choiceKind]);
 
   // The history beside the board follows the newest line.
@@ -344,6 +348,14 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       setMode("ai");
       setHistory([]);
       g = await aiCast(g, removal, "ai");
+      if (!alive.current || g.winner) return setMode(g.winner ? "over" : "main");
+    }
+    // More than seven cards in hand: discard down, one at a time.
+    for (let asked = playerCleanup(g, setup.book); asked !== g; asked = playerCleanup(g, setup.book)) {
+      setMode("ai");
+      // After the click that lowered it for the last discard.
+      setHandUp(true);
+      g = await waitChoice(asked);
       if (!alive.current || g.winner) return setMode(g.winner ? "over" : "main");
     }
     g = endTurn(g, setup.book);
@@ -495,6 +507,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!game || !setup || !ninjaRef.current) return;
     const next = ninjutsu(game, "you", ninjaIid, attackerIid, setup.book);
     if (next === game) return;
+    // A spell cast for its sneak cost that searches (Splinter's Technique):
+    // the search opens, as for any tutor you cast.
+    const cast = findCard(game, ninjaIid)?.card;
+    const spec = cast && findCard(next, ninjaIid)?.zone === "graveyard" ? searchOnCast(infoOf(setup.book, cast)) : null;
+    if (spec && cast) setSearch({ source: cast.name, spec, found: 0, top: [] });
     setMenu(null);
     setZoom(null);
     setGame(next);
@@ -782,14 +799,20 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
             { label: "+1/+1 counter", step: (g) => addCounters(g, card.iid, 1, book) },
             { label: "−1/−1 counter", step: (g) => addCounters(g, card.iid, -1, book) },
           ]
-        : [];
+        : zone === "battlefield" && isPlaneswalker(book, card)
+          ? [
+              { label: "+1 loyalty", step: (g) => addLoyalty(g, card.iid, 1, book) },
+              { label: "−1 loyalty", step: (g) => addLoyalty(g, card.iid, -1, book) },
+            ]
+          : [];
     if (seat === "opp") {
       if (zone !== "battlefield") return [];
       return [
         ...counters,
         { label: card.tapped ? "Untap" : "Tap", step: (g) => tapToggle(g, card.iid) },
-        { label: "Destroy", step: to("graveyard") },
-        { label: "Exile", step: to("exile") },
+        // A commander goes back to its command zone, to be cast again for {2} more.
+        { label: card.commander && game?.commanderGame ? "Destroy (to its command zone)" : "Destroy", step: to("graveyard") },
+        { label: card.commander && game?.commanderGame ? "Exile (to its command zone)" : "Exile", step: to("exile") },
         { label: "Return to its owner's hand", step: to("hand") },
       ];
     }
@@ -848,6 +871,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     return undefined;
   };
   const statOf = (card: PlayCard): string | null => {
+    // A planeswalker shows its loyalty.
+    const loyalty = loyaltyOf(book, card);
+    if (loyalty !== null) return `◆ ${loyalty}`;
     if (!isCreature(book, card)) return null;
     const s = stats(book, card);
     const info = infoOf(book, card);
@@ -874,7 +900,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const info = infoOf(setup.book, card);
     if (hasAltCost(info)) return true;
     const cost = spellCost(game, "you", card, setup.book, zone);
-    return youPay(game, cost, availableMana(game, "you", setup.book), setup.book) !== null;
+    return youPay(game, cost, availableMana(game, "you", setup.book, [], { commander: card.commander }), setup.book) !== null;
   };
   const cardProps = (seat: Seat) => (card: PlayCard, zone: Zone) => ({
     playable: seat === "you" && playableNow(card, zone),
@@ -1036,8 +1062,14 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const choicePrompt = game.choice
     ? `${game.choice.source}: ${
         game.choice.kind === "discard"
-          ? "choose a card from your hand to discard"
-          : game.choice.kind === "put"
+          ? game.choice.cleanup
+            ? `you have ${you.hand.length} cards. Discard down to seven: choose a card`
+            : game.choice.only === "land"
+              ? "discard a land card to keep it, or it goes to the graveyard"
+              : "choose a card from your hand to discard"
+          : game.choice.kind === "imprint"
+            ? "exile a nonartifact, nonland card from your hand. It makes mana of that card's colours"
+            : game.choice.kind === "put"
             ? "choose a permanent card from your hand to put onto the battlefield"
             : game.choice.kind === "attach"
               ? "choose the creature it goes on"
@@ -1055,7 +1087,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         ? `Put ${you.toBottom} card${you.toBottom === 1 ? "" : "s"} from your hand on the bottom.`
         : `${game.first === "you" ? "You're" : "The opponent is"} on the play.`
       : mode === "ninjutsu"
-        ? "Blocks are in. Use ninjutsu for an unblocked attacker, or go to damage."
+        ? "Blocks are in. Use ninjutsu or sneak for an unblocked attacker, or go to damage."
       : mode === "attack"
         ? "Tap the creatures that attack."
         : mode === "block"
@@ -1110,7 +1142,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   );
 
   return (
-    <div className="pt-root pt-vs pt-table" role="dialog" aria-label="Practice game against the AI">
+    <div className="pt-root pt-vs pt-table" data-mode={mode} role="dialog" aria-label="Practice game against the AI">
       <RotateHint onClose={onClose} />
       {header}
 
@@ -1223,13 +1255,16 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               are the same choice). */}
           {mode === "ninjutsu" && (
             <div className="pt-ninja" role="group" aria-label="Ninjutsu">
-              <span className="pt-ninja-caption">Blocks are in. Ninjutsu?</span>
+              <span className="pt-ninja-caption">
+                Blocks are in. {ninjutsuOptions(game, "you", book).every((o) => o.sneak) ? "Sneak?" : ninjutsuOptions(game, "you", book).some((o) => o.sneak) ? "Ninjutsu or sneak?" : "Ninjutsu?"}
+              </span>
               {ninjutsuOptions(game, "you", book)
                 .flatMap((o) => [...o.unblocked].sort((a, b) => stats(book, a).power - stats(book, b).power).map((a) => ({ o, a })))
                 .filter(({ o, a }, i, all) => all.findIndex((x) => x.o.ninja.name === o.ninja.name && x.a.name === a.name) === i)
                 .slice(0, 6)
                 .map(({ o, a }) => (
                   <button key={`${o.ninja.iid}:${a.iid}`} type="button" className="pt-btn pt-btn-gold" onClick={() => bringNinja(o.ninja.iid, a.iid)}>
+                    {o.sneak ? "Sneak " : ""}
                     {o.ninja.name.split(",")[0]} for {a.name.split(",")[0]} <span className="pt-ninja-cost">{o.cost}</span>
                   </button>
                 ))}

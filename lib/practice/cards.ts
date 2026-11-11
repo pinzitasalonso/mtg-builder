@@ -75,30 +75,126 @@ export const BASIC_COLOR: Record<string, string> = { plains: "W", island: "U", s
 
 const frontText = (info: CardInfo | undefined) => (info?.oracleText ?? "").split("\n//\n")[0]!;
 
-/** The mana a permanent adds when tapped for it: which colours, and how
-    much ("Add {C}{C}" is two), and whether using it sacrifices it (Lotus
-    Petal). Null when it makes none. A fetch land makes none: it cracks
-    itself when played (fetchOf). */
-export function manaOutput(info: CardInfo | undefined, typeLine: string | null): { colors: string[]; amount: number; sacrifice: boolean } | null {
-  const text = frontText(info);
-  let colors = (info?.producedMana ?? []).filter((c) => COLORS.includes(c));
-  // A basic land type makes its colour even when the data says nothing.
-  if (!colors.length) {
-    const t = frontType(typeLine).toLowerCase();
-    colors = Object.entries(BASIC_COLOR).filter(([sub]) => t.includes(sub)).map(([, c]) => c);
+/** A card's own rules: without reminder text "(…)", and without the
+    abilities it gives to something else ("…"). Smothering Tithe makes
+    Treasures; it doesn't tap for mana itself. */
+export const ownText = (text: string) => text.replace(/\([^)]*\)/g, "").replace(/"[^"]*"/g, '""');
+
+const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
+
+export interface ManaMade {
+  colors: string[];
+  /** What it adds, less the mana that goes in ("{1}, {T}: Add {U}{B}" is 1). */
+  amount: number;
+  /** Using it sacrifices it (Lotus Petal). */
+  sacrifice: boolean;
+  /** "Add {G} for each creature you control": one for each of those
+      ("creature"), less `input`. */
+  per?: string;
+  input?: number;
+  /** The life each use costs (Ancient Tomb: 2). */
+  pain?: number;
+  /** "Spend this mana only to cast your commander" (Jeweled Lotus). */
+  commanderOnly?: boolean;
+  /** "Tap an untapped creature you control" as well (Springleaf Drum). */
+  tapCreature?: boolean;
+  /** "Activate only if you control three or more artifacts" (Mox Opal). */
+  metalcraft?: boolean;
+  /** Its colours come from elsewhere: your legendary creatures and
+      planeswalkers (Mox Amber), or the card exiled with it (Chrome Mox). */
+  from?: "legends" | "imprint";
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** One "cost: … add …" line as a mana ability, or null when it isn't one
+    a permanent can just be tapped (or sacrificed) for. */
+function manaAbility(line: string, name: string): Omit<ManaMade, "colors"> | null {
+  const m = /^(?:[\w' ]+ — )?([^:]*): (.*\badd\b.*)$/i.exec(line.trim());
+  if (!m) return null;
+  const cost = m[1]!;
+  const effect = m[2]!;
+  const selfSac = new RegExp(`\\bsacrifice (this \\w+|${escapeRe(name.split(" // ")[0]!)})\\b`, "i").test(cost);
+  // Tapped, or sacrificed, for mana. Not "Exile this card from your hand"
+  // (Simian Spirit Guide), a discard (Lion's Eye Diamond), or another
+  // permanent's sacrifice (Phyrexian Tower's second ability).
+  if (!/\{T\}/i.test(cost) && !selfSac) return null;
+  if (/\b(discard|exile|remove|return)\b|\{X\}/i.test(cost)) return null;
+  if (/\bsacrifice\b/i.test(cost) && !selfSac) return null;
+  let input = 0;
+  for (const sym of cost.matchAll(/\{([^}]+)\}/g)) {
+    const x = sym[1]!.toUpperCase();
+    if (x === "T" || x === "Q") continue;
+    input += /^\d+$/.test(x) ? Number(x) : 1;
   }
+  // "{T}: Add {C}{C}." — a run of symbols is one ability adding them all;
+  // "Add {G} or {U}" or "one mana of any color" is one; "three mana of any
+  // one color" is three.
+  let amount = 1;
+  const run = /\badd ((?:\{[^}]+\})+)/i.exec(effect);
+  const word = /\badd (one|two|three|four|five|six|seven|\d+) mana\b/i.exec(effect);
+  if (run) amount = (run[1]!.match(/\{/g) ?? []).length;
+  else if (word) amount = NUMBER_WORDS[word[1]!.toLowerCase()] ?? Number(word[1]);
+  const per = /\bfor each ([a-z]+)(?: card)? (?:you control|on the battlefield)/i.exec(effect)?.[1]?.toLowerCase();
+  const pain = Number(/\bpay (\d+) life\b/i.exec(cost)?.[1] ?? /\bdeals (\d+) damage to you\b/i.exec(effect)?.[1] ?? 0);
+  return {
+    amount: amount - input,
+    sacrifice: selfSac,
+    ...(per ? { per, input } : {}),
+    ...(pain ? { pain } : {}),
+    ...(/spend this mana only to cast your commander/i.test(effect) ? { commanderOnly: true } : {}),
+    ...(/\btap an untapped creature you control\b/i.test(cost) ? { tapCreature: true } : {}),
+    ...(/activate only if you control three or more artifacts/i.test(effect) ? { metalcraft: true } : {}),
+    ...(/among legendary creatures and planeswalkers you control/i.test(effect) ? { from: "legends" as const } : /exiled card's colors/i.test(effect) ? { from: "imprint" as const } : {}),
+  };
+}
+
+/** The mana a permanent adds when tapped for it: which colours, how much
+    ("Add {C}{C}" is two, a Signet's "{1}, {T}: Add {U}{B}" is one more than
+    it takes), and whether using it sacrifices it (Lotus Petal). Read from
+    its own abilities: a card that only talks about mana (Dockside
+    Extortionist's Treasures, Wild Growth) makes none. Null when it makes
+    none. A fetch land makes none: it cracks itself when played (fetchOf).
+    `flipped`: the back face is up (a modal card played as its land). */
+export function manaOutput(info: CardInfo | undefined, typeLine: string | null, flipped = false): ManaMade | null {
+  const raw = faceText(info, { flipped });
+  const text = ownText(raw);
+  const types = (typeLine ?? "").split(" // ");
+  const type = ((flipped && types[1]) || types[0] || "").toLowerCase();
+  const land = /\bland\b/.test(type);
+  const produced = (info?.producedMana ?? []).filter((c) => COLORS.includes(c));
+  const basics = Object.entries(BASIC_COLOR).filter(([sub]) => type.includes(sub)).map(([, c]) => c);
+  // Nothing known of its text: what the data says it makes, or its land type.
+  if (!raw.trim()) {
+    const colors = produced.length ? produced : basics;
+    return colors.length ? { colors, amount: 1, sacrifice: false } : null;
+  }
+  const abilities = text
+    .split("\n")
+    .map((line) => manaAbility(line, info?.name ?? ""))
+    .filter((a): a is Omit<ManaMade, "colors"> => !!a);
+  // The best one it can just be tapped for: the most mana, then one that
+  // keeps it, then one that doesn't hurt.
+  const rank = (a: Omit<ManaMade, "colors">) => a.amount * 4 + (a.sacrifice ? 0 : 2) + (a.pain ? 0 : 1);
+  const plain = abilities.filter((a) => !a.per && a.amount > 0).sort((a, b) => rank(b) - rank(a))[0];
+  const best = plain ?? abilities.find((a) => a.per);
+  if (best) {
+    let colors = produced;
+    if (!colors.length) {
+      const line = text.split("\n").find((l) => /\badd\b/i.test(l)) ?? "";
+      colors = /any (one )?(color|type)/i.test(line) ? ["W", "U", "B", "R", "G"] : [...new Set([...line.matchAll(/\{([WUBRGC])\}/g)].map((x) => x[1]!))];
+    }
+    if (!colors.length) colors = basics;
+    return colors.length ? { ...best, colors } : null;
+  }
+  if (!land) return null;
+  // A land with a basic land type taps for its colour (the ability is
+  // reminder text, or not printed at all).
+  if (basics.length) return { colors: produced.length ? produced : basics, amount: 1, sacrifice: false };
   // "Choose a basic land type" or "a color" as it enters (Thran Portal):
   // whichever it needs.
-  if (!colors.length && isLandCard(typeLine) && /\bchoose a (basic land type|color)\b/i.test(text)) colors = ["W", "U", "B", "R", "G"];
-  if (!colors.length) return null;
-  // "{T}: Add {C}{C}." — a run of symbols is one ability adding them all;
-  // "Add {G} or {U}" or "one mana of any color" is one.
-  let amount = 1;
-  for (const m of text.matchAll(/\badd ((?:\{[WUBRGC]\})+)/gi)) {
-    amount = Math.max(amount, (m[1]!.match(/\{/g) ?? []).length);
-  }
-  const sacrifice = /\bsacrifice [^:.]*:[^.]*\badd\b/i.test(text) && !/\{T\}: add/i.test(text);
-  return { colors, amount, sacrifice };
+  if (/\bchoose a (basic land type|color)\b/i.test(text)) return { colors: ["W", "U", "B", "R", "G"], amount: 1, sacrifice: false };
+  return null;
 }
 
 /** "enters tapped" without an "unless" escape. A shock land ("you may pay
@@ -484,12 +580,51 @@ export const indestructibleOnYourTurn = (book: CardBook, card: PlayCard) =>
   !card.token && /during your turn, [^.\n]*\bhas indestructible\b/i.test(faceText(infoOf(book, card), card));
 
 /** "Ninjutsu {U}{B}" or "Commander ninjutsu {U}{B}" (Yuriko): its cost, and
-    whether it also works from the command zone. */
-export function ninjutsuOf(book: CardBook, card: PlayCard): { cost: string; commander: boolean } | null {
+    whether it also works from the command zone. "Sneak {1}{B}" works at the
+    same moment, for an unblocked attacker returned to hand, but it's a cast:
+    of a creature, which enters tapped and attacking, or of an instant or
+    sorcery (Splinter's Technique). */
+export function ninjutsuOf(book: CardBook, card: PlayCard): { cost: string; commander: boolean; sneak?: boolean } | null {
   if (card.token) return null;
-  const m = /^(commander )?ninjutsu ((?:\{[^}]+\})+)/im.exec(faceText(infoOf(book, card), card));
-  return m ? { cost: m[2]!, commander: !!m[1] } : null;
+  const text = faceText(infoOf(book, card), card);
+  const m = /^(commander )?ninjutsu ((?:\{[^}]+\})+)/im.exec(text);
+  if (m) return { cost: m[2]!, commander: !!m[1] };
+  const s = /^sneak ((?:\{[^}]+\})+)/im.exec(text);
+  return s ? { cost: s[1]!, commander: false, sneak: true } : null;
 }
+
+// ── Fast mana's small print ────────────────────────────────────────────
+
+const own = (book: CardBook, card: PlayCard) => (card.token ? "" : ownText(faceText(infoOf(book, card), card)));
+
+/** "This artifact doesn't untap during your untap step" (Mana Vault, Grim
+    Monolith, Basalt Monolith). */
+export const staysTapped = (book: CardBook, card: PlayCard) => /\bdoesn't untap during your untap step\b/i.test(own(book, card));
+
+/** "At the beginning of your draw step, if this artifact is tapped, it
+    deals 1 damage to you" (Mana Vault): the damage. */
+export const tappedPainOf = (book: CardBook, card: PlayCard) =>
+  Number(/at the beginning of your draw step, if [^,]+ is tapped, it deals (\d+) damage to you/i.exec(own(book, card))?.[1] ?? 0);
+
+/** "At the beginning of your upkeep, flip a coin. If you lose the flip,
+    this artifact deals 3 damage to you" (Mana Crypt): the damage. */
+export const coinFlipPainOf = (book: CardBook, card: PlayCard) =>
+  Number(/at the beginning of your upkeep, flip a coin\. if you lose the flip, [^.]+? deals (\d+) damage to you/i.exec(own(book, card))?.[1] ?? 0);
+
+/** "If this artifact would enter, you may discard a land card instead. If
+    you do, put this artifact onto the battlefield. If you don't, put it
+    into its owner's graveyard" (Mox Diamond). */
+export const entersForALand = (book: CardBook, card: PlayCard) => /\bwould enter[^.]*, you may discard a land card instead\b/i.test(own(book, card));
+
+/** "Imprint — When this artifact enters, you may exile a nonartifact,
+    nonland card from your hand" (Chrome Mox). */
+export const imprintsFromHand = (book: CardBook, card: PlayCard) => /\benters[^.]*, you may exile a nonartifact, nonland card from your hand\b/i.test(own(book, card));
+
+/** "When you play another land, sacrifice this land" (City of Traitors). */
+export const goesWhenALandIsPlayed = (book: CardBook, card: PlayCard) => /\bwhen you play another land, sacrifice\b/i.test(own(book, card));
+
+/** "You have no maximum hand size" (Reliquary Tower, Thought Vessel). */
+export const noMaxHandSize = (book: CardBook, card: PlayCard) => /\b(you have|each player has|players have) no maximum hand size\b/i.test(own(book, card));
 
 /** A Ninja: by its type line, or a changeling. */
 export const isNinja = (book: CardBook, card: PlayCard) =>
