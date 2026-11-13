@@ -183,7 +183,7 @@ describe("/api/paddle/webhook", () => {
 
   it("links a checkout's customer to the account named in customData, and never moves it", async () => {
     const [a, b] = [await makeUser(), await makeUser()];
-    await POST(delivery(customerEvent({ id: "ctm_link", email: "someone@example.com" })));
+    await POST(delivery(customerEvent({ id: "ctm_link", email: a.email })));
     const txn = (userId: number) => ({
       event_id: `evt_t${userId}`, event_type: "transaction.completed", occurred_at: "2026-11-13T23:03:33Z", notification_id: `ntf_t${userId}`,
       data: {
@@ -197,6 +197,14 @@ describe("/api/paddle/webhook", () => {
     expect((await POST(delivery(txn(a.id)))).status).toBe(200);
     expect((await POST(delivery(txn(b.id)))).status).toBe(200);
     expect((await prisma.paddleCustomer.findUniqueOrThrow({ where: { customerId: "ctm_link" } })).userId).toBe(a.id);
+  });
+
+  it("won't link a customer whose email isn't the account's, whatever customData says", async () => {
+    const intruder = await makeUser();
+    await POST(delivery(customerEvent({ id: "ctm_victim", email: "victim@example.com" })));
+    await POST(delivery(subscriptionEvent({ id: "sub_intruder", customer: "ctm_victim", userId: String(intruder.id) })));
+    expect((await prisma.paddleCustomer.findUniqueOrThrow({ where: { customerId: "ctm_victim" } })).userId).toBeNull();
+    expect(await customerIdsFor(intruder)).toEqual([]);
   });
 });
 

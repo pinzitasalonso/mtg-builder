@@ -10,7 +10,7 @@ import PricingClient from "./PricingClient";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "Spellpool Pro, monthly or yearly: unlimited decks, AI, deck scans and practice games.",
+  description: "Spellpool Pro, monthly or yearly: unlimited AI, deck scans and practice games.",
 };
 
 export default async function PricingPage() {

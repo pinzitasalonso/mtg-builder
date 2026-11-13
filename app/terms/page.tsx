@@ -40,7 +40,7 @@ export default function TermsPage() {
 
       <h2 style={H2}>Spellpool Pro (auto-renewing subscription)</h2>
       <p style={P}>
-        Spellpool Pro lifts the free plan&apos;s limits on decks, AI asks, deck scans and practice games. It&apos;s
+        Spellpool Pro lifts the free plan&apos;s daily limits on AI asks, deck scans and practice games. It&apos;s
         an auto-renewing subscription, monthly or yearly, at the price shown when you buy. It renews
         automatically at the end of each period until you cancel. Cancelling stops future charges, and Pro
         stays on until the end of the period you&apos;ve paid for.

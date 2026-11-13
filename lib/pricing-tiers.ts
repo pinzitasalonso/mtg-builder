@@ -9,7 +9,7 @@
 // product, so local dev shows the sandbox Pro plan (different amounts).
 
 import type { PaddleEnv } from "@/lib/paddle-config";
-import { FREE_AI_PER_DAY, FREE_DECK_LIMIT } from "@/lib/limits";
+import { FREE_AI_PER_DAY, FREE_PRACTICE_PER_DAY, FREE_SCANS_PER_DAY } from "@/lib/limits";
 
 export type BillingInterval = "month" | "year";
 
@@ -23,12 +23,11 @@ export interface Tier {
 
 const PRO_COPY: Omit<Tier, "priceId"> = {
   name: "Pro",
-  description: "Every deck, scan, AI answer and practice game you want.",
+  description: "Every scan, AI answer and practice game you want.",
   features: [
-    `Unlimited decks (free holds ${FREE_DECK_LIMIT})`,
     `Unlimited AI assistant (free gets ${FREE_AI_PER_DAY} a day)`,
-    "Unlimited Deck Score scans",
-    "Unlimited practice games vs AI",
+    `Unlimited Deck Score scans (free gets ${FREE_SCANS_PER_DAY} a day)`,
+    `Unlimited practice games vs AI (free gets ${FREE_PRACTICE_PER_DAY} a day)`,
   ],
   featured: true,
 };

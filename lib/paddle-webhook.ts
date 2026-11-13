@@ -130,8 +130,20 @@ async function linkTransaction(event: TransactionCompletedEvent): Promise<void> 
   if (userId && t.customerId) await linkAccount(userId, t.customerId, t.subscriptionId);
 }
 
+// customData is client-supplied, and a Paddle checkout reuses the existing
+// customer for an email. So a customer is linked only when its email is the
+// account's own (the checkout fills in and locks that email): a checkout typed
+// with someone else's email can't attach their customer, and its portal, to
+// another account. If the customer row hasn't arrived yet, a later event links
+// it, or the verified-email match in customerIdsFor covers it.
 async function linkAccount(userId: number, customerId: string, subscriptionId: string | null): Promise<void> {
-  await prisma.paddleCustomer.updateMany({ where: { customerId, userId: null }, data: { userId } });
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  if (user) {
+    await prisma.paddleCustomer.updateMany({
+      where: { customerId, userId: null, email: user.email.toLowerCase() },
+      data: { userId },
+    });
+  }
   if (subscriptionId) {
     await prisma.paddleSubscription.updateMany({ where: { subscriptionId, userId: null }, data: { userId } });
   }
