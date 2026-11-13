@@ -1,9 +1,8 @@
 // Plan limits — the DB half. Server-only (imports Prisma).
 
 import { randomUUID } from "node:crypto";
-import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { FREE_AI_PER_DAY, FREE_DECK_LIMIT, FREE_PRACTICE_PER_DAY, FREE_SCANS_PER_DAY, isPro, utcDay, type TierFields } from "@/lib/limits";
+import { FREE_AI_PER_DAY, FREE_PRACTICE_PER_DAY, FREE_SCANS_PER_DAY, isPro, utcDay, type TierFields } from "@/lib/limits";
 
 /* Spend one AI call from the user's daily budget. Returns false when the
    budget is exhausted (free tier only — pro never runs out). Each UPDATE's
@@ -24,24 +23,6 @@ export async function consumeAi(user: { id: number } & TierFields): Promise<bool
     data: { aiCount: { increment: 1 } },
   });
   return spent.count === 1;
-}
-
-/* Whether the user may create (or duplicate into) another deck. */
-export async function canCreateDeck(user: { id: number } & TierFields): Promise<boolean> {
-  if (isPro(user)) return true;
-  const count = await prisma.deck.count({ where: { userId: user.id } });
-  return count < FREE_DECK_LIMIT;
-}
-
-/* Create a deck only if the plan has room, counting and creating in one
-   transaction (the app has one database connection, so transactions run one
-   after another). canCreateDeck alone is count-then-create: requests sent
-   together all saw room. Returns null when the plan is full. */
-export async function createDeckIfRoom<T>(user: { id: number } & TierFields, create: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T | null> {
-  return prisma.$transaction(async (tx) => {
-    if (!isPro(user) && (await tx.deck.count({ where: { userId: user.id } })) >= FREE_DECK_LIMIT) return null;
-    return create(tx);
-  });
 }
 
 /* Spend one deck scan from the user's daily budget. Same compare-and-set

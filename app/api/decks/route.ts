@@ -4,8 +4,7 @@ import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { newPublicId } from "@/lib/deck-id";
-import { DECK_LIMIT_MSG, SIGN_IN_FOR_DECKS_MSG } from "@/lib/limits";
-import { canCreateDeck, createDeckIfRoom } from "@/lib/limits-db";
+import { SIGN_IN_FOR_DECKS_MSG } from "@/lib/limits";
 import { recordEvent } from "@/lib/analytics";
 import { scanSummary } from "@/lib/deck-analysis";
 import { sweepEmptyPublicDecks } from "@/lib/public-sweep";
@@ -82,16 +81,12 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: SIGN_IN_FOR_DECKS_MSG, code: "sign_in" }, { status: 401 });
-  if (!(await canCreateDeck(user))) {
-    return NextResponse.json({ error: DECK_LIMIT_MSG, code: "deck_limit" }, { status: 403 });
-  }
   const body = await jsonBody(req);
   const name = typeof body.name === "string" ? body.name.trim().slice(0, DECK_TEXT_MAX.name) : "";
   if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
   const format = typeof body.format === "string" && body.format.trim() ? body.format.trim().slice(0, DECK_TEXT_MAX.format) : "commander";
   const commander = typeof body.commander === "string" && body.commander.trim() ? body.commander.trim().slice(0, DECK_TEXT_MAX.commander) : null;
-  const deck = await createDeckIfRoom(user, (tx) => tx.deck.create({ data: { name, format, commander, userId: user.id, publicId: newPublicId() } }));
-  if (!deck) return NextResponse.json({ error: DECK_LIMIT_MSG, code: "deck_limit" }, { status: 403 });
+  const deck = await prisma.deck.create({ data: { name, format, commander, userId: user.id, publicId: newPublicId() } });
   await recordEvent("deck_created");
   return NextResponse.json(deck, { status: 201 });
 }

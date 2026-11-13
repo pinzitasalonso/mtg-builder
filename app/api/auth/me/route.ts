@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth";
-import { FREE_DECK_LIMIT, aiRemaining, isPro, scansRemaining } from "@/lib/limits";
+import { aiRemaining, scansRemaining } from "@/lib/limits";
 
 export const runtime = "nodejs";
 
@@ -15,7 +15,9 @@ export async function GET() {
       tier: user.tier,
       aiRemaining: aiRemaining(user),
       scansRemaining: scansRemaining(user),
-      deckLimit: isPro(user) ? null : FREE_DECK_LIMIT,
+      // Decks have no cap on any plan. Still sent, as null ("unlimited"),
+      // for the iOS app and any client that reads it.
+      deckLimit: null,
       hasPassword: user.hasPassword,
     },
   });

@@ -4,8 +4,7 @@ import prisma from "@/lib/prisma";
 import { newPublicId } from "@/lib/deck-id";
 import { singletonCapped } from "@/lib/commander";
 import { canBeCommander, fitsIdentity, isBackground } from "@/lib/format";
-import { DECK_LIMIT_MSG, type TierFields } from "@/lib/limits";
-import { canCreateDeck, createDeckIfRoom } from "@/lib/limits-db";
+import { type TierFields } from "@/lib/limits";
 import { snapshotDeck } from "@/lib/deck-versions";
 import { lookupCollection, NAMED_GAP_MS, normalizeCardKey, resolveNamedDetailed, SCRYFALL_HEADERS, type OutCard } from "@/lib/scryfall";
 import { scryfallFetch } from "@/lib/scryfall-limit";
@@ -377,7 +376,6 @@ async function ownDeck(userId: number, publicId: string) {
 async function createDeck(user: { id: number } & TierFields, input: Record<string, unknown>): Promise<ToolOutcome> {
   const name = str(input.name, 80);
   if (!name) return { result: "A deck needs a name.", isError: true };
-  if (!(await canCreateDeck(user))) return { result: DECK_LIMIT_MSG, isError: true, note: `Couldn’t create “${name}”: ${DECK_LIMIT_MSG}` };
   const format = str(input.format, 30).toLowerCase() || "commander";
   const commander = str(input.commander, 120) || null;
   const cards = cardInputs(input.cards);
@@ -409,13 +407,10 @@ async function createDeck(user: { id: number } & TierFields, input: Record<strin
     identity = headCards.map((c) => c!.colorIdentity ?? "").join("");
   }
 
-  const deck = await createDeckIfRoom(user, (tx) =>
-    tx.deck.create({
-      data: { name, format, commander, userId: user.id, publicId: newPublicId() },
-      select: { id: true, publicId: true, name: true, format: true },
-    })
-  );
-  if (!deck) return { result: DECK_LIMIT_MSG, isError: true, note: `Couldn’t create “${name}”: ${DECK_LIMIT_MSG}` };
+  const deck = await prisma.deck.create({
+    data: { name, format, commander, userId: user.id, publicId: newPublicId() },
+    select: { id: true, publicId: true, name: true, format: true },
+  });
   const resolved = cards
     .map((c) => ({ card: found.get(normalizeCardKey(c.name)), quantity: c.quantity, board: c.board }))
     .filter((x): x is { card: OutCard; quantity: number; board: Board } => Boolean(x.card));

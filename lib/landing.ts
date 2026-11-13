@@ -2,7 +2,7 @@
 // structured data (JSON-LD) say the same thing — search engines penalise FAQ
 // markup that doesn't match what's on the page.
 
-import { FREE_AI_PER_DAY, FREE_DECK_LIMIT, FREE_SCANS_PER_DAY } from "./limits";
+import { FREE_AI_PER_DAY, FREE_SCANS_PER_DAY } from "./limits";
 
 export const SITE_URL = "https://www.spellpool.com";
 export const SITE_DESCRIPTION =
@@ -93,7 +93,7 @@ export const LANDING_FAQ: FaqItem[] = [
       // One template literal on purpose: the production minifier folded two
       // concatenated templates here into "with 41 deck scan a day", dropping
       // the words between the constants.
-      `Yes. The free plan holds ${FREE_DECK_LIMIT} decks, with ${FREE_AI_PER_DAY} AI questions and ${FREE_SCANS_PER_DAY} deck scan a day. Spellpool Pro, with no limits, is coming soon.`,
+      `Yes. The free plan has as many decks as you like, with ${FREE_AI_PER_DAY} AI questions and ${FREE_SCANS_PER_DAY} deck scan a day. Spellpool Pro, with no limits, is coming soon.`,
   },
   {
     q: "How does the Deck Score work?",
