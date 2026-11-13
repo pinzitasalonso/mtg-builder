@@ -47,10 +47,8 @@ interface Deck {
   cover?: string | null;
 }
 
-// `aiRemaining` and `deckLimit` are null for pro (no cap) and absent only if
-// the payload predates them. /api/auth/me has always sent both; nothing on the
-// web read them, which is why a free player got no warning before a cap and no
-// explanation after one.
+// `aiRemaining` is null for pro (no cap) and absent only if the payload
+// predates it. `deckLimit` is null now for everyone: decks have no cap.
 type Me = {
   id: number;
   email: string;
@@ -95,8 +93,7 @@ export default function HomePage() {
   // home shows the decks at once while loadAll re-checks them.
   const [cached] = useState(() => peek<HomeCache>("home"));
   const [me, setMe] = useState<Me | undefined>(cached?.me);
-  /// Why a create or a duplicate was refused — almost always the free plan's
-  /// deck cap, which the server explains in the response body.
+  /// Why a create or a duplicate failed, as the server explains it.
   const [createError, setCreateError] = useState("");
   const [listError, setListError] = useState("");
   // A short confirmation at the bottom of the screen ("Deleted …").
@@ -242,10 +239,8 @@ export default function HomePage() {
       router.push("/login");
       return;
     }
-    // A free account at its deck limit gets a 403 with the reason. This used to
-    // clear the form, close the modal and silently reload, so hitting the cap
-    // looked like the button simply not working — the one moment the plan most
-    // needs to explain itself.
+    // A failure keeps the form open with the reason, rather than closing the
+    // modal and silently reloading, which looked like the button not working.
     if (!res.ok || !created?.publicId) {
       setCreateError(created?.error || "Couldn't create that deck. Try again.");
       return;
@@ -282,12 +277,10 @@ export default function HomePage() {
     loadAll();
   }
 
-  /// The free plan's two counters, side by side: decks held against the cap,
-  /// and AI asks left today. Rendered only for a free account — pro has no
-  /// numbers worth watching, which is what the PRO badge says instead.
-  ///
-  /// `deckLimit` and `aiRemaining` are null on pro and absent on an old
-  /// payload, so both halves are independently optional rather than assumed.
+  /// The free plan's counter: AI asks left today. Rendered only for a free
+  /// account — pro has no numbers worth watching, which is what the PRO badge
+  /// says instead. A deck count shows only if the server ever sends a
+  /// `deckLimit` again (it sends null: decks have no cap).
   const planMeter = (() => {
     if (!me) return null;
     const parts: string[] = [];
@@ -298,7 +291,7 @@ export default function HomePage() {
     return (
       <span
         className="home-meter"
-        title="Free plan. Spellpool Pro, coming soon, lifts both limits."
+        title="Free plan. Spellpool Pro, coming soon, lifts the limits."
         style={{
           fontSize: 11.5,
           fontWeight: 600,
@@ -335,9 +328,8 @@ export default function HomePage() {
     if (me === null) return toSignIn();
     const res = await fetch(`/api/decks/${id}/duplicate`, { method: "POST" });
     if (res.status === 401) return toSignIn();
-    // Duplicating is the other way past the deck cap, and it answered a 403 by
-    // doing nothing at all. Its own notice rather than the new-deck modal's —
-    // opening "Begin a new deck" to explain a failed duplicate is a non sequitur.
+    // A failed duplicate says why. Its own notice rather than the new-deck
+    // modal's — opening "Begin a new deck" to explain it is a non sequitur.
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       setListError(body?.error || "Couldn't duplicate that deck.");

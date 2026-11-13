@@ -3,7 +3,6 @@ import { jsonRequest, makeUser, params, prisma, signIn, signOut } from "@/test/d
 import { POST as createDeck } from "@/app/api/decks/route";
 import { POST as addCard } from "@/app/api/decks/[id]/cards/route";
 import { CARD_TEXT_MAX } from "@/lib/api";
-import { FREE_DECK_LIMIT } from "@/lib/limits";
 
 const IMAGE = "https://cards.scryfall.io/normal/front/a/b/sol-ring.jpg";
 
@@ -16,21 +15,13 @@ describe("POST /api/decks", () => {
     expect(await prisma.deck.count()).toBe(0);
   });
 
-  it("keeps a free account to its deck limit when the requests arrive together", async () => {
+  it("has no deck limit on the free plan", async () => {
     const user = await makeUser();
     await signIn(user);
-    const asked = FREE_DECK_LIMIT + 5;
+    const asked = 15;
     const statuses = await Promise.all(Array.from({ length: asked }, async (_, i) => (await createDeck(jsonRequest("/api/decks", { name: `Deck ${i}` }))).status));
-    expect(statuses.filter((s) => s === 201)).toHaveLength(FREE_DECK_LIMIT);
-    expect(statuses.filter((s) => s === 403)).toHaveLength(5);
-    expect(await prisma.deck.count({ where: { userId: user.id } })).toBe(FREE_DECK_LIMIT);
-  });
-
-  it("has no limit on Pro", async () => {
-    const user = await makeUser({ tier: "pro" });
-    await signIn(user);
-    const statuses = await Promise.all(Array.from({ length: FREE_DECK_LIMIT + 2 }, async (_, i) => (await createDeck(jsonRequest("/api/decks", { name: `Deck ${i}` }))).status));
     expect(statuses.every((s) => s === 201)).toBe(true);
+    expect(await prisma.deck.count({ where: { userId: user.id } })).toBe(asked);
   });
 
   it("cuts a deck's name to size and refuses an empty one", async () => {

@@ -22,6 +22,6 @@ import { LANDING_FAQ } from "./landing";
 describe("landing FAQ", () => {
   it("spells out the free plan's limits", () => {
     const free = LANDING_FAQ.find((f) => f.q === "Is Spellpool free?")!;
-    expect(free.a).toMatch(/holds \d+ decks, with \d+ AI questions and \d+ deck scan a day/);
+    expect(free.a).toMatch(/as many decks as you like, with \d+ AI questions and \d+ deck scan a day/);
   });
 });
