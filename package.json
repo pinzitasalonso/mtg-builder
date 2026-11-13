@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.101.0",
+    "@paddle/paddle-js": "^1.6.6",
+    "@paddle/paddle-node-sdk": "^3.12.0",
     "@prisma/adapter-better-sqlite3": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "better-sqlite3": "^12.10.0",

@@ -394,3 +394,45 @@ model PracticeGame {
   @@index([userId, createdAt])
   @@index([userId, deck])
 }
+
+// Paddle billing (web), mirrored from verified webhooks (app/api/paddle/webhook).
+// Paddle is the source of truth: these rows are only ever upserted from its
+// events, keyed on Paddle's ids, and never deleted. Each row keeps Paddle's own
+// updated_at, so a late, older delivery can't overwrite newer state.
+//
+// No foreign key from subscription to customer: deliveries arrive in any
+// order, and a subscription.created can land before its customer.created.
+model PaddleCustomer {
+  customerId      String   @id // ctm_…
+  email           String
+  // The Spellpool account, when known: from the checkout's customData (a
+  // signed-in checkout sends it). Set once, never moved to another account.
+  userId          Int?
+  paddleUpdatedAt DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([email])
+  @@index([userId])
+}
+
+model PaddleSubscription {
+  subscriptionId        String    @id // sub_…
+  customerId            String
+  // active | trialing | past_due | paused | canceled (lib/paddle-billing.ts
+  // decides which of them grant access).
+  status                String
+  priceId               String
+  productId             String
+  // A pending cancel or pause ("cancel" | "pause" | "resume") and when it
+  // takes effect. Access isn't revoked for one of these; only by the status.
+  scheduledChangeAction String?
+  scheduledChangeAt     DateTime?
+  userId                Int?
+  paddleUpdatedAt       DateTime
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([userId])
+}

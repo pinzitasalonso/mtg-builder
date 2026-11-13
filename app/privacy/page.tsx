@@ -19,7 +19,7 @@ export default function PrivacyPage() {
       <h1 className="id-display" style={{ fontSize: "clamp(34px,6vw,52px)", margin: "26px 0 4px", color: "var(--t1)" }}>
         Privacy Policy
       </h1>
-      <p style={{ ...P, color: "var(--t3)" }}>Last updated July 17, 2026 · Applies to spellpool.com and the Spellpool iOS app.</p>
+      <p style={{ ...P, color: "var(--t3)" }}>Last updated November 14, 2026 · Applies to spellpool.com and the Spellpool iOS app.</p>
 
       <h2 style={H2}>The short version</h2>
       <p style={P}>
@@ -58,9 +58,13 @@ export default function PrivacyPage() {
 
       <h2 style={H2}>Purchases</h2>
       <p style={P}>
-        Pro subscriptions are bought through Apple&apos;s App Store; Apple handles all payment details — your
-        card number never reaches us. We use RevenueCat to know whether a subscription is active: it
-        receives your Spellpool account id and purchase state, nothing more.
+        Pro can be bought in the iOS app through Apple&apos;s App Store, or on spellpool.com through Paddle.com,
+        our reseller and Merchant of Record. Apple or Paddle handles all payment details — your card number
+        never reaches us. For a web purchase, Paddle receives your email, your country and postcode, your
+        payment details and your Spellpool account id, and processes them under its own privacy policy
+        (paddle.com/legal/privacy). We keep a copy of your Paddle customer and subscription records (their
+        ids, status and plan) to know what you&apos;ve bought. We use RevenueCat to know whether a subscription
+        is active: it receives your Spellpool account id and purchase state, nothing more.
       </p>
 
       <h2 style={H2}>What we don&apos;t do</h2>
