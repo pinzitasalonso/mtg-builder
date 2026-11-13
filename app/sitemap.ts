@@ -18,6 +18,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: SITE_URL, lastModified: now, changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${SITE_URL}/refund`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${SITE_URL}/pricing`, changeFrequency: "monthly", priority: 0.6 },
   ];
   const decks = await prisma.deck
     .findMany({

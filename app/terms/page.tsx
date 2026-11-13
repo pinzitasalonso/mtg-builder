@@ -17,7 +17,11 @@ export default function TermsPage() {
       <h1 className="id-display" style={{ fontSize: "clamp(34px,6vw,52px)", margin: "26px 0 4px", color: "var(--t1)" }}>
         Terms of Use
       </h1>
-      <p style={{ ...P, color: "var(--t3)" }}>Last updated July 17, 2026 · Applies to spellpool.com and the Spellpool iOS app.</p>
+      <p style={{ ...P, color: "var(--t3)" }}>Last updated November 14, 2026 · Applies to spellpool.com and the Spellpool iOS app.</p>
+      <p style={P}>
+        Spellpool (&quot;Spellpool&quot;, &quot;we&quot;) runs spellpool.com and the Spellpool iOS app. By using either,
+        you agree to these terms.
+      </p>
 
       <h2 style={H2}>The service</h2>
       <p style={P}>
@@ -36,12 +40,24 @@ export default function TermsPage() {
 
       <h2 style={H2}>Spellpool Pro (auto-renewing subscription)</h2>
       <p style={P}>
-        Spellpool Pro lifts the free plan&apos;s limits (synced decks and daily AI asks). It&apos;s an
-        auto-renewable subscription purchased through your Apple ID. Payment is charged to your Apple ID
-        at confirmation of purchase at the price shown; the subscription renews automatically unless
-        cancelled at least 24 hours before the end of the current period. Manage or cancel any time in
-        your Apple ID subscription settings. Cancelling stops future charges; access continues to the end
-        of the paid period. Refunds are handled by Apple under their standard terms.
+        Spellpool Pro lifts the free plan&apos;s limits on decks, AI asks, deck scans and practice games. It&apos;s
+        an auto-renewing subscription, monthly or yearly, at the price shown when you buy. It renews
+        automatically at the end of each period until you cancel. Cancelling stops future charges, and Pro
+        stays on until the end of the period you&apos;ve paid for.
+      </p>
+      <p style={P}>
+        <b>On spellpool.com</b>,{" "}our order process is conducted by our online reseller Paddle.com. Paddle.com
+        is the Merchant of Record for all our web orders: it takes the payment, handles sales tax, and
+        provides customer service for billing questions and returns. Manage or cancel from{" "}
+        <Link href="/account" style={{ color: "var(--gold)" }}>Account</Link> → Manage billing.
+      </p>
+      <p style={P}>
+        <b>In the iOS app</b>,{" "}Pro is purchased through your Apple ID and charged to it at confirmation of
+        purchase. It renews unless cancelled at least 24 hours before the end of the current period; manage
+        or cancel it in your Apple ID subscription settings.
+      </p>
+      <p style={P}>
+        Refunds are covered by our <Link href="/refund" style={{ color: "var(--gold)" }}>Refund Policy</Link>.
       </p>
 
       <h2 style={H2}>AI answers</h2>
@@ -70,7 +86,8 @@ export default function TermsPage() {
       <h2 style={H2}>Contact</h2>
       <p style={P}>
         Questions about these terms: <a href="mailto:pinzitasalonso@gmail.com" style={{ color: "var(--gold)" }}>pinzitasalonso@gmail.com</a>.
-        See also the <Link href="/privacy" style={{ color: "var(--gold)" }}>Privacy Policy</Link>.
+        See also the <Link href="/privacy" style={{ color: "var(--gold)" }}>Privacy Policy</Link>{" "}and the{" "}
+        <Link href="/refund" style={{ color: "var(--gold)" }}>Refund Policy</Link>.
       </p>
     </main>
   );

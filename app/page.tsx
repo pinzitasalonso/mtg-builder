@@ -691,9 +691,11 @@ export default function HomePage() {
 
       {/* footer — legal links + the WotC fan-content line */}
       <footer style={{ marginTop: "auto", padding: "28px clamp(20px,4vw,52px) 34px", borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", gap: 18, fontSize: 13.5 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px", fontSize: 13.5 }}>
           <Link href="/privacy" style={{ color: "var(--t2)", textDecoration: "none" }}>Privacy</Link>
           <Link href="/terms" style={{ color: "var(--t2)", textDecoration: "none" }}>Terms</Link>
+          <Link href="/refund" style={{ color: "var(--t2)", textDecoration: "none" }}>Refunds</Link>
+          <Link href="/pricing" style={{ color: "var(--t2)", textDecoration: "none" }}>Pricing</Link>
           <a href="mailto:pinzitasalonso@gmail.com" style={{ color: "var(--t2)", textDecoration: "none" }}>Contact</a>
         </div>
         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--t3)", maxWidth: 720 }}>
