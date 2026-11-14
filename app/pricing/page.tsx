@@ -13,9 +13,14 @@ export const metadata: Metadata = {
   description: "Spellpool Pro, monthly or yearly: unlimited AI, deck scans and practice games.",
 };
 
+// Rendered per request (it reads the visitor's country and session). Never
+// prerendered at build: a missing Paddle variable must fail this page when
+// it's opened, not every deploy of the site.
+export const dynamic = "force-dynamic";
+
 export default async function PricingPage() {
-  const paddle = paddleClientConfig();
   const [h, user] = await Promise.all([headers(), currentUser()]);
+  const paddle = paddleClientConfig();
   const country = countryFromHeaders(h);
   // Paddle Retain wants the signed-in player's Paddle customer id, once they have one.
   const [customerId] = user ? await customerIdsFor(user) : [];
