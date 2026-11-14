@@ -1,4 +1,5 @@
-// Paddle.js settings for the browser, read on the server at request time.
+// Paddle.js settings for the browser, read on the server at request time
+// (runtimeEnv).
 // Both values are public (a client-side token is made to be exposed); the
 // server-side API key is never read here. The environment is never defaulted:
 // a missing or unknown value throws, so the page can't quietly run against the
@@ -11,9 +12,19 @@ export interface PaddleClientConfig {
   token: string;
 }
 
+// Read when a request comes in, not when the app is built. Next copies a
+// literal `process.env.NEXT_PUBLIC_…` into the build, so a variable added or
+// changed later would need a fresh build to be seen (a Railway redeploy can
+// reuse the old one). A computed name isn't copied. Every reader of these
+// values runs on the server; the browser gets them as props.
+function runtimeEnv(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  return value ? value : undefined;
+}
+
 /** The Paddle environment, for the browser and the server alike. Throws when unset. */
 export function paddleEnv(): PaddleEnv {
-  const environment = process.env.NEXT_PUBLIC_PADDLE_ENV;
+  const environment = runtimeEnv("NEXT_PUBLIC_PADDLE_ENV");
   if (environment !== "sandbox" && environment !== "production") {
     // Never echo the value: if a key was pasted here by mistake, it must not
     // reach a log or an error page.
@@ -26,7 +37,7 @@ export function paddleEnv(): PaddleEnv {
 
 export function paddleClientConfig(): PaddleClientConfig {
   const environment = paddleEnv();
-  const token = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN;
+  const token = runtimeEnv("NEXT_PUBLIC_PADDLE_CLIENT_TOKEN");
   if (!token) throw new Error("NEXT_PUBLIC_PADDLE_CLIENT_TOKEN is not set");
   // A sandbox token starts test_, a live one live_. A mismatch means the two
   // variables point at different accounts.
