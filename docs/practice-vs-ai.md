@@ -421,7 +421,25 @@ side does.
    own Treasures for those cards aren't made twice.
 
    **The built-in planner** no longer casts a 0/0 creature (Walking
-   Ballista at X = 0, a clone with nothing chosen): it died at once.
+   Ballista at X = 0, a clone with nothing chosen): it died at once. It
+   also casts the instants and sorceries it can carry out whole
+   (`lib/practice/spells.ts`):
+   - **tutors** (Demonic, Grim, Diabolic; Vampiric, Mystical, Worldly,
+     Enlightened and Imperial Seal to the top: the `search` effect's
+     `"top"`): the biggest card it can cast next turn with one more land, or
+     a land when it has none in hand and fewer than four out;
+   - **board wipes** (Wrath of God, Damnation, Day of Judgment, Supreme
+     Verdict, Pyroclasm, "all creatures get -N/-N", Toxic Deluge with the
+     least X that does the most), when they take at least two of the
+     player's creatures (or their commander) and clearly more than its
+     own;
+   - **draw spells** with a scry or a life cost (Night's Whisper, Sign in
+     Blood, Opt, Preordain, Read the Bones), while it keeps 10 life.
+   A ramp search is one that finds only lands: "a card" is a tutor. When it
+   plans, a land that enters tapped (a Triome) pays for nothing that turn:
+   it used to plan a spell it then couldn't pay for. Modal spells (Farewell,
+   Austere Command, Fabricate) and instants it holds for the player's turn
+   (removal, counterspells) are still left to the model.
 
    **Planeswalkers** show their loyalty on the card (`loyaltyOf`: the
    starting loyalty from Scryfall until it changes). The ⋯ menu has "+1

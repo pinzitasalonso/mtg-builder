@@ -4,9 +4,10 @@
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
 import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, searchOnCast, stats, wheelSpellOf } from "./cards";
-import { aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, lifeFor, spellCost } from "./game";
-import { manaSources, parseCost, payCost } from "./mana";
+import { aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, indestructible, lifeFor, spellCost } from "./game";
+import { manaSources, manaTotal, parseCost, payCost } from "./mana";
 import { treasureSpellOf } from "./treasure";
+import { drawSpellOf, tutorOf, wipeOf } from "./spells";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
 
 const value = (book: CardBook, c: PlayCard) => (c.token ? 1 : (infoOf(book, c)?.manaValue ?? 0));
@@ -151,11 +152,75 @@ function landColors(book: CardBook, land: PlayCard): string[] {
   return f.types.includes("land") ? ["W", "U", "B", "R", "G"] : f.types.flatMap((t) => (BASIC_COLOR[t] ? [BASIC_COLOR[t]!] : []));
 }
 
-const NUMBER: Record<string, number> = { a: 1, one: 1, two: 2, three: 3, four: 4 };
-/** A spell that only draws ("Draw two cards."): safe to cast without judgement. */
-function drawOnly(book: CardBook, c: PlayCard): number {
-  const m = /^draw (a|one|two|three|four) cards?\.$/i.exec((infoOf(book, c)?.oracleText ?? "").trim());
-  return m ? NUMBER[m[1]!.toLowerCase()]! : 0;
+/** A spell that only draws (and maybe costs life): safe to cast without
+    judgement while the life is there (Night's Whisper, Opt, Read the Bones). */
+function drawOnly(book: CardBook, c: PlayCard, life = Infinity): number {
+  const d = drawSpellOf(infoOf(book, c));
+  return d && life - d.lose >= 10 ? d.draw : 0;
+}
+
+const blank = (type: Effect["type"]): Effect => ({ ...drawEffect(0), type, player: null, amount: null });
+
+/** What a tutor finds: the biggest card it can cast next turn (with one
+    more land), or else the biggest. Lands only when it has none in hand and
+    few out. */
+function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): Effect[] | null {
+  const t = tutorOf(infoOf(book, c));
+  if (!t || g.sides[seat].life - t.lose < 10) return null;
+  const side = g.sides[seat];
+  // Next turn's mana: what it has (tapped or not) and a land drop.
+  const reach = manaTotal(availableMana(g, seat, book)) + side.battlefield.filter((x) => x.tapped).length + 1;
+  const needLand = !side.hand.some(canPlayAsLand) && side.battlefield.filter(isLand).length < 4;
+  const fits = side.library.filter((x) => t.search.test(x.typeLine, infoOf(book, x)) && (needLand || !isLand(x)) && (infoOf(book, x)?.toughness !== 0 || !isCreature(book, x)));
+  if (!fits.length) return null;
+  const mv = (x: PlayCard) => infoOf(book, x)?.manaValue ?? 0;
+  const score = (x: PlayCard) => (needLand && isLand(x) ? 10000 : 0) + (mv(x) <= reach ? 1000 : 0) + mv(x) * 10 + (isCreature(book, x) ? 1 : 0);
+  const pick = fits.reduce((a, b) => (score(b) > score(a) ? b : a));
+  const effects: Effect[] = [{ ...blank("search"), name: pick.name, to: t.search.to[0]!.zone === "top" ? "top" : "hand" }];
+  if (t.lose) effects.push({ ...blank("life"), player: "ai", amount: -t.lose });
+  return effects;
+}
+
+/** A board wipe, when it takes much more of the player's than of its own:
+    at least two of their creatures (or their commander), and five more in
+    power and mana value than it loses. Toxic Deluge's X is the least life
+    that does it best, keeping ten. */
+function wipePlan(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): PlanAction | null {
+  const w = wipeOf(infoOf(book, c));
+  if (!w) return null;
+  const foe = other(seat);
+  const all = (["you", "opp"] as Seat[]).flatMap((s) => g.sides[s].battlefield.filter((x) => isCreature(book, x)).map((x) => ({ x, s })));
+  if (!all.some(({ s }) => s === foe)) return null;
+  const dies = (x: PlayCard, s: Seat, n: number) => {
+    const t = stats(book, x).toughness - (w.kind === "damage" ? (x.damage ?? 0) : 0);
+    if (w.kind === "shrink") return t <= n;
+    if (indestructible(g, s, x, book)) return false;
+    return w.kind === "destroy" || t <= n;
+  };
+  const worth = (x: PlayCard) => Math.max(0, stats(book, x).power) + value(book, x) + (x.commander ? 5 : 0);
+  const net = (n: number) => {
+    const gone = all.filter(({ x, s }) => dies(x, s, n));
+    const theirs = gone.filter(({ s }) => s === foe);
+    return { theirs, gain: theirs.reduce((t, { x }) => t + worth(x), 0) - gone.filter(({ s }) => s === seat).reduce((t, { x }) => t + worth(x), 0) };
+  };
+  let n = w.amount ?? 0;
+  if (w.amount === null) {
+    // Toxic Deluge: try each X the life allows.
+    let best = { n: 0, gain: -Infinity };
+    for (let x = 1; x <= Math.min(13, g.sides[seat].life - 10); x++) {
+      const r = net(x);
+      if (r.gain > best.gain) best = { n: x, gain: r.gain };
+    }
+    if (!best.n) return null;
+    n = best.n;
+  }
+  const r = net(n);
+  if (r.gain < 5 || !(r.theirs.length >= 2 || r.theirs.some(({ x }) => x.commander))) return null;
+  const effects: Effect[] = all.map(({ x }) =>
+    w.kind === "destroy" ? { ...blank("destroy"), target: cardId(x.iid) } : w.kind === "damage" ? { ...blank("damage"), target: cardId(x.iid), amount: n } : { ...blank("pump"), target: cardId(x.iid), power: -n, toughness: -n }
+  );
+  if (w.amount === null) effects.unshift({ ...blank("life"), player: "ai", amount: -n });
+  return { ...blankAction("cast", c.iid), x: w.amount === null ? n : null, effects };
 }
 
 /** A wheel is worth casting when it gives this seat more cards than it
@@ -192,7 +257,10 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
   let sim: PracticeGame = structuredClone(g);
   if (main.length) {
     const land = sim.sides[seat].hand.find((c) => cardId(c.iid) === main[0]!.card)!;
-    sim.sides[seat] = { ...sim.sides[seat], hand: sim.sides[seat].hand.filter((c) => c !== land), battlefield: [...sim.sides[seat].battlefield, { ...land, enteredTurn: g.turn }] };
+    // A land that enters tapped (a Triome) gives nothing this turn. (A fetch
+    // land or a shock land is played out by the engine below.)
+    const tapped = entersTapped(infoOf(book, land)) && !fetchOf(infoOf(book, land));
+    sim.sides[seat] = { ...sim.sides[seat], hand: sim.sides[seat].hand.filter((c) => c !== land), battlefield: [...sim.sides[seat].battlefield, { ...land, enteredTurn: g.turn, tapped }] };
     sim.landPlayed = true;
   }
   // Pay from the simulated table: tap what's used, and pay the life.
@@ -228,9 +296,18 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     if (!payIn(spellCost(sim, seat, c, book, "hand"))) continue;
     main.push({ ...blankAction("cast", c.iid), effects: finds });
   }
+  // A board wipe, when the player's board is much the bigger.
+  let wiped = false;
+  for (const c of sim.sides[seat].hand) {
+    const wipe = wipePlan(sim, seat, c, book);
+    if (!wipe || !castable(sim, seat, c, book, "hand") || !payIn(spellCost(sim, seat, c, book, "hand"))) continue;
+    main.push(wipe);
+    wiped = true;
+    break;
+  }
   // A sorcery that removes a creature (Feed the Swarm), at the player's
   // biggest threat. Its instants are kept for the player's turn.
-  if (seat === "opp") {
+  if (seat === "opp" && !wiped) {
     const kill = aiRemovalAction(sim, book, sim.sides.you.battlefield.map((c) => c.iid), "main");
     const card = kill ? sim.sides.opp.hand.find((c) => cardId(c.iid) === kill.card) : undefined;
     if (kill && card && payIn(spellCost(sim, "opp", card, book, "hand"))) main.push(kill);
@@ -240,18 +317,39 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     ...sim.sides[seat].hand.filter((c) => !cast.has(cardId(c.iid))).map((c) => ({ c, zone: "hand" as const })),
     ...sim.sides[seat].command.map((c) => ({ c, zone: "command" as const })),
   ]
-    .filter(({ c }) => !isLand(c) && (!/\b(Instant|Sorcery)\b/.test((c.typeLine ?? "").split(" // ")[0]!) || drawOnly(book, c) > 0 || wheelWorth(sim, seat, c, book) || !!treasureSpellOf(book, c)))
+    .filter(
+      ({ c }) =>
+        !isLand(c) &&
+        (!/\b(Instant|Sorcery)\b/.test((c.typeLine ?? "").split(" // ")[0]!) ||
+          drawOnly(book, c, sim.sides[seat].life) > 0 ||
+          !!tutorOf(infoOf(book, c)) ||
+          wheelWorth(sim, seat, c, book) ||
+          !!treasureSpellOf(book, c))
+    )
     // A 0/0 creature needs a choice the planner doesn't make: X counters
     // (Walking Ballista) or a creature to copy (Phyrexian Metamorph). Cast
     // as it is, it dies at once.
     .filter(({ c }) => !(isCreature(book, c) && infoOf(book, c)?.toughness === 0))
-    // Permanents first, biggest first; then the draw spells.
-    .sort((a, b) => (drawOnly(book, a.c) ? 1 : 0) - (drawOnly(book, b.c) ? 1 : 0) || value(book, b.c) - value(book, a.c));
+    // Permanents first, biggest first; then tutors; then the draw spells.
+    .sort((a, b) => rank(a.c) - rank(b.c) || value(book, b.c) - value(book, a.c));
+  function rank(c: PlayCard) {
+    return tutorOf(infoOf(book, c)) ? 1 : drawOnly(book, c) ? 2 : 0;
+  }
   for (const { c, zone } of candidates) {
     if (!castable(sim, seat, c, book, zone)) continue;
+    // A tutor needs something worth finding; a draw spell, the life to spare.
+    const found = tutorOf(infoOf(book, c)) ? tutorPick(sim, seat, c, book) : null;
+    if (tutorOf(infoOf(book, c)) && !found) continue;
+    const drawSpell = drawSpellOf(infoOf(book, c));
     if (!payIn(spellCost(sim, seat, c, book, zone))) continue;
-    const draws = drawOnly(book, c);
-    main.push(draws ? { ...blankAction("cast", c.iid), effects: [drawEffect(draws)] } : blankAction("cast", c.iid));
+    if (found) main.push({ ...blankAction("cast", c.iid), effects: found });
+    else if (drawSpell && !wheelWorth(sim, seat, c, book) && !treasureSpellOf(book, c)) {
+      const effects = [drawEffect(drawSpell.draw)];
+      if (drawSpell.lose) effects.push({ ...blank("life"), player: "ai", amount: -drawSpell.lose });
+      main.push({ ...blankAction("cast", c.iid), effects });
+      sim = structuredClone(sim);
+      sim.sides[seat] = { ...sim.sides[seat], life: sim.sides[seat].life - drawSpell.lose };
+    } else main.push(blankAction("cast", c.iid));
   }
   return {
     main,
@@ -271,6 +369,9 @@ function landSearch(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, ta
   const spec = searchOnCast(info);
   // Only a search and nothing else: "…, then shuffle." is the whole card.
   if (!spec || !/^search your library for [^.]*\.(?: \([^)]*\))?$/i.test((info?.oracleText ?? "").trim())) return null;
+  // A ramp spell finds only lands; one that would find a creature or a
+  // spell too ("a card": Demonic Tutor) is a tutor.
+  if (["Creature — Test", "Instant", "Artifact"].some((t) => spec.test(t, undefined))) return null;
   const side = g.sides[seat];
   const lands = side.library.filter((l) => !taken.has(l.iid) && isLand(l) && spec.test(l.typeLine, infoOf(book, l)));
   if (!lands.length) return null;

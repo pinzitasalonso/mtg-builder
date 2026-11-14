@@ -2313,6 +2313,13 @@ function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: Ca
           say(g, caster, `${source} finds nothing called ${e.name ?? "that"}.`);
           break;
         }
+        if (e.to === "top") {
+          // Shuffled, then on top (Vampiric Tutor): the next card drawn.
+          const rest = shuffled(g.sides[s].library.filter((c) => c.iid !== found.iid));
+          g.sides[s] = { ...g.sides[s], library: [found, ...rest] };
+          say(g, caster, `${source} finds a card and puts it on top of ${s === "you" ? "your" : "its"} library.`);
+          break;
+        }
         moveTo(g, found.iid, e.to === "hand" ? "hand" : "battlefield", { tapped: !!e.tapped });
         g.sides[s] = { ...g.sides[s], library: shuffled(g.sides[s].library) };
         say(g, caster, `${source} finds ${found.name}${e.to === "hand" ? " (to hand)" : ""}.`);
