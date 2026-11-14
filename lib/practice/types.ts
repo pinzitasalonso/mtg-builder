@@ -176,7 +176,7 @@ export interface Effect {
   power: number | null;
   toughness: number | null;
   keywords: string[];
-  to: "battlefield" | "hand" | null;
+  to: "battlefield" | "hand" | "top" | null;
   tapped: boolean | null;
   text: string | null;
 }

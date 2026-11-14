@@ -50,7 +50,7 @@ const EFFECT_SCHEMA = {
     power: nullable("integer"),
     toughness: nullable("integer"),
     keywords: { type: "array", items: { type: "string" } },
-    to: nullableEnum(["battlefield", "hand"]),
+    to: nullableEnum(["battlefield", "hand", "top"]),
     tapped: nullable("boolean"),
     text: nullable("string"),
   },
@@ -119,7 +119,7 @@ EFFECTS (every field present: unused ones null, keywords [] when unused)
 - token: name, power, toughness, amount (how many), keywords, tapped, and player (whose; null means yours).
 - counters: target and amount (+1/+1 counters; negative for -1/-1).
 - pump: target, power and toughness, until end of turn.
-- search: name (an exact card name from your deck still in your library), to ("battlefield" or "hand"), tapped.
+- search: name (an exact card name from your deck still in your library), to ("battlefield", "hand", or "top" for a tutor that puts it on top of your library, like Vampiric Tutor), tapped.
 - mana: text is the mana it adds, like "{R}{R}{R}" (a ritual, or "three mana of any one color": pick the colour). Your next actions spend it first.
 - note: text, for anything else the card does. The player resolves it by hand, so make it short and concrete ("The player sacrifices a creature").
 Turn each card's text into these effects faithfully. Never invent an effect a card doesn't have. Target only cards the brief shows, by id.`;
@@ -301,7 +301,7 @@ function cleanEffect(raw: unknown): Effect | null {
     power: int(e.power, -20, 99),
     toughness: int(e.toughness, -20, 99),
     keywords: Array.isArray(e.keywords) ? e.keywords.filter((k): k is string => typeof k === "string").slice(0, 6).map((k) => k.slice(0, 30)) : [],
-    to: e.to === "battlefield" || e.to === "hand" ? e.to : null,
+    to: e.to === "battlefield" || e.to === "hand" || e.to === "top" ? e.to : null,
     tapped: bool(e.tapped),
     text: text(e.text, 200),
   };

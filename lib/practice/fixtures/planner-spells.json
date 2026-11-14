@@ -1,0 +1,233 @@
+[
+ {
+  "name": "Demonic Tutor",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{B}",
+  "manaValue": 2,
+  "oracleText": "Search your library for a card, put that card into your hand, then shuffle."
+ },
+ {
+  "name": "Vampiric Tutor",
+  "typeLine": "Instant",
+  "manaCost": "{B}",
+  "manaValue": 1,
+  "oracleText": "Search your library for a card, then shuffle and put that card on top. You lose 2 life."
+ },
+ {
+  "name": "Mystical Tutor",
+  "typeLine": "Instant",
+  "manaCost": "{U}",
+  "manaValue": 1,
+  "oracleText": "Search your library for an instant or sorcery card, reveal it, then shuffle and put that card on top."
+ },
+ {
+  "name": "Worldly Tutor",
+  "typeLine": "Instant",
+  "manaCost": "{G}",
+  "manaValue": 1,
+  "oracleText": "Search your library for a creature card, reveal it, then shuffle and put the card on top."
+ },
+ {
+  "name": "Enlightened Tutor",
+  "typeLine": "Instant",
+  "manaCost": "{W}",
+  "manaValue": 1,
+  "oracleText": "Search your library for an artifact or enchantment card, reveal it, then shuffle and put that card on top."
+ },
+ {
+  "name": "Imperial Seal",
+  "typeLine": "Sorcery",
+  "manaCost": "{B}",
+  "manaValue": 1,
+  "oracleText": "Search your library for a card, then shuffle and put that card on top. You lose 2 life."
+ },
+ {
+  "name": "Diabolic Tutor",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{B}{B}",
+  "manaValue": 4,
+  "oracleText": "Search your library for a card, put that card into your hand, then shuffle."
+ },
+ {
+  "name": "Grim Tutor",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{B}{B}",
+  "manaValue": 3,
+  "oracleText": "Search your library for a card, put that card into your hand, then shuffle. You lose 3 life."
+ },
+ {
+  "name": "Wrath of God",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{W}{W}",
+  "manaValue": 4,
+  "oracleText": "Destroy all creatures. They can't be regenerated."
+ },
+ {
+  "name": "Damnation",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{B}{B}",
+  "manaValue": 4,
+  "oracleText": "Destroy all creatures. They can't be regenerated."
+ },
+ {
+  "name": "Toxic Deluge",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{B}",
+  "manaValue": 3,
+  "oracleText": "As an additional cost to cast this spell, pay X life.\nAll creatures get -X/-X until end of turn."
+ },
+ {
+  "name": "Blasphemous Act",
+  "typeLine": "Sorcery",
+  "manaCost": "{8}{R}",
+  "manaValue": 9,
+  "oracleText": "This spell costs {1} less to cast for each creature on the battlefield.\nBlasphemous Act deals 13 damage to each creature."
+ },
+ {
+  "name": "Pyroclasm",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Pyroclasm deals 2 damage to each creature."
+ },
+ {
+  "name": "Anger of the Gods",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}{R}",
+  "manaValue": 3,
+  "oracleText": "Anger of the Gods deals 3 damage to each creature. If a creature dealt damage this way would die this turn, exile it instead."
+ },
+ {
+  "name": "Day of Judgment",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{W}{W}",
+  "manaValue": 4,
+  "oracleText": "Destroy all creatures."
+ },
+ {
+  "name": "Supreme Verdict",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{W}{W}{U}",
+  "manaValue": 4,
+  "oracleText": "This spell can't be countered.\nDestroy all creatures."
+ },
+ {
+  "name": "Austere Command",
+  "typeLine": "Sorcery",
+  "manaCost": "{4}{W}{W}",
+  "manaValue": 6,
+  "oracleText": "Choose two —\n• Destroy all artifacts.\n• Destroy all enchantments.\n• Destroy all creatures with mana value 3 or less.\n• Destroy all creatures with mana value 4 or greater."
+ },
+ {
+  "name": "Night's Whisper",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{B}",
+  "manaValue": 2,
+  "oracleText": "You draw two cards and lose 2 life."
+ },
+ {
+  "name": "Sign in Blood",
+  "typeLine": "Sorcery",
+  "manaCost": "{B}{B}",
+  "manaValue": 2,
+  "oracleText": "Target player draws two cards and loses 2 life."
+ },
+ {
+  "name": "Opt",
+  "typeLine": "Instant",
+  "manaCost": "{U}",
+  "manaValue": 1,
+  "oracleText": "Scry 1. (Look at the top card of your library. You may put that card on the bottom.)\nDraw a card."
+ },
+ {
+  "name": "Preordain",
+  "typeLine": "Sorcery",
+  "manaCost": "{U}",
+  "manaValue": 1,
+  "oracleText": "Scry 2, then draw a card. (To scry 2, look at the top two cards of your library, then put any number of them on the bottom and the rest on top in any order.)"
+ },
+ {
+  "name": "Brainstorm",
+  "typeLine": "Instant",
+  "manaCost": "{U}",
+  "manaValue": 1,
+  "oracleText": "Draw three cards, then put two cards from your hand on top of your library in any order."
+ },
+ {
+  "name": "Ponder",
+  "typeLine": "Sorcery",
+  "manaCost": "{U}",
+  "manaValue": 1,
+  "oracleText": "Look at the top three cards of your library, then put them back in any order. You may shuffle.\nDraw a card."
+ },
+ {
+  "name": "Read the Bones",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{B}",
+  "manaValue": 3,
+  "oracleText": "Scry 2, then draw two cards. You lose 2 life. (To scry 2, look at the top two cards of your library, then put any number of them on the bottom and the rest on top in any order.)"
+ },
+ {
+  "name": "Harmonize",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{G}{G}",
+  "manaValue": 4,
+  "oracleText": "Draw three cards."
+ },
+ {
+  "name": "Divination",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{U}",
+  "manaValue": 3,
+  "oracleText": "Draw two cards."
+ },
+ {
+  "name": "Painful Truths",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{B}",
+  "manaValue": 3,
+  "oracleText": "Converge — You draw X cards and lose X life, where X is the number of colors of mana spent to cast this spell."
+ },
+ {
+  "name": "Swords to Plowshares",
+  "typeLine": "Instant",
+  "manaCost": "{W}",
+  "manaValue": 1,
+  "oracleText": "Exile target creature. Its controller gains life equal to its power."
+ },
+ {
+  "name": "Path to Exile",
+  "typeLine": "Instant",
+  "manaCost": "{W}",
+  "manaValue": 1,
+  "oracleText": "Exile target creature. Its controller may search their library for a basic land card, put that card onto the battlefield tapped, then shuffle."
+ },
+ {
+  "name": "Chaos Warp",
+  "typeLine": "Instant",
+  "manaCost": "{2}{R}",
+  "manaValue": 3,
+  "oracleText": "The owner of target permanent shuffles it into their library, then reveals the top card of their library. If it's a permanent card, they put it onto the battlefield."
+ },
+ {
+  "name": "Feed the Swarm",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{B}",
+  "manaValue": 2,
+  "oracleText": "Destroy target creature or enchantment an opponent controls. You lose life equal to that permanent's mana value."
+ },
+ {
+  "name": "Infernal Grasp",
+  "typeLine": "Instant",
+  "manaCost": "{1}{B}",
+  "manaValue": 2,
+  "oracleText": "Destroy target creature. You lose 2 life."
+ },
+ {
+  "name": "Deadly Rollick",
+  "typeLine": "Instant",
+  "manaCost": "{3}{B}",
+  "manaValue": 4,
+  "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nExile target creature."
+ }
+]
