@@ -288,23 +288,31 @@ export default function HomePage() {
     if (typeof me.aiRemaining === "number") parts.push(`${me.aiRemaining} AI left`);
     if (parts.length === 0) return null;
     const spent = typeof me.deckLimit === "number" && decks.length >= me.deckLimit;
+    // The meter and the way past it in one pill: what's left today, then Go Pro.
     return (
-      <span
-        className="home-meter"
-        title="Free plan. Spellpool Pro, coming soon, lifts the limits."
+      <Link
+        href="/pricing"
+        className="home-meter home-meter-link"
+        title="Free plan. Spellpool Pro removes the daily limits."
         style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
           fontSize: 11.5,
           fontWeight: 600,
           letterSpacing: "0.02em",
-          color: spent ? "var(--danger)" : "var(--t3)",
           border: "1px solid var(--line)",
-          padding: "3px 9px",
+          padding: "3px 4px 3px 10px",
           borderRadius: 999,
           whiteSpace: "nowrap",
+          textDecoration: "none",
         }}
       >
-        {parts.join(" · ")}
-      </span>
+        <span className="home-meter-count" style={{ color: spent ? "var(--danger)" : "var(--t3)" }}>{parts.join(" · ")}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 800, color: "var(--accent-ink)", background: "var(--gold)", padding: "2px 8px", borderRadius: 999 }}>
+          <Sparkles size={11} strokeWidth={2.5} aria-hidden="true" /> Go Pro
+        </span>
+      </Link>
     );
   })();
 
@@ -381,9 +389,9 @@ export default function HomePage() {
             {me ? (
               <>
                 {me.tier === "pro" ? (
-                  <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.14em", color: "var(--accent-ink)", background: "var(--gold)", padding: "3px 8px", borderRadius: 999 }}>
+                  <Link href="/account" title="Spellpool Pro: manage your subscription" style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.14em", color: "var(--accent-ink)", background: "var(--gold)", padding: "3px 8px", borderRadius: 999, textDecoration: "none" }}>
                     PRO
-                  </span>
+                  </Link>
                 ) : (
                   // What the free plan has left, which the web never showed —
                   // so a player met both caps as a refusal rather than as a
@@ -391,9 +399,9 @@ export default function HomePage() {
                   // two figures in Account and beside the assistant's input.
                   planMeter
                 )}
-                <span className="home-email" title={me.email} style={{ fontSize: 13, color: "var(--t3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <Link href="/account" className="home-email" title={`${me.email} · Account and billing`} style={{ fontSize: 13, color: "var(--t3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none" }}>
                   {me.email}
-                </span>
+                </Link>
                 {/* The collection sits below every deck; this is the way to it
                     without scrolling past them all. */}
                 <button onClick={() => setShowCollection("collection")} className="id-ghost home-icon-btn" style={{ padding: "9px 16px" }} aria-label="Collection">

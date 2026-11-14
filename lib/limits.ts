@@ -1,7 +1,7 @@
 // Plan limits — the pure half (no Prisma import, so tests stay hermetic;
 // the DB-touching helpers live in lib/limits-db.ts). Tiers live on
-// User.tier: "free" is the default; "pro" (the future paid tier) lifts
-// every cap. Decks have no cap on any plan.
+// User.tier: "free" is the default; "pro" (Spellpool Pro, on the web through
+// Paddle and in the iOS app) lifts every cap. Decks have no cap on any plan.
 
 export const FREE_AI_PER_DAY = 1;
 // Deck scans — the Score plus the AI's written analysis — are dearer than a
@@ -18,14 +18,14 @@ export const PRACTICE_AI_TURNS = 40;
 export const SIGN_IN_FOR_DECKS_MSG = "Sign in to create a deck — it's free.";
 export const AI_LIMIT_MSG =
   FREE_AI_PER_DAY === 1
-    ? `You've used today's free AI ask — it resets at midnight UTC. Spellpool Pro, coming soon, lifts the limit.`
-    : `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro, coming soon, lifts the limit.`;
+    ? `You've used today's free AI ask — it resets at midnight UTC. Spellpool Pro lifts the limit.`
+    : `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro lifts the limit.`;
 export const PRACTICE_LIMIT_MSG =
   FREE_PRACTICE_PER_DAY === 1
-    ? `You've played today's free practice game — it resets at midnight UTC. Spellpool Pro, coming soon, makes them unlimited.`
-    : `You've played today's ${FREE_PRACTICE_PER_DAY} free practice games — they reset at midnight UTC. Spellpool Pro, coming soon, makes them unlimited.`;
+    ? `You've played today's free practice game — it resets at midnight UTC. Spellpool Pro makes them unlimited.`
+    : `You've played today's ${FREE_PRACTICE_PER_DAY} free practice games — they reset at midnight UTC. Spellpool Pro makes them unlimited.`;
 export const SCAN_LIMIT_MSG =
-  `You've used today's free deck scan — it resets at midnight UTC. Spellpool Pro, coming soon, makes scans unlimited.`;
+  `You've used today's free deck scan — it resets at midnight UTC. Spellpool Pro makes scans unlimited.`;
 
 export interface TierFields {
   tier?: string | null;

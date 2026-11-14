@@ -3626,13 +3626,16 @@ button {
   }
 }
 
-/* Home header on a phone: the email goes first, then the plan meter, so
-   Sign out and New deck always fit on one line. */
-@media (max-width: 640px) {
+/* Home header on a narrow screen: the email goes first (the Go Pro pill
+   needs the room), then the plan meter, so Sign out and New deck always fit
+   on one line. */
+@media (max-width: 960px) {
   .home-email { display: none; }
 }
+/* On a phone the pill keeps only Go Pro. */
 @media (max-width: 480px) {
-  .home-meter { display: none; }
+  .home-meter-count { display: none; }
+  .home-meter-link { padding-left: 4px !important; }
 }
 
 /* Icons that only a phone's header shows (Sign out, the + on New deck). */
@@ -3640,7 +3643,7 @@ button {
 /* Home header on a phone: one row. The wordmark goes (the disc still reads as
    the logo), Collection and Sign out become 38px icon buttons with their
    aria-labels, and New deck keeps its words. */
-@media (max-width: 560px) {
+@media (max-width: 680px) {
   .home-header { padding-left: 16px !important; padding-right: 16px !important; gap: 8px; }
   .home-header .logo-word,
   .home-header .home-hide { display: none; }
@@ -4005,3 +4008,5 @@ button {
   max-width: 880px;
   margin: 0 auto;
 }
+.home-meter-link { transition: border-color 0.14s; }
+.home-meter-link:hover { border-color: var(--text) !important; }
