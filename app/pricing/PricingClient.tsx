@@ -1,10 +1,12 @@
 "use client";
 
 import { initializePaddle, type Paddle, type PricePreviewParams } from "@paddle/paddle-js";
+import { Check } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { rememberAfterSignIn } from "@/lib/after-sign-in";
 import type { PaddleClientConfig } from "@/lib/paddle-config";
-import type { BillingInterval, Tier } from "@/lib/pricing-tiers";
+import { FREE_PLAN, type BillingInterval, type Tier } from "@/lib/pricing-tiers";
 
 interface Props {
   paddle: PaddleClientConfig;
@@ -16,6 +18,8 @@ interface Props {
   country?: string;
   email?: string;
   userId?: number;
+  /** Already on Pro (User.tier, from RevenueCat): no second subscription. */
+  isPro?: boolean;
 }
 
 // priceId → Paddle's formatted total ("£8.00"), shown exactly as it comes back,
@@ -27,7 +31,7 @@ function trialLabel(t: { interval: string; frequency: number } | null | undefine
   return `${t.frequency}-${t.interval} free trial`;
 }
 
-export default function PricingClient({ paddle: config, tiers, customerId, country, email, userId }: Props) {
+export default function PricingClient({ paddle: config, tiers, customerId, country, email, userId, isPro }: Props) {
   const [paddle, setPaddle] = useState<Paddle>();
   const [interval, setInterval] = useState<BillingInterval>("month");
   const [prices, setPrices] = useState<Prices>({});
@@ -99,77 +103,137 @@ export default function PricingClient({ paddle: config, tiers, customerId, count
 
   return (
     <div>
-      <div role="radiogroup" aria-label="Billing interval" style={toggleWrap}>
-        {(["month", "year"] as const).map((v) => (
-          <button
-            key={v}
-            role="radio"
-            aria-checked={interval === v}
-            onClick={() => setInterval(v)}
-            style={{ ...toggleBtn, ...(interval === v ? toggleOn : null) }}
-          >
-            {v === "month" ? "Monthly" : "Yearly"}
-          </button>
-        ))}
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 28 }}>
+        <div className="mn-seg" role="radiogroup" aria-label="Billing period" style={{ padding: 4 }}>
+          {(["month", "year"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              role="radio"
+              aria-checked={interval === v}
+              data-on={interval === v}
+              onClick={() => setInterval(v)}
+              style={{ fontSize: 14, padding: "9px 22px" }}
+            >
+              {v === "month" ? "Monthly" : "Yearly"}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {error && <p style={{ color: "var(--danger)", margin: "0 0 16px" }}>{error}</p>}
+      {error && (
+        <p role="alert" style={{ textAlign: "center", color: "var(--danger)", margin: "0 0 18px", fontSize: 14.5 }}>{error}</p>
+      )}
 
-      <div style={grid}>
+      <div className="pricing-grid">
+        {/* Free, for comparison */}
+        <section style={card}>
+          <div style={{ minHeight: 24, display: "flex", alignItems: "center" }}>
+            <div className="id-label" style={{ color: "var(--t3)" }}>{FREE_PLAN.name}</div>
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", marginTop: 14, minHeight: 64 }}>
+            <span className="id-display" style={priceBig}>Free</span>
+          </div>
+          <p style={sub}>{FREE_PLAN.description}</p>
+          <ul style={list}>
+            {FREE_PLAN.features.map((f) => <Feature key={f} text={f} muted />)}
+          </ul>
+          {userId ? (
+            <p style={{ ...footNote, marginTop: "auto", padding: "14px 0", textAlign: "center" }}>
+              {isPro ? "Included with Pro." : "Your current plan."}
+            </p>
+          ) : (
+            <Link href="/" className="id-ghost" style={{ ...ctaBase, marginTop: "auto" }}>Start brewing</Link>
+          )}
+        </section>
+
         {tiers.map((tier) => {
           const priceId = tier.priceId[interval];
           const price = prices[priceId];
-          const total = price?.total;
           return (
-            <section key={tier.name} style={{ ...card, ...(tier.featured ? cardFeatured : null) }}>
-              <h2 style={{ margin: 0, fontSize: 22, color: "var(--t1)" }}>{tier.name}</h2>
-              <p style={{ margin: "6px 0 18px", color: "var(--t2)", fontSize: 14.5, minHeight: 42 }}>{tier.description}</p>
-              <p style={{ margin: "0 0 4px", fontSize: 36, fontWeight: 700, color: "var(--t1)" }} aria-live="polite">
-                {total ?? <span style={{ color: "var(--t3)" }}>…</span>}
-                <span style={{ fontSize: 15, fontWeight: 500, color: "var(--t2)" }}>
-                  {" "}/ {interval === "month" ? "month" : "year"}
-                </span>
-              </p>
-              <p style={{ margin: "0 0 18px", color: "var(--t3)", fontSize: 13, minHeight: 18 }}>{price?.trial ?? ""}</p>
-              <ul style={{ listStyle: "none", padding: 0, margin: "0 0 22px", flex: 1 }}>
-                {tier.features.map((f) => (
-                  <li key={f} style={{ color: "var(--t2)", fontSize: 14.5, padding: "5px 0" }}>✓ {f}</li>
-                ))}
+            <section key={tier.name} style={{ ...card, ...cardFeatured }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minHeight: 24 }}>
+                <div className="id-label" style={{ color: "var(--gold)" }}>{tier.name}</div>
+                {price?.trial && <span style={badge}>{price.trial}</span>}
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 14, minHeight: 64 }} aria-live="polite">
+                {price ? (
+                  <>
+                    <span className="id-display" style={priceBig}>{price.total}</span>
+                    <span style={{ fontSize: 15, fontWeight: 600, color: "var(--t2)" }}>/ {interval}</span>
+                  </>
+                ) : (
+                  <span aria-label="Loading price" style={skeleton} />
+                )}
+              </div>
+              <p style={sub}>{tier.description}</p>
+              <ul style={list}>
+                <li style={{ ...item, color: "var(--t1)", fontWeight: 700 }}>Everything in Free, plus:</li>
+                {tier.features.map((f) => <Feature key={f} text={f} />)}
               </ul>
-              <button
-                onClick={() => subscribe(priceId)}
-                disabled={!paddle || !total}
-                style={{ ...cta, ...(tier.featured ? ctaFeatured : null), opacity: !paddle || !total ? 0.5 : 1 }}
-              >
-                {userId ? "Subscribe" : "Sign in to subscribe"}
-              </button>
+              {isPro ? (
+                <Link href="/account" className="id-ghost" style={{ ...ctaBase, marginTop: "auto" }}>You&apos;re on Pro · Manage</Link>
+              ) : (
+                <button
+                  type="button"
+                  className="id-btn"
+                  onClick={() => subscribe(priceId)}
+                  disabled={!paddle || !price}
+                  style={{ ...ctaBase, marginTop: "auto" }}
+                >
+                  {userId ? (price?.trial ? "Start free trial" : "Subscribe") : "Sign in to subscribe"}
+                </button>
+              )}
             </section>
           );
         })}
       </div>
+
+      <p style={{ ...footNote, textAlign: "center", marginTop: 22 }}>
+        Cancel any time · Secure checkout by Paddle
+      </p>
     </div>
   );
 }
 
-const toggleWrap: React.CSSProperties = {
-  display: "inline-flex", gap: 4, padding: 4, borderRadius: 999,
-  background: "var(--surface)", border: "1px solid var(--border)", marginBottom: 22,
-};
-const toggleBtn: React.CSSProperties = {
-  border: 0, borderRadius: 999, padding: "8px 18px", fontSize: 14, fontWeight: 600,
-  background: "transparent", color: "var(--t2)", cursor: "pointer",
-};
-const toggleOn: React.CSSProperties = { background: "var(--accent)", color: "var(--accent-ink)" };
-const grid: React.CSSProperties = {
-  display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-};
+function Feature({ text, muted }: { text: string; muted?: boolean }) {
+  return (
+    <li style={item}>
+      <span
+        aria-hidden="true"
+        style={{
+          flex: "none", width: 20, height: 20, borderRadius: 999, display: "inline-flex", alignItems: "center",
+          justifyContent: "center", marginTop: 1,
+          background: muted ? "var(--bg3)" : "var(--accent)", color: muted ? "var(--t2)" : "var(--accent-ink)",
+        }}
+      >
+        <Check size={12} strokeWidth={3} />
+      </span>
+      <span>{text}</span>
+    </li>
+  );
+}
+
 const card: React.CSSProperties = {
-  display: "flex", flexDirection: "column", padding: 22, borderRadius: 16,
-  background: "var(--bg2)", border: "1px solid var(--border)",
+  display: "flex", flexDirection: "column", padding: "26px 26px 24px", borderRadius: 22,
+  background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)",
 };
-const cardFeatured: React.CSSProperties = { borderColor: "var(--accent)" };
-const cta: React.CSSProperties = {
-  border: "1px solid var(--border)", borderRadius: 12, padding: "12px 16px", fontSize: 15, fontWeight: 600,
-  background: "var(--surface2)", color: "var(--t1)", cursor: "pointer",
+const cardFeatured: React.CSSProperties = {
+  boxShadow: "inset 0 0 0 2px var(--accent), 0 24px 48px -28px rgba(0, 0, 0, 0.45)",
 };
-const ctaFeatured: React.CSSProperties = { background: "var(--accent)", color: "var(--accent-ink)", borderColor: "var(--accent)" };
+const priceBig: React.CSSProperties = { fontSize: "clamp(44px, 5vw, 56px)", lineHeight: 1, color: "var(--t1)" };
+const sub: React.CSSProperties = { margin: "12px 0 22px", fontSize: 15, lineHeight: 1.5, color: "var(--t2)" };
+const list: React.CSSProperties = {
+  listStyle: "none", padding: "20px 0 0", margin: "0 0 26px", display: "flex", flexDirection: "column", gap: 12,
+  borderTop: "1px solid var(--line)",
+};
+const item: React.CSSProperties = { display: "flex", gap: 10, fontSize: 14.5, lineHeight: 1.45, color: "var(--t2)" };
+const ctaBase: React.CSSProperties = { width: "100%", padding: "14px 20px", fontSize: 15.5, textDecoration: "none", justifyContent: "center", textAlign: "center" };
+const footNote: React.CSSProperties = { margin: 0, fontSize: 13.5, color: "var(--t3)" };
+const badge: React.CSSProperties = {
+  fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 999,
+  background: "var(--accent)", color: "var(--accent-ink)", whiteSpace: "nowrap",
+};
+const skeleton: React.CSSProperties = {
+  display: "inline-block", width: 150, height: 48, borderRadius: 10, background: "var(--bg3)",
+};

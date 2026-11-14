@@ -3996,3 +3996,12 @@ button {
     animation: none;
   }
 }
+
+/* Pricing page: the plans side by side, stacking on a phone. */
+.pricing-grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  max-width: 880px;
+  margin: 0 auto;
+}
