@@ -32,10 +32,6 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     ),
   },
   {
-    q: "How does the free trial work?",
-    a: "The monthly plan starts with a free trial. Cancel before it ends and you won't be charged.",
-  },
-  {
     q: "Does Pro work in the iOS app too?",
     a: "Yes. Pro belongs to your Spellpool account, so it's on wherever you sign in: on the web and in the iOS app.",
   },
