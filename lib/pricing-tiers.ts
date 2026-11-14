@@ -38,9 +38,9 @@ export const FREE_PLAN = {
   description: "Everything you need to brew, for as long as you like.",
   features: [
     "Unlimited decks",
-    `${FREE_AI_PER_DAY} AI assistant questions a day`,
-    `${FREE_SCANS_PER_DAY} Deck Score scan a day`,
-    `${FREE_PRACTICE_PER_DAY} practice game vs AI a day`,
+    `${FREE_AI_PER_DAY} AI ask${FREE_AI_PER_DAY === 1 ? "" : "s"} a day, shared by the assistant, AI search and primers`,
+    `${FREE_SCANS_PER_DAY} Deck Score scan${FREE_SCANS_PER_DAY === 1 ? "" : "s"} a day`,
+    `${FREE_PRACTICE_PER_DAY} practice game${FREE_PRACTICE_PER_DAY === 1 ? "" : "s"} vs AI a day`,
     "Collection, wishlist, combos and playtesting",
   ],
 };
