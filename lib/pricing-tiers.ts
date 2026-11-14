@@ -25,11 +25,24 @@ const PRO_COPY: Omit<Tier, "priceId"> = {
   name: "Pro",
   description: "Every scan, AI answer and practice game you want.",
   features: [
-    `Unlimited AI assistant (free gets ${FREE_AI_PER_DAY} a day)`,
-    `Unlimited Deck Score scans (free gets ${FREE_SCANS_PER_DAY} a day)`,
-    `Unlimited practice games vs AI (free gets ${FREE_PRACTICE_PER_DAY} a day)`,
+    "Unlimited AI assistant",
+    "Unlimited Deck Score scans",
+    "Unlimited practice games vs AI",
   ],
   featured: true,
+};
+
+/** The free plan, shown beside the paid ones for comparison. Not a Paddle product. */
+export const FREE_PLAN = {
+  name: "Spellpool",
+  description: "Everything you need to brew, for as long as you like.",
+  features: [
+    "Unlimited decks",
+    `${FREE_AI_PER_DAY} AI assistant questions a day`,
+    `${FREE_SCANS_PER_DAY} Deck Score scan a day`,
+    `${FREE_PRACTICE_PER_DAY} practice game vs AI a day`,
+    "Collection, wishlist, combos and playtesting",
+  ],
 };
 
 const TIERS: Record<PaddleEnv, Tier[]> = {
