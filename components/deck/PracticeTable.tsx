@@ -11,7 +11,7 @@ import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHin
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
-import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, type Search } from "@/lib/practice/cards";
+import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, wheelAbilityOf, type Search } from "@/lib/practice/cards";
 import { tapTribeOf, untapLandsOf } from "@/lib/practice/abilities";
 import { canPayNextTax, declineTax, payTax, playerDraws, concede,
   addCounters,
@@ -24,6 +24,8 @@ import { canPayNextTax, declineTax, payTax, playerDraws, concede,
   isPlaneswalker,
   loyaltyOf,
   playerCleanup,
+  playerSpellResolves,
+  playerWheelAbility,
   declineChoice,
   playerEndStep,
   playerTapTribe,
@@ -313,8 +315,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       // A tutor, or a creature that searches as it enters: the search opens.
       const spec = searchOnCast(infoOf(book, card));
       if (spec) setSearch({ source: card.name, spec, found: 0, top: [] });
-      // What it does as it enters (Kefka's discard).
-      return playerEnters(answered, iid, book);
+      // A wheel, both hands at once; what a permanent does as it enters
+      // (Kefka's discard).
+      return playerEnters(playerSpellResolves(answered, iid, book), iid, book);
     };
   const cast = (iid: number) => act(castStep(iid));
   const undo = () => {
@@ -829,6 +832,14 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (untap && !game?.once?.includes(card.iid)) out.unshift({ label: `Pay ${untap.life} life: untap your lands`, step: (g) => playerUntapLands(g, card.iid, book) });
     // Silas Renn let you cast it from your graveyard this turn.
     if (zone === "graveyard" && game?.mayCast?.includes(card.iid)) out.unshift({ label: "Cast it (this turn)", step: castStep(card.iid) });
+    // Magus of the Wheel: its wheel, paid and carried out for both players.
+    const wa = zone === "battlefield" ? wheelAbilityOf(book, card) : null;
+    if (wa && !(wa.tap && card.tapped)) {
+      out.unshift({
+        label: `${[wa.mana, wa.tap ? "{T}" : "", wa.sacrifice ? "sacrifice" : ""].filter(Boolean).join(", ")}: each player ${wa.kind === "discard" ? "discards" : "shuffles away"} their hand and draws`,
+        step: (g) => playerWheelAbility(g, card.iid, book),
+      });
+    }
     // An "each opponent sacrifices" ability (Kefka's {8}).
     const edict = zone === "battlefield" ? edictOf(book, card) : null;
     if (edict) {
@@ -1077,7 +1088,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                 ? "sacrifice an artifact, creature, enchantment, land or planeswalker? The opponent then sacrifices one that shares a type, or loses 2 life and you draw"
                 : game.choice.types
                   ? `sacrifice a ${game.choice.types.join(" or ")}, or lose ${game.choice.life ?? 2} life and the opponent draws`
-                  : `choose a ${game.choice.what ?? "permanent"} of yours to sacrifice`
+                  : `choose ${/^[aeiou]/i.test(game.choice.what ?? "permanent") ? "an" : "a"} ${game.choice.what ?? "permanent"} of yours to sacrifice`
       }.`
     : null;
   const status = choicePrompt

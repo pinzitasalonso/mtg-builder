@@ -1206,7 +1206,7 @@ describe("the triggers most decks are full of", () => {
   it("Smothering Tithe makes a Treasure for each card the other player draws", () => {
     const g = startTurn({ ...table({ youField: ["Smothering Tithe"] }), turn: 5 }, BOOK);
     expect(count(g, "you", "Treasure")).toBe(1);
-    expect(said(g, "Smothering Tithe: the opponent doesn't pay {2}; you make a Treasure.")).toBe(true);
+    expect(said(g, "Smothering Tithe: you make a Treasure (the opponent didn't pay {2}).")).toBe(true);
   });
 
   it("Rhystic Study: the AI pays when it has the mana left, and you draw when it hasn't", () => {

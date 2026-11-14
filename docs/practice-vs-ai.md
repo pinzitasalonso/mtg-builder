@@ -387,6 +387,42 @@ side does.
      with no mana cost (**Lotus Bloom**, Mox Tantalite) can't be cast by the
      AI: suspend isn't played.
 
+   **Wheels** (`wheelSpellOf`, `wheelAbilityOf`, `wheelOnHitOf` in
+   `lib/practice/cards.ts`; `wheel` in `game.ts`) are carried out for both
+   players, since the other side's hand is never yours to move: Wheel of
+   Fortune, Reforge the Soul, Windfall and Whispering Madness (as many as
+   the biggest hand), Timetwister and Echo of Eons (hands and graveyards
+   shuffled back), Winds of Change, Dark Deal; Magus of the Wheel and
+   Jace's Archivist from their menu (the AI by activating them); Dragon
+   Mage when it hits. A card that does more than the wheel (Day's Undoing
+   ends the turn, Time Spiral untaps lands, Molten Psyche's metalcraft) is
+   left to you. The AI's planner casts one when its own hand is two cards
+   or fewer. Every draw goes through `drawCards`, which now knows what
+   stops a wheel: Narset ("each opponent can't draw more than one card each
+   turn", counted in `PracticeGame.drawn`), Notion Thief (the draws become
+   its controller's) and Hullbreacher (Treasures instead). The first card
+   of a draw step is never taken.
+
+   **Treasure tokens** (`lib/practice/treasure.ts`) are made by the table
+   for both sides, through one maker (`makeArtifacts`) so Xorn and Jolene
+   add one to each batch and Academy Manufactor makes a Food and a Clue
+   too: Dockside Extortionist (one for each artifact and enchantment on the
+   other side), Ragavan (and the top card of the other library is exiled;
+   casting it is left to you), Ancient Copper Dragon (a d20), Professional
+   Face-Breaker and Grim Hireling (once a damage step), Old Gnawbone (as
+   many as the damage), Goldspan Dragon as it attacks (and its Treasures
+   make two mana), Tireless Provisioner (the Treasure, not the Food),
+   Revel in Riches (and its ten-Treasure win), Lotho and Monologue Tax
+   (the second spell of a turn, counted in `PracticeGame.spells`),
+   Storm-Kiln Artist's magecraft, and the spells Strike It Rich, Brass's
+   Bounty, Big Score, Unexpected Windfall, Seize the Spoils and Deadly
+   Dispute (their extra cost is your `choice`, then the draw and Treasures
+   follow; the AI picks its own). The AI's brief tells it so, and its plan's
+   own Treasures for those cards aren't made twice.
+
+   **The built-in planner** no longer casts a 0/0 creature (Walking
+   Ballista at X = 0, a clone with nothing chosen): it died at once.
+
    **Planeswalkers** show their loyalty on the card (`loyaltyOf`: the
    starting loyalty from Scryfall until it changes). The ⋯ menu has "+1
    loyalty" and "−1 loyalty" for yours and the opponent's (`addLoyalty`);

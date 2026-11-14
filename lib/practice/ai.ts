@@ -3,9 +3,10 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, searchOnCast, stats } from "./cards";
+import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, searchOnCast, stats, wheelSpellOf } from "./cards";
 import { aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, lifeFor, spellCost } from "./game";
 import { manaSources, parseCost, payCost } from "./mana";
+import { treasureSpellOf } from "./treasure";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
 
 const value = (book: CardBook, c: PlayCard) => (c.token ? 1 : (infoOf(book, c)?.manaValue ?? 0));
@@ -157,6 +158,15 @@ function drawOnly(book: CardBook, c: PlayCard): number {
   return m ? NUMBER[m[1]!.toLowerCase()]! : 0;
 }
 
+/** A wheel is worth casting when it gives this seat more cards than it
+    throws away: the hand (less the wheel) is two cards or fewer. */
+function wheelWorth(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): boolean {
+  const w = wheelSpellOf(book, c);
+  if (!w) return false;
+  const left = g.sides[seat].hand.filter((x) => x.iid !== c.iid).length;
+  return left <= 2 && g.sides[seat].library.length > 10;
+}
+
 /** The turn without the model: a land (the one that unlocks the most), then
     the biggest permanents it can pay for, then spells that only draw, then
     safe attacks. */
@@ -230,7 +240,11 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     ...sim.sides[seat].hand.filter((c) => !cast.has(cardId(c.iid))).map((c) => ({ c, zone: "hand" as const })),
     ...sim.sides[seat].command.map((c) => ({ c, zone: "command" as const })),
   ]
-    .filter(({ c }) => !isLand(c) && (!/\b(Instant|Sorcery)\b/.test((c.typeLine ?? "").split(" // ")[0]!) || drawOnly(book, c) > 0))
+    .filter(({ c }) => !isLand(c) && (!/\b(Instant|Sorcery)\b/.test((c.typeLine ?? "").split(" // ")[0]!) || drawOnly(book, c) > 0 || wheelWorth(sim, seat, c, book) || !!treasureSpellOf(book, c)))
+    // A 0/0 creature needs a choice the planner doesn't make: X counters
+    // (Walking Ballista) or a creature to copy (Phyrexian Metamorph). Cast
+    // as it is, it dies at once.
+    .filter(({ c }) => !(isCreature(book, c) && infoOf(book, c)?.toughness === 0))
     // Permanents first, biggest first; then the draw spells.
     .sort((a, b) => (drawOnly(book, a.c) ? 1 : 0) - (drawOnly(book, b.c) ? 1 : 0) || value(book, b.c) - value(book, a.c));
   for (const { c, zone } of candidates) {

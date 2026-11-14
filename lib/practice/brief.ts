@@ -4,7 +4,7 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { canPlayAsLand, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats } from "./cards";
+import { canPlayAsLand, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
 import { availableMana, castable, cardId, lifeFor, loyaltyOf } from "./game";
 import {
   affinityOf,
@@ -31,6 +31,7 @@ import {
 } from "./abilities";
 import { hasTriggers } from "./triggers";
 import { manaSummary, manaTotal } from "./mana";
+import { makesTreasures, treasureSpellOf } from "./treasure";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
 const EFFECT_TYPES: EffectType[] = ["damage", "life", "destroy", "exile", "bounce", "tap", "untap", "draw", "discard", "mill", "token", "counters", "pump", "search", "mana", "note"];
@@ -150,6 +151,14 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (lifeForMana(book, front).length) notes.push(`while it's out you may pay 2 life for each {${lifeForMana(book, front).join("}/{")}} in a cost: the app does it when your mana runs short, and "you can pay for it now" counts it`);
     if (castTriggerOf(book, front)) notes.push("its trigger when you cast a spell (counters, damage, a token) happens by itself");
     if (discardTriggerOf(book, front)) notes.push("its discard-and-draw as it enters or attacks happens by itself: give it no discard or draw effects");
+    if (wheelSpellOf(book, front)) notes.push("a wheel: the app makes both players lose their hands and draw. Give it no effects. Cast it when your hand is nearly empty and the player's is full, or when the player can't draw (your Narset, Notion Thief or Hullbreacher)");
+    const wa = wheelAbilityOf(book, front);
+    if (wa) notes.push(`a wheel: to use it, activate it with "mana":"${wa.mana}" and no effects; the app pays${wa.tap ? ", taps" : ""}${wa.sacrifice ? ", sacrifices it" : ""} and makes both players lose their hands and draw`);
+    if (wheelOnHitOf(book, front)) notes.push("when it deals combat damage to the player, the app makes both players lose their hands and draw seven");
+    if (treasureSpellOf(book, front)) notes.push("the app pays its extra cost (it picks the card), draws and makes the Treasures: give it no effects");
+    else if (makesTreasures(book, front)) notes.push("the app makes its Treasures when it triggers: give it no token effects for them");
+    if (drawCapOf(book, front)) notes.push("the app stops the player drawing more than one card a turn while it's out: wheels and draw spells then hurt only them");
+    if (drawThiefOf(book, front)) notes.push(`while it's out, the player's draws beyond the first of their draw step become ${drawThiefOf(book, front) === "draw" ? "your draws" : "your Treasures"}: the app does it`);
     const edict = edictOf(book, front);
     if (edict) notes.push(`to use its ${edict.mana} ability, activate it with "mana":"${edict.mana}" and no effects: the player chooses what to sacrifice${edict.transform ? " and it transforms" : ""}`);
     if (drawsOnLifeLoss(book, back) || drawsOnLifeLoss(book, front)) notes.push("drawing when the player loses life on your turn happens by itself");

@@ -80,6 +80,10 @@ export interface PracticeGame {
   /** What the player may pay to stop the opponent's card (Rhystic Study,
       Smothering Tithe), waiting for their answer: pay, or don't. */
   taxes?: PendingTax[];
+  /** Cards each seat has drawn this turn (Narset's "one card each turn"). */
+  drawn?: Record<Seat, number>;
+  /** Spells each seat has cast this turn (Lotho's "second spell"). */
+  spells?: Record<Seat, number>;
 }
 
 /** "…unless that player pays {1}": the player's to decide. Unanswered at
@@ -131,6 +135,9 @@ export interface Choice {
   card?: number;
   /** A discard at the end of your turn, down to seven cards. */
   cleanup?: boolean;
+  /** A Treasure spell's extra cost (Big Score's discard, Deadly Dispute's
+      sacrifice): what it does once the cost is paid. */
+  then?: { draw: number; treasures: number };
   /** attach: the Aura, and whether Light-Paws searches for another after. */
   aura?: number;
   tutor?: number;
