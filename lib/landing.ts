@@ -93,7 +93,7 @@ export const LANDING_FAQ: FaqItem[] = [
       // One template literal on purpose: the production minifier folded two
       // concatenated templates here into "with 41 deck scan a day", dropping
       // the words between the constants.
-      `Yes. The free plan has as many decks as you like, with ${FREE_AI_PER_DAY} AI questions and ${FREE_SCANS_PER_DAY} deck scan a day. Spellpool Pro, with no limits, is coming soon.`,
+      `Yes. The free plan has as many decks as you like, with ${FREE_AI_PER_DAY} AI question${FREE_AI_PER_DAY === 1 ? "" : "s"} and ${FREE_SCANS_PER_DAY} deck scan a day. Spellpool Pro, with no limits, is coming soon.`,
   },
   {
     q: "How does the Deck Score work?",

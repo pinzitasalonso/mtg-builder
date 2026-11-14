@@ -18,7 +18,8 @@ describe("aiRemaining", () => {
   });
 
   it("counts down today's uses and floors at zero", () => {
-    expect(aiRemaining({ tier: "free", aiDay: "2026-07-11", aiCount: 3 }, now)).toBe(FREE_AI_PER_DAY - 3);
+    expect(aiRemaining({ tier: "free", aiDay: "2026-07-11", aiCount: FREE_AI_PER_DAY - 1 }, now)).toBe(1);
+    expect(aiRemaining({ tier: "free", aiDay: "2026-07-11", aiCount: FREE_AI_PER_DAY }, now)).toBe(0);
     expect(aiRemaining({ tier: "free", aiDay: "2026-07-11", aiCount: 9 }, now)).toBe(0);
   });
 
