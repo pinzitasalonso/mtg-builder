@@ -660,3 +660,118 @@ export function hitTriggersOf(book: CardBook, card: PlayCard): HitTrigger[] {
   }
   return out;
 }
+
+// ── Wheels ────────────────────────────────────────────────────────────
+
+/** A wheel: every player's hand goes (discarded, or shuffled into the
+    library, with the graveyard too for a Timetwister), then each draws:
+    a number, as many as the most anyone lost (Windfall), as many as they
+    lost themselves (Winds of Change), or one less (Dark Deal). */
+export interface Wheel {
+  kind: "discard" | "shuffle" | "twister";
+  draw: number | "greatest" | "same" | "less1";
+}
+
+const WHEELS: [RegExp, (m: RegExpExecArray) => Wheel][] = [
+  [/^each player discards their hand, then draws (seven|\d+) cards$/i, (m) => ({ kind: "discard", draw: m[1]!.toLowerCase() === "seven" ? 7 : Number(m[1]) })],
+  [/^each player discards their hand, then draws cards equal to the greatest number of cards a player discarded this way$/i, () => ({ kind: "discard", draw: "greatest" })],
+  [/^each player discards all the cards in their hand, then draws that many cards minus one$/i, () => ({ kind: "discard", draw: "less1" })],
+  [/^each player shuffles their hand and graveyard into their library, then draws seven cards$/i, () => ({ kind: "twister", draw: 7 })],
+  [/^each player shuffles the cards from their hand into their library, then draws that many cards$/i, () => ({ kind: "shuffle", draw: "same" })],
+];
+
+/** The wheel a sentence is, if it is one, word for word. */
+export function wheelIn(sentence: string): Wheel | null {
+  const s = sentence.trim().replace(/\.$/, "");
+  for (const [re, make] of WHEELS) {
+    const m = re.exec(s);
+    if (m) return make(m);
+  }
+  return null;
+}
+
+/** Keyword lines a wheel spell may carry that change nothing when it's
+    cast from hand (Echo of Eons's flashback, Reforge the Soul's miracle,
+    Whispering Madness's cipher). */
+const WHEEL_KEYWORDS = /^(flashback|miracle|cipher)\b/i;
+
+/** An instant or sorcery that is a wheel and nothing else (Wheel of
+    Fortune, Windfall, Timetwister, Echo of Eons, Winds of Change). A card
+    that also does something the table can't (Day's Undoing ends the turn,
+    Time Spiral untaps lands, Molten Psyche's metalcraft) isn't one. */
+export function wheelSpellOf(book: CardBook, card: PlayCard): Wheel | null {
+  if (card.token) return null;
+  if (!/\b(Instant|Sorcery)\b/.test(faceUpType({ typeLine: infoOf(book, card)?.typeLine ?? card.typeLine, flipped: card.flipped }))) return null;
+  const lines = ownText(faceText(infoOf(book, card), card))
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const wheels = lines.map(wheelIn);
+  if (wheels.filter(Boolean).length !== 1) return null;
+  if (!lines.every((l, i) => wheels[i] || WHEEL_KEYWORDS.test(l))) return null;
+  return wheels.find(Boolean)!;
+}
+
+/** A permanent's activated wheel (Magus of the Wheel: "{1}{R}, {T},
+    Sacrifice this creature: …"; Jace's Archivist: "{U}, {T}: …"). */
+export interface WheelAbility extends Wheel {
+  mana: string;
+  tap: boolean;
+  sacrifice: boolean;
+}
+export function wheelAbilityOf(book: CardBook, card: PlayCard): WheelAbility | null {
+  if (card.token) return null;
+  for (const line of ownText(faceText(infoOf(book, card), card)).split("\n")) {
+    const m = /^([^:]+): (.+)$/.exec(line.trim());
+    if (!m) continue;
+    const w = wheelIn(m[2]!);
+    if (!w) continue;
+    const cost = m[1]!;
+    // Only a cost the table can pay: mana, tapping it, sacrificing it.
+    const parts = cost.split(",").map((p) => p.trim());
+    const sacrifice = parts.some((p) => /^sacrifice (this \w+|~)$/i.test(p) || p.toLowerCase() === `sacrifice ${card.name.split(" // ")[0]!.toLowerCase()}`);
+    if (!parts.every((p) => /^(\{[^}]+\})+$/.test(p) || /^sacrifice /i.test(p))) return null;
+    if (parts.some((p) => /^sacrifice /i.test(p)) && !sacrifice) return null;
+    const mana = parts.filter((p) => /^(\{[^}]+\})+$/.test(p) && p !== "{T}").join("");
+    return { ...w, mana, tap: parts.includes("{T}"), sacrifice };
+  }
+  return null;
+}
+
+/** "Whenever this creature deals combat damage to a player, each player
+    discards their hand, then draws seven cards" (Dragon Mage). */
+export function wheelOnHitOf(book: CardBook, card: PlayCard): Wheel | null {
+  if (card.token) return null;
+  const name = escapeRe(card.name.split(" // ")[0]!);
+  const re = new RegExp(`^whenever (?:this creature|${name}) deals combat damage to a player, (.+)$`, "i");
+  for (const line of ownText(faceText(infoOf(book, card), card)).split("\n")) {
+    const m = re.exec(line.trim());
+    const w = m ? wheelIn(m[1]!) : null;
+    if (w) return w;
+  }
+  return null;
+}
+
+// ── What stops a wheel: draws capped or taken ─────────────────────────
+
+/** "Each opponent can't draw more than one card each turn" (Narset,
+    Parter of Veils): "opponents". "Each player can't…" (Spirit of the
+    Labyrinth): "everyone". */
+export function drawCapOf(book: CardBook, card: PlayCard): "opponents" | "everyone" | null {
+  if (card.token) return null;
+  const m = /\beach (opponent|player) can't draw more than one card each turn\b/i.exec(ownText(faceText(infoOf(book, card), card)));
+  return m ? (m[1]!.toLowerCase() === "player" ? "everyone" : "opponents") : null;
+}
+
+/** "If an opponent would draw a card except the first one they draw in
+    each of their draw steps, instead …": that player skips the draw and
+    this card's controller draws (Notion Thief), or makes a Treasure
+    (Hullbreacher, Opposition Agent's cousin). */
+export function drawThiefOf(book: CardBook, card: PlayCard): "draw" | "treasure" | null {
+  if (card.token) return null;
+  const m = /\bif an opponent would draw a card except the first one they draw in each of their draw steps, instead (that player skips that draw and you draw a card|you create a treasure token)\b/i.exec(
+    ownText(faceText(infoOf(book, card), card))
+  );
+  return m ? (/treasure/i.test(m[1]!) ? "treasure" : "draw") : null;
+}
+

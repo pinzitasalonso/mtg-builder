@@ -1,0 +1,266 @@
+[
+ {
+  "name": "Wheel of Fortune",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{R}",
+  "oracleText": "Each player discards their hand, then draws seven cards.",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Windfall",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{U}",
+  "oracleText": "Each player discards their hand, then draws cards equal to the greatest number of cards a player discarded this way.",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Timetwister",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{U}",
+  "oracleText": "Each player shuffles their hand and graveyard into their library, then draws seven cards. (Then put Timetwister into its owner's graveyard.)",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Echo of Eons",
+  "typeLine": "Sorcery",
+  "manaCost": "{4}{U}{U}",
+  "oracleText": "Each player shuffles their hand and graveyard into their library, then draws seven cards.\nFlashback {2}{U} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Reforge the Soul",
+  "typeLine": "Sorcery",
+  "manaCost": "{3}{R}{R}",
+  "oracleText": "Each player discards their hand, then draws seven cards.\nMiracle {1}{R} (You may cast this card for its miracle cost when you draw it if it's the first card you drew this turn.)",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Magus of the Wheel",
+  "typeLine": "Creature — Human Wizard",
+  "manaCost": "{2}{R}",
+  "oracleText": "{1}{R}, {T}, Sacrifice this creature: Each player discards their hand, then draws seven cards.",
+  "power": 3,
+  "toughness": 3
+ },
+ {
+  "name": "Winds of Change",
+  "typeLine": "Sorcery",
+  "manaCost": "{R}",
+  "oracleText": "Each player shuffles the cards from their hand into their library, then draws that many cards.",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Day's Undoing",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{U}",
+  "oracleText": "Each player shuffles their hand and graveyard into their library, then draws seven cards. If it's your turn, end the turn. (Exile all spells and abilities from the stack, including this card. Discard down to your maximum hand size. Damage wears off, and \"this turn\" and \"until end of turn\" effects end.)",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Time Spiral",
+  "typeLine": "Sorcery",
+  "manaCost": "{4}{U}{U}",
+  "oracleText": "Exile Time Spiral. Each player shuffles their hand and graveyard into their library, then draws seven cards. You untap up to six lands.",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Dark Deal",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{B}",
+  "oracleText": "Each player discards all the cards in their hand, then draws that many cards minus one.",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Molten Psyche",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}{R}",
+  "oracleText": "Each player shuffles the cards from their hand into their library, then draws that many cards.\nMetalcraft — If you control three or more artifacts, Molten Psyche deals damage to each opponent equal to the number of cards that player has drawn this turn.",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Dragon Mage",
+  "typeLine": "Creature — Dragon Wizard",
+  "manaCost": "{5}{R}{R}",
+  "oracleText": "Flying\nWhenever this creature deals combat damage to a player, each player discards their hand, then draws seven cards.",
+  "power": 5,
+  "toughness": 5
+ },
+ {
+  "name": "Jace's Archivist",
+  "typeLine": "Creature — Vedalken Wizard",
+  "manaCost": "{1}{U}{U}",
+  "oracleText": "{U}, {T}: Each player discards their hand, then draws cards equal to the greatest number of cards a player discarded this way.",
+  "power": 2,
+  "toughness": 2
+ },
+ {
+  "name": "Notion Thief",
+  "typeLine": "Creature — Human Rogue",
+  "manaCost": "{2}{U}{B}",
+  "oracleText": "Flash\nIf an opponent would draw a card except the first one they draw in each of their draw steps, instead that player skips that draw and you draw a card.",
+  "power": 3,
+  "toughness": 1
+ },
+ {
+  "name": "Narset, Parter of Veils",
+  "typeLine": "Legendary Planeswalker — Narset",
+  "manaCost": "{1}{U}{U}",
+  "oracleText": "Each opponent can't draw more than one card each turn.\n−2: Look at the top four cards of your library. You may reveal a noncreature, nonland card from among them and put it into your hand. Put the rest on the bottom of your library in a random order.",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Hullbreacher",
+  "typeLine": "Creature — Merfolk Pirate",
+  "manaCost": "{2}{U}",
+  "oracleText": "Flash\nIf an opponent would draw a card except the first one they draw in each of their draw steps, instead you create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": 3,
+  "toughness": 2
+ },
+ {
+  "name": "Dockside Extortionist",
+  "typeLine": "Creature — Goblin Pirate",
+  "manaCost": "{1}{R}",
+  "oracleText": "When this creature enters, create X Treasure tokens, where X is the number of artifacts and enchantments your opponents control. (Treasure tokens are artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": 1,
+  "toughness": 2
+ },
+ {
+  "name": "Ragavan, Nimble Pilferer",
+  "typeLine": "Legendary Creature — Monkey Pirate",
+  "manaCost": "{R}",
+  "oracleText": "Whenever Ragavan deals combat damage to a player, create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card.\nDash {1}{R} (You may cast this spell for its dash cost. If you do, it gains haste, and it's returned from the battlefield to its owner's hand at the beginning of the next end step.)",
+  "power": 2,
+  "toughness": 1
+ },
+ {
+  "name": "Professional Face-Breaker",
+  "typeLine": "Creature — Human Warrior",
+  "manaCost": "{2}{R}",
+  "oracleText": "Menace\nWhenever one or more creatures you control deal combat damage to a player, create a Treasure token.\nSacrifice a Treasure: Exile the top card of your library. You may play that card this turn.",
+  "power": 2,
+  "toughness": 3
+ },
+ {
+  "name": "Storm-Kiln Artist",
+  "typeLine": "Creature — Dwarf Shaman",
+  "manaCost": "{3}{R}",
+  "oracleText": "This creature gets +1/+0 for each artifact you control.\nMagecraft — Whenever you cast or copy an instant or sorcery spell, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": 2,
+  "toughness": 2
+ },
+ {
+  "name": "Goldspan Dragon",
+  "typeLine": "Creature — Dragon",
+  "manaCost": "{3}{R}{R}",
+  "oracleText": "Flying, haste\nWhenever this creature attacks or becomes the target of a spell, create a Treasure token.\nTreasures you control have \"{T}, Sacrifice this artifact: Add two mana of any one color.\"",
+  "power": 4,
+  "toughness": 4
+ },
+ {
+  "name": "Tireless Provisioner",
+  "typeLine": "Creature — Elf Scout",
+  "manaCost": "{2}{G}",
+  "oracleText": "Landfall — Whenever a land you control enters, create a Food token or a Treasure token. (Food is an artifact with \"{2}, {T}, Sacrifice this token: You gain 3 life.\" Treasure is an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": 3,
+  "toughness": 2
+ },
+ {
+  "name": "Big Score",
+  "typeLine": "Instant",
+  "manaCost": "{3}{R}",
+  "oracleText": "As an additional cost to cast this spell, discard a card.\nDraw two cards and create two Treasure tokens. (They're artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Deadly Dispute",
+  "typeLine": "Instant",
+  "manaCost": "{1}{B}",
+  "oracleText": "As an additional cost to cast this spell, sacrifice an artifact or creature.\nDraw two cards and create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Revel in Riches",
+  "typeLine": "Enchantment",
+  "manaCost": "{4}{B}",
+  "oracleText": "Whenever a creature an opponent controls dies, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nAt the beginning of your upkeep, if you control ten or more Treasures, you win the game.",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Old Gnawbone",
+  "typeLine": "Legendary Creature — Dragon",
+  "manaCost": "{5}{G}{G}",
+  "oracleText": "Flying\nWhenever a creature you control deals combat damage to a player, create that many Treasure tokens.",
+  "power": 7,
+  "toughness": 7
+ },
+ {
+  "name": "Xorn",
+  "typeLine": "Creature — Elemental",
+  "manaCost": "{2}{R}",
+  "oracleText": "If you would create one or more Treasure tokens, instead create those tokens plus an additional Treasure token.",
+  "power": 3,
+  "toughness": 2
+ },
+ {
+  "name": "Academy Manufactor",
+  "typeLine": "Artifact Creature — Assembly-Worker",
+  "manaCost": "{3}",
+  "oracleText": "If you would create a Clue, Food, or Treasure token, instead create one of each.",
+  "power": 1,
+  "toughness": 3
+ },
+ {
+  "name": "Monologue Tax",
+  "typeLine": "Enchantment",
+  "manaCost": "{2}{W}",
+  "oracleText": "Whenever an opponent casts their second spell each turn, you create a Treasure token.",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Strike It Rich",
+  "typeLine": "Sorcery",
+  "manaCost": "{R}",
+  "oracleText": "Create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nFlashback {2}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Brass's Bounty",
+  "typeLine": "Sorcery",
+  "manaCost": "{6}{R}",
+  "oracleText": "For each land you control, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": null,
+  "toughness": null
+ },
+ {
+  "name": "Lotho, Corrupt Shirriff",
+  "typeLine": "Legendary Creature — Halfling Rogue",
+  "manaCost": "{W}{B}",
+  "oracleText": "Whenever a player casts their second spell each turn, you lose 1 life and create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": 2,
+  "toughness": 1
+ },
+ {
+  "name": "Ancient Copper Dragon",
+  "typeLine": "Creature — Elder Dragon",
+  "manaCost": "{4}{R}{R}",
+  "oracleText": "Flying\nWhenever this creature deals combat damage to a player, roll a d20. You create a number of Treasure tokens equal to the result.",
+  "power": 6,
+  "toughness": 5
+ }
+]

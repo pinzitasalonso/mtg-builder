@@ -6,6 +6,7 @@
 
 import type { PlayCard, PlaytestState } from "../playtest";
 import { infoOf, isCreature, isSick, manaOutput } from "./cards";
+import { doublesTreasures } from "./treasure";
 import type { CardBook, CardInfo } from "./types";
 
 export interface Cost {
@@ -71,11 +72,13 @@ export function manaSources(side: PlaytestState, book: CardBook, turn: number, e
   const count = (what: string) =>
     side.battlefield.filter((c) => (what === "creature" ? isCreature(book, c) : what === "artifact" ? isArtifact(c) : new RegExp(`\\b${what}\\b`, "i").test(typeOf(c)))).length;
   const drums: PlayCard[] = [];
+  const goldspan = side.battlefield.some((c) => doublesTreasures(book, c));
   for (const c of side.battlefield) {
     if (c.tapped || exclude.includes(c.iid)) continue;
-    // A Treasure is one mana of any colour, used up when it's spent.
+    // A Treasure is one mana of any colour (two with Goldspan Dragon), used
+    // up when it's spent.
     if (c.token) {
-      if (c.token.kind === "artifact" && /^treasure$/i.test(c.name)) out.push({ iid: c.iid, name: c.name, colors: ["W", "U", "B", "R", "G"], amount: 1, sacrifice: true });
+      if (c.token.kind === "artifact" && /^treasure$/i.test(c.name)) out.push({ iid: c.iid, name: c.name, colors: ["W", "U", "B", "R", "G"], amount: goldspan ? 2 : 1, sacrifice: true });
       continue;
     }
     const info = infoOf(book, c);

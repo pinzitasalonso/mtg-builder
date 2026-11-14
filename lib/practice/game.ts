@@ -17,6 +17,8 @@ import {
   coinFlipPainOf,
   counterOf,
   discardTriggerOf,
+  drawCapOf,
+  drawThiefOf,
   drawsOnLifeLoss,
   edictOf,
   entersForALand,
@@ -44,6 +46,10 @@ import {
   stats,
   staysTapped,
   tappedPainOf,
+  wheelAbilityOf,
+  wheelOnHitOf,
+  wheelSpellOf,
+  type Wheel,
   type Edict,
   type SearchAbility,
 } from "./cards";
@@ -75,6 +81,19 @@ import {
   winotaOf,
 } from "./abilities";
 import { triggersOf, type Outcome } from "./triggers";
+import {
+  extraTreasureOf,
+  oneOfEachOf,
+  treasureOnAttackOf,
+  treasureOnFoeDeathOf,
+  treasureOnHitOf,
+  treasureOnLandfallOf,
+  treasureOnMagecraftOf,
+  treasureOnSecondSpellOf,
+  treasureSpellOf,
+  treasuresOnEnterForFoes,
+  winsWithTreasures,
+} from "./treasure";
 import { colorsOfCost, manaSources, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
 import { type PendingTax, other, type CardBook, type Choice, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
@@ -210,18 +229,91 @@ function update(g: PracticeGame, iid: number, fn: (c: PlayCard) => PlayCard) {
   g.sides[at.seat] = { ...side, [at.zone]: side[at.zone].map((c) => (c.iid === iid ? fn(c) : c)) };
 }
 
-function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook) {
-  const side = g.sides[seat];
-  if (side.library.length < n) {
-    g.sides[seat] = draw(side, side.library.length);
-    if (!g.winner) {
-      g.winner = other(seat);
-      say(g, seat, `${seat === "you" ? "You" : "The opponent"} drew from an empty library and lost.`);
+function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook, opts: { step?: boolean } = {}) {
+  if (n <= 0) return;
+  const foe = other(seat);
+  // Narset (or Spirit of the Labyrinth): at most one card a turn. Notion
+  // Thief, Hullbreacher: every draw but the first of the draw step is the
+  // opponent's instead. Only with the card book, which reads them.
+  const capped = !!book && [...g.sides.you.battlefield, ...g.sides.opp.battlefield].some((c) => {
+    const cap = drawCapOf(book, c);
+    return cap === "everyone" || (cap === "opponents" && g.sides[foe].battlefield.includes(c));
+  });
+  const thiefCard = book ? g.sides[foe].battlefield.find((c) => drawThiefOf(book, c)) : undefined;
+  const thief = thiefCard && book ? drawThiefOf(book, thiefCard) : null;
+  if (!g.drawn) g.drawn = { you: 0, opp: 0 };
+  let drew = 0;
+  let skipped = 0;
+  let taken = 0;
+  for (let i = 0; i < n; i++) {
+    if (thief && !(opts.step && i === 0)) {
+      taken++;
+      continue;
     }
-    return;
+    if (capped && g.drawn[seat] >= 1) {
+      skipped++;
+      continue;
+    }
+    if (!g.sides[seat].library.length) {
+      if (!g.winner) {
+        g.winner = foe;
+        say(g, seat, `${seat === "you" ? "You" : "The opponent"} drew from an empty library and lost.`);
+      }
+      return;
+    }
+    g.sides[seat] = draw(g.sides[seat], 1);
+    g.drawn[seat] += 1;
+    drew++;
   }
-  g.sides[seat] = draw(side, n);
-  if (book && n > 0) opponentDrew(g, seat, n, book);
+  if (skipped) say(g, seat, `${who(seat)} can't draw more than one card a turn: ${skipped === 1 ? "a draw is" : `${skipped} draws are`} skipped.`);
+  if (book && drew) opponentDrew(g, seat, drew, book);
+  if (taken && thiefCard) {
+    const name = faceName(thiefCard);
+    if (thief === "draw") {
+      say(g, foe, `${name}: ${seat === "you" ? "you skip" : "the opponent skips"} ${taken === 1 ? "a draw" : `${taken} draws`}, and ${foe === "you" ? "you draw" : "the opponent draws"} instead.`);
+      drawCards(g, foe, taken, book);
+    } else {
+      say(g, foe, `${name}: ${seat === "you" ? "you skip" : "the opponent skips"} ${taken === 1 ? "a draw" : `${taken} draws`}.`);
+      if (book) treasures(g, foe, taken, name, book);
+    }
+  }
+}
+
+/** A Treasure spell's draw and Treasures, once its extra cost is paid. */
+function treasureSpellEffect(g: PracticeGame, seat: Seat, source: string, then: { draw: number; treasures: number }, book: CardBook) {
+  if (then.draw && !g.winner) {
+    say(g, seat, `${who(seat)} ${verb(seat, "draw")} ${then.draw === 1 ? "a card" : `${then.draw} cards`} (${source}).`);
+    drawCards(g, seat, Math.min(then.draw, g.sides[seat].library.length), book);
+  }
+  treasures(g, seat, then.treasures, source, book);
+}
+
+/** How many Treasures a Treasure spell makes now. */
+const treasureCount = (g: PracticeGame, seat: Seat, n: number | "lands") => (n === "lands" ? g.sides[seat].battlefield.filter(isLand).length : n);
+
+/** A wheel: each player's hand goes (discarded, or shuffled away with
+    the graveyard for a Timetwister), then each draws, the active player
+    first. `except`: the wheel itself, still in hand or already in the
+    graveyard as it resolves. Draws go through drawCards, so Narset caps
+    them and Smothering Tithe, Notion Thief and Nekusar see them. */
+function wheel(g: PracticeGame, caster: Seat, w: Wheel, source: string, book: CardBook, except?: number) {
+  const order: Seat[] = [g.active, other(g.active)];
+  const lost: Record<Seat, number> = { you: 0, opp: 0 };
+  for (const s of order) {
+    const hand = g.sides[s].hand.filter((c) => c.iid !== except);
+    lost[s] = hand.length;
+    if (w.kind === "discard") for (const c of hand) moveTo(g, c.iid, "graveyard");
+    else {
+      const back = [...hand, ...(w.kind === "twister" ? g.sides[s].graveyard.filter((c) => c.iid !== except) : [])];
+      for (const c of back) moveTo(g, c.iid, "library");
+      g.sides[s] = { ...g.sides[s], library: shuffled(g.sides[s].library) };
+    }
+  }
+  const away = w.kind === "discard" ? "discards their hand" : w.kind === "twister" ? "shuffles their hand and graveyard into their library" : "shuffles their hand into their library";
+  const drawsOf = (s: Seat) =>
+    w.draw === "greatest" ? Math.max(lost.you, lost.opp) : w.draw === "same" ? lost[s] : w.draw === "less1" ? Math.max(0, lost[s] - 1) : w.draw;
+  say(g, caster, `${source}: each player ${away} (you ${lost.you}, the opponent ${lost.opp}), then draws (you ${drawsOf("you")}, the opponent ${drawsOf("opp")}).`);
+  for (const s of order) if (!g.winner) drawCards(g, s, drawsOf(s), book);
 }
 
 /** A seat drew cards: the other side's "whenever an opponent draws a card".
@@ -241,8 +333,7 @@ function opponentDrew(g: PracticeGame, seat: Seat, n: number, book: CardBook) {
       // Yours to decide, a card at a time: pay {2}, or it makes a Treasure.
       owe(g, { source: faceName(c), cost: t.pay, count: n, gives: "treasure" });
     } else if (t.treasure) {
-      addTokens(g, owner, { name: "Treasure", power: 0, toughness: 0, keywords: [], kind: "artifact" }, n);
-      say(g, owner, `${faceName(c)}: ${seat === "you" ? "you don't" : "the opponent doesn't"} pay {${t.pay}}; ${owner === "you" ? "you make" : "the opponent makes"} ${n === 1 ? "a Treasure" : `${n} Treasures`}.`);
+      treasures(g, owner, n, faceName(c), book, ` (${seat === "you" ? "you didn't" : "the opponent didn't"} pay {${t.pay}})`);
     }
   }
 }
@@ -267,8 +358,7 @@ function unpaid(g: PracticeGame, tax: PendingTax, times: number, book: CardBook)
     say(g, "opp", `${tax.source}: you don't pay {${tax.cost}}; the opponent draws ${k === 1 ? "a card" : `${k} cards`}.`);
     if (k) drawCards(g, "opp", k, book);
   } else {
-    addTokens(g, "opp", { name: "Treasure", power: 0, toughness: 0, keywords: [], kind: "artifact" }, times);
-    say(g, "opp", `${tax.source}: you don't pay {${tax.cost}}; the opponent makes ${times === 1 ? "a Treasure" : `${times} Treasures`}.`);
+    treasures(g, "opp", times, tax.source, book, ` (you didn't pay {${tax.cost}})`);
   }
 }
 
@@ -318,8 +408,8 @@ function applyOutcome(g: PracticeGame, seat: Seat, source: PlayCard, out: Outcom
     say(g, seat, `${name}: ${seat === "you" ? "you create" : "the opponent creates"} ${t.count === 1 ? "a" : t.count} ${t.name} token${t.count === 1 ? "" : "s"} (${t.power}/${t.toughness}${t.keywords.length ? `, ${t.keywords.join(", ").toLowerCase()}` : ""}).`);
   }
   for (const a of out.artifacts) {
-    addTokens(g, seat, { name: a.name, power: 0, toughness: 0, keywords: [], kind: "artifact" }, a.count);
-    say(g, seat, `${name}: ${seat === "you" ? "you make" : "the opponent makes"} ${a.count === 1 ? `a ${a.name}` : `${a.count} ${a.name} tokens`}.`);
+    const made = makeArtifacts(g, seat, a.name, a.count, book);
+    say(g, seat, `${name}: ${seat === "you" ? "you make" : "the opponent makes"} ${made}.`);
   }
   if (out.damage) {
     say(g, seat, `${name} deals ${out.damage} damage to ${foe === "you" ? "you" : "the opponent"}.`);
@@ -347,6 +437,8 @@ function applyOutcome(g: PracticeGame, seat: Seat, source: PlayCard, out: Outcom
 
 /** A creature died: "whenever another creature dies" on either side. */
 function creatureDied(g: PracticeGame, seat: Seat, dead: PlayCard, book: CardBook) {
+  // Revel in Riches: a Treasure for each of the other side's creatures that dies.
+  for (const c of g.sides[other(seat)].battlefield.filter((x) => treasureOnFoeDeathOf(book, x))) treasures(g, other(seat), 1, faceName(c), book, ` (${dead.name} died)`);
   for (const s of ["you", "opp"] as Seat[]) {
     // The dead creature's own "this or another creature dies" counts: it saw itself die.
     for (const c of [...g.sides[s].battlefield, ...(s === seat ? [dead] : [])]) {
@@ -662,6 +754,8 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   // Untap, but not what "doesn't untap during your untap step" (Mana Vault).
   g.sides[seat] = { ...side, battlefield: side.battlefield.map((c) => (c.tapped && staysTapped(book, c) ? c : { ...c, tapped: false })) };
   g.landPlayed = false;
+  g.drawn = { you: 0, opp: 0 };
+  g.spells = { you: 0, opp: 0 };
   g.attacked = [];
   g.once = [];
   g.mayCast = [];
@@ -675,6 +769,13 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
       addTokens(g, s, { name: t.name, power: t.power, toughness: t.toughness, keywords: [], kind: "creature" }, t.count);
       say(g, s, `${faceName(c)}: ${s === "you" ? "you create" : "the opponent creates"} ${t.count === 1 ? "a" : t.count} ${t.name} token${t.count === 1 ? "" : "s"} (${t.power}/${t.toughness}).`);
     }
+  }
+  // Revel in Riches: ten Treasures at the upkeep win the game.
+  const revel = g.sides[seat].battlefield.find((c) => winsWithTreasures(book, c));
+  if (revel && g.sides[seat].battlefield.filter((c) => c.token?.kind === "artifact" && /^treasure$/i.test(c.name)).length >= 10) {
+    g.winner = seat;
+    say(g, seat, `${revel.name}: ${seat === "you" ? "you control" : "the opponent controls"} ten or more Treasures, and ${seat === "you" ? "you win" : "the opponent wins"}.`);
+    return g;
   }
   // "At the beginning of your upkeep, …" (Phyrexian Arena), before the draw.
   for (const c of [...g.sides[seat].battlefield]) {
@@ -691,7 +792,7 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
       loseLife(g, seat, flip, book);
     }
   }
-  if (g.turn > 1 && !g.winner) drawCards(g, seat, 1, book);
+  if (g.turn > 1 && !g.winner) drawCards(g, seat, 1, book, { step: true });
   // Mana Vault, still tapped at the draw step.
   for (const c of g.sides[seat].battlefield) {
     const pain = c.tapped ? tappedPainOf(book, c) : 0;
@@ -704,7 +805,7 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
 }
 
 /** The coin for Mana Crypt: true wins the flip. A test sets it. */
-export const coin = { flip: () => Math.random() < 0.5 };
+export const coin = { flip: () => Math.random() < 0.5, d20: () => 1 + Math.floor(Math.random() * 20) };
 
 /** The most cards a seat may keep at the end of its turn: seven, or none
     to speak of with "You have no maximum hand size" (Reliquary Tower). */
@@ -833,6 +934,51 @@ export function playerEnters(g0: PracticeGame, iid: number, book: CardBook): Pra
     const lightPaws = g.sides.you.battlefield.find((c) => auraTutorOf(book, c));
     g.choice = { kind: "attach", source: at.card.name, by: "you", aura: iid, tutor: lightPaws?.iid };
   }
+  checkState(g, book);
+  return g;
+}
+
+/** Your instant or sorcery has resolved (not countered): what the table
+    carries out for it. A wheel: both hands go and both draw (the AI's
+    hand isn't yours to move by hand). */
+export function playerSpellResolves(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
+  const at = findCard(g0, iid);
+  if (!at || at.seat !== "you" || at.zone !== "graveyard") return g0;
+  const w = wheelSpellOf(book, at.card);
+  const ts = w ? null : treasureSpellOf(book, at.card);
+  if (!w && !ts) return g0;
+  const g = structuredClone(g0);
+  if (w) wheel(g, "you", w, at.card.name, book, iid);
+  else if (ts) {
+    const then = { draw: ts.draw, treasures: treasureCount(g, "you", ts.treasures) };
+    // The extra cost is yours to pick: the draw and the Treasures follow it.
+    const fits = ts.cost === "discard" ? g.sides.you.hand.length > 0 : ts.cost === "sacrifice" ? g.sides.you.battlefield.some((c) => sacrificable(book, c, "artifact or creature")) : false;
+    if (fits && !g.choice) {
+      g.choice =
+        ts.cost === "discard"
+          ? { kind: "discard", source: at.card.name, by: "you", loot: true, then }
+          : { kind: "sacrifice", source: at.card.name, by: "you", what: "artifact or creature", then };
+      return g;
+    }
+    treasureSpellEffect(g, "you", at.card.name, then, book);
+  }
+  checkState(g, book);
+  return g;
+}
+
+/** Your permanent's activated wheel (Magus of the Wheel): paid from your
+    untapped mana, tapped and sacrificed as it says, then the wheel. */
+export function playerWheelAbility(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
+  const at = findCard(g0, iid);
+  if (!at || at.seat !== "you" || at.zone !== "battlefield") return g0;
+  const wa = wheelAbilityOf(book, at.card);
+  if (!wa || (wa.tap && at.card.tapped)) return g0;
+  const g = structuredClone(g0);
+  if (wa.tap) update(g, iid, (c) => ({ ...c, tapped: true }));
+  if (wa.mana) payForYou(g, parseCost(wa.mana), `${at.card.name}'s ability`, book);
+  if (wa.sacrifice) moveTo(g, iid, "graveyard");
+  say(g, "you", `You ${wa.sacrifice ? "sacrifice" : "activate"} ${at.card.name}.`, at.card);
+  wheel(g, "you", wa, at.card.name, book);
   checkState(g, book);
   return g;
 }
@@ -1024,6 +1170,23 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     checkState(g, book);
     return { game: g, ok: true };
   }
+  // Magus of the Wheel, Jace's Archivist: the wheel is the table's.
+  const wa = wheelAbilityOf(book, card);
+  if (wa && !action.mana?.includes("{T}") && (!action.mana || totalOf(parseCost(action.mana)) === totalOf(parseCost(wa.mana)))) {
+    if (wa.tap && card.tapped) return fail(`(${card.name} is already tapped.)`);
+    if (wa.tap && isCreature(book, card) && isSick(book, card, g.turn)) return fail(`(${card.name} can't tap the turn it arrived.)`);
+    const sources = availableMana(g, seat, book, wa.tap ? [card.iid] : []);
+    const paid = aiPay(g, seat, parseCost(wa.mana), sources, book);
+    if (!paid) return fail(`The opponent can't pay for ${card.name}'s ability.`);
+    spend(g, seat, paid, sources, book);
+    loseLife(g, seat, paid.life, book);
+    if (wa.tap) update(g, card.iid, (c) => ({ ...c, tapped: true }));
+    if (wa.sacrifice) moveTo(g, card.iid, "graveyard");
+    say(g, seat, `${who(seat)} ${verb(seat, wa.sacrifice ? "sacrifice" : "activate")} ${card.name}.`, card);
+    wheel(g, seat, wa, card.name, book);
+    checkState(g, book);
+    return { game: g, ok: true };
+  }
   if (action.tap_card) {
     if (card.tapped) return fail(`(${card.name} is already tapped.)`);
     if (isCreature(book, card) && isSick(book, card, g.turn)) return fail(`(${card.name} can't tap the turn it arrived.)`);
@@ -1111,6 +1274,29 @@ export interface TokenSpec {
   tapped?: boolean;
 }
 
+/** Treasure, Food or Clue tokens for a seat, through what changes them:
+    Xorn and Jolene add a Treasure to each batch of Treasures; Academy
+    Manufactor makes one of each of the three instead. Returns what was made,
+    for the log ("3 Treasures and a Food"). */
+function makeArtifacts(g: PracticeGame, seat: Seat, name: string, n: number, book: CardBook): string {
+  if (n <= 0) return "";
+  const field = g.sides[seat].battlefield;
+  const counts: Record<string, number> = {};
+  const add = (k: string, m: number) => (counts[k] = (counts[k] ?? 0) + m);
+  const kinds = /^(Treasure|Food|Clue)$/i.test(name) && field.some((c) => oneOfEachOf(book, c)) ? ["Treasure", "Food", "Clue"] : [name];
+  for (const k of kinds) add(k, n);
+  if (counts.Treasure) add("Treasure", field.filter((c) => extraTreasureOf(book, c)).length);
+  for (const [k, m] of Object.entries(counts)) addTokens(g, seat, { name: k, power: 0, toughness: 0, keywords: [], kind: "artifact" }, m);
+  const parts = Object.entries(counts).map(([k, m]) => (m === 1 ? `a ${k}` : `${m} ${k === "Treasure" ? "Treasures" : `${k}s`}`));
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts[0]!;
+}
+
+/** A seat makes Treasures from a card, said in the log. */
+function treasures(g: PracticeGame, seat: Seat, n: number, source: string, book: CardBook, why = "") {
+  const made = makeArtifacts(g, seat, "Treasure", n, book);
+  if (made) say(g, seat, `${source}: ${seat === "you" ? "you make" : "the opponent makes"} ${made}${why}.`);
+}
+
 function addTokens(g: PracticeGame, seat: Seat, spec: TokenSpec, count: number) {
   for (let i = 0; i < Math.max(1, Math.min(20, count)); i++) {
     const token: PlayCard = {
@@ -1179,6 +1365,26 @@ export function addLoyalty(g0: PracticeGame, iid: number, n: number, book: CardB
 /** A seat casts a spell: its permanents' "whenever you cast a … spell"
     triggers (K'rrik's counter, Vivi's counter and damage, prowess). */
 function castTriggers(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBook) {
+  // The second spell a player casts in a turn: Lotho, Monologue Tax.
+  if (!g.spells) g.spells = { you: 0, opp: 0 };
+  g.spells[seat] += 1;
+  if (g.spells[seat] === 2) {
+    for (const s of ["you", "opp"] as Seat[]) {
+      for (const c of [...g.sides[s].battlefield]) {
+        const t = treasureOnSecondSpellOf(book, c);
+        if (!t || (!t.anyone && s === seat) || g.winner) continue;
+        if (t.lose) {
+          say(g, s, `${faceName(c)}: ${s === "you" ? "you lose" : "the opponent loses"} ${t.lose} life.`);
+          loseLife(g, s, t.lose, book);
+        }
+        treasures(g, s, 1, faceName(c), book, ` (${seat === "you" ? "your" : "its"} second spell this turn)`);
+      }
+    }
+  }
+  // Storm-Kiln Artist: magecraft.
+  if (/\b(Instant|Sorcery)\b/.test(frontLine(book, spell))) {
+    for (const c of g.sides[seat].battlefield.filter((x) => treasureOnMagecraftOf(book, x))) treasures(g, seat, 1, faceName(c), book, " (magecraft)");
+  }
   const info = infoOf(book, spell);
   const seen = { typeLine: info?.typeLine ?? spell.typeLine ?? "", manaCost: info?.manaCost ?? "" };
   const foe = other(seat);
@@ -1297,7 +1503,15 @@ function drawForTypes(g: PracticeGame, choice: Choice, book: CardBook) {
 
 /** Can this permanent be sacrificed to "sacrifices a <what>"? */
 const sacrificable = (book: CardBook, c: PlayCard, what: string) =>
-  /\bnonland\b/.test(what) ? !isLand(c) : /\bcreature\b/.test(what) ? isCreature(book, c) : /\bland\b/.test(what) ? isLand(c) : true;
+  /\bartifact or creature\b/.test(what)
+    ? isCreature(book, c) || /\bArtifact\b/.test(frontLine(book, c))
+    : /\bnonland\b/.test(what)
+      ? !isLand(c)
+      : /\bcreature\b/.test(what)
+        ? isCreature(book, c)
+        : /\bland\b/.test(what)
+          ? isLand(c)
+          : true;
 
 /** The permanent the AI would rather lose: a token, a land it has plenty
     of, its cheapest card, and its commander last. */
@@ -1383,6 +1597,8 @@ export function resolveChoice(g0: PracticeGame, iid: number, book: CardBook): Pr
     update(g, choice.aura!, (c) => ({ ...c, attachedTo: iid }));
     say(g, "you", `${choice.source} goes on ${at.card.name}.`);
   }
+  // A Treasure spell: its draw and Treasures, now its extra cost is paid.
+  if (choice.then) treasureSpellEffect(g, "you", choice.source, choice.then, book);
   checkState(g, book);
   return g;
 }
@@ -1432,6 +1648,8 @@ export function playerEdict(g0: PracticeGame, iid: number, book: CardBook): Prac
 
 /** A land entered under a seat's control: its landfall tokens (Thranduil). */
 function landEntered(g: PracticeGame, seat: Seat, book: CardBook, played?: number) {
+  // Tireless Provisioner: a Food or a Treasure; the table takes the Treasure.
+  for (const c of g.sides[seat].battlefield.filter((x) => treasureOnLandfallOf(book, x))) treasures(g, seat, 1, faceName(c), book, " (landfall)");
   // "When you play another land, sacrifice this land" (City of Traitors).
   if (played !== undefined) {
     for (const c of g.sides[seat].battlefield.filter((x) => x.iid !== played && goesWhenALandIsPlayed(book, x))) {
@@ -1495,6 +1713,13 @@ function entered(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, op
       const pick = fits.filter((c) => colorsOfCost(infoOf(book, c)).length).sort((a, b) => (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0))[0];
       if (pick) imprint(g, "opp", now, pick, book);
     } else if (fits.length && !g.choice) g.choice = { kind: "imprint", source: now.name, by: "you", card: now.iid, decline: "Exile nothing" };
+  }
+  // Dockside Extortionist: a Treasure for each artifact and enchantment
+  // the other side controls.
+  if (treasuresOnEnterForFoes(book, now)) {
+    const x = g.sides[other(seat)].battlefield.filter((c) => /\b(Artifact|Enchantment)\b/.test(frontLine(book, c))).length;
+    if (x) treasures(g, seat, x, faceName(now), book, ` (${x === 1 ? "an artifact or enchantment" : `${x} artifacts and enchantments`} on the other side)`);
+    else say(g, seat, `${faceName(now)}: the other side has no artifacts or enchantments, so no Treasures.`);
   }
   // "When this enters, …": a card, tokens, life.
   const own = triggersOf(book, now).enters;
@@ -1874,7 +2099,32 @@ export function playerUseSearch(g0: PracticeGame, iid: number, ability: SearchAb
 
 /** A paid-for cast takes effect: a permanent enters, a spell resolves. */
 function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAction, book: CardBook) {
-  if (resolvesToGraveyard(card.typeLine)) {
+  // A wheel is the table's to carry out, whatever effects the plan gave it.
+  const w = wheelSpellOf(book, card);
+  const ts = w ? null : treasureSpellOf(book, card);
+  if (w) {
+    wheel(g, seat, w, card.name, book, card.iid);
+    moveTo(g, card.iid, "graveyard");
+  } else if (ts) {
+    // Its extra cost: the AI's own pick (the card it would discard, the
+    // permanent it would rather lose). Then the draw and the Treasures.
+    moveTo(g, card.iid, "graveyard");
+    if (ts.cost === "discard") {
+      const pick = aiDiscardPick(g, seat, book);
+      if (pick) {
+        moveTo(g, pick.iid, "graveyard");
+        say(g, seat, `${who(seat)} ${verb(seat, "discard")} ${pick.name} (${card.name}).`);
+      }
+    } else if (ts.cost === "sacrifice") {
+      const pick = aiSacrificePick(g, seat, "artifact or creature", book);
+      if (pick) {
+        moveTo(g, pick.iid, "graveyard");
+        say(g, seat, `${who(seat)} ${verb(seat, "sacrifice")} ${pick.name} (${card.name}).`);
+        if (isCreature(book, pick)) creatureDied(g, seat, pick, book);
+      }
+    }
+    treasureSpellEffect(g, seat, card.name, { draw: ts.draw, treasures: treasureCount(g, seat, ts.treasures) }, book);
+  } else if (resolvesToGraveyard(card.typeLine)) {
     applyEffects(g, seat, action.effects, book, card.name);
     moveTo(g, card.iid, "graveyard");
   } else {
@@ -1885,7 +2135,7 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
     const auto = discardTriggerOf(book, card)?.enters;
     // What it does as it enters is the table's to carry out when it can do
     // all of it (lib/practice/triggers.ts): the plan's copy would do it twice.
-    const tabled = !!triggersOf(book, card).enters;
+    const tabled = !!triggersOf(book, card).enters || treasuresOnEnterForFoes(book, card);
     const effects = tabled ? [] : auto ? action.effects.filter((e) => e.type !== "discard" && e.type !== "draw") : action.effects;
     applyEffects(g, seat, effects, book, card.name);
     if (auto) discardTrigger(g, seat, card, book);
@@ -2030,6 +2280,12 @@ function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: Ca
         const count = Math.max(1, Math.min(10, Math.floor(e.amount ?? 1)));
         const name = (e.name ?? "Token").slice(0, 40);
         const artifact = ARTIFACT_TOKENS.test(name) || (e.power === null && e.toughness === null);
+        if (/^(treasure|food|clue)$/i.test(name)) {
+          // Through Xorn and Academy Manufactor, like every Treasure.
+          const made = makeArtifacts(g, s, name[0]!.toUpperCase() + name.slice(1).toLowerCase(), count, book);
+          say(g, caster, `${source} makes ${made}.`);
+          break;
+        }
         addTokens(g, s, { name, power: e.power ?? 1, toughness: e.toughness ?? 1, keywords: e.keywords, kind: artifact ? "artifact" : "creature", tapped: !!e.tapped }, count);
         say(g, caster, `${source} makes ${count} ${name} token${count === 1 ? "" : "s"}${artifact ? "" : ` (${e.power ?? 1}/${e.toughness ?? 1})`}.`);
         break;
@@ -2131,6 +2387,8 @@ export function declareAttackers(g0: PracticeGame, seat: Seat, iids: number[], b
     const card = findCard(g, iid)?.card;
     const out = card ? triggersOf(book, card).attacks : undefined;
     if (card && out && !g.winner) applyOutcome(g, seat, card, out, book);
+    // Goldspan Dragon: a Treasure as it attacks.
+    if (card && treasureOnAttackOf(book, card)) treasures(g, seat, 1, faceName(card), book);
   }
   // Winota: each non-Human attacker brings a Human in from the top six.
   const winotas = g.sides[seat].battlefield.flatMap((c) => {
@@ -2217,6 +2475,7 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
     // Attackers that hit the player this step, for "deals combat damage to
     // a player" triggers (Yuriko).
     const hitters: PlayCard[] = [];
+    const hitFor = new Map<number, number>();
     const gain: Record<Seat, number> = { you: 0, opp: 0 };
     const mark = (iid: number, n: number, from: PlayCard) => {
       if (n <= 0) return;
@@ -2234,7 +2493,10 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
         if (!wasBlocked) {
           toPlayer += left;
           if (attacker.commander) cmdToPlayer += left;
-          if (left > 0) hitters.push(attacker);
+          if (left > 0) {
+            hitters.push(attacker);
+            hitFor.set(attacker.iid, left);
+          }
           left = 0;
         } else {
           blockers.forEach((b, i) => {
@@ -2250,6 +2512,7 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
               toPlayer += left;
               if (attacker.commander) cmdToPlayer += left;
               hitters.push(attacker);
+              hitFor.set(attacker.iid, left);
             }
           }
         }
@@ -2275,7 +2538,15 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
         say(g, s, `${s === "you" ? "You gain" : "The opponent gains"} ${gain[s]} life (lifelink).`);
       }
     }
-    for (const h of hitters) hitTriggers(g, atk, h, book);
+    for (const h of hitters) hitTriggers(g, atk, h, book, hitFor.get(h.iid) ?? 0);
+    // "Whenever one or more creatures you control deal combat damage to a
+    // player" (Professional Face-Breaker, Grim Hireling): once a step.
+    if (hitters.length && !g.winner) {
+      for (const c of [...g.sides[atk].battlefield]) {
+        const t = treasureOnHitOf(book, c);
+        if (t?.who === "group" && typeof t.n === "number") treasures(g, atk, t.n, faceName(c), book);
+      }
+    }
     for (const iid of deathtouched) {
       const c = findCard(g, iid);
       if (c && c.zone === "battlefield" && !indestructible(g, c.seat, c.card, book)) {
@@ -2294,8 +2565,24 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
     control deals combat damage to a player" triggers (Yuriko's reveal and
     life loss, a card), and its own "whenever ~ deals combat damage to a
     player, draw a card". */
-function hitTriggers(g: PracticeGame, seat: Seat, hitter: PlayCard, book: CardBook) {
+function hitTriggers(g: PracticeGame, seat: Seat, hitter: PlayCard, book: CardBook, damage = 0) {
   const foe = other(seat);
+  // Treasures for the hit: the creature's own (Ragavan, Ancient Copper
+  // Dragon's d20), and Old Gnawbone's "that many" for any of yours.
+  const own = treasureOnHitOf(book, hitter);
+  if (own?.who === "self") {
+    const n = own.n === "d20" ? coin.d20() : own.n === "damage" ? damage : own.n;
+    treasures(g, seat, n, faceName(hitter), book, own.n === "d20" ? ` (rolled ${n})` : "");
+    const top = own.exileTop ? g.sides[foe].library[0] : undefined;
+    if (top) {
+      moveTo(g, top.iid, "exile");
+      say(g, seat, `${faceName(hitter)} exiles ${top.name} from the top of ${foe === "you" ? "your" : "the opponent's"} library. (Casting it this turn is left to you.)`);
+    }
+  }
+  for (const c of g.sides[seat].battlefield) {
+    const t = treasureOnHitOf(book, c);
+    if (t?.who === "each" && damage > 0) treasures(g, seat, damage, faceName(c), book, ` (${hitter.name} dealt ${damage})`);
+  }
   // Silas Renn: an artifact card from the graveyard may be cast this turn
   // (the priciest; yours shows "Cast it" in its menu).
   const kind = castFromGraveyardOnHitOf(book, hitter);
@@ -2308,6 +2595,10 @@ function hitTriggers(g: PracticeGame, seat: Seat, hitter: PlayCard, book: CardBo
       say(g, seat, `${faceName(hitter)}: ${seat === "you" ? "you" : "the opponent"} may cast ${pick.name} from ${seat === "you" ? "your" : "its"} graveyard this turn.`);
     }
   }
+  // Dragon Mage: "deals combat damage to a player, each player discards
+  // their hand, then draws seven cards".
+  const hitWheel = wheelOnHitOf(book, hitter);
+  if (hitWheel && !g.winner) wheel(g, seat, hitWheel, faceName(hitter), book);
   for (const c of [...g.sides[seat].battlefield]) {
     for (const t of hitTriggersOf(book, c)) {
       if (t.ninjas ? !isNinja(book, hitter) : c.iid !== hitter.iid) continue;
