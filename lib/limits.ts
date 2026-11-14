@@ -3,7 +3,7 @@
 // User.tier: "free" is the default; "pro" (the future paid tier) lifts
 // every cap. Decks have no cap on any plan.
 
-export const FREE_AI_PER_DAY = 3;
+export const FREE_AI_PER_DAY = 1;
 // Deck scans — the Score plus the AI's written analysis — are dearer than a
 // chat turn, so they have their own meter: one a day free, unlimited on Pro.
 export const FREE_SCANS_PER_DAY = 1;
@@ -17,7 +17,9 @@ export const PRACTICE_AI_TURNS = 40;
 // anybody could edit.
 export const SIGN_IN_FOR_DECKS_MSG = "Sign in to create a deck — it's free.";
 export const AI_LIMIT_MSG =
-  `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro, coming soon, lifts the limit.`;
+  FREE_AI_PER_DAY === 1
+    ? `You've used today's free AI ask — it resets at midnight UTC. Spellpool Pro, coming soon, lifts the limit.`
+    : `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro, coming soon, lifts the limit.`;
 export const PRACTICE_LIMIT_MSG =
   FREE_PRACTICE_PER_DAY === 1
     ? `You've played today's free practice game — it resets at midnight UTC. Spellpool Pro, coming soon, makes them unlimited.`
