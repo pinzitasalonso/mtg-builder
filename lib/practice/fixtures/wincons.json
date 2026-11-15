@@ -1,0 +1,222 @@
+[
+ {
+  "name": "Thassa's Oracle",
+  "typeLine": "Creature — Merfolk Wizard",
+  "manaCost": "{U}{U}",
+  "manaValue": 2,
+  "oracleText": "When this creature enters, look at the top X cards of your library, where X is your devotion to blue. Put up to one of them on top of your library and the rest on the bottom of your library in a random order. If X is greater than or equal to the number of cards in your library, you win the game. (Each {U} in the mana costs of permanents you control counts toward your devotion to blue.)",
+  "power": 1,
+  "toughness": 3,
+  "keywords": []
+ },
+ {
+  "name": "Demonic Consultation",
+  "typeLine": "Instant",
+  "manaCost": "{B}",
+  "manaValue": 1,
+  "oracleText": "Choose a card name. Exile the top six cards of your library, then reveal cards from the top of your library until you reveal a card with the chosen name. Put that card into your hand and exile all other cards revealed this way.",
+  "power": null,
+  "toughness": null,
+  "keywords": []
+ },
+ {
+  "name": "Tainted Pact",
+  "typeLine": "Instant",
+  "manaCost": "{1}{B}",
+  "manaValue": 2,
+  "oracleText": "Exile the top card of your library. You may put that card into your hand unless it has the same name as another card exiled this way. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first.",
+  "power": null,
+  "toughness": null,
+  "keywords": []
+ },
+ {
+  "name": "Laboratory Maniac",
+  "typeLine": "Creature — Human Wizard",
+  "manaCost": "{2}{U}",
+  "manaValue": 3,
+  "oracleText": "If you would draw a card while your library has no cards in it, you win the game instead.",
+  "power": 2,
+  "toughness": 2,
+  "keywords": []
+ },
+ {
+  "name": "Torbran, Thane of Red Fell",
+  "typeLine": "Legendary Creature — Dwarf Noble",
+  "manaCost": "{1}{R}{R}{R}",
+  "manaValue": 4,
+  "oracleText": "If a red source you control would deal damage to an opponent or a permanent an opponent controls, it deals that much damage plus 2 instead.",
+  "power": 2,
+  "toughness": 4,
+  "keywords": []
+ },
+ {
+  "name": "Fiery Emancipation",
+  "typeLine": "Enchantment",
+  "manaCost": "{3}{R}{R}{R}",
+  "manaValue": 6,
+  "oracleText": "If a source you control would deal damage to a permanent or player, it deals triple that damage to that permanent or player instead.",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Triple"
+  ]
+ },
+ {
+  "name": "Furnace of Rath",
+  "typeLine": "Enchantment",
+  "manaCost": "{1}{R}{R}{R}",
+  "manaValue": 4,
+  "oracleText": "If a source would deal damage to a permanent or player, it deals double that damage to that permanent or player instead.",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Double"
+  ]
+ },
+ {
+  "name": "Twinflame Tyrant",
+  "typeLine": "Creature — Dragon",
+  "manaCost": "{3}{R}{R}",
+  "manaValue": 5,
+  "oracleText": "Flying\nIf a source you control would deal damage to an opponent or a permanent an opponent controls, it deals double that damage instead.",
+  "power": 3,
+  "toughness": 5,
+  "keywords": [
+   "Flying",
+   "Double"
+  ]
+ },
+ {
+  "name": "Solphim, Mayhem Dominus",
+  "typeLine": "Legendary Creature — Phyrexian Horror",
+  "manaCost": "{2}{R}{R}",
+  "manaValue": 4,
+  "oracleText": "If a source you control would deal noncombat damage to an opponent or a permanent an opponent controls, it deals double that damage to that player or permanent instead.\n{1}{R/P}{R/P}, Discard two cards: Put an indestructible counter on Solphim. ({R/P} can be paid with either {R} or 2 life.)",
+  "power": 5,
+  "toughness": 4,
+  "keywords": [
+   "Double"
+  ]
+ },
+ {
+  "name": "Gratuitous Violence",
+  "typeLine": "Enchantment",
+  "manaCost": "{2}{R}{R}{R}",
+  "manaValue": 5,
+  "oracleText": "If a creature you control would deal damage to a permanent or player, it deals double that damage instead.",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Double"
+  ]
+ },
+ {
+  "name": "Vivi Ornitier",
+  "typeLine": "Legendary Creature — Wizard",
+  "manaCost": "{1}{U}{R}",
+  "manaValue": 3,
+  "oracleText": "{0}: Add X mana in any combination of {U} and/or {R}, where X is Vivi Ornitier's power. Activate only during your turn and only once each turn.\nWhenever you cast a noncreature spell, put a +1/+1 counter on Vivi Ornitier and it deals 1 damage to each opponent.",
+  "power": 0,
+  "toughness": 3,
+  "keywords": []
+ },
+ {
+  "name": "Dark Ritual",
+  "typeLine": "Instant",
+  "manaCost": "{B}",
+  "manaValue": 1,
+  "oracleText": "Add {B}{B}{B}.",
+  "power": null,
+  "toughness": null,
+  "keywords": []
+ },
+ {
+  "name": "Pyretic Ritual",
+  "typeLine": "Instant",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Add {R}{R}{R}.",
+  "power": null,
+  "toughness": null,
+  "keywords": []
+ },
+ {
+  "name": "Desperate Ritual",
+  "typeLine": "Instant — Arcane",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Add {R}{R}{R}.\nSplice onto Arcane {1}{R} (As you cast an Arcane spell, you may reveal this card from your hand and pay its splice cost. If you do, add this card's effects to that spell.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Splice"
+  ]
+ },
+ {
+  "name": "Seething Song",
+  "typeLine": "Instant",
+  "manaCost": "{2}{R}",
+  "manaValue": 3,
+  "oracleText": "Add {R}{R}{R}{R}{R}.",
+  "power": null,
+  "toughness": null,
+  "keywords": []
+ },
+ {
+  "name": "Craterhoof Behemoth",
+  "typeLine": "Creature — Beast",
+  "manaCost": "{5}{G}{G}{G}",
+  "manaValue": 8,
+  "oracleText": "Haste\nWhen this creature enters, creatures you control gain trample and get +X/+X until end of turn, where X is the number of creatures you control.",
+  "power": 5,
+  "toughness": 5,
+  "keywords": [
+   "Haste"
+  ]
+ },
+ {
+  "name": "Time Warp",
+  "typeLine": "Sorcery",
+  "manaCost": "{3}{U}{U}",
+  "manaValue": 5,
+  "oracleText": "Target player takes an extra turn after this one.",
+  "power": null,
+  "toughness": null,
+  "keywords": []
+ },
+ {
+  "name": "Grapeshot",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Grapeshot deals 1 damage to any target.\nStorm (When you cast this spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Storm"
+  ]
+ },
+ {
+  "name": "Ojer Axonil, Deepest Might // Temple of Power",
+  "typeLine": "Legendary Creature — God // Land",
+  "manaCost": "{2}{R}{R}",
+  "manaValue": 4,
+  "oracleText": "Trample\nIf a red source you control would deal an amount of noncombat damage less than Ojer Axonil's power to an opponent, that source deals damage equal to Ojer Axonil's power instead.\nWhen Ojer Axonil dies, return it to the battlefield tapped and transformed under its owner's control.\n//\n(Transforms from Ojer Axonil, Deepest Might.)\n{T}: Add {R}.\n{2}{R}, {T}: Transform this land. Activate only if red sources you controlled dealt 4 or more noncombat damage this turn and only as a sorcery.",
+  "power": 4,
+  "toughness": 4,
+  "keywords": [
+   "Transform",
+   "Trample"
+  ]
+ },
+ {
+  "name": "Lightning Bolt",
+  "typeLine": "Instant",
+  "manaCost": "{R}",
+  "manaValue": 1,
+  "oracleText": "Lightning Bolt deals 3 damage to any target.",
+  "power": null,
+  "toughness": null,
+  "keywords": []
+ }
+]

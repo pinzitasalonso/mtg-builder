@@ -5,9 +5,12 @@
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
 import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, searchOnCast, stats, wheelSpellOf } from "./cards";
 import { aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, indestructible, lifeFor, spellCost } from "./game";
-import { manaSources, manaTotal, parseCost, payCost } from "./mana";
+import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
 import { treasureSpellOf } from "./treasure";
 import { drawSpellOf, tutorOf, wipeOf } from "./spells";
+import { burnOf, devotion, emptyDrawWinsOf, libraryExilerOf, oracleWinOf, ritualOf } from "./wincons";
+import { scaleDamage } from "./damage";
+import { castTriggerOf } from "./cards";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
 
 const value = (book: CardBook, c: PlayCard) => (c.token ? 1 : (infoOf(book, c)?.manaValue ?? 0));
@@ -272,6 +275,9 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     const tapped = new Set(paid.tap.flatMap((t) => [t, ...(sources.find((x) => x.iid === t)?.also ?? [])]).filter((t) => !once.includes(t)));
     sim = structuredClone(sim);
     sim.once = [...(sim.once ?? []), ...once];
+    // Floating mana used (a ritual's) is gone.
+    const usedPool = new Set(paid.tap.filter((t) => t < 0).map((t) => -t - 1));
+    if (usedPool.size && sim.pool) sim.pool[seat] = sim.pool[seat].filter((_, i) => !usedPool.has(i));
     sim.sides[seat] = {
       ...sim.sides[seat],
       life: sim.sides[seat].life - paid.life,
@@ -279,6 +285,85 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     };
     return true;
   };
+  // A way to win now comes before anything else.
+  const win = winLine();
+  if (win) return { main: [...main, ...win], attack: [], after_combat: [], say: "" };
+  function winLine(): PlanAction[] | null {
+    const hand = sim.sides[seat].hand;
+    const can = (c: PlayCard) => castable(sim, seat, c, book, "hand");
+    const tryPay = (cards: PlayCard[]) => {
+      const before = sim;
+      for (const c of cards) {
+        if (!can(c) || !payIn(spellCost(sim, seat, c, book, "hand"))) {
+          sim = before;
+          return false;
+        }
+      }
+      return true;
+    };
+    const oracle = hand.find((c) => oracleWinOf(book, c));
+    const exiler = hand.find((c) => libraryExilerOf(infoOf(book, c)));
+    // Thassa's Oracle alone, when devotion (with its own {U}{U}) covers the library.
+    if (oracle && devotion(sim, seat, "U", book) + 2 >= sim.sides[seat].library.length && tryPay([oracle])) return [blankAction("cast", oracle.iid)];
+    // Demonic Consultation or Tainted Pact, then the Oracle.
+    if (oracle && exiler && tryPay([exiler, oracle])) return [blankAction("cast", exiler.iid), blankAction("cast", oracle.iid)];
+    // Laboratory Maniac or Jace out: empty the library, then draw.
+    const maniac = sim.sides[seat].battlefield.some((c) => emptyDrawWinsOf(book, c));
+    const drawer = hand.find((c) => drawOnly(book, c, sim.sides[seat].life) > 0);
+    if (maniac && exiler && drawer && tryPay([exiler, drawer])) return [blankAction("cast", exiler.iid), { ...blankAction("cast", drawer.iid), effects: [drawEffect(1)] }];
+    return allIn();
+  }
+  /** A storm or burn turn: every spell it can cast, rituals first, when
+      the damage they deal (Vivi's ping for each noncreature spell, burn at
+      the player's face, through Torbran and Fiery Emancipation) is lethal. */
+  function allIn(): PlanAction[] | null {
+    const foe = other(seat);
+    const pingers = sim.sides[seat].battlefield.flatMap((c) => {
+      const t = castTriggerOf(book, c);
+      return t && (t.damage || t.drain) ? [{ c, t }] : [];
+    });
+    const spells = sim.sides[seat].hand.filter((c) => !isLand(c) && !isCreature(book, c));
+    if (!spells.length) return null;
+    const hurts = (c: PlayCard) => {
+      const info = infoOf(book, c);
+      const seen = { typeLine: info?.typeLine ?? c.typeLine ?? "", manaCost: info?.manaCost ?? "" };
+      const pings = pingers.filter(({ t }) => t.hits(seen)).reduce((n, { c: p, t }) => n + scaleDamage(sim, book, seat, p, foe, t.damage) + t.drain, 0);
+      return pings + scaleDamage(sim, book, seat, c, foe, burnOf(info));
+    };
+    if (!spells.some((c) => hurts(c) > 0)) return null;
+    const saved = sim;
+    const plan: PlanAction[] = [];
+    let total = 0;
+    const left = [...spells];
+    for (;;) {
+      const net = (c: PlayCard) => (ritualOf(infoOf(book, c))?.length ?? 0) - totalOf(spellCost(sim, seat, c, book, "hand"));
+      // A ritual that makes more than it costs first, then the cheapest.
+      const order = left
+        .filter((c) => castable(sim, seat, c, book, "hand"))
+        .sort((a, b) => Number(net(b) > 0) - Number(net(a) > 0) || totalOf(spellCost(sim, seat, a, book, "hand")) - totalOf(spellCost(sim, seat, b, book, "hand")));
+      const next = order.find((c) => payIn(spellCost(sim, seat, c, book, "hand")));
+      if (!next) break;
+      left.splice(left.indexOf(next), 1);
+      const info = infoOf(book, next);
+      const units = ritualOf(info);
+      const effects: Effect[] = [];
+      if (units) {
+        sim = structuredClone(sim);
+        if (!sim.pool) sim.pool = { you: [], opp: [] };
+        sim.pool[seat] = [...sim.pool[seat], ...units];
+        effects.push({ ...blank("mana"), text: units.map((u) => `{${u}}`).join("") });
+      }
+      const burn = burnOf(info);
+      if (burn) effects.push({ ...blank("damage"), target: seat === "opp" ? "player" : "ai", amount: burn });
+      const draws = drawOnly(book, next);
+      if (draws) effects.push(drawEffect(draws));
+      total += hurts(next);
+      plan.push({ ...blankAction("cast", next.iid), effects });
+    }
+    if (total >= sim.sides[foe].life) return plan;
+    sim = saved;
+    return null;
+  }
   // An "each opponent sacrifices" ability (Kefka's {8}) comes first: it
   // takes a permanent and transforms Kefka.
   for (const c of sim.sides[seat].battlefield) {
@@ -326,6 +411,8 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
           wheelWorth(sim, seat, c, book) ||
           !!treasureSpellOf(book, c))
     )
+    // Thassa's Oracle is kept for the win; Consultation and Pact too.
+    .filter(({ c }) => !oracleWinOf(book, c) && !libraryExilerOf(infoOf(book, c)))
     // A 0/0 creature needs a choice the planner doesn't make: X counters
     // (Walking Ballista) or a creature to copy (Phyrexian Metamorph). Cast
     // as it is, it dies at once.

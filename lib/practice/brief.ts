@@ -32,6 +32,8 @@ import {
 import { hasTriggers } from "./triggers";
 import { manaSummary, manaTotal } from "./mana";
 import { makesTreasures, treasureSpellOf } from "./treasure";
+import { emptyDrawWinsOf, libraryExilerOf, oracleWinOf } from "./wincons";
+import { damageRuleOf } from "./damage";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
 const EFFECT_TYPES: EffectType[] = ["damage", "life", "destroy", "exile", "bounce", "tap", "untap", "draw", "discard", "mill", "token", "counters", "pump", "search", "mana", "note"];
@@ -96,6 +98,8 @@ HOW THIS TABLE WORKS
 - On the player's turn the app plays for you. It blocks, and it casts your hard counterspells (marked "counterspell" in your hand) at the player's spells that are worth it, if you left their mana untapped. Nothing else of yours is cast on their turn, so cards that only work in response (protection, redirecting a spell, combat tricks) are rarely worth casting on your own turn.
 - Creatures that are summoning sick (marked in the brief) can't attack.
 - The app follows each mana source's own rules: Mana Vault and the Monoliths stay tapped once used, Mox Opal needs three artifacts, Mox Amber a legendary creature or planeswalker, Mox Diamond a land card in your hand to discard (the app picks it), Chrome Mox a coloured card to exile (the app picks it), and Jeweled Lotus pays only for your commander.
+- Win the game when you can, not only with damage. With Thassa's Oracle and Demonic Consultation or Tainted Pact in hand, cast the Consultation or Pact (no effects: the app exiles your whole library because you hold the Oracle), then Thassa's Oracle: the app checks its devotion and you win. With Laboratory Maniac or Jace, Wielder of Mysteries out, empty your library the same way and then draw. With Vivi Ornitier or another "whenever you cast a noncreature spell, it deals damage" card out, count the spells you can cast this turn (rituals add mana): if the pings are lethal, cast them all.
+- Damage multipliers apply by themselves to all your damage: Torbran adds 2 to each red source's damage to the player and their permanents, Fiery Emancipation and City on Fire triple it, Furnace of Rath and Dictate of the Twin Gods double everyone's. Count them when you look for lethal, and put burn at the player's face when it's enough.
 - Your commander goes back to your command zone when it dies or is exiled: cast it again for {2} more each time. At the end of your turn you discard down to seven cards.
 
 HOW TO PLAY WELL
@@ -155,6 +159,10 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     const wa = wheelAbilityOf(book, front);
     if (wa) notes.push(`a wheel: to use it, activate it with "mana":"${wa.mana}" and no effects; the app pays${wa.tap ? ", taps" : ""}${wa.sacrifice ? ", sacrifices it" : ""} and makes both players lose their hands and draw`);
     if (wheelOnHitOf(book, front)) notes.push("when it deals combat damage to the player, the app makes both players lose their hands and draw seven");
+    if (oracleWinOf(book, front)) notes.push("a win: the app wins the game when it enters with your devotion to blue at least your library's size; empty the library first with Demonic Consultation or Tainted Pact");
+    if (libraryExilerOf(info)) notes.push("with Thassa's Oracle in your hand or Laboratory Maniac out, the app exiles your whole library with it; otherwise it finds your best card. Give it no effects");
+    if (emptyDrawWinsOf(book, front)) notes.push("while it's out, drawing from an empty library wins you the game: the app does it");
+    if (damageRuleOf(book, front)) notes.push("it changes the damage you deal; the app applies it to every hit, so give damage effects their printed amounts");
     if (treasureSpellOf(book, front)) notes.push("the app pays its extra cost (it picks the card), draws and makes the Treasures: give it no effects");
     else if (makesTreasures(book, front)) notes.push("the app makes its Treasures when it triggers: give it no token effects for them");
     if (drawCapOf(book, front)) notes.push("the app stops the player drawing more than one card a turn while it's out: wheels and draw spells then hurt only them");

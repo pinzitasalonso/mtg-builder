@@ -81,6 +81,8 @@ import {
   winotaOf,
 } from "./abilities";
 import { triggersOf, type Outcome } from "./triggers";
+import { scaleDamage } from "./damage";
+import { devotion, emptyDrawWinsOf, libraryExilerOf, oracleWinOf } from "./wincons";
 import {
   extraTreasureOf,
   oneOfEachOf,
@@ -94,7 +96,7 @@ import {
   treasuresOnEnterForFoes,
   winsWithTreasures,
 } from "./treasure";
-import { colorsOfCost, manaSources, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
+import { colorsOfCost, manaSources, manaTotal, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
 import { type PendingTax, other, type CardBook, type Choice, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
@@ -256,8 +258,10 @@ function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook, opts
     }
     if (!g.sides[seat].library.length) {
       if (!g.winner) {
-        g.winner = foe;
-        say(g, seat, `${seat === "you" ? "You" : "The opponent"} drew from an empty library and lost.`);
+        // Laboratory Maniac, Jace: the empty library wins instead.
+        const maniac = book ? g.sides[seat].battlefield.find((c) => emptyDrawWinsOf(book, c)) : undefined;
+        g.winner = maniac ? seat : foe;
+        say(g, seat, maniac ? `${who(seat)} ${verb(seat, "draw")} from an empty library with ${faceName(maniac)} out, and ${seat === "you" ? "you win" : "the opponent wins"}.` : `${seat === "you" ? "You" : "The opponent"} drew from an empty library and lost.`);
       }
       return;
     }
@@ -277,6 +281,46 @@ function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook, opts
       if (book) treasures(g, foe, taken, name, book);
     }
   }
+}
+
+/** Demonic Consultation or Tainted Pact, for the AI. With a way to win
+    from an empty library (Thassa's Oracle in hand or out, Laboratory
+    Maniac or Jace out) it names a card that isn't there and exiles the
+    whole library. Otherwise it's a tutor: Consultation names the best card
+    it could cast next turn (exiling the top six first, and what's above
+    it); the Pact keeps the first card that isn't a land. */
+function libraryExile(g: PracticeGame, seat: Seat, source: string, kind: "consultation" | "pact", book: CardBook) {
+  const side = g.sides[seat];
+  const wins = [...side.hand, ...side.battlefield].some((c) => oracleWinOf(book, c)) || side.battlefield.some((c) => emptyDrawWinsOf(book, c));
+  const lib = side.library;
+  const exile = (cards: PlayCard[]) => {
+    const gone = new Set(cards.map((c) => c.iid));
+    g.sides[seat] = { ...g.sides[seat], library: g.sides[seat].library.filter((c) => !gone.has(c.iid)), exile: [...g.sides[seat].exile, ...cards] };
+  };
+  if (wins) {
+    exile(lib);
+    say(g, seat, `${source}: ${who(seat)} ${kind === "consultation" ? `${verb(seat, "name")} a card that isn't in ${seat === "you" ? "your" : "its"} library and ${verb(seat, "exile")}` : verb(seat, "exile")} the whole library (${lib.length} cards).`);
+    return;
+  }
+  let found: PlayCard | undefined;
+  let gone: PlayCard[];
+  if (kind === "consultation") {
+    const reach = manaTotal(availableMana(g, seat, book)) + side.battlefield.filter((c) => c.tapped).length + 1;
+    const mv = (c: PlayCard) => infoOf(book, c)?.manaValue ?? 0;
+    const named = lib.slice(6).filter((c) => !isLand(c)).sort((a, b) => Number(mv(b) <= reach) - Number(mv(a) <= reach) || mv(b) - mv(a))[0];
+    const at = named ? lib.indexOf(named) : lib.length;
+    gone = lib.slice(0, at);
+    found = named;
+  } else {
+    const at = lib.findIndex((c) => !isLand(c));
+    found = at >= 0 ? lib[at] : undefined;
+    gone = lib.slice(0, at >= 0 ? at : lib.length);
+  }
+  exile(gone);
+  if (found) {
+    g.sides[seat] = { ...g.sides[seat], library: g.sides[seat].library.filter((c) => c.iid !== found!.iid), hand: [...g.sides[seat].hand, found] };
+  }
+  say(g, seat, `${source}: ${who(seat)} ${verb(seat, "exile")} ${gone.length} card${gone.length === 1 ? "" : "s"}${found ? ` and ${verb(seat, "put")} ${found.name} into ${seat === "you" ? "your" : "its"} hand` : ""}.`);
 }
 
 /** A Treasure spell's draw and Treasures, once its extra cost is paid. */
@@ -326,8 +370,9 @@ function opponentDrew(g: PracticeGame, seat: Seat, n: number, book: CardBook) {
     const t = triggersOf(book, c).oppDraws;
     if (!t || g.winner) continue;
     if (t.damage) {
-      say(g, owner, `${faceName(c)} deals ${t.damage * n} damage to ${seat === "you" ? "you" : "the opponent"}.`);
-      loseLife(g, seat, t.damage * n, book);
+      const dealt = scaleDamage(g, book, owner, c, seat, t.damage * n);
+      say(g, owner, `${faceName(c)} deals ${dealt} damage to ${seat === "you" ? "you" : "the opponent"}.`);
+      loseLife(g, seat, dealt, book);
     }
     if (t.treasure && seat === "you" && canPayTax(g, t.pay, book)) {
       // Yours to decide, a card at a time: pay {2}, or it makes a Treasure.
@@ -412,8 +457,9 @@ function applyOutcome(g: PracticeGame, seat: Seat, source: PlayCard, out: Outcom
     say(g, seat, `${name}: ${seat === "you" ? "you make" : "the opponent makes"} ${made}.`);
   }
   if (out.damage) {
-    say(g, seat, `${name} deals ${out.damage} damage to ${foe === "you" ? "you" : "the opponent"}.`);
-    loseLife(g, foe, out.damage, book);
+    const dealt = scaleDamage(g, book, seat, source, foe, out.damage);
+    say(g, seat, `${name} deals ${dealt} damage to ${foe === "you" ? "you" : "the opponent"}.`);
+    loseLife(g, foe, dealt, book);
   }
   if (out.drain) {
     say(g, seat, `${foe === "you" ? "You lose" : "The opponent loses"} ${out.drain} life (${name}).`);
@@ -655,8 +701,10 @@ function spend(g: PracticeGame, seat: Seat, paid: Payment, sources: Source[], bo
     for (const a of src?.also ?? []) update(g, a, (c) => ({ ...c, tapped: true }));
     // Ancient Tomb: the mana hurts.
     if (src?.pain) {
-      say(g, seat, `${src.name} deals ${src.pain} damage to ${seat === "you" ? "you" : "the opponent"}.`);
-      loseLife(g, seat, src.pain, book);
+      const painter = findCard(g, t)?.card ?? null;
+      const dealt = scaleDamage(g, book, seat, painter, seat, src.pain);
+      say(g, seat, `${src.name} deals ${dealt} damage to ${seat === "you" ? "you" : "the opponent"}.`);
+      loseLife(g, seat, dealt, book);
     }
     // Vivi, Selvala: all of it at once; what this payment leaves floats.
     if (src?.float) {
@@ -788,8 +836,9 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
     if (!flip || g.winner) continue;
     if (coin.flip()) say(g, seat, `${c.name}: ${seat === "you" ? "you win" : "the opponent wins"} the flip.`);
     else {
-      say(g, seat, `${c.name}: ${seat === "you" ? "you lose" : "the opponent loses"} the flip, and it deals ${flip} damage to ${seat === "you" ? "you" : "the opponent"}.`);
-      loseLife(g, seat, flip, book);
+      const dealt = scaleDamage(g, book, seat, c, seat, flip);
+      say(g, seat, `${c.name}: ${seat === "you" ? "you lose" : "the opponent loses"} the flip, and it deals ${dealt} damage to ${seat === "you" ? "you" : "the opponent"}.`);
+      loseLife(g, seat, dealt, book);
     }
   }
   if (g.turn > 1 && !g.winner) drawCards(g, seat, 1, book, { step: true });
@@ -797,8 +846,9 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   for (const c of g.sides[seat].battlefield) {
     const pain = c.tapped ? tappedPainOf(book, c) : 0;
     if (!pain || g.winner) continue;
-    say(g, seat, `${c.name} is tapped: it deals ${pain} damage to ${seat === "you" ? "you" : "the opponent"}.`);
-    loseLife(g, seat, pain, book);
+    const dealt = scaleDamage(g, book, seat, c, seat, pain);
+    say(g, seat, `${c.name} is tapped: it deals ${dealt} damage to ${seat === "you" ? "you" : "the opponent"}.`);
+    loseLife(g, seat, dealt, book);
   }
   checkState(g, book);
   return g;
@@ -872,8 +922,9 @@ function endStep(g: PracticeGame, book: CardBook) {
       if (!punishesIdleOf(book, c)) continue;
       const idle = g.sides[seat].battlefield.filter((x) => isCreature(book, x) && !(g.attacked ?? []).includes(x.iid)).length;
       if (!idle) continue;
-      say(g, s, `${faceName(c)} deals ${idle} damage to ${seat === "you" ? "you" : "the opponent"}: ${idle === 1 ? "a creature" : `${idle} creatures`} that didn't attack.`);
-      loseLife(g, seat, idle, book);
+      const dealt = scaleDamage(g, book, s, c, seat, idle);
+      say(g, s, `${faceName(c)} deals ${dealt} damage to ${seat === "you" ? "you" : "the opponent"}: ${idle === 1 ? "a creature" : `${idle} creatures`} that didn't attack.`);
+      loseLife(g, seat, dealt, book);
     }
   }
   for (const s of ["you", "opp"] as Seat[]) {
@@ -946,9 +997,15 @@ export function playerSpellResolves(g0: PracticeGame, iid: number, book: CardBoo
   if (!at || at.seat !== "you" || at.zone !== "graveyard") return g0;
   const w = wheelSpellOf(book, at.card);
   const ts = w ? null : treasureSpellOf(book, at.card);
-  if (!w && !ts) return g0;
+  const exiler = libraryExilerOf(infoOf(book, at.card));
+  // Consultation or Pact goes for the win only with Thassa's Oracle in hand
+  // or Laboratory Maniac out; as a tutor it's yours to resolve by hand.
+  const goesForWin =
+    !!exiler && (g0.sides.you.hand.some((c) => oracleWinOf(book, c)) || g0.sides.you.battlefield.some((c) => oracleWinOf(book, c) || emptyDrawWinsOf(book, c)));
+  if (!w && !ts && !goesForWin) return g0;
   const g = structuredClone(g0);
-  if (w) wheel(g, "you", w, at.card.name, book, iid);
+  if (goesForWin && exiler) libraryExile(g, "you", at.card.name, exiler, book);
+  else if (w) wheel(g, "you", w, at.card.name, book, iid);
   else if (ts) {
     const then = { draw: ts.draw, treasures: treasureCount(g, "you", ts.treasures) };
     // The extra cost is yours to pick: the draw and the Treasures follow it.
@@ -1200,7 +1257,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   loseLife(g, seat, paid.life, book);
   if (action.sacrifice_card) moveTo(g, card.iid, "graveyard");
   say(g, seat, `${who(seat)} ${action.sacrifice_card ? "sacrifices" : "activates"} ${card.name}.`, card);
-  applyEffects(g, seat, action.effects, book, card.name);
+  applyEffects(g, seat, action.effects, book, card.name, card);
   checkState(g, book);
   return { game: g, ok: true };
 }
@@ -1210,6 +1267,30 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     a big spell), when the spell is worth a card. A countered commander goes
     back to the command zone. Returns the game unchanged when it lets the
     spell be. */
+/** Does the player's spell win the game, or set up a win the AI can
+    see? A card that says so ("you win the game", an extra turn), a
+    library-emptying spell next to Thassa's Oracle or Laboratory Maniac,
+    or a creature, anthem or Craterhoof that makes the player's attack
+    lethal this turn. The AI can't see the player's hand. */
+export function threatens(g: PracticeGame, spell: PlayCard, book: CardBook): boolean {
+  const text = faceText(infoOf(book, spell), spell);
+  if (/\byou win the game\b|\bloses the game\b|\btakes? an extra turn\b/i.test(text)) return true;
+  if (libraryExilerOf(infoOf(book, spell)) || emptyDrawWinsOf(book, spell)) return true;
+  if (g.active !== "you" || g.combat) return false;
+  // Lethal on board: the player's creatures that can attack, with this
+  // spell's help (a hasty creature, "creatures you control get +N/+N", or
+  // Craterhoof's +X/+X for each creature).
+  const able = g.sides.you.battlefield.filter((c) => isCreature(book, c) && canAttack(g, "you", c, book));
+  let power = able.reduce((n, c) => n + Math.max(0, scaleDamage(g, book, "you", c, "opp", stats(book, c).power, true)), 0);
+  const isHasty = isCreature(book, spell) && (has(book, spell, "Haste") || g.sides.you.battlefield.some((c) => globalKeywordsOf(book, c).includes("Haste")));
+  if (isHasty) power += Math.max(0, stats(book, spell).power);
+  const count = able.length + (isHasty ? 1 : 0);
+  const anthem = /creatures you control (?:gain [a-z ]+ and )?get \+(\d+|x)\/\+(?:\d+|x)/i.exec(text);
+  if (anthem) power += (anthem[1]!.toLowerCase() === "x" ? count + 1 : Number(anthem[1])) * count;
+  const blockers = g.sides.opp.battlefield.filter((c) => isCreature(book, c) && !c.tapped).length;
+  return count > blockers && power >= g.sides.opp.life;
+}
+
 export function aiResponds(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
   if (g0.winner) return g0;
   const at = findCard(g0, iid);
@@ -1222,13 +1303,16 @@ export function aiResponds(g0: PracticeGame, iid: number, book: CardBook): Pract
     .filter((o): o is { c: PlayCard; k: NonNullable<typeof o.k> } => !!o.k && o.k.hits(spell))
     .sort((a, b) => (infoOf(book, a.c)?.manaValue ?? 0) - (infoOf(book, b.c)?.manaValue ?? 0));
   if (!options.length) return g0;
-  const big = spell.manaValue >= 4 || at.card.commander;
+  // A spell that wins, or would let the player win this turn, is countered
+  // whatever it costs, with a free counter if that's what there is.
+  const critical = threatens(g0, at.card, book);
+  const big = spell.manaValue >= 4 || at.card.commander || critical;
   const commanderOut = opp.battlefield.some((c) => c.commander);
   for (const { c, k } of options) {
     // Worth a card: two mana or more, the commander, or the one spell this
     // counter was made for (Mental Misstep on a one-drop).
     const exact = !k.hits({ ...spell, manaValue: spell.manaValue + 1 });
-    if (spell.manaValue < 2 && !at.card.commander && !exact) continue;
+    if (spell.manaValue < 2 && !at.card.commander && !exact && !critical) continue;
     const sources = availableMana(g0, "opp", book);
     const paid = aiPay(g0, "opp", spellCost(g0, "opp", c, book, "hand"), sources, book, { x: k.xIsValue ? spell.manaValue : 0 });
     let free: "commander" | "exile-blue" | null = null;
@@ -1402,8 +1486,9 @@ function castTriggers(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBo
       say(g, seat, `${name} gets +${t.pump}/+${t.pump} until end of turn.`);
     }
     if (t.damage) {
-      say(g, seat, `${name} deals ${t.damage} damage to ${foe === "you" ? "you" : "the opponent"}.`);
-      loseLife(g, foe, t.damage, book);
+      const dealt = scaleDamage(g, book, seat, c, foe, t.damage);
+      say(g, seat, `${name} deals ${dealt} damage to ${foe === "you" ? "you" : "the opponent"}.`);
+      loseLife(g, foe, dealt, book);
     }
     if (t.drain) {
       say(g, seat, `${foe === "you" ? "You lose" : "The opponent loses"} ${t.drain} life (${name}).`);
@@ -1689,6 +1774,17 @@ function entered(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, op
   const at = findCard(g, card.iid);
   if (!at || at.zone !== "battlefield") return false;
   const now = at.card;
+  // Thassa's Oracle: devotion to blue against the library.
+  if (oracleWinOf(book, now) && !g.winner) {
+    const x = devotion(g, seat, "U", book);
+    const left = g.sides[seat].library.length;
+    if (x >= left) {
+      g.winner = seat;
+      say(g, seat, `${faceName(now)}: devotion to blue ${x}, ${left === 0 ? "and no cards left in the library" : `${left} cards in the library`}: ${seat === "you" ? "you win" : "the opponent wins"}.`);
+      return false;
+    }
+    say(g, seat, `${faceName(now)}: devotion to blue ${x}, ${left} cards in the library: no win. (Ordering the top ${x} is left to ${seat === "you" ? "you" : "the table"}.)`);
+  }
   // Mox Diamond: a land card discarded, or it goes to the graveyard.
   if (entersForALand(book, now)) {
     const lands = g.sides[seat].hand.filter(isLand);
@@ -2102,7 +2198,11 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
   // A wheel is the table's to carry out, whatever effects the plan gave it.
   const w = wheelSpellOf(book, card);
   const ts = w ? null : treasureSpellOf(book, card);
-  if (w) {
+  const exiler = libraryExilerOf(infoOf(book, card));
+  if (exiler) {
+    moveTo(g, card.iid, "graveyard");
+    libraryExile(g, seat, card.name, exiler, book);
+  } else if (w) {
     wheel(g, seat, w, card.name, book, card.iid);
     moveTo(g, card.iid, "graveyard");
   } else if (ts) {
@@ -2125,7 +2225,7 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
     }
     treasureSpellEffect(g, seat, card.name, { draw: ts.draw, treasures: treasureCount(g, seat, ts.treasures) }, book);
   } else if (resolvesToGraveyard(card.typeLine)) {
-    applyEffects(g, seat, action.effects, book, card.name);
+    applyEffects(g, seat, action.effects, book, card.name, card);
     moveTo(g, card.iid, "graveyard");
   } else {
     moveTo(g, card.iid, "battlefield");
@@ -2137,10 +2237,10 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
     // all of it (lib/practice/triggers.ts): the plan's copy would do it twice.
     const tabled = !!triggersOf(book, card).enters || treasuresOnEnterForFoes(book, card);
     const effects = tabled ? [] : auto ? action.effects.filter((e) => e.type !== "discard" && e.type !== "draw") : action.effects;
-    applyEffects(g, seat, effects, book, card.name);
+    applyEffects(g, seat, effects, book, card.name, card);
     if (auto) discardTrigger(g, seat, card, book);
     // Inalla's copy enters too: its enters ability happens again.
-    if (entered(g, seat, card, book, { cast: true }) && effects.length) applyEffects(g, seat, effects, book, `${card.name} (the copy)`);
+    if (entered(g, seat, card, book, { cast: true }) && effects.length) applyEffects(g, seat, effects, book, `${card.name} (the copy)`, card);
   }
   checkState(g, book);
 }
@@ -2203,7 +2303,7 @@ export function aiRemovalAction(g: PracticeGame, book: CardBook, targets: number
 
 const seatOf = (caster: Seat, p: "ai" | "player" | null): Seat => (p === "player" ? "you" : p === "ai" ? "opp" : caster);
 
-function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: CardBook, source: string) {
+function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: CardBook, source: string, src: PlayCard | null = null) {
   for (const e of effects.slice(0, 20)) {
     const amount = Math.max(0, Math.min(99, Math.floor(e.amount ?? 0)));
     const targetIid = parseCardId(e.target);
@@ -2213,11 +2313,13 @@ function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: Ca
       case "damage": {
         if (e.target === "player" || e.target === "ai") {
           const s = e.target === "player" ? "you" : "opp";
-          say(g, caster, `${source} deals ${amount} damage to ${s === "you" ? "you" : "the opponent"}.`);
-          loseLife(g, s, amount, book);
+          const dealt = scaleDamage(g, book, caster, src, s, amount);
+          say(g, caster, `${source} deals ${dealt} damage to ${s === "you" ? "you" : "the opponent"}.`);
+          loseLife(g, s, dealt, book);
         } else if (onField && isCreature(book, onField.card)) {
-          update(g, onField.card.iid, (c) => ({ ...c, damage: (c.damage ?? 0) + amount }));
-          say(g, caster, `${source} deals ${amount} damage to ${onField.card.name}.`);
+          const dealt = scaleDamage(g, book, caster, src, onField.seat, amount);
+          update(g, onField.card.iid, (c) => ({ ...c, damage: (c.damage ?? 0) + dealt }));
+          say(g, caster, `${source} deals ${dealt} damage to ${onField.card.name}.`);
         }
         break;
       }
@@ -2484,10 +2586,23 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
     const hitters: PlayCard[] = [];
     const hitFor = new Map<number, number>();
     const gain: Record<Seat, number> = { you: 0, opp: 0 };
-    const mark = (iid: number, n: number, from: PlayCard) => {
-      if (n <= 0) return;
-      marks.set(iid, (marks.get(iid) ?? 0) + n);
+    // Damage as it's dealt, through the multipliers (Fiery Emancipation,
+    // Torbran…): marked on a creature, or taken by the defending player.
+    // Lifelink gains what was really dealt.
+    const mark = (iid: number, n: number, from: PlayCard, fromSeat: Seat, toSeat: Seat) => {
+      if (n <= 0) return 0;
+      const dealt = scaleDamage(g, book, fromSeat, from, toSeat, n, true);
+      marks.set(iid, (marks.get(iid) ?? 0) + dealt);
       if (has(book, from, "Deathtouch")) deathtouched.add(iid);
+      return dealt;
+    };
+    const hitPlayer = (attacker: PlayCard, n: number) => {
+      const dealt = scaleDamage(g, book, atk, attacker, def, n, true);
+      toPlayer += dealt;
+      if (attacker.commander) cmdToPlayer += dealt;
+      hitters.push(attacker);
+      hitFor.set(attacker.iid, dealt);
+      return dealt;
     };
     for (const a of combat.attackers) {
       if (!alive(a)) continue;
@@ -2496,14 +2611,9 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
       const wasBlocked = (combat.blocks[a] ?? []).length > 0;
       if (strikesIn(attacker, first)) {
         let left = stats(book, attacker).power;
-        const dealt = left;
+        let dealt = 0;
         if (!wasBlocked) {
-          toPlayer += left;
-          if (attacker.commander) cmdToPlayer += left;
-          if (left > 0) {
-            hitters.push(attacker);
-            hitFor.set(attacker.iid, left);
-          }
+          if (left > 0) dealt += hitPlayer(attacker, left);
           left = 0;
         } else {
           blockers.forEach((b, i) => {
@@ -2511,26 +2621,18 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
             const need = has(book, attacker, "Deathtouch") ? 1 : Math.max(0, stats(book, blocker).toughness - (blocker.damage ?? 0) - (marks.get(b) ?? 0));
             const last = i === blockers.length - 1;
             const give = last && !has(book, attacker, "Trample") ? left : Math.min(left, need);
-            mark(b, give, attacker);
+            dealt += mark(b, give, attacker, atk, def);
             left -= give;
           });
-          if (left > 0 && (has(book, attacker, "Trample") || !blockers.length)) {
-            if (has(book, attacker, "Trample")) {
-              toPlayer += left;
-              if (attacker.commander) cmdToPlayer += left;
-              hitters.push(attacker);
-              hitFor.set(attacker.iid, left);
-            }
-          }
+          if (left > 0 && has(book, attacker, "Trample")) dealt += hitPlayer(attacker, left);
         }
         if (has(book, attacker, "Lifelink") && dealt > 0) gain[atk] += dealt;
       }
       for (const b of blockers) {
         const blocker = card(b);
         if (!strikesIn(blocker, first)) continue;
-        const p = stats(book, blocker).power;
-        mark(a, p, blocker);
-        if (has(book, blocker, "Lifelink") && p > 0) gain[def] += p;
+        const dealt = mark(a, stats(book, blocker).power, blocker, def, atk);
+        if (has(book, blocker, "Lifelink") && dealt > 0) gain[def] += dealt;
       }
     }
     for (const [iid, n] of marks) update(g, iid, (c) => ({ ...c, damage: (c.damage ?? 0) + n }));
