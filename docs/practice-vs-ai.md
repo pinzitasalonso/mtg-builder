@@ -441,6 +441,35 @@ side does.
    Austere Command, Fabricate) and instants it holds for the player's turn
    (removal, counterspells) are still left to the model.
 
+   **Damage multipliers** (`lib/practice/damage.ts`, `scaleDamage`) apply
+   to every hit, combat or not, on both sides: Torbran (+2 from a red
+   source to the other side), Fiery Emancipation and City on Fire (×3),
+   Furnace of Rath and Dictate of the Twin Gods (×2, anyone's), Twinflame
+   Tyrant and Angrath's Marauders (×2), Solphim (×2, noncombat), Gratuitous
+   Violence (×2, creatures), and Ojer Axonil (a red source's noncombat hit
+   is at least its power). They stack the way that suits their controller:
+   Ojer, then +2, then the multipliers. Lifelink gains what was really
+   dealt.
+
+   **Winning without combat** (`lib/practice/wincons.ts`): Thassa's Oracle
+   checks devotion to blue against the library as it enters; drawing from
+   an empty library wins with Laboratory Maniac or Jace, Wielder of
+   Mysteries out; Demonic Consultation and Tainted Pact exile the whole
+   library when their caster holds the Oracle or has the Maniac out (the
+   AI otherwise uses them as tutors; yours are left to you then). The
+   built-in planner looks for a win before anything else: the Oracle when
+   devotion covers the library, Consultation or Pact then the Oracle, the
+   Maniac with a draw spell, or a storm or burn turn (rituals first, then
+   every spell) when Vivi's pings and burn at the player's face, through
+   the multipliers, add up to lethal. It no longer casts the Oracle as a
+   plain 1/3. The model's prompt says the same.
+
+   **Counters for a winning spell** (`threatens`): the AI counters, whatever
+   the spell costs and with a free counter if needed, a spell that says it
+   wins or takes an extra turn, a library emptier or Laboratory Maniac, and
+   on your turn before combat a hasty creature or an anthem (Craterhoof)
+   that makes your attack lethal. It can't see your hand.
+
    **Planeswalkers** show their loyalty on the card (`loyaltyOf`: the
    starting loyalty from Scryfall until it changes). The ⋯ menu has "+1
    loyalty" and "−1 loyalty" for yours and the opponent's (`addLoyalty`);
