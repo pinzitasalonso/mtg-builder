@@ -32,7 +32,7 @@ import {
 import { hasTriggers } from "./triggers";
 import { manaSummary, manaTotal } from "./mana";
 import { makesTreasures, treasureSpellOf } from "./treasure";
-import { emptyDrawWinsOf, libraryExilerOf, oracleWinOf } from "./wincons";
+import { emptyDrawWinsOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf } from "./wincons";
 import { damageRuleOf } from "./damage";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
@@ -159,6 +159,8 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     const wa = wheelAbilityOf(book, front);
     if (wa) notes.push(`a wheel: to use it, activate it with "mana":"${wa.mana}" and no effects; the app pays${wa.tap ? ", taps" : ""}${wa.sacrifice ? ", sacrifices it" : ""} and makes both players lose their hands and draw`);
     if (wheelOnHitOf(book, front)) notes.push("when it deals combat damage to the player, the app makes both players lose their hands and draw seven");
+    if (extraTurnOf(info)) notes.push("the app gives you the extra turn: give it no effects for that");
+    if (hasStorm(info)) notes.push("storm: the app copies it for each spell cast before it this turn. Give its effects once, and cast it last");
     if (oracleWinOf(book, front)) notes.push("a win: the app wins the game when it enters with your devotion to blue at least your library's size; empty the library first with Demonic Consultation or Tainted Pact");
     if (libraryExilerOf(info)) notes.push("with Thassa's Oracle in your hand or Laboratory Maniac out, the app exiles your whole library with it; otherwise it finds your best card. Give it no effects");
     if (emptyDrawWinsOf(book, front)) notes.push("while it's out, drawing from an empty library wins you the game: the app does it");

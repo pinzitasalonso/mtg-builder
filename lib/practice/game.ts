@@ -82,7 +82,7 @@ import {
 } from "./abilities";
 import { triggersOf, type Outcome } from "./triggers";
 import { scaleDamage } from "./damage";
-import { devotion, emptyDrawWinsOf, libraryExilerOf, oracleWinOf } from "./wincons";
+import { devotion, emptyDrawWinsOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf } from "./wincons";
 import {
   extraTreasureOf,
   oneOfEachOf,
@@ -231,7 +231,7 @@ function update(g: PracticeGame, iid: number, fn: (c: PlayCard) => PlayCard) {
   g.sides[at.seat] = { ...side, [at.zone]: side[at.zone].map((c) => (c.iid === iid ? fn(c) : c)) };
 }
 
-function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook, opts: { step?: boolean } = {}) {
+function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook, opts: { step?: boolean; taken?: boolean } = {}) {
   if (n <= 0) return;
   const foe = other(seat);
   // Narset (or Spirit of the Labyrinth): at most one card a turn. Notion
@@ -241,7 +241,9 @@ function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook, opts
     const cap = drawCapOf(book, c);
     return cap === "everyone" || (cap === "opponents" && g.sides[foe].battlefield.includes(c));
   });
-  const thiefCard = book ? g.sides[foe].battlefield.find((c) => drawThiefOf(book, c)) : undefined;
+  // A draw a thief took isn't taken back by the other side's thief: with
+  // one on each side the cards would go round for ever.
+  const thiefCard = book && !opts.taken ? g.sides[foe].battlefield.find((c) => drawThiefOf(book, c)) : undefined;
   const thief = thiefCard && book ? drawThiefOf(book, thiefCard) : null;
   if (!g.drawn) g.drawn = { you: 0, opp: 0 };
   let drew = 0;
@@ -263,7 +265,8 @@ function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook, opts
         g.winner = maniac ? seat : foe;
         say(g, seat, maniac ? `${who(seat)} ${verb(seat, "draw")} from an empty library with ${faceName(maniac)} out, and ${seat === "you" ? "you win" : "the opponent wins"}.` : `${seat === "you" ? "You" : "The opponent"} drew from an empty library and lost.`);
       }
-      return;
+      // What was drawn, skipped or taken before this still counts below.
+      break;
     }
     g.sides[seat] = draw(g.sides[seat], 1);
     g.drawn[seat] += 1;
@@ -275,7 +278,7 @@ function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook, opts
     const name = faceName(thiefCard);
     if (thief === "draw") {
       say(g, foe, `${name}: ${seat === "you" ? "you skip" : "the opponent skips"} ${taken === 1 ? "a draw" : `${taken} draws`}, and ${foe === "you" ? "you draw" : "the opponent draws"} instead.`);
-      drawCards(g, foe, taken, book);
+      if (!g.winner) drawCards(g, foe, taken, book, { taken: true });
     } else {
       say(g, foe, `${name}: ${seat === "you" ? "you skip" : "the opponent skips"} ${taken === 1 ? "a draw" : `${taken} draws`}.`);
       if (book) treasures(g, foe, taken, name, book);
@@ -322,6 +325,17 @@ function libraryExile(g: PracticeGame, seat: Seat, source: string, kind: "consul
   }
   say(g, seat, `${source}: ${who(seat)} ${verb(seat, "exile")} ${gone.length} card${gone.length === 1 ? "" : "s"}${found ? ` and ${verb(seat, "put")} ${found.name} into ${seat === "you" ? "your" : "its"} hand` : ""}.`);
 }
+
+/** A spell gave its caster another turn after this one. */
+function extraTurn(g: PracticeGame, seat: Seat, source: string) {
+  if (!g.extraTurns) g.extraTurns = { you: 0, opp: 0 };
+  g.extraTurns[seat] += 1;
+  say(g, seat, `${source}: ${who(seat)} ${verb(seat, "take")} an extra turn after this one.`);
+}
+
+/** The storm count for the spell just cast: the spells cast before it
+    this turn, by either player. */
+const stormCount = (g: PracticeGame) => Math.max(0, (g.spells?.you ?? 0) + (g.spells?.opp ?? 0) - 1);
 
 /** A Treasure spell's draw and Treasures, once its extra cost is paid. */
 function treasureSpellEffect(g: PracticeGame, seat: Seat, source: string, then: { draw: number; treasures: number }, book: CardBook) {
@@ -902,7 +916,11 @@ export function endTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
     if (gone.length) say(g, "opp", `The opponent discards down to ${max} cards: ${gone.join(", ")}.`);
   }
   emptyPool(g);
-  g.active = other(g.active);
+  // An extra turn (Time Warp) comes before the other player's.
+  if ((g.extraTurns?.[g.active] ?? 0) > 0) {
+    g.extraTurns![g.active] -= 1;
+    say(g, g.active, `${who(g.active)} ${verb(g.active, "take")} an extra turn.`);
+  } else g.active = other(g.active);
   g.turn += 1;
   return startTurn(g, book);
 }
@@ -1002,8 +1020,13 @@ export function playerSpellResolves(g0: PracticeGame, iid: number, book: CardBoo
   // or Laboratory Maniac out; as a tutor it's yours to resolve by hand.
   const goesForWin =
     !!exiler && (g0.sides.you.hand.some((c) => oracleWinOf(book, c)) || g0.sides.you.battlefield.some((c) => oracleWinOf(book, c) || emptyDrawWinsOf(book, c)));
-  if (!w && !ts && !goesForWin) return g0;
+  // Your storm spell: the table counts the copies; they're yours to resolve.
+  const copies = hasStorm(infoOf(book, at.card)) ? stormCount(g0) : 0;
+  const again = extraTurnOf(infoOf(book, at.card));
+  if (!w && !ts && !goesForWin && !copies && !again) return g0;
   const g = structuredClone(g0);
+  if (again) extraTurn(g, "you", at.card.name);
+  if (copies) say(g, "you", `${at.card.name}: storm, ${copies === 1 ? "a copy" : `${copies} copies`} (${copies + 1} in all). Resolve them by hand.`);
   if (goesForWin && exiler) libraryExile(g, "you", at.card.name, exiler, book);
   else if (w) wheel(g, "you", w, at.card.name, book, iid);
   else if (ts) {
@@ -1017,7 +1040,9 @@ export function playerSpellResolves(g0: PracticeGame, iid: number, book: CardBoo
           : { kind: "sacrifice", source: at.card.name, by: "you", what: "artifact or creature", then };
       return g;
     }
-    treasureSpellEffect(g, "you", at.card.name, then, book);
+    // Nothing to discard or sacrifice: the spell couldn't have been cast.
+    if (ts.cost && !fits) say(g, "you", `(${at.card.name} needs ${ts.cost === "discard" ? "a card to discard" : "an artifact or creature to sacrifice"}: nothing happens. Undo takes it back.)`);
+    else treasureSpellEffect(g, "you", at.card.name, then, book);
   }
   checkState(g, book);
   return g;
@@ -1083,12 +1108,18 @@ export function concede(g0: PracticeGame): PracticeGame {
   return g;
 }
 
+/** Would drawing from an empty library win for this seat (Laboratory
+    Maniac; Jace, Wielder of Mysteries)? */
+export const winsOnEmptyDraw = (g: PracticeGame, seat: Seat, book: CardBook) => g.sides[seat].battlefield.some((c) => emptyDrawWinsOf(book, c));
+
 /** You draw by hand (the Draw button): through the engine, so what watches
     your draws sees them (Nekusar, Smothering Tithe). */
 export function playerDraws(g0: PracticeGame, n: number, book: CardBook): PracticeGame {
-  if (g0.winner || n <= 0 || !g0.sides.you.library.length) return g0;
+  // From an empty library only with Laboratory Maniac or Jace out: that wins.
+  const left = g0.sides.you.library.length;
+  if (g0.winner || n <= 0 || (!left && !winsOnEmptyDraw(g0, "you", book))) return g0;
   const g = structuredClone(g0);
-  drawCards(g, "you", Math.min(n, g.sides.you.library.length), book);
+  drawCards(g, "you", left ? Math.min(n, left) : 1, book);
   checkState(g, book);
   return g;
 }
@@ -1280,15 +1311,20 @@ export function threatens(g: PracticeGame, spell: PlayCard, book: CardBook): boo
   // Lethal on board: the player's creatures that can attack, with this
   // spell's help (a hasty creature, "creatures you control get +N/+N", or
   // Craterhoof's +X/+X for each creature).
-  const able = g.sides.you.battlefield.filter((c) => isCreature(book, c) && canAttack(g, "you", c, book));
-  let power = able.reduce((n, c) => n + Math.max(0, scaleDamage(g, book, "you", c, "opp", stats(book, c).power, true)), 0);
+  // The spell itself is already on the battlefield when the AI answers (the
+  // table plays it, then asks): it's counted once, as the hasty creature,
+  // and a lord's bonus is already in every creature's stats.
+  const able = g.sides.you.battlefield.filter((c) => c.iid !== spell.iid && isCreature(book, c) && canAttack(g, "you", c, book));
   const isHasty = isCreature(book, spell) && (has(book, spell, "Haste") || g.sides.you.battlefield.some((c) => globalKeywordsOf(book, c).includes("Haste")));
-  if (isHasty) power += Math.max(0, stats(book, spell).power);
-  const count = able.length + (isHasty ? 1 : 0);
-  const anthem = /creatures you control (?:gain [a-z ]+ and )?get \+(\d+|x)\/\+(?:\d+|x)/i.exec(text);
-  if (anthem) power += (anthem[1]!.toLowerCase() === "x" ? count + 1 : Number(anthem[1])) * count;
+  const attackers = isHasty ? [...able, spell] : able;
+  // "…creatures you control get +N/+N until end of turn" as it enters or
+  // resolves; Craterhoof's X is every creature you control, itself too.
+  const anthem = /creatures you control (?:gain [a-z ]+ and )?get \+(\d+|x)\/\+(?:\d+|x) until end of turn/i.exec(text);
+  const mine = g.sides.you.battlefield.filter((c) => c.iid !== spell.iid && isCreature(book, c)).length + (isCreature(book, spell) ? 1 : 0);
+  const bonus = anthem ? (anthem[1]!.toLowerCase() === "x" ? mine : Number(anthem[1])) : 0;
+  const power = attackers.reduce((n, c) => n + Math.max(0, scaleDamage(g, book, "you", c, "opp", stats(book, c).power + bonus, true)), 0);
   const blockers = g.sides.opp.battlefield.filter((c) => isCreature(book, c) && !c.tapped).length;
-  return count > blockers && power >= g.sides.opp.life;
+  return attackers.length > blockers && power >= g.sides.opp.life;
 }
 
 export function aiResponds(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
@@ -2225,7 +2261,14 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
     }
     treasureSpellEffect(g, seat, card.name, { draw: ts.draw, treasures: treasureCount(g, seat, ts.treasures) }, book);
   } else if (resolvesToGraveyard(card.typeLine)) {
-    applyEffects(g, seat, action.effects, book, card.name, card);
+    // Storm: a copy for each spell cast before it this turn, by anyone.
+    const copies = hasStorm(infoOf(book, card)) ? stormCount(g) : 0;
+    if (copies) say(g, seat, `${card.name}: storm, ${copies === 1 ? "a copy" : `${copies} copies`}.`);
+    for (let i = 0; i <= copies && !g.winner; i++) {
+      applyEffects(g, seat, action.effects, book, i ? `${card.name} (copy)` : card.name, card);
+      checkState(g, book);
+    }
+    if (extraTurnOf(infoOf(book, card)) && !g.winner) extraTurn(g, seat, card.name);
     moveTo(g, card.iid, "graveyard");
   } else {
     moveTo(g, card.iid, "battlefield");
@@ -2317,7 +2360,7 @@ function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: Ca
           say(g, caster, `${source} deals ${dealt} damage to ${s === "you" ? "you" : "the opponent"}.`);
           loseLife(g, s, dealt, book);
         } else if (onField && isCreature(book, onField.card)) {
-          const dealt = scaleDamage(g, book, caster, src, onField.seat, amount);
+          const dealt = scaleDamage(g, book, caster, src, onField.seat, amount, false, true);
           update(g, onField.card.iid, (c) => ({ ...c, damage: (c.damage ?? 0) + dealt }));
           say(g, caster, `${source} deals ${dealt} damage to ${onField.card.name}.`);
         }
@@ -2591,7 +2634,7 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
     // Lifelink gains what was really dealt.
     const mark = (iid: number, n: number, from: PlayCard, fromSeat: Seat, toSeat: Seat) => {
       if (n <= 0) return 0;
-      const dealt = scaleDamage(g, book, fromSeat, from, toSeat, n, true);
+      const dealt = scaleDamage(g, book, fromSeat, from, toSeat, n, true, true);
       marks.set(iid, (marks.get(iid) ?? 0) + dealt);
       if (has(book, from, "Deathtouch")) deathtouched.add(iid);
       return dealt;

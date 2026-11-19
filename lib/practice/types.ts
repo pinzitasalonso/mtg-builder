@@ -82,6 +82,9 @@ export interface PracticeGame {
   taxes?: PendingTax[];
   /** Cards each seat has drawn this turn (Narset's "one card each turn"). */
   drawn?: Record<Seat, number>;
+  /** Extra turns each seat has coming (Time Warp): taken before the other
+      player's next turn. */
+  extraTurns?: Record<Seat, number>;
   /** Spells each seat has cast this turn (Lotho's "second spell"). */
   spells?: Record<Seat, number>;
 }

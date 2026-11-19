@@ -56,11 +56,23 @@ export function ritualOf(info: CardInfo | undefined): string[] | null {
   return m ? [...m[1]!.matchAll(/\{([WUBRGC])\}/gi)].map((x) => x[1]!.toUpperCase()) : null;
 }
 
+/** An instant or sorcery that gives its caster another turn: "Take an
+    extra turn after this one" (Temporal Mastery), "Target player takes an
+    extra turn after this one" (Time Warp, on its caster). What else the
+    card says is left to its caster. */
+export const extraTurnOf = (info: CardInfo | undefined) =>
+  /\b(Instant|Sorcery)\b/.test((info?.typeLine ?? "").split(" // ")[0]!) && sentences(info?.oracleText ?? "").some((s) => /^(?:target player takes|take) an extra turn after this one$/i.test(s));
+
+/** Storm: "When you cast this spell, copy it for each spell cast before
+    it this turn" (Grapeshot, Brain Freeze). */
+export const hasStorm = (info: CardInfo | undefined) => /^storm\b/im.test((info?.oracleText ?? "").split("\n//\n")[0]!);
+
 /** Burn that can go at a player: "Lightning Bolt deals 3 damage to any
-    target", "… to target player", "… to each opponent". */
+    target", "… to target player", "… to each opponent". A storm line is
+    allowed (Grapeshot): the copies are the engine's. */
 export function burnOf(info: CardInfo | undefined): number {
   if (!/\b(Instant|Sorcery)\b/.test((info?.typeLine ?? "").split(" // ")[0]!)) return 0;
-  const lines = sentences(info?.oracleText ?? "");
+  const lines = sentences(info?.oracleText ?? "").filter((s) => !/^storm$/i.test(s));
   if (lines.length !== 1) return 0;
   const m = /^\S.* deals (\d+) damage to (any target|target player|target opponent|each opponent|target player or planeswalker|target opponent or planeswalker)$/i.exec(lines[0]!);
   return m ? Number(m[1]) : 0;

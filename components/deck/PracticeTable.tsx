@@ -24,6 +24,7 @@ import { canPayNextTax, declineTax, payTax, playerDraws, concede,
   isPlaneswalker,
   loyaltyOf,
   playerCleanup,
+  winsOnEmptyDraw,
   playerSpellResolves,
   playerWheelAbility,
   declineChoice,
@@ -363,6 +364,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     }
     g = endTurn(g, setup.book);
     setGame(g);
+    // An extra turn of yours (Time Warp): your turn again.
+    if (!g.winner && g.active === "you") {
+      setHistory([]);
+      setFought(false);
+      return setMode("main");
+    }
     if (!g.winner) void runAi(g);
   }
 
@@ -632,6 +639,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     g = endTurn(g, setup.book);
     setGame(g);
     setHistory([]);
+    // An extra turn of the opponent's: it plays again.
+    if (!g.winner && g.active === "opp") return void runAi(g);
     setMode(g.winner ? "over" : "main");
   }
 
@@ -1185,7 +1194,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               <button type="button" className="pt-btn" onClick={undo} disabled={!history.length} aria-label="Undo">
                 <Undo2 size={14} strokeWidth={2.25} /> <span className="pt-btn-label">Undo</span>
               </button>
-              <button type="button" className="pt-btn" onClick={() => act((g) => playerDraws(g, 1, book))} disabled={!you.library.length}>
+              <button type="button" className="pt-btn" onClick={() => act((g) => playerDraws(g, 1, book))} disabled={!you.library.length && !winsOnEmptyDraw(game, "you", book)}>
                 Draw
               </button>
               <button type="button" className="pt-btn" onClick={() => setScryOpen(true)} disabled={!you.library.length || !!game.choice}>

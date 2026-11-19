@@ -33,7 +33,9 @@ export interface Tutor {
 export function tutorOf(info: CardInfo | undefined): Tutor | null {
   if (!isSpell(info)) return null;
   const [first, ...rest] = sentences(info);
-  if (!first || !/^search your library for /i.test(first)) return null;
+  // The whole sentence, and only to the hand or the top: Entomb's "into
+  // your graveyard" and Gamble's "discard a card at random" aren't this.
+  if (!first || !/^search your library for [^,.]*?\bcard(?:, reveal (?:it|that card))?, (?:put (?:it|that card|the card) into your hand, then shuffle|then shuffle and put (?:it|that card|the card) on top)$/i.test(first)) return null;
   let lose = 0;
   for (const s of rest) {
     const m = /^you lose (\d+) life$/i.exec(s);

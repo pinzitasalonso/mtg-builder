@@ -5,7 +5,7 @@ import { extractJson } from "@/lib/ai";
 import { recordEvent } from "@/lib/analytics";
 import { currentUser } from "@/lib/auth";
 import { PRACTICE_AI_TURNS } from "@/lib/limits";
-import { fallbackPlan, simpleTurn } from "@/lib/practice/ai";
+import { fallbackPlan, simpleTurn, winningTurn } from "@/lib/practice/ai";
 import { cleanPlan, PLAN_SCHEMA, sinceLastTurn, systemPrompt, turnBrief, type DeckLine } from "@/lib/practice/brief";
 import type { CardBook, TurnPlan } from "@/lib/practice/types";
 import { asGame } from "@/lib/practice/wire";
@@ -55,6 +55,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // the same. It isn't one of the game's AI turns.
   const simple = simpleTurn(game, setup.book);
   if (simple) return NextResponse.json({ plan: simple, source: "simple" });
+  // A win the table can see and has checked (Thassa's Oracle on an empty
+  // library, a lethal storm turn) is played, not left for the model to find.
+  const win = winningTurn(game, setup.book);
+  if (win) return NextResponse.json({ plan: win, source: "win" });
 
   // One more AI turn, if the game has any left.
   const spent = await prisma.practiceGame.updateMany({ where: { id, userId: user.id, turns: { lt: PRACTICE_AI_TURNS } }, data: { turns: { increment: 1 } } });

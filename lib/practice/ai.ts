@@ -8,7 +8,7 @@ import { aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardI
 import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
 import { treasureSpellOf } from "./treasure";
 import { drawSpellOf, tutorOf, wipeOf } from "./spells";
-import { burnOf, devotion, emptyDrawWinsOf, libraryExilerOf, oracleWinOf, ritualOf } from "./wincons";
+import { burnOf, devotion, emptyDrawWinsOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualOf } from "./wincons";
 import { scaleDamage } from "./damage";
 import { castTriggerOf } from "./cards";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
@@ -177,7 +177,22 @@ function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): Ef
   const fits = side.library.filter((x) => t.search.test(x.typeLine, infoOf(book, x)) && (needLand || !isLand(x)) && (infoOf(book, x)?.toughness !== 0 || !isCreature(book, x)));
   if (!fits.length) return null;
   const mv = (x: PlayCard) => infoOf(book, x)?.manaValue ?? 0;
-  const score = (x: PlayCard) => (needLand && isLand(x) ? 10000 : 0) + (mv(x) <= reach ? 1000 : 0) + mv(x) * 10 + (isCreature(book, x) ? 1 : 0);
+  // The missing half of a win comes first: Thassa's Oracle when it holds
+  // Demonic Consultation or Tainted Pact (or the other way round), and one
+  // of them with Laboratory Maniac out. With neither half in hand but both
+  // in the deck, the Oracle.
+  const isOracle = (x: PlayCard) => oracleWinOf(book, x);
+  const isExiler = (x: PlayCard) => !!libraryExilerOf(infoOf(book, x));
+  const holdsOracle = side.hand.some(isOracle);
+  const holdsExiler = side.hand.some(isExiler);
+  const maniacOut = side.battlefield.some((x) => emptyDrawWinsOf(book, x));
+  const combo = (x: PlayCard) =>
+    (isExiler(x) && (holdsOracle || maniacOut) && !holdsExiler) || (isOracle(x) && holdsExiler && !holdsOracle)
+      ? 100000
+      : isOracle(x) && !holdsOracle && side.library.some(isExiler)
+        ? 50000
+        : 0;
+  const score = (x: PlayCard) => combo(x) + (needLand && isLand(x) ? 10000 : 0) + (mv(x) <= reach ? 1000 : 0) + mv(x) * 10 + (isCreature(book, x) ? 1 : 0);
   const pick = fits.reduce((a, b) => (score(b) > score(a) ? b : a));
   const effects: Effect[] = [{ ...blank("search"), name: pick.name, to: t.search.to[0]!.zone === "top" ? "top" : "hand" }];
   if (t.lose) effects.push({ ...blank("life"), player: "ai", amount: -t.lose });
@@ -226,6 +241,20 @@ function wipePlan(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): Pla
   return { ...blankAction("cast", c.iid), x: w.amount === null ? n : null, effects };
 }
 
+/** The planner's turn when it wins the game outright (Thassa's Oracle
+    with an empty library, a lethal storm or burn turn), checked by
+    playing it out; null otherwise. A model game uses it too: a win the
+    table can see isn't left to the model to find. */
+export function winningTurn(g: PracticeGame, book: CardBook, seat: Seat = "opp"): TurnPlan | null {
+  if (g.winner || g.choice || g.combat || g.active !== seat) return null;
+  const out: { wins?: boolean } = {};
+  const plan = fallbackPlan(g, book, seat, out);
+  if (!out.wins) return null;
+  let after = g;
+  for (const a of plan.main) after = applyAction(after, seat, a, book).game;
+  return after.winner === seat ? plan : null;
+}
+
 /** A wheel is worth casting when it gives this seat more cards than it
     throws away: the hand (less the wheel) is two cards or fewer. */
 function wheelWorth(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): boolean {
@@ -238,7 +267,7 @@ function wheelWorth(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): b
 /** The turn without the model: a land (the one that unlocks the most), then
     the biggest permanents it can pay for, then spells that only draw, then
     safe attacks. */
-export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"): TurnPlan {
+export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp", out: { wins?: boolean } = {}): TurnPlan {
   const side = g.sides[seat];
   const main: PlanAction[] = [];
   const lands = side.hand.filter(canPlayAsLand);
@@ -270,7 +299,10 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
   const payIn = (cost: ReturnType<typeof parseCost>) => {
     const sources = availableMana(sim, seat, book);
     const paid = payCost(cost, sources, { lifeFor: lifeFor(sim, seat, book) });
-    if (!paid || (paid.life && sim.sides[seat].life - paid.life < 10)) return false;
+    // The life it costs: K'rrik's, and what a land like Ancient Tomb deals.
+    if (!paid) return false;
+    const life = paid.life + paid.pain;
+    if (life && sim.sides[seat].life - life < 10) return false;
     const once = paid.tap.filter((t) => sources.find((x) => x.iid === t)?.once);
     const tapped = new Set(paid.tap.flatMap((t) => [t, ...(sources.find((x) => x.iid === t)?.also ?? [])]).filter((t) => !once.includes(t)));
     sim = structuredClone(sim);
@@ -280,14 +312,17 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     if (usedPool.size && sim.pool) sim.pool[seat] = sim.pool[seat].filter((_, i) => !usedPool.has(i));
     sim.sides[seat] = {
       ...sim.sides[seat],
-      life: sim.sides[seat].life - paid.life,
+      life: sim.sides[seat].life - life,
       battlefield: sim.sides[seat].battlefield.map((x) => (tapped.has(x.iid) ? { ...x, tapped: true } : x)),
     };
     return true;
   };
   // A way to win now comes before anything else.
   const win = winLine();
-  if (win) return { main: [...main, ...win], attack: [], after_combat: [], say: "" };
+  if (win) {
+    out.wins = true;
+    return { main: [...main, ...win], attack: [], after_combat: [], say: "" };
+  }
   function winLine(): PlanAction[] | null {
     const hand = sim.sides[seat].hand;
     const can = (c: PlayCard) => castable(sim, seat, c, book, "hand");
@@ -324,11 +359,13 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     });
     const spells = sim.sides[seat].hand.filter((c) => !isLand(c) && !isCreature(book, c));
     if (!spells.length) return null;
-    const hurts = (c: PlayCard) => {
+    // Spells cast so far this turn, by anyone: a storm spell's copies.
+    const before = (g.spells?.you ?? 0) + (g.spells?.opp ?? 0);
+    const hurts = (c: PlayCard, cast = 0) => {
       const info = infoOf(book, c);
       const seen = { typeLine: info?.typeLine ?? c.typeLine ?? "", manaCost: info?.manaCost ?? "" };
       const pings = pingers.filter(({ t }) => t.hits(seen)).reduce((n, { c: p, t }) => n + scaleDamage(sim, book, seat, p, foe, t.damage) + t.drain, 0);
-      return pings + scaleDamage(sim, book, seat, c, foe, burnOf(info));
+      return pings + scaleDamage(sim, book, seat, c, foe, burnOf(info)) * (hasStorm(info) ? before + cast + 1 : 1);
     };
     if (!spells.some((c) => hurts(c) > 0)) return null;
     const saved = sim;
@@ -340,7 +377,13 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
       // A ritual that makes more than it costs first, then the cheapest.
       const order = left
         .filter((c) => castable(sim, seat, c, book, "hand"))
-        .sort((a, b) => Number(net(b) > 0) - Number(net(a) > 0) || totalOf(spellCost(sim, seat, a, book, "hand")) - totalOf(spellCost(sim, seat, b, book, "hand")));
+        // A storm spell goes last, with the most spells before it.
+        .sort(
+          (a, b) =>
+            Number(hasStorm(infoOf(book, a))) - Number(hasStorm(infoOf(book, b))) ||
+            Number(net(b) > 0) - Number(net(a) > 0) ||
+            totalOf(spellCost(sim, seat, a, book, "hand")) - totalOf(spellCost(sim, seat, b, book, "hand"))
+        );
       const next = order.find((c) => payIn(spellCost(sim, seat, c, book, "hand")));
       if (!next) break;
       left.splice(left.indexOf(next), 1);
@@ -357,7 +400,7 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
       if (burn) effects.push({ ...blank("damage"), target: seat === "opp" ? "player" : "ai", amount: burn });
       const draws = drawOnly(book, next);
       if (draws) effects.push(drawEffect(draws));
-      total += hurts(next);
+      total += hurts(next, plan.length);
       plan.push({ ...blankAction("cast", next.iid), effects });
     }
     if (total >= sim.sides[foe].life) return plan;
@@ -408,6 +451,7 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
         (!/\b(Instant|Sorcery)\b/.test((c.typeLine ?? "").split(" // ")[0]!) ||
           drawOnly(book, c, sim.sides[seat].life) > 0 ||
           !!tutorOf(infoOf(book, c)) ||
+          extraTurnOf(infoOf(book, c)) ||
           wheelWorth(sim, seat, c, book) ||
           !!treasureSpellOf(book, c))
     )
@@ -420,7 +464,8 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     // Permanents first, biggest first; then tutors; then the draw spells.
     .sort((a, b) => rank(a.c) - rank(b.c) || value(book, b.c) - value(book, a.c));
   function rank(c: PlayCard) {
-    return tutorOf(infoOf(book, c)) ? 1 : drawOnly(book, c) ? 2 : 0;
+    // Another turn first: everything after it is worth twice.
+    return extraTurnOf(infoOf(book, c)) ? -1 : tutorOf(infoOf(book, c)) ? 1 : drawOnly(book, c) ? 2 : 0;
   }
   for (const { c, zone } of candidates) {
     if (!castable(sim, seat, c, book, zone)) continue;
