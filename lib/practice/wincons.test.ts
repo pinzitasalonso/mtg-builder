@@ -3,15 +3,18 @@
 // the player's winning spell. Card text is Scryfall's (fixtures/wincons.json).
 
 import { describe, expect, it } from "vitest";
-import { fallbackPlan } from "./ai";
+import { fallbackPlan, winningTurn } from "./ai";
 import { scaleDamage } from "./damage";
 import {
   aiResponds,
   applyAction,
   cardId,
   declareAttackers,
+  endTurn,
   newGame,
+  playerSpellResolves,
   playerCast,
+  playerDraws,
   resolveCombat,
   setBlocks,
   threatens,
@@ -34,6 +37,8 @@ const BOOK: CardBook = Object.fromEntries(
     info("Grizzly Bears", { typeLine: "Creature — Bear", manaCost: "{1}{G}", manaValue: 2, power: 2, toughness: 2 }),
     info("Goblin Guide", { typeLine: "Creature — Goblin Scout", manaCost: "{R}", manaValue: 1, power: 2, toughness: 2, keywords: ["Haste"], oracleText: "Haste" }),
     info("Opt", { typeLine: "Instant", manaCost: "{U}", manaValue: 1, oracleText: "Scry 1.\nDraw a card." }),
+    info("Demonic Tutor", { typeLine: "Sorcery", manaCost: "{1}{B}", manaValue: 2, oracleText: "Search your library for a card, put that card into your hand, then shuffle." }),
+    info("Serra Angel", { typeLine: "Creature — Angel", manaCost: "{3}{W}{W}", manaValue: 5, power: 4, toughness: 4 }),
     info("Counterspell", { typeLine: "Instant", manaCost: "{U}{U}", manaValue: 2, oracleText: "Counter target spell." }),
     ...CARDS.map((c) => info(c.name, { typeLine: c.typeLine, manaCost: c.manaCost, manaValue: c.manaValue, oracleText: c.oracleText, power: c.power, toughness: c.toughness, keywords: c.keywords })),
   ].map((c) => [c.name.toLowerCase(), c])
@@ -168,3 +173,110 @@ describe("the AI counters a winning spell", () => {
     expect(aiResponds(cast2, at(safe, "you", "Goblin Guide", "hand").iid, BOOK)).toBe(cast2);
   });
 });
+
+describe("review fixes", () => {
+  it("a thief on each side: the draws are taken once, not for ever", () => {
+    const thief = info("Notion Thief", { typeLine: "Creature — Human Rogue", power: 3, toughness: 1, oracleText: "Flash\nIf an opponent would draw a card except the first one they draw in each of their draw steps, instead that player skips that draw and you draw a card." });
+    const book: CardBook = { ...BOOK, "notion thief": thief };
+    const g0 = table({ opp: { field: ["Island", "Island"], hand: ["Opt"] } });
+    for (const s of ["you", "opp"] as const) g0.sides[s].battlefield.push({ iid: s === "you" ? 901 : 10901, name: "Notion Thief", imageUri: "", typeLine: thief.typeLine, tapped: false, commander: false, enteredTurn: 0 });
+    const opt = at(g0, "opp", "Opt", "hand").iid;
+    const g = applyAction(g0, "opp", action("cast", opt, { effects: [{ type: "draw", target: null, player: "ai", amount: 2, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: null }] }), book).game;
+    // The AI's two draws go to you, and stay with you.
+    expect(g.sides.you.hand).toHaveLength(2);
+    expect(g.sides.opp.hand).toHaveLength(0);
+  });
+
+  it("the cast creature counts once: 2/2 haste beside two 2/2s is 6, not 8", () => {
+    const g0 = table({ active: "you", you: { field: ["Mountain", "Grizzly Bears", "Grizzly Bears"], hand: ["Goblin Guide"] }, opp: { field: ["Island", "Island"], hand: ["Counterspell"] }, life: { opp: 8 } });
+    const iid = at(g0, "you", "Goblin Guide", "hand").iid;
+    const cast = playerCast(g0, iid, BOOK);
+    expect(threatens(cast, at(cast, "you", "Goblin Guide"), BOOK)).toBe(false);
+    expect(aiResponds(cast, iid, BOOK)).toBe(cast);
+  });
+
+  it("Craterhoof's X is every creature you control", () => {
+    // Two Bears and the Behemoth: X = 3. Attack: 5+5+8 = 18.
+    const mk = (life: number) => {
+      const g0 = table({ active: "you", you: { field: ["Grizzly Bears", "Grizzly Bears", ...Array(8).fill("Forest")], hand: ["Craterhoof Behemoth"] }, life: { opp: life } });
+      const cast = playerCast(g0, at(g0, "you", "Craterhoof Behemoth", "hand").iid, BOOK);
+      return threatens(cast, at(cast, "you", "Craterhoof Behemoth"), BOOK);
+    };
+    expect(mk(18)).toBe(true);
+    expect(mk(19)).toBe(false);
+  });
+
+  it("Ojer Axonil raises damage to a player, not to a creature", () => {
+    const g = table({ opp: { field: ["Ojer Axonil, Deepest Might // Temple of Power"] } });
+    const vivi = { iid: 9, name: "Vivi Ornitier", imageUri: "", typeLine: "Legendary Creature — Wizard", tapped: false, commander: false };
+    expect(scaleDamage(g, BOOK, "opp", vivi, "you", 1)).toBe(4);
+    expect(scaleDamage(g, BOOK, "opp", vivi, "you", 1, false, true)).toBe(1);
+  });
+
+  it("your Laboratory Maniac wins from the Draw button on an empty library", () => {
+    const g0 = table({ active: "you", you: { field: ["Laboratory Maniac"] }, lib: 0 });
+    expect(playerDraws(g0, 1, BOOK).winner).toBe("you");
+    const none = table({ active: "you", lib: 0 });
+    expect(playerDraws(none, 1, BOOK)).toBe(none);
+  });
+});
+
+describe("storm, and finding the win", () => {
+  const dmg = (n: number) => ({ type: "damage" as const, target: "player", player: null, amount: n, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: null });
+
+  it("Grapeshot is copied for each spell cast before it this turn", () => {
+    const g0 = table({ opp: { field: ["Mountain", "Mountain", "Mountain", "Swamp"], hand: ["Dark Ritual", "Lightning Bolt", "Grapeshot"] } });
+    let g = applyAction(g0, "opp", action("cast", at(g0, "opp", "Dark Ritual", "hand").iid, { effects: [{ ...dmg(0), type: "mana", target: null, amount: null, text: "{B}{B}{B}" }] }), BOOK).game;
+    g = applyAction(g, "opp", action("cast", at(g, "opp", "Lightning Bolt", "hand").iid, { effects: [dmg(3)] }), BOOK).game;
+    g = applyAction(g, "opp", action("cast", at(g, "opp", "Grapeshot", "hand").iid, { effects: [dmg(1)] }), BOOK).game;
+    // Bolt 3, then Grapeshot and its two copies.
+    expect(g.sides.you.life).toBe(40 - 3 - 3);
+    expect(texts(g)).toContain("Grapeshot: storm, 2 copies.");
+  });
+
+  it("the planner saves Grapeshot for last and counts its copies for lethal", () => {
+    const g = table({ opp: { field: ["Mountain", "Mountain", "Swamp"], hand: ["Grapeshot", "Dark Ritual", "Lightning Bolt", "Opt"] }, life: { you: 6 } });
+    const { names, after } = run(g);
+    expect(names.at(-1)).toBe("Grapeshot");
+    expect(after.winner).toBe("opp");
+  });
+
+  it("a tutor finds the missing half of the Oracle win", () => {
+    const withOracle = table({ opp: { field: ["Swamp", "Swamp"], hand: ["Demonic Tutor", "Thassa's Oracle"] }, lib: 10 });
+    withOracle.sides.opp.library = [...withOracle.sides.opp.library, ...["Serra Angel", "Demonic Consultation"].map((name, i) => ({ iid: 800 + i, name, imageUri: "", typeLine: BOOK[name.toLowerCase()]!.typeLine, tapped: false, commander: false }))];
+    expect(run(withOracle).after.sides.opp.hand.map((c) => c.name)).toContain("Demonic Consultation");
+    const withPact = table({ opp: { field: ["Swamp", "Swamp"], hand: ["Demonic Tutor", "Tainted Pact"] }, lib: 10 });
+    withPact.sides.opp.library = [...withPact.sides.opp.library, ...["Serra Angel", "Thassa's Oracle"].map((name, i) => ({ iid: 800 + i, name, imageUri: "", typeLine: BOOK[name.toLowerCase()]!.typeLine, tapped: false, commander: false }))];
+    expect(run(withPact).after.sides.opp.hand.map((c) => c.name)).toContain("Thassa's Oracle");
+  });
+
+  it("winningTurn: the checked win, for a model game too; null when there's none", () => {
+    const win = table({ opp: { field: ["Island", "Island", "Swamp"], hand: ["Thassa's Oracle", "Demonic Consultation"] }, lib: 30 });
+    expect(winningTurn(win, BOOK)?.main).toHaveLength(2);
+    expect(winningTurn(table({ opp: { field: ["Island", "Island", "Swamp"], hand: ["Thassa's Oracle", "Grizzly Bears"] }, lib: 30 }), BOOK)).toBeNull();
+    // Not on the player's turn.
+    expect(winningTurn({ ...win, active: "you" }, BOOK)).toBeNull();
+  });
+});
+
+describe("extra turns", () => {
+  it("the AI's Time Warp: it takes the next turn too, then play passes", () => {
+    const g0 = table({ opp: { field: ["Island", "Island", "Island", "Island", "Island"], hand: ["Time Warp"] } });
+    const { names, after } = run(g0);
+    expect(names).toEqual(["Time Warp"]);
+    const again = endTurn(after, BOOK);
+    expect(again.active).toBe("opp");
+    expect(again.turn).toBe(6);
+    expect(texts(again)).toContain("The opponent takes an extra turn.");
+    expect(endTurn(again, BOOK).active).toBe("you");
+  });
+
+  it("your Time Warp gives you the turn after this one", () => {
+    const g0 = table({ active: "you", you: { field: ["Island", "Island", "Island", "Island", "Island"], hand: ["Time Warp"] } });
+    const iid = at(g0, "you", "Time Warp", "hand").iid;
+    const g = playerSpellResolves(playerCast(g0, iid, BOOK), iid, BOOK);
+    expect(g.extraTurns).toEqual({ you: 1, opp: 0 });
+    expect(endTurn(g, BOOK).active).toBe("you");
+  });
+});
+

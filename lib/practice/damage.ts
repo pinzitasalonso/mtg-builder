@@ -28,8 +28,9 @@ export interface DamageRule {
   red?: boolean;
   creature?: boolean;
   noncombat?: boolean;
-  /** Ojer Axonil: at least this much. */
+  /** Ojer Axonil: at least this much, and only to a player. */
   atLeast?: number;
+  playersOnly?: boolean;
 }
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -54,7 +55,7 @@ export function damageRuleOf(book: CardBook, card: PlayCard): DamageRule | null 
     if (/^if a source would deal damage to a permanent or player, it deals double that damage to that permanent or player instead$/i.test(s)) return { who: "any", to: "any", times: 2 };
     if (/^if a red source you control would deal damage to an opponent or a permanent an opponent controls, it deals that much damage plus 2 instead$/i.test(s)) return { who: "you", to: "opponents", plus: 2, red: true };
     m = new RegExp(`^if a red source you control would deal an amount of noncombat damage less than (?:${esc(name)}|${esc(short)})'s power to an opponent, that source deals damage equal to (?:${esc(name)}|${esc(short)})'s power instead$`, "i").exec(s);
-    if (m) return { who: "you", to: "opponents", red: true, noncombat: true, atLeast: Math.max(0, stats(book, card).power) };
+    if (m) return { who: "you", to: "opponents", red: true, noncombat: true, playersOnly: true, atLeast: Math.max(0, stats(book, card).power) };
   }
   return null;
 }
@@ -62,9 +63,10 @@ export function damageRuleOf(book: CardBook, card: PlayCard): DamageRule | null 
 /** Red: a red pip in its mana cost (a token's colour isn't known). */
 const isRed = (book: CardBook, src: PlayCard | null) => !!src && !src.token && colorsOfCost(infoOf(book, src)).includes("R");
 
-/** The damage a source of `from`'s deals to `to` (the player, or a
-    permanent they control), after every multiplier on the battlefield. */
-export function scaleDamage(g: PracticeGame, book: CardBook, from: Seat, src: PlayCard | null, to: Seat, amount: number, combat = false): number {
+/** The damage a source of `from`'s deals to `to` (the player, or with
+    `permanent` a permanent they control), after every multiplier on the
+    battlefield. */
+export function scaleDamage(g: PracticeGame, book: CardBook, from: Seat, src: PlayCard | null, to: Seat, amount: number, combat = false, permanent = false): number {
   if (amount <= 0) return amount;
   const rules = (["you", "opp"] as Seat[]).flatMap((s) => g.sides[s].battlefield.flatMap((c) => {
     const r = damageRuleOf(book, c);
@@ -76,7 +78,8 @@ export function scaleDamage(g: PracticeGame, book: CardBook, from: Seat, src: Pl
     (r.to === "any" || to !== from) &&
     (!r.red || isRed(book, src)) &&
     (!r.creature || (!!src && isCreature(book, src))) &&
-    (!r.noncombat || !combat);
+    (!r.noncombat || !combat) &&
+    (!r.playersOnly || !permanent);
   let n = amount;
   for (const x of rules) if (x.r.atLeast !== undefined && applies(x)) n = Math.max(n, x.r.atLeast);
   for (const x of rules) if (x.r.plus && applies(x)) n += x.r.plus;

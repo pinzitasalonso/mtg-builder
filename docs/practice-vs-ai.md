@@ -464,6 +464,21 @@ side does.
    the multipliers, add up to lethal. It no longer casts the Oracle as a
    plain 1/3. The model's prompt says the same.
 
+   A tutor finds the missing half of the Oracle win first. In a model game
+   the turn route asks the planner before the model (`winningTurn`): a win
+   it finds, and has checked by playing it out, is played.
+
+   **Storm** (`hasStorm`): Grapeshot and Brain Freeze are copied for each
+   spell cast before them that turn, by either player
+   (`PracticeGame.spells`). The AI's copies are carried out; yours are
+   counted in the log and left to you. The planner casts a storm spell last
+   and counts its copies when it looks for lethal.
+
+   **Extra turns** (`extraTurnOf`, `PracticeGame.extraTurns`): "Take an
+   extra turn after this one" and Time Warp's "target player takes…" give
+   the caster the next turn, on either side; the table then lets you play
+   again, or runs the AI's turn again. The planner casts one first.
+
    **Counters for a winning spell** (`threatens`): the AI counters, whatever
    the spell costs and with a free counter if needed, a spell that says it
    wins or takes an extra turn, a library emptier or Laboratory Maniac, and
