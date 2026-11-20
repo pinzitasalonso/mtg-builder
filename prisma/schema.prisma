@@ -57,6 +57,7 @@ model User {
   playCodes    PlayCode[]
   assistantThreads AssistantThread[]
   practiceGames    PracticeGame[]
+  devices          Device[]
 }
 
 // A card the user physically owns, for "do I have this?" checks across their
@@ -214,6 +215,7 @@ model Deck {
   assistantMessages AssistantMessage[]
   playCodes PlayCode[]
   games     GameLog[]
+  onDevices DeviceDeck[]
 
   // The owner's decks: the home list, the plan's deck limit, the assistant.
   @@index([userId])
@@ -436,3 +438,53 @@ model PaddleSubscription {
   @@index([customerId])
   @@index([userId])
 }
+
+// A Spellpool Dial: a round screen with a knob that sits by a deck and
+// counts life (docs/dial-device-api.md). It belongs to one account, and
+// signs its requests with its own token: only the SHA-256 is stored, like a
+// Session's, so a copy of the database replays nothing.
+model Device {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String    @default("Spellpool Dial")
+  tokenHash  String    @unique
+  // What the dial says it runs, for support and for update prompts.
+  firmware   String?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime?
+  decks      DeviceDeck[]
+
+  @@index([userId])
+}
+
+// A dial being paired: it has no keyboard, so it shows `code` and its owner
+// types that in at /dial, signed in (as a TV signs in to a streaming
+// service). The dial then collects its token with the secret only it knows;
+// the token is made at that moment and never stored. Short-lived, single use.
+model DevicePairing {
+  code       String   @id
+  secretHash String   @unique
+  firmware   String?
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  // Set when a signed-in player claims the code: who, and the name they gave.
+  userId     Int?
+  name       String?
+
+  @@index([createdAt])
+}
+
+// A deck sent to a dial: the dial keeps a copy (name, commander, art) to
+// pick from at the table with no network.
+model DeviceDeck {
+  deviceId Int
+  device   Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  deckId   Int
+  deck     Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  addedAt  DateTime @default(now())
+
+  @@id([deviceId, deckId])
+  @@index([deckId])
+}
+
