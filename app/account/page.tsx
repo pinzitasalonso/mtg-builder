@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { currentUser } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 import { grantsAccess, subscriptionsFor } from "@/lib/paddle-billing";
 import { paddleEnv } from "@/lib/paddle-config";
 import { tiersFor } from "@/lib/pricing-tiers";
@@ -36,6 +37,7 @@ function day(d: Date): string {
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ billing?: string }> }) {
   const [user, { billing }] = await Promise.all([currentUser(), searchParams]);
+  const dials = user ? await prisma.device.count({ where: { userId: user.id } }) : 0;
 
   return (
     <main style={{ maxWidth: 640, margin: "0 auto", padding: "28px 20px 80px", width: "100%" }}>
@@ -48,7 +50,15 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           <Link href="/login" style={{ color: "var(--accent)", fontWeight: 600 }}>Sign in</Link>{" "}to manage your subscription.
         </p>
       ) : (
-        <Billing user={user} notice={billing} />
+        <>
+          <Billing user={user} notice={billing} />
+          {/* For a player who has a Spellpool Dial. (A new dial shows the address itself.) */}
+          {dials > 0 && (
+            <p style={{ ...P, marginTop: 18 }}>
+              <Link href="/dial" style={{ color: "var(--accent)", fontWeight: 600 }}>Your dials</Link>{" "}— {dials === 1 ? "1 dial" : `${dials} dials`}. Choose the decks each carries.
+            </p>
+          )}
+        </>
       )}
     </main>
   );

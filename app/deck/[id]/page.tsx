@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   ArrowLeft, BookOpen, Check, ChevronDown, Copy, Crown, Dices, Download, Eye, Share2, History,
-  LayoutGrid, List, ListChecks, Mountain, Plus, RefreshCw, ScanSearch, ShoppingCart, Sparkles, Ticket, Trash2, TriangleAlert, Upload, X,
+  LayoutGrid, List, ListChecks, Mountain, Plus, RefreshCw, ScanSearch, ShoppingCart, Sparkles, Ticket, CircleDot, Trash2, TriangleAlert, Upload, X,
   type LucideIcon, PackageCheck, Swords,
 } from "lucide-react";
 import Logo from "@/components/Logo";
@@ -346,6 +346,18 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [orderOpen, setOrderOpen] = useState(false);
   // "Assemble deck": ticking the cards off as the deck is built in cardboard.
   const [assembleOpen, setAssembleOpen] = useState(false);
+  // "Send to dial" is offered to a player who has a Spellpool Dial paired.
+  const [hasDial, setHasDial] = useState(false);
+  useEffect(() => {
+    let live = true;
+    fetch("/api/dials")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => live && setHasDial(Array.isArray(d?.dials) && d.dials.length > 0))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   // commander's color identity (resolved from Scryfall) for legality checks
   const [cmdrIdentity, setCmdrIdentity] = useState<string | null>(null);
@@ -1128,6 +1140,9 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                         { label: "Assemble deck", icon: PackageCheck, on: () => setAssembleOpen(true), disabled: deckCards.length === 0 },
                         ...(assistant.available === true ? [{ label: "Play vs AI", icon: Swords, on: () => setPlaytestOpen("ai"), disabled: deckCards.length === 0 }] : []),
                         { label: "Game code", icon: Ticket, on: () => setGameCodeOpen(true) },
+                        // A Spellpool Dial carries the deck to the table: the dials page
+                        // sends it. Only for a player who has one.
+                        ...(hasDial ? [{ label: "Send to dial", icon: CircleDot, on: () => router.push(`/dial?send=${encodeURIComponent(deckId)}`) }] : []),
                         { group: "Write-ups" },
                         { label: "Primer", icon: BookOpen, on: () => { setPrimerOpen(true); setPane("stats"); } },
                         { label: "Scan deck", icon: ScanSearch, on: () => { setScanOpen(true); setPane("stats"); }, disabled: deckCards.length < 40 },

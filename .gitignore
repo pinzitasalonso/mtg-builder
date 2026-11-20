@@ -54,3 +54,7 @@ dev.db-*
 # calibration: the generated database (rebuild with calibration/db/build.sh)
 /calibration/calibration.db
 /calibration/calibration.db-*
+
+# scripts/dial-sim.mjs: the simulated dial's token and pictures
+.dial-sim.json
+/dial-art/
