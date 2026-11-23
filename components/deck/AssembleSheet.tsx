@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Check, ExternalLink, Heart, PackageCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, ExternalLink, Heart, PackageCheck, Sparkles } from "lucide-react";
 import type { CardElsewhere } from "@/app/api/decks/[id]/assemble/route";
 import type { OwnedCopy } from "@/components/deck/DeckCardSheet";
 import { CardArt, CAT_COLOR, categoryOf, scanVersionURL, TYPE_ORDER } from "@/components/mtg";
+import { isBasicLand } from "@/lib/format";
 import type { PoolEntry } from "@/lib/pool-client";
 import { addToWishlist } from "@/lib/wishlist-client";
+import ReplaceMissing, { type Replaced } from "./ReplaceMissing";
 import { ModalShell, ghostBtn, goldBtn } from "./ui";
 
 /* "Assemble deck": building the deck in cardboard. Tick each card as it goes
@@ -22,6 +25,9 @@ import { ModalShell, ghostBtn, goldBtn } from "./ui";
    what's still to find, what you don't own, or what one of your other decks
    holds: pick a deck, pull those cards out of its box, tick them all.
 
+   What never turns up can be swapped for cards you do have ("Replace what
+   you haven't found", ReplaceMissing.tsx).
+
    Each row has the card's picture small. On a wide screen the card the mouse
    is on shows large in a column at the side; on a phone a tap on the picture
    shows it over the list. */
@@ -29,6 +35,8 @@ import { ModalShell, ghostBtn, goldBtn } from "./ui";
 interface State {
   assembled: Set<number>;
   elsewhere: Record<string, CardElsewhere[]>;
+  /** The deck is yours: your collection can stand in for what's missing. */
+  owner: boolean;
 }
 
 /** What the list shows: everything, what's left, what you'd have to buy, or
@@ -51,6 +59,7 @@ export default function AssembleSheet({
   cards,
   owned,
   isCommander,
+  onChanged,
   onClose,
 }: {
   deckId: string;
@@ -60,8 +69,12 @@ export default function AssembleSheet({
   isCommander?: (card: PoolEntry) => boolean;
   /** Copies in your collection, by lowercase name. */
   owned: Map<string, OwnedCopy>;
+  /** The deck's cards changed here (missing ones were replaced): load them again. */
+  onChanged?: () => void;
   onClose: () => void;
 }) {
+  const router = useRouter();
+  const [replacing, setReplacing] = useState(false);
   const [state, setState] = useState<State | null>(null);
   const [failed, setFailed] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
@@ -78,20 +91,25 @@ export default function AssembleSheet({
     return () => mq.removeEventListener("change", on);
   }, []);
 
+  const load = useCallback(
+    (live: () => boolean = () => true) =>
+      fetch(`/api/decks/${deckId}/assemble`, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d: { assembled?: number[]; elsewhere?: Record<string, CardElsewhere[]>; owner?: boolean } | null) => {
+          if (!live()) return;
+          if (d) setState({ assembled: new Set(d.assembled ?? []), elsewhere: d.elsewhere ?? {}, owner: d.owner === true });
+          else setFailed(true);
+        })
+        .catch(() => live() && setFailed(true)),
+    [deckId]
+  );
   useEffect(() => {
     let live = true;
-    fetch(`/api/decks/${deckId}/assemble`, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { assembled?: number[]; elsewhere?: Record<string, CardElsewhere[]> } | null) => {
-        if (!live) return;
-        if (d) setState({ assembled: new Set(d.assembled ?? []), elsewhere: d.elsewhere ?? {} });
-        else setFailed(true);
-      })
-      .catch(() => live && setFailed(true));
+    void load(() => live);
     return () => {
       live = false;
     };
-  }, [deckId]);
+  }, [load]);
 
   const post = (body: unknown) =>
     fetch(`/api/decks/${deckId}/assemble`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
@@ -135,6 +153,25 @@ export default function AssembleSheet({
   const missing = state ? cards.filter((c) => !state.assembled.has(c.dbId)) : [];
   // Still to find, and not in your collection: what you'd have to get.
   const toBuy = missing.filter((c) => have(c) < c.quantity);
+  // Still to find, and a card another could stand in for: not the commander, not a basic land.
+  const swappable = missing.filter((c) => !isCommander?.(c) && !isBasicLand(c.typeLine));
+
+  // The swaps were made. In this deck: its cards are loaded again, and so is
+  // where they are. In a new deck: go there.
+  function replaced(r: Replaced) {
+    setReplacing(false);
+    if (r.copy) {
+      router.push(`/deck/${r.deck}`);
+      return;
+    }
+    onChanged?.();
+    void load();
+    setFilter("missing");
+    setNote(
+      `Replaced ${r.replaced} ${r.replaced === 1 ? "card" : "cards"} with ${r.replaced === 1 ? "one" : "ones"} from your collection. The list as it was is in Versions.` +
+        (r.skipped.length ? ` Not allowed in this format, so left out: ${r.skipped.join(", ")}.` : "")
+    );
+  }
 
   // Your other decks that hold cards still to find, the most first. A deck
   // stays in the row while it's the one picked, even once it's emptied.
@@ -303,6 +340,11 @@ export default function AssembleSheet({
                       <Heart size={14} strokeWidth={2.25} /> Wishlist the {toBuy.length} I don’t own
                     </button>
                   )}
+                  {state.owner && swappable.length > 0 && (
+                    <button onClick={() => setReplacing(true)} disabled={busy} style={{ ...ghostBtn, padding: "7px 14px", fontSize: 13 }} title="Swap the unticked cards for cards you own that do the same job">
+                      <Sparkles size={14} strokeWidth={2.25} /> Replace the {swappable.length} I haven’t found
+                    </button>
+                  )}
                   {done > 0 && (
                     <button onClick={reset} disabled={busy} style={{ ...ghostBtn, padding: "7px 14px", fontSize: 13 }}>
                       Untick all
@@ -413,6 +455,7 @@ export default function AssembleSheet({
           )}
         </div>
       </div>
+      {replacing && <ReplaceMissing deckId={deckId} count={swappable.length} onClose={() => setReplacing(false)} onDone={replaced} />}
       {overlay && typeof document !== "undefined" && createPortal(<CardOverlay card={overlay} onClose={() => setOverlay(null)} />, document.body)}
     </ModalShell>
   );
