@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ExternalLink, Heart, LayoutGrid, List, PackageCheck, Search, Sparkles, X } from "lucide-react";
+import { Check, ChevronDown, ExternalLink, Heart, LayoutGrid, List, PackageCheck, Search, SlidersHorizontal, Sparkles, X } from "lucide-react";
 import type { CardElsewhere } from "@/app/api/decks/[id]/assemble/route";
 import type { OwnedCopy } from "@/components/deck/DeckCardSheet";
-import { CardArt, CAT_COLOR, categoryOf, scanVersionURL, TYPE_ORDER } from "@/components/mtg";
+import { CardArt, CAT_COLOR, categoryOf, colorsOf, Pip, scanVersionURL, TYPE_ORDER } from "@/components/mtg";
 import { isBasicLand } from "@/lib/format";
 import type { PoolEntry } from "@/lib/pool-client";
 import { addToWishlist } from "@/lib/wishlist-client";
@@ -25,6 +25,10 @@ import { ModalShell, ghostBtn, goldBtn } from "./ui";
    what's still to find, what you don't own, or what one of your other decks
    holds: pick a deck, pull those cards out of its box, tick them all. A
    box at the top finds a card by name: the one in your hand, to tick it.
+   The filters are folded away behind a button until they're wanted, so the
+   list starts near the top of the screen; a filter that is on shows beside
+   the button while they're folded. One of them is by colour, for going
+   through a collection that is sorted that way.
 
    Two ways to look at it. The list has each card's name, and where to look
    for it. The pictures show the cards themselves, which is how you spot one
@@ -47,6 +51,17 @@ interface State {
 /** What the list shows: everything, what's left, what you'd have to buy, or
     what's left that one of your other decks holds ("deck:<publicId>"). */
 type Filter = "all" | "missing" | "owned" | "unowned" | `deck:${string}`;
+
+/** The colours a card can be filtered by: the five, and "C" for none. */
+const COLOURS = ["W", "U", "B", "R", "G", "C"] as const;
+const COLOUR_NAME: Record<string, string> = { W: "White", U: "Blue", B: "Black", R: "Red", G: "Green", C: "Colourless" };
+
+/** A card's colours, as a box of cards is sorted: the colours of its cost.
+    A card with no cost (a land) goes by the colours it belongs to. None is "C". */
+function coloursOf(c: PoolEntry): string[] {
+  const found = c.manaCost ? colorsOf(c.manaCost) : [...(c.colorIdentity ?? "")].filter((l) => "WUBRG".includes(l));
+  return found.length ? found : ["C"];
+}
 
 /** Names in a list, or the cards' pictures. Remembered on this device. */
 type View = "list" | "pictures";
@@ -90,6 +105,16 @@ export default function AssembleSheet({
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
+  // The filters are folded away until asked for.
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [colours, setColours] = useState<Set<string>>(new Set());
+  const toggleColour = (c: string) =>
+    setColours((had) => {
+      const next = new Set(had);
+      if (next.has(c)) next.delete(c);
+      else next.add(c);
+      return next;
+    });
   const [view, setView] = useState<View>("list");
   useEffect(() => {
     try {
@@ -216,25 +241,37 @@ export default function AssembleSheet({
     return [...by.values()].filter((h) => h.missing > 0 || filter === `deck:${h.publicId}`).sort((a, b) => b.missing - a.missing || a.name.localeCompare(b.name));
   }, [cards, state, filter]);
   const pickedDeck = filter.startsWith("deck:") ? (holdings.find((h) => `deck:${h.publicId}` === filter) ?? null) : null;
+  // How many filters are on: what the button says while they're folded away.
+  const filtering = (filter === "all" ? 0 : 1) + colours.size;
 
-  const shown = useMemo(() => {
+  // What the status filter leaves: everything, what's left, or a part of it.
+  const byStatus = useMemo(() => {
     if (!state) return [];
-    const of = () => {
-      if (filter === "missing") return missing;
-      if (filter === "owned") return toPull;
-      if (filter === "unowned") return toBuy;
-      if (filter.startsWith("deck:")) {
-        const id = filter.slice(5);
-        return missing.filter((c) => (state.elsewhere[key(c)] ?? []).some((d) => d.publicId === id));
-      }
-      return cards;
-    };
-    // The box at the top: the card whose name has these letters.
-    const q = query.trim().toLowerCase();
-    return q ? of().filter((c) => c.name.toLowerCase().includes(q)) : of();
+    if (filter === "missing") return missing;
+    if (filter === "owned") return toPull;
+    if (filter === "unowned") return toBuy;
+    if (filter.startsWith("deck:")) {
+      const id = filter.slice(5);
+      return missing.filter((c) => (state.elsewhere[key(c)] ?? []).some((d) => d.publicId === id));
+    }
+    return cards;
     // missing, toPull and toBuy are worked out from cards, state and owned on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, state, owned, filter, query]);
+  }, [cards, state, owned, filter]);
+  // How many of those are of each colour: the numbers on the colour filter.
+  const colourCount = useMemo(() => {
+    const n: Record<string, number> = {};
+    for (const c of byStatus) for (const col of coloursOf(c)) n[col] = (n[col] ?? 0) + 1;
+    return n;
+  }, [byStatus]);
+
+  const shown = useMemo(() => {
+    let list = byStatus;
+    if (colours.size) list = list.filter((c) => coloursOf(c).some((col) => colours.has(col)));
+    // The box at the top: the card whose name has these letters.
+    const q = query.trim().toLowerCase();
+    return q ? list.filter((c) => c.name.toLowerCase().includes(q)) : list;
+  }, [byStatus, colours, query]);
 
   // The deck view's order: the commander, then each type, A to Z within it.
   const groups = useMemo(() => {
@@ -325,16 +362,8 @@ export default function AssembleSheet({
               <p style={{ margin: 0, fontSize: 14, color: "var(--t2)" }}>Loading…</p>
             ) : (
               <>
-                {/* What to show: everything, or what's left, split by whether it's yours. */}
-                <div role="group" aria-label="Show" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: wide ? 8 : 6 }}>
-                  <Tile on={filter === "all"} onClick={() => setFilter("all")} label="All" count={cards.length} />
-                  <Tile on={filter === "missing"} onClick={() => setFilter("missing")} label="To find" count={missing.length} />
-                  <Tile on={filter === "owned"} onClick={() => setFilter("owned")} label="You own" count={toPull.length} tone="#0d8a5f" title="Still to find, and in your collection" />
-                  <Tile on={filter === "unowned"} onClick={() => setFilter("unowned")} label="Not owned" count={toBuy.length} tone="#c2402a" title="Still to find, and not in your collection" />
-                </div>
-
-                {/* Find a card by name, and how to look at them. */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+                {/* Find a card by name, the filters' button, and how to look at them. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <label style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "0 12px", height: 38, borderRadius: 999, background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)" }}>
                     <Search size={15} strokeWidth={2.25} style={{ flex: "none", color: "var(--t3)" }} />
                     <input
@@ -353,6 +382,22 @@ export default function AssembleSheet({
                       </button>
                     )}
                   </label>
+                  <button
+                    type="button"
+                    aria-expanded={filtersOpen}
+                    aria-controls="assemble-filters"
+                    onClick={() => setFiltersOpen((o) => !o)}
+                    style={{ ...ghostBtn, flex: "none", height: 38, padding: "0 11px", gap: 6, fontSize: 13.5, ...(filtersOpen ? { background: "var(--bg2)" } : {}), ...(filtering ? { borderColor: "var(--t1)", color: "var(--t1)" } : {}) }}
+                  >
+                    <SlidersHorizontal size={15} strokeWidth={2.25} />
+                    Filters
+                    {filtering > 0 && (
+                      <span className="id-mono" style={{ minWidth: 18, padding: "0 5px", borderRadius: 999, background: "var(--t1)", color: "var(--bg)", fontSize: 11.5, fontWeight: 700, lineHeight: "18px", textAlign: "center" }}>
+                        {filtering}
+                      </span>
+                    )}
+                    <ChevronDown size={14} strokeWidth={2.5} style={{ transform: filtersOpen ? "rotate(180deg)" : "none", transition: "transform .15s ease" }} />
+                  </button>
                   <div role="group" aria-label="View" style={{ flex: "none", display: "flex", padding: 3, borderRadius: 999, background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)" }}>
                     {([["list", List, "List"], ["pictures", LayoutGrid, "Pictures"]] as const).map(([v, Icon, label]) => (
                       <button
@@ -370,13 +415,64 @@ export default function AssembleSheet({
                   </div>
                 </div>
 
+
+                {/* Folded, a filter that is on still shows: a tap takes it off. */}
+                {!filtersOpen && filtering > 0 && (
+                  <div data-testid="assemble-active-filters" style={{ ...chipRow(wide), marginTop: 8 }}>
+                    {filter !== "all" && (
+                      <ActiveFilter label={filter === "missing" ? "To find" : filter === "owned" ? "You own" : filter === "unowned" ? "Not owned" : (pickedDeck?.name ?? "Another deck")} onClear={() => setFilter("all")} />
+                    )}
+                    {COLOURS.filter((c) => colours.has(c)).map((c) => (
+                      <ActiveFilter key={c} label={COLOUR_NAME[c]} pip={c} onClear={() => toggleColour(c)} />
+                    ))}
+                  </div>
+                )}
+
+                {filtersOpen && (
+                  <div id="assemble-filters" style={{ marginTop: 10, padding: wide ? 14 : 10, borderRadius: 14, boxShadow: "inset 0 0 0 1px var(--line)" }}>
+                    {/* What to show: everything, or what's left, split by whether it's yours. */}
+                <div role="group" aria-label="Show" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: wide ? 8 : 6 }}>
+                  <Tile on={filter === "all"} onClick={() => setFilter("all")} compact={!wide} label="All" count={cards.length} />
+                  <Tile on={filter === "missing"} onClick={() => setFilter("missing")} compact={!wide} label="To find" count={missing.length} />
+                  <Tile on={filter === "owned"} onClick={() => setFilter("owned")} compact={!wide} label="You own" count={toPull.length} tone="#0d8a5f" title="Still to find, and in your collection" />
+                  <Tile on={filter === "unowned"} onClick={() => setFilter("unowned")} compact={!wide} label="Not owned" count={toBuy.length} tone="#c2402a" title="Still to find, and not in your collection" />
+                </div>
+
+
+                    {/* By colour: any of the ones picked. */}
+                    <div style={{ marginTop: 12 }}>
+                      <div className="id-label" style={{ color: "var(--t3)", fontSize: 11, marginBottom: 6 }}>
+                        Colour
+                      </div>
+                      {/* On a phone the six share one line. */}
+                      <div role="group" aria-label="Colour" style={wide ? wrapRow : { display: "grid", gridTemplateColumns: "repeat(6, minmax(0, 1fr))", gap: 5 }}>
+                        {COLOURS.map((c) => {
+                          const on = colours.has(c);
+                          const n = colourCount[c] ?? 0;
+                          return (
+                            <button
+                              key={c}
+                              type="button"
+                              aria-pressed={on}
+                              aria-label={COLOUR_NAME[c]}
+                              title={COLOUR_NAME[c]}
+                              onClick={() => toggleColour(c)}
+                              style={{ ...ghostBtn, flex: "none", minWidth: 0, padding: wide ? "5px 11px 5px 6px" : "5px 2px", gap: wide ? 7 : 5, fontSize: 13, opacity: n || on ? 1 : 0.45, ...(on ? { background: "var(--t1)", borderColor: "var(--t1)", color: "var(--bg)" } : {}) }}
+                            >
+                              <Pip sym={c} size={20} />
+                              <span className="id-mono" style={{ opacity: 0.8 }}>{n}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                 {/* Where the missing cards are: one of your other decks. */}
                 {holdings.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
+                  <div style={{ marginTop: 12 }}>
                     <div className="id-label" style={{ color: "var(--t3)", fontSize: 11, marginBottom: 6 }}>
                       Pull from another deck
                     </div>
-                    <div role="group" aria-label="In your other decks" style={chipRow(wide)}>
+                    <div role="group" aria-label="In your other decks" style={wrapRow}>
                       {holdings.map((h) => (
                         <Chip
                           key={h.publicId}
@@ -389,6 +485,24 @@ export default function AssembleSheet({
                         />
                       ))}
                     </div>
+                  </div>
+                )}
+
+
+                    {filtering > 0 && (
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setFilter("all");
+                            setColours(new Set());
+                          }}
+                          style={{ border: "none", background: "none", padding: 0, fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--t3)", textDecoration: "underline", cursor: "pointer" }}
+                        >
+                          Clear the filters
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -455,6 +569,8 @@ export default function AssembleSheet({
                       ? "This deck has no cards yet."
                       : query.trim()
                         ? `No card here has “${query.trim()}” in its name.`
+                        : colours.size
+                          ? "No card of that colour here."
                         : filter === "unowned"
                           ? "You own every card that’s still to find."
                           : filter === "owned"
@@ -614,8 +730,24 @@ function Where({ card, have, elsewhere, ticked, onDeck }: { card: PoolEntry; hav
   );
 }
 
+/** A filter that is on, shown while the filters are folded: a tap takes it off. */
+function ActiveFilter({ label, pip, onClear }: { label: string; pip?: string; onClear: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClear}
+      aria-label={`${label}: remove this filter`}
+      style={{ ...ghostBtn, flex: "none", maxWidth: 220, padding: pip ? "4px 9px 4px 5px" : "4px 9px 4px 11px", gap: 6, fontSize: 12.5, background: "var(--bg2)" }}
+    >
+      {pip && <Pip sym={pip} size={18} />}
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      <X size={13} strokeWidth={2.5} style={{ flex: "none", opacity: 0.7 }} />
+    </button>
+  );
+}
+
 /** One of the four numbers at the top, which is also what the list shows. */
-function Tile({ on, onClick, label, count, tone, title }: { on: boolean; onClick: () => void; label: string; count: number; tone?: string; title?: string }) {
+function Tile({ on, onClick, label, count, tone, title, compact }: { on: boolean; onClick: () => void; label: string; count: number; tone?: string; title?: string; /** A phone: four of them share its width. */ compact?: boolean }) {
   return (
     <button
       type="button"
@@ -628,7 +760,7 @@ function Tile({ on, onClick, label, count, tone, title }: { on: boolean; onClick
         alignItems: "flex-start",
         gap: 1,
         minWidth: 0,
-        padding: "8px 10px",
+        padding: compact ? "8px 8px" : "8px 10px",
         border: "none",
         borderRadius: 12,
         cursor: "pointer",
@@ -640,7 +772,7 @@ function Tile({ on, onClick, label, count, tone, title }: { on: boolean; onClick
       }}
     >
       <span className="id-mono" style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.1, color: on || !count ? "inherit" : (tone ?? "inherit"), opacity: count ? 1 : 0.45 }}>{count}</span>
-      <span style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11.5, fontWeight: 600, opacity: 0.75 }}>{label}</span>
+      <span style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: compact ? 11 : 11.5, fontWeight: 600, opacity: 0.75 }}>{label}</span>
     </button>
   );
 }
@@ -706,6 +838,9 @@ function Chip({ on, onClick, label, count, ticked, title }: { on: boolean; onCli
     </button>
   );
 }
+
+/* A row of filters inside the folded-out box: it wraps, on any screen. */
+const wrapRow: React.CSSProperties = { display: "flex", flexWrap: "wrap", gap: 6 };
 
 /* A row of filters: wrapped on a wide screen, one line that scrolls sideways on a phone. */
 const chipRow = (wide: boolean): React.CSSProperties =>
