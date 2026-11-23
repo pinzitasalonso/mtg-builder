@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { History, RotateCcw, Trash2 } from "lucide-react";
 import { PoolEntry } from "@/lib/pool-client";
 import { DeckDiff, VersionCard, VersionSummary, diffDecklists, isEmptyDiff } from "@/lib/deck-diff";
@@ -30,6 +30,12 @@ export default function VersionsModal({
   const [compare, setCompare] = useState<{ version: VersionSummary; diff: DeckDiff } | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [note, setNote] = useState("");
+  // The open comparison, to bring it into view when it opens.
+  const shown = useRef<HTMLDivElement>(null);
+  const shownId = compare?.version.id ?? null;
+  useEffect(() => {
+    if (shownId !== null) shown.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [shownId]);
 
   const now: VersionCard[] = pool.map((c) => ({ name: c.name, quantity: c.quantity, board: c.board, scryfallId: c.id }));
   const deckNow = now.filter((c) => c.board === "deck").reduce((n, c) => n + c.quantity, 0);
@@ -74,6 +80,11 @@ export default function VersionsModal({
   }
 
   async function open(version: VersionSummary) {
+    // A second tap on the open one closes it.
+    if (compare?.version.id === version.id) {
+      setCompare(null);
+      return;
+    }
     setBusyId(version.id);
     setError("");
     try {
@@ -129,6 +140,34 @@ export default function VersionsModal({
     }
   }
 
+  // The comparison opens under the version it is of, and is scrolled into
+  // view. It used to sit at the bottom of the dialog, under every version:
+  // on a phone that is off the screen, so "Compare" seemed to do nothing.
+  const comparison = compare && (
+    <div ref={shown} data-testid="version-diff" style={{ margin: "2px 0 8px", padding: "12px 12px 14px", borderRadius: 10, boxShadow: "inset 0 0 0 1px var(--line)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+        <div className="label-sc" style={{ fontSize: 11.5, color: "var(--t2)", letterSpacing: ".1em" }}>
+          This version → now · the deck
+        </div>
+        {canEdit && !isEmptyDiff(compare.diff) && (
+          <button onClick={() => restore(compare.version)} disabled={busyId !== null} style={{ ...goldBtn, padding: "6px 14px", fontSize: 13 }}>
+            <RotateCcw size={14} strokeWidth={2.25} /> {busyId === compare.version.id ? "Restoring…" : "Restore this version"}
+          </button>
+        )}
+      </div>
+      {isEmptyDiff(compare.diff) ? (
+        <p style={{ margin: 0, fontSize: 13.5, color: "var(--t3)" }}>No changes — the deck is the same as this version.</p>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <DiffList title="Added" color="#0d8a5f" rows={compare.diff.added.map((c) => `${c.quantity > 1 ? `${c.quantity}× ` : ""}${c.name}`)} />
+          <DiffList title="Removed" color="var(--danger)" rows={compare.diff.removed.map((c) => `${c.quantity > 1 ? `${c.quantity}× ` : ""}${c.name}`)} />
+          <DiffList title="Count changed" color="var(--gold)" rows={compare.diff.changed.map((c) => `${c.name}: ${c.from} → ${c.to}`)} />
+          <div style={{ fontSize: 12, color: "var(--t3)" }}>{compare.diff.unchanged} card{compare.diff.unchanged === 1 ? "" : "s"} unchanged.</div>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <ModalShell onDismiss={onClose} maxWidth={560}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
@@ -182,8 +221,8 @@ export default function VersionsModal({
           {versions.map((v) => {
             const active = compare?.version.id === v.id;
             return (
+              <Fragment key={v.id}>
               <div
-                key={v.id}
                 style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 10, background: active ? "rgba(39,66,214,.09)" : "rgba(0,0,0,.05)" }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -192,8 +231,8 @@ export default function VersionsModal({
                     {when(v.createdAt)} · {v.deckCount} in deck · {v.poolCount} in pool
                   </div>
                 </div>
-                <button onClick={() => open(v)} disabled={busyId === v.id} style={{ ...ghostBtn, padding: "6px 12px", fontSize: 13 }}>
-                  {busyId === v.id ? "…" : active ? "Comparing" : "Compare"}
+                <button onClick={() => open(v)} disabled={busyId === v.id} aria-expanded={active} style={{ ...ghostBtn, flex: "none", padding: "6px 12px", fontSize: 13 }}>
+                  {busyId === v.id ? "…" : active ? "Hide" : "Compare"}
                 </button>
                 {canEdit && (
                   <button onClick={() => remove(v)} disabled={busyId === v.id} title="Delete version" aria-label="Delete version" style={{ ...ghostBtn, display: "inline-flex", alignItems: "center", padding: "6px 10px", fontSize: 13, color: "var(--danger)" }}>
@@ -201,35 +240,13 @@ export default function VersionsModal({
                   </button>
                 )}
               </div>
+              {active && comparison}
+              </Fragment>
             );
           })}
         </div>
       )}
 
-      {compare && (
-        <div style={{ marginTop: 16, paddingTop: 14, borderTop: "1px solid var(--line)" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-            <div className="label-sc" style={{ fontSize: 11.5, color: "var(--t2)", letterSpacing: ".1em" }}>
-              {titleOf(compare.version)} → now · the deck
-            </div>
-            {canEdit && !isEmptyDiff(compare.diff) && (
-              <button onClick={() => restore(compare.version)} disabled={busyId !== null} style={{ ...goldBtn, padding: "6px 14px", fontSize: 13 }}>
-                <RotateCcw size={14} strokeWidth={2.25} /> {busyId === compare.version.id ? "Restoring…" : "Restore this version"}
-              </button>
-            )}
-          </div>
-          {isEmptyDiff(compare.diff) ? (
-            <p style={{ margin: 0, fontSize: 13.5, color: "var(--t3)" }}>No changes — the deck is the same as this version.</p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <DiffList title="Added" color="#0d8a5f" rows={compare.diff.added.map((c) => `${c.quantity > 1 ? `${c.quantity}× ` : ""}${c.name}`)} />
-              <DiffList title="Removed" color="var(--danger)" rows={compare.diff.removed.map((c) => `${c.quantity > 1 ? `${c.quantity}× ` : ""}${c.name}`)} />
-              <DiffList title="Count changed" color="var(--gold)" rows={compare.diff.changed.map((c) => `${c.name}: ${c.from} → ${c.to}`)} />
-              <div style={{ fontSize: 12, color: "var(--t3)" }}>{compare.diff.unchanged} card{compare.diff.unchanged === 1 ? "" : "s"} unchanged.</div>
-            </div>
-          )}
-        </div>
-      )}
     </ModalShell>
   );
 }
