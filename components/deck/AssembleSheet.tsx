@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ExternalLink, Heart, PackageCheck, Sparkles } from "lucide-react";
+import { Check, ExternalLink, Heart, LayoutGrid, List, PackageCheck, Search, Sparkles, X } from "lucide-react";
 import type { CardElsewhere } from "@/app/api/decks/[id]/assemble/route";
 import type { OwnedCopy } from "@/components/deck/DeckCardSheet";
 import { CardArt, CAT_COLOR, categoryOf, scanVersionURL, TYPE_ORDER } from "@/components/mtg";
@@ -23,7 +23,12 @@ import { ModalShell, ghostBtn, goldBtn } from "./ui";
    It takes the whole screen. The list reads like the deck view: the
    commander first, then the cards by type, A to Z. It can be narrowed to
    what's still to find, what you don't own, or what one of your other decks
-   holds: pick a deck, pull those cards out of its box, tick them all.
+   holds: pick a deck, pull those cards out of its box, tick them all. A
+   box at the top finds a card by name: the one in your hand, to tick it.
+
+   Two ways to look at it. The list has each card's name, and where to look
+   for it. The pictures show the cards themselves, which is how you spot one
+   in a pile of cardboard: a tap ticks it.
 
    What never turns up can be swapped for cards you do have ("Replace what
    you haven't found", ReplaceMissing.tsx).
@@ -41,7 +46,11 @@ interface State {
 
 /** What the list shows: everything, what's left, what you'd have to buy, or
     what's left that one of your other decks holds ("deck:<publicId>"). */
-type Filter = "all" | "missing" | "unowned" | `deck:${string}`;
+type Filter = "all" | "missing" | "owned" | "unowned" | `deck:${string}`;
+
+/** Names in a list, or the cards' pictures. Remembered on this device. */
+type View = "list" | "pictures";
+const VIEW_KEY = "sp-assemble-view";
 
 /** One of your other decks, as a filter: how many of the cards still to find it holds. */
 interface DeckHolding {
@@ -80,6 +89,19 @@ export default function AssembleSheet({
   const [filter, setFilter] = useState<Filter>("all");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
+  const [view, setView] = useState<View>("list");
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(VIEW_KEY) === "pictures") setView("pictures");
+    } catch {}
+  }, []);
+  const pickView = (v: View) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {}
+  };
   // The card shown large: in the side column on a wide screen, over the list otherwise.
   const [focus, setFocus] = useState<PoolEntry | null>(null);
   const [overlay, setOverlay] = useState<PoolEntry | null>(null);
@@ -153,6 +175,8 @@ export default function AssembleSheet({
   const missing = state ? cards.filter((c) => !state.assembled.has(c.dbId)) : [];
   // Still to find, and not in your collection: what you'd have to get.
   const toBuy = missing.filter((c) => have(c) < c.quantity);
+  // Still to find, and yours: somewhere in your collection (or in another deck's box).
+  const toPull = missing.filter((c) => have(c) >= c.quantity);
   // Still to find, and a card another could stand in for: not the commander, not a basic land.
   const swappable = missing.filter((c) => !isCommander?.(c) && !isBasicLand(c.typeLine));
 
@@ -195,16 +219,22 @@ export default function AssembleSheet({
 
   const shown = useMemo(() => {
     if (!state) return [];
-    if (filter === "missing") return missing;
-    if (filter === "unowned") return toBuy;
-    if (filter.startsWith("deck:")) {
-      const id = filter.slice(5);
-      return missing.filter((c) => (state.elsewhere[key(c)] ?? []).some((d) => d.publicId === id));
-    }
-    return cards;
-    // missing and toBuy are worked out from cards, state and owned on each render.
+    const of = () => {
+      if (filter === "missing") return missing;
+      if (filter === "owned") return toPull;
+      if (filter === "unowned") return toBuy;
+      if (filter.startsWith("deck:")) {
+        const id = filter.slice(5);
+        return missing.filter((c) => (state.elsewhere[key(c)] ?? []).some((d) => d.publicId === id));
+      }
+      return cards;
+    };
+    // The box at the top: the card whose name has these letters.
+    const q = query.trim().toLowerCase();
+    return q ? of().filter((c) => c.name.toLowerCase().includes(q)) : of();
+    // missing, toPull and toBuy are worked out from cards, state and owned on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, state, owned, filter]);
+  }, [cards, state, owned, filter, query]);
 
   // The deck view's order: the commander, then each type, A to Z within it.
   const groups = useMemo(() => {
@@ -264,14 +294,22 @@ export default function AssembleSheet({
           </div>
           {state && (
             <>
-              <div aria-live="polite" style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 10, marginTop: 10, fontSize: 14, color: "var(--t1)", fontWeight: 600 }}>
-                <span data-testid="assemble-progress">
-                  {done} of {total} cards in the deck
+              <div aria-live="polite" style={{ display: "flex", alignItems: "baseline", gap: 10, marginTop: 10 }}>
+                <span data-testid="assemble-progress" style={{ fontSize: 14, color: "var(--t2)", fontWeight: 500 }}>
+                  <b style={{ fontFamily: "var(--font-display)", fontSize: wide ? 26 : 22, fontWeight: 700, color: "var(--frame-ink)", marginRight: 2 }}>
+                    {done} of {total}
+                  </b>{" "}
+                  cards in the deck
                 </span>
-                <span style={{ color: "var(--t3)", fontWeight: 500 }}>{total - done === 0 ? "All there." : `${total - done} to find`}</span>
+                <span style={{ marginLeft: "auto", fontSize: 14, color: total - done === 0 ? "#0d8a5f" : "var(--t2)", fontWeight: 600 }}>{total - done === 0 ? "All there" : `${total - done} to find`}</span>
+                {done > 0 && (
+                  <button onClick={reset} disabled={busy} style={{ border: "none", background: "none", padding: 0, fontFamily: "var(--font-ui)", fontSize: 13, color: "var(--t3)", textDecoration: "underline", cursor: "pointer" }}>
+                    Untick all
+                  </button>
+                )}
               </div>
-              <div style={{ height: 6, borderRadius: 999, background: "var(--bg3)", overflow: "hidden", marginTop: 7 }}>
-                <div style={{ width: `${total ? (done / total) * 100 : 0}%`, height: "100%", background: "var(--gold)", transition: "width .2s ease" }} />
+              <div style={{ height: 8, borderRadius: 999, background: "var(--bg3)", overflow: "hidden", marginTop: 8 }}>
+                <div style={{ width: `${total ? (done / total) * 100 : 0}%`, height: "100%", borderRadius: 999, background: total - done === 0 ? "#0d8a5f" : "var(--gold)", transition: "width .2s ease" }} />
               </div>
             </>
           )}
@@ -287,19 +325,56 @@ export default function AssembleSheet({
               <p style={{ margin: 0, fontSize: 14, color: "var(--t2)" }}>Loading…</p>
             ) : (
               <>
-                <p style={{ margin: "0 0 14px", fontSize: 14, color: "var(--t2)", lineHeight: 1.45 }}>Tick each card as you put it in the deck. What’s left is what you still have to find.</p>
-
-                {/* What to show. */}
-                <div role="group" aria-label="Show" style={chipRow(wide)}>
-                  <Chip on={filter === "all"} onClick={() => setFilter("all")} label="All" count={cards.length} />
-                  <Chip on={filter === "missing"} onClick={() => setFilter("missing")} label="Still to find" count={missing.length} />
-                  <Chip on={filter === "unowned"} onClick={() => setFilter("unowned")} label="Not owned" count={toBuy.length} />
+                {/* What to show: everything, or what's left, split by whether it's yours. */}
+                <div role="group" aria-label="Show" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: wide ? 8 : 6 }}>
+                  <Tile on={filter === "all"} onClick={() => setFilter("all")} label="All" count={cards.length} />
+                  <Tile on={filter === "missing"} onClick={() => setFilter("missing")} label="To find" count={missing.length} />
+                  <Tile on={filter === "owned"} onClick={() => setFilter("owned")} label="You own" count={toPull.length} tone="#0d8a5f" title="Still to find, and in your collection" />
+                  <Tile on={filter === "unowned"} onClick={() => setFilter("unowned")} label="Not owned" count={toBuy.length} tone="#c2402a" title="Still to find, and not in your collection" />
                 </div>
+
+                {/* Find a card by name, and how to look at them. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 10 }}>
+                  <label style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center", gap: 8, padding: "0 12px", height: 38, borderRadius: 999, background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)" }}>
+                    <Search size={15} strokeWidth={2.25} style={{ flex: "none", color: "var(--t3)" }} />
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Find a card"
+                      aria-label="Find a card by name"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      style={{ flex: 1, minWidth: 0, border: "none", outline: "none", background: "none", fontFamily: "var(--font-ui)", fontSize: 15, color: "var(--t1)" }}
+                    />
+                    {query && (
+                      <button type="button" onClick={() => setQuery("")} aria-label="Clear" style={{ flex: "none", display: "flex", border: "none", background: "none", padding: 2, color: "var(--t3)", cursor: "pointer" }}>
+                        <X size={15} strokeWidth={2.5} />
+                      </button>
+                    )}
+                  </label>
+                  <div role="group" aria-label="View" style={{ flex: "none", display: "flex", padding: 3, borderRadius: 999, background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)" }}>
+                    {([["list", List, "List"], ["pictures", LayoutGrid, "Pictures"]] as const).map(([v, Icon, label]) => (
+                      <button
+                        key={v}
+                        type="button"
+                        aria-pressed={view === v}
+                        aria-label={label}
+                        title={label}
+                        onClick={() => pickView(v)}
+                        style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 38, height: 32, border: "none", borderRadius: 999, cursor: "pointer", background: view === v ? "var(--t1)" : "transparent", color: view === v ? "var(--bg)" : "var(--t2)" }}
+                      >
+                        <Icon size={16} strokeWidth={2.25} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Where the missing cards are: one of your other decks. */}
                 {holdings.length > 0 && (
                   <div style={{ marginTop: 10 }}>
                     <div className="id-label" style={{ color: "var(--t3)", fontSize: 11, marginBottom: 6 }}>
-                      In your other decks
+                      Pull from another deck
                     </div>
                     <div role="group" aria-label="In your other decks" style={chipRow(wide)}>
                       {holdings.map((h) => (
@@ -334,28 +409,59 @@ export default function AssembleSheet({
                   </div>
                 )}
 
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, margin: "14px 0" }}>
-                  {toBuy.length > 0 && (
-                    <button onClick={wishMissing} disabled={busy} style={{ ...ghostBtn, padding: "7px 14px", fontSize: 13 }} title="The unticked cards that aren’t in your collection">
-                      <Heart size={14} strokeWidth={2.25} /> Wishlist the {toBuy.length} I don’t own
-                    </button>
-                  )}
-                  {state.owner && swappable.length > 0 && (
-                    <button onClick={() => setReplacing(true)} disabled={busy} style={{ ...ghostBtn, padding: "7px 14px", fontSize: 13 }} title="Swap the unticked cards for cards you own that do the same job">
-                      <Sparkles size={14} strokeWidth={2.25} /> Replace the {swappable.length} I haven’t found
-                    </button>
-                  )}
-                  {done > 0 && (
-                    <button onClick={reset} disabled={busy} style={{ ...ghostBtn, padding: "7px 14px", fontSize: 13 }}>
-                      Untick all
-                    </button>
-                  )}
-                </div>
-                {note && <p role="status" style={{ margin: "0 0 12px", fontSize: 13, color: "var(--t2)" }}>{note}</p>}
+                {/* What can't be found: swap it for a card you have, or put it on the wishlist. */}
+                {((state.owner && swappable.length > 0) || toBuy.length > 0) && (
+                  <div style={{ marginTop: 10 }}>
+                    <div className="id-label" style={{ color: "var(--t3)", fontSize: 11, marginBottom: 6 }}>
+                      Can’t find some?
+                    </div>
+                    <div style={chipRow(wide)}>
+                      {state.owner && swappable.length > 0 && (
+                        <button onClick={() => setReplacing(true)} disabled={busy} style={{ ...ghostBtn, flex: "none", padding: "6px 12px", fontSize: 13 }} title="Swap the unticked cards for cards you own that do the same job">
+                          <Sparkles size={14} strokeWidth={2.25} /> Replace the {swappable.length} I haven’t found
+                        </button>
+                      )}
+                      {toBuy.length > 0 && (
+                        <button onClick={wishMissing} disabled={busy} style={{ ...ghostBtn, flex: "none", padding: "6px 12px", fontSize: 13 }} title="The unticked cards that aren’t in your collection">
+                          <Heart size={14} strokeWidth={2.25} /> Wishlist the {toBuy.length} I don’t own
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {/* The dots on the pictures. */}
+                {view === "pictures" && missing.length > 0 && (
+                  <div aria-hidden style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", marginTop: 12, fontSize: 12.5, color: "var(--t3)" }}>
+                    {([["#0d8a5f", "In your collection"], ["var(--gold)", "In another of your decks"], ["#c2402a", "Not owned"]] as const).map(([color, label]) => (
+                      <span key={label} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ width: 9, height: 9, borderRadius: 999, background: color }} /> {label}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {note && <p role="status" style={{ margin: "12px 0 0", fontSize: 13, color: "var(--t2)" }}>{note}</p>}
+                <div style={{ height: 14 }} />
+
+                {/* Every card is in: say so. */}
+                {cards.length > 0 && missing.length === 0 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, padding: "12px 14px", borderRadius: 12, background: "rgba(13,138,95,.12)", color: "#0d8a5f", fontSize: 14.5, fontWeight: 600 }}>
+                    <Check size={18} strokeWidth={3} style={{ flex: "none" }} /> Every card is in the deck. Sleeve it up.
+                  </div>
+                )}
 
                 {groups.length === 0 && !pickedDeck && (
                   <p style={{ margin: 0, fontSize: 14, color: "var(--t2)" }}>
-                    {!cards.length ? "This deck has no cards yet." : filter === "unowned" ? "You own every card that’s still to find." : "Every card is in the deck."}
+                    {!cards.length
+                      ? "This deck has no cards yet."
+                      : query.trim()
+                        ? `No card here has “${query.trim()}” in its name.`
+                        : filter === "unowned"
+                          ? "You own every card that’s still to find."
+                          : filter === "owned"
+                            ? "Nothing left to pull from your collection."
+                            : filter === "missing"
+                              ? "Nothing left to find."
+                              : ""}
                   </p>
                 )}
                 {groups.map((g) => (
@@ -364,10 +470,28 @@ export default function AssembleSheet({
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                       <span style={{ width: 9, height: 9, borderRadius: 3, background: CAT_COLOR[g.type] || "#ccc", flex: "none" }} />
                       <span className="id-label" style={{ color: "var(--t2)", fontSize: 11.5 }}>{g.type}</span>
-                      <span className="id-mono" style={{ fontSize: 11.5, color: "var(--t3)" }}>{g.cards.reduce((n, c) => n + c.quantity, 0)}</span>
+                      <span className="id-mono" style={{ fontSize: 11.5, color: "var(--t3)" }}>
+                        {filter === "all" && !query.trim() ? `${g.cards.filter((c) => state.assembled.has(c.dbId)).reduce((n, c) => n + c.quantity, 0)}/` : ""}
+                        {g.cards.reduce((n, c) => n + c.quantity, 0)}
+                      </span>
                       <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
                     </div>
-                    <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+                    {view === "pictures" && (
+                      <ul style={{ listStyle: "none", margin: "8px 0 0", padding: 0, display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${wide ? 118 : 96}px, 1fr))`, gap: wide ? 10 : 8 }}>
+                        {g.cards.map((c) => (
+                          <PictureTile
+                            key={c.dbId}
+                            card={c}
+                            on={state.assembled.has(c.dbId)}
+                            own={have(c)}
+                            elsewhere={(state.elsewhere[key(c)] ?? []).some((d) => d.deck > 0)}
+                            onToggle={() => void tick([c], !state.assembled.has(c.dbId))}
+                            onHover={() => wide && setFocus(c)}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: view === "list" ? "block" : "none" }}>
                       {g.cards.map((c) => {
                         const on = state.assembled.has(c.dbId);
                         const own = have(c);
@@ -487,6 +611,74 @@ function Where({ card, have, elsewhere, ticked, onDeck }: { card: PoolEntry; hav
         </ul>
       )}
     </div>
+  );
+}
+
+/** One of the four numbers at the top, which is also what the list shows. */
+function Tile({ on, onClick, label, count, tone, title }: { on: boolean; onClick: () => void; label: string; count: number; tone?: string; title?: string }) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      onClick={onClick}
+      title={title}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-start",
+        gap: 1,
+        minWidth: 0,
+        padding: "8px 10px",
+        border: "none",
+        borderRadius: 12,
+        cursor: "pointer",
+        textAlign: "left",
+        fontFamily: "var(--font-ui)",
+        background: on ? "var(--t1)" : "var(--bg2)",
+        boxShadow: on ? "none" : "inset 0 0 0 1px var(--line)",
+        color: on ? "var(--bg)" : "var(--t1)",
+      }}
+    >
+      <span className="id-mono" style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.1, color: on || !count ? "inherit" : (tone ?? "inherit"), opacity: count ? 1 : 0.45 }}>{count}</span>
+      <span style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 11.5, fontWeight: 600, opacity: 0.75 }}>{label}</span>
+    </button>
+  );
+}
+
+/** A card as its picture: a tap ticks it. Ticked, it fades behind a check.
+    A dot says where it is while it's still to find: yours (green), in
+    another of your decks (gold), or not owned (red). */
+function PictureTile({ card, on, own, elsewhere, onToggle, onHover }: { card: PoolEntry; on: boolean; own: number; elsewhere: boolean; onToggle: () => void; onHover: () => void }) {
+  const where = own >= card.quantity ? (elsewhere ? "In another of your decks" : "In your collection") : "Not owned";
+  return (
+    <li>
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={on}
+        aria-label={`${card.name}: in the deck`}
+        title={on ? card.name : `${card.name}. ${where}.`}
+        onClick={onToggle}
+        onPointerEnter={(e) => e.pointerType === "mouse" && onHover()}
+        style={{ position: "relative", display: "block", width: "100%", aspectRatio: "5 / 7", padding: 0, border: "none", borderRadius: "4.8%/3.5%", overflow: "hidden", background: "var(--bg3)", cursor: "pointer", boxShadow: on ? "none" : "0 4px 12px -6px rgba(0,0,0,.45)" }}
+      >
+        <CardArt name={card.name} src={scanVersionURL(card.imageUri || undefined, "normal") ?? (card.imageUri || undefined)} prefer="src" version="normal" loading="lazy" radius={0} style={{ width: "100%", height: "100%", opacity: on ? 0.32 : 1, filter: on ? "grayscale(.6)" : "none", transition: "opacity .15s ease" }} />
+        {on ? (
+          <span style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: 999, background: "var(--gold)", color: "var(--bg)", boxShadow: "0 6px 14px -6px rgba(0,0,0,.6)" }}>
+              <Check size={24} strokeWidth={3.25} />
+            </span>
+          </span>
+        ) : (
+          <span aria-hidden style={{ position: "absolute", right: 6, bottom: 6, width: 12, height: 12, borderRadius: 999, background: own >= card.quantity ? (elsewhere ? "var(--gold)" : "#0d8a5f") : "#c2402a", boxShadow: "0 0 0 2px rgba(255,255,255,.9)" }} />
+        )}
+        {card.quantity > 1 && (
+          <span className="id-mono" style={{ position: "absolute", left: 6, top: 6, padding: "1px 7px", borderRadius: 999, background: "rgba(8,6,11,.78)", color: "#fff", fontSize: 12, fontWeight: 700 }}>
+            {card.quantity}
+          </span>
+        )}
+      </button>
+    </li>
   );
 }
 
