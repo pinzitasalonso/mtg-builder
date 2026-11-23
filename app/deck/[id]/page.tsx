@@ -25,6 +25,8 @@ import DeckPrimer from "@/components/deck/DeckPrimer";
 import DeckStatsPane from "@/components/deck/DeckStatsPane";
 import OrderModal from "@/components/deck/OrderModal";
 import AssembleSheet from "@/components/deck/AssembleSheet";
+import TokensModal from "@/components/deck/TokensModal";
+import { Shapes } from "lucide-react";
 import VersionsModal from "@/components/deck/VersionsModal";
 import { ModalShell, Field, ErrorNote, paperInput, ghostBtn, goldBtn, toolBtn, dangerBtn } from "@/components/deck/ui";
 import { OutCard, resolveNamedDetailed } from "@/lib/scryfall";
@@ -341,6 +343,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const [gameCodeOpen, setGameCodeOpen] = useState(false);
   // saved versions of the deck — runs in <VersionsModal> while open
   const [versionsOpen, setVersionsOpen] = useState(false);
+  const [tokensOpen, setTokensOpen] = useState(false);
 
   // "Order on CardTrader" — runs in <OrderModal> while open
   const [orderOpen, setOrderOpen] = useState(false);
@@ -1134,6 +1137,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                       ...(canEdit ? [{ label: "Import decklist", icon: Upload, on: () => openImport("") }] : []),
                       { label: "Buy list", icon: ShoppingCart, on: () => setOrderOpen(true), disabled: deckCards.length === 0 },
                       { label: "Versions", icon: History, on: () => setVersionsOpen(true) },
+                      // What the deck makes that isn't in it: for anyone who can see the list.
+                      { label: "Tokens", icon: Shapes, on: () => setTokensOpen(true), disabled: deckCards.length === 0 },
                       ...(canEdit ? [
                         { label: "Add lands & staples", icon: Mountain, on: () => setTool("lands") },
                         { group: "At the table" },
@@ -1922,6 +1927,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {assembleOpen && <AssembleSheet deckId={deckId} cards={deckCards} owned={ownedCopies} isCommander={isCommander} onChanged={() => void loadPool()} onClose={() => setAssembleOpen(false)} />}
 
       {/* saved versions — snapshot now, compare an earlier one with the current list */}
+      {tokensOpen && <TokensModal deckId={deckId} onClose={() => setTokensOpen(false)} />}
       {versionsOpen && <VersionsModal deckId={deckId} pool={pool} canEdit={canEdit} onClose={() => setVersionsOpen(false)} onRestored={loadPool} />}
 
       {/* a deck card, opened */}
