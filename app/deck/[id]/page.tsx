@@ -1919,7 +1919,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {orderOpen && <OrderModal cards={deckCards} onClose={() => setOrderOpen(false)} />}
 
       {/* the deck in cardboard: tick the cards off, see where the rest are */}
-      {assembleOpen && <AssembleSheet deckId={deckId} cards={deckCards} owned={ownedCopies} isCommander={isCommander} onClose={() => setAssembleOpen(false)} />}
+      {assembleOpen && <AssembleSheet deckId={deckId} cards={deckCards} owned={ownedCopies} isCommander={isCommander} onChanged={() => void loadPool()} onClose={() => setAssembleOpen(false)} />}
 
       {/* saved versions — snapshot now, compare an earlier one with the current list */}
       {versionsOpen && <VersionsModal deckId={deckId} pool={pool} canEdit={canEdit} onClose={() => setVersionsOpen(false)} onRestored={loadPool} />}

@@ -25,6 +25,16 @@ export async function consumeAi(user: { id: number } & TierFields): Promise<bool
   return spent.count === 1;
 }
 
+/* Give an AI ask back: the answer never came, and a failed ask is not one
+   the player used. Only today's meter, only above zero. */
+export async function refundAi(user: { id: number } & TierFields): Promise<void> {
+  if (isPro(user)) return;
+  await prisma.user.updateMany({
+    where: { id: user.id, aiDay: utcDay(), aiCount: { gt: 0 } },
+    data: { aiCount: { decrement: 1 } },
+  });
+}
+
 /* Spend one deck scan from the user's daily budget. Same compare-and-set
    shape as consumeAi, on its own columns. */
 export async function consumeScan(user: { id: number } & TierFields): Promise<boolean> {

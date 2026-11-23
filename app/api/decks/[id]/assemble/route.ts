@@ -44,7 +44,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // Where it's ticked first, then where it's played, then pools; A–Z within.
     for (const list of Object.values(elsewhere)) list.sort((a, b) => Number(b.assembled) - Number(a.assembled) || Number(b.deck > 0) - Number(a.deck > 0) || a.name.localeCompare(b.name));
   }
-  return NextResponse.json({ assembled: cards.filter((c) => c.assembled).map((c) => c.id), elsewhere });
+  // `owner`: it is their collection, so "replace what I haven't found" is theirs to use.
+  return NextResponse.json({ assembled: cards.filter((c) => c.assembled).map((c) => c.id), elsewhere, owner: Boolean(user && deck.userId === user.id) });
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
