@@ -4387,3 +4387,38 @@ button {
   container-type: inline-size;
 }
 .lv-well .lv-pic { padding-top: 0; }
+
+/* A deck with no commander and no cards: an outline where its card goes. */
+.deck-face-empty {
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 20px;
+  border-radius: 16px;
+  border: 1.5px dashed var(--w-line-2);
+  background: var(--w-fill);
+  color: var(--w-1);
+  font-family: var(--font-ui);
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s;
+}
+.deck-face-empty b { font-size: 16px; font-weight: 700; }
+.deck-face-empty i { font-style: normal; font-size: 13px; color: var(--w-2); }
+.deck-face-empty:hover { background: var(--w-fill-2); border-color: var(--w-1); }
+.deck-face-empty[data-quiet] { cursor: default; color: var(--w-2); }
+.deck-face-empty[data-quiet]:hover { background: var(--w-fill); border-color: var(--w-line-2); }
+.deck-face-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--w-fill-2);
+}

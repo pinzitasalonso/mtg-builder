@@ -983,6 +983,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // else's shared deck, an ownerless public one) it's this page's own chat.
   const assistant = useAssistant();
   const plan = usePlan();
+  // What stands in for the commander's card when there is no commander.
+  const faceCard = deck?.commander ? null : deckCards.find((c) => c.imageUri && !c.typeLine?.includes("Land")) ?? null;
   const sharedChat = assistant.available === true && !!deck?.canEdit && !deck?.isPublic;
   const assistantFocus = useMemo<AssistantFocus | null>(
     () => (sharedChat && deck ? { publicId: deckId, name: deck.name, pool, ownedNames, onPoolChanged: reloadDeck } : null),
@@ -1275,19 +1277,35 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             {/* commander showcase + progress badge */}
             <div style={{ display: "flex", justifyContent: "center" }}>
               <div style={{ position: "relative", width: "min(280px, 54vw)" }}>
-                <div style={{ aspectRatio: "5 / 7", borderRadius: 16, overflow: "hidden", boxShadow: "0 30px 60px -24px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.1)" }}>
-                  {(deck?.commander || deck?.name) && (
+                {/* The deck's face: its commander. With none, its first
+                    non-land card; with no cards either, an outline that says
+                    what goes here (it used to be a dark card spelling the
+                    first two letters of the deck's name). */}
+                {deck?.commander || faceCard ? (
+                  <div style={{ aspectRatio: "5 / 7", borderRadius: 16, overflow: "hidden", boxShadow: "0 30px 60px -24px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.1)" }}>
                     <CardArt
-                      key={deck?.commander || deck?.name}
-                      name={commanderArtName(deck?.commander)}
+                      key={deck?.commander || faceCard?.name}
+                      name={deck?.commander ? commanderArtName(deck.commander) : faceCard?.name}
+                      src={deck?.commander ? undefined : faceCard?.imageUri || undefined}
+                      prefer={deck?.commander ? "art" : "src"}
                       label={deck?.name}
                       colors={identityPips.length ? identityPips : ["C"]}
                       version="normal"
                       radius={16}
                       style={{ width: "100%", height: "100%" }}
                     />
-                  )}
-                </div>
+                  </div>
+                ) : canEdit && deck?.format?.toLowerCase() === "commander" ? (
+                  <button type="button" className="deck-face-empty" onClick={openSettings}>
+                    <span className="deck-face-plus" aria-hidden><Plus size={22} strokeWidth={2.25} /></span>
+                    <b>Choose a commander</b>
+                    <i>It sets the deck&apos;s colours.</i>
+                  </button>
+                ) : (
+                  <div className="deck-face-empty" data-quiet>
+                    <b>No cards yet</b>
+                  </div>
+                )}
                 <div className="id-card" style={{ position: "absolute", bottom: -18, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 11, padding: "10px 16px", whiteSpace: "nowrap" }}>
                   <span className="id-display" style={{ fontSize: 26, color: "var(--w-1)" }}>
                     {deckCount}<span style={{ color: "var(--w-3)", fontSize: 18 }}>/{target}</span>

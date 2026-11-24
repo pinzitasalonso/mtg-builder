@@ -120,6 +120,32 @@ describe("GET /api/decks?public=1", () => {
     expect(names).not.toContain("aloy");
   });
 
+  // The tile's picture: the commander's card, or with no commander the
+  // first non-land card of the decklist (never a pool card, never a land).
+  it("faces a deck with its commander, or its first non-land card", async () => {
+    const user = await makeUser();
+    await signIn(user);
+    const img = (n: string) => `https://cards.scryfall.io/normal/front/a/b/${n}.jpg`;
+    const led = await prisma.deck.create({ data: { name: "Led", commander: "Krenko, Mob Boss", userId: user.id, publicId: `l-${user.id}` } });
+    const free = await prisma.deck.create({ data: { name: "Burn", format: "modern", userId: user.id, publicId: `b-${user.id}` } });
+    await prisma.deck.create({ data: { name: "Empty", userId: user.id, publicId: `e-${user.id}` } });
+    const card = (deckId: number, name: string, typeLine: string, board = "deck") => ({ deckId, scryfallId: `${deckId}-${name}`, name, imageUri: img(name), typeLine, board });
+    await prisma.poolCard.createMany({
+      data: [
+        card(led.id, "Sol", "Artifact"),
+        card(led.id, "Krenko, Mob Boss", "Legendary Creature — Goblin Warrior"),
+        card(free.id, "Pooled", "Instant", "pool"),
+        card(free.id, "Mountain", "Basic Land — Mountain"),
+        card(free.id, "Bolt", "Instant"),
+      ],
+    });
+    const decks: { name: string; cover: string | null }[] = await (await listDecks(jsonRequest("/api/decks"))).json();
+    const cover = (name: string) => decks.find((d) => d.name === name)?.cover;
+    expect(cover("Led")).toBe(img("Krenko, Mob Boss"));
+    expect(cover("Burn")).toBe(img("Bolt"));
+    expect(cover("Empty")).toBeNull();
+  });
+
   it("still lists a signed-in player's own decks in full", async () => {
     const user = await makeUser();
     await signIn(user);

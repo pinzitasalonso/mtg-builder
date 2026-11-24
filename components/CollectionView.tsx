@@ -343,7 +343,7 @@ export default function CollectionView({
       <div style={{ padding: "14px clamp(16px, 4vw, 22px) 12px", borderBottom: "1px solid var(--line)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
           {/* Two lists, one screen: what you have, and what you want. */}
-          <div role="tablist" aria-label="Collection or wishlist" style={{ display: "flex", alignItems: "baseline", gap: "clamp(12px, 3vw, 22px)", minWidth: 0 }}>
+          <div role="tablist" aria-label="Collection or wishlist" style={{ display: "flex", alignItems: "baseline", gap: "clamp(12px, 3vw, 22px)", minWidth: 0, overflow: "hidden" }}>
             {(["collection", "wishlist"] as const).map((t) => (
               <button
                 key={t}
@@ -358,7 +358,7 @@ export default function CollectionView({
                   background: "none",
                   cursor: "pointer",
                   fontFamily: "var(--font-display)",
-                  fontSize: "clamp(17px, 5vw, 24px)",
+                  fontSize: "clamp(15px, 4.2vw, 24px)",
                   fontWeight: 800,
                   textTransform: "uppercase",
                   letterSpacing: ".02em",
