@@ -1,12 +1,11 @@
 import { prisma, makeUser, signIn, signOut } from "@/test/db";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const create = vi.fn(async (customerId: string, subscriptionIds?: string[]) => ({
-  id: "cpls_1",
-  customerId,
-  urls: { general: { overview: `https://sandbox-customer-portal.paddle.com/cpl_x?token=${customerId}` }, subscriptions: subscriptionIds ?? [] },
+const create = vi.fn(async (p: { customer: string; return_url: string }) => ({
+  id: "bps_1",
+  url: `https://billing.stripe.com/p/session/test_${p?.customer}`,
 }));
-vi.mock("@/lib/paddle-server", () => ({ paddle: () => ({ customerPortalSessions: { create } }) }));
+vi.mock("@/lib/stripe", () => ({ stripe: () => ({ billingPortal: { sessions: { create } } }) }));
 
 const { openBillingPortal } = await import("@/app/account/actions");
 
@@ -25,31 +24,37 @@ async function target(): Promise<string> {
 describe("openBillingPortal", () => {
   beforeEach(() => create.mockClear());
 
-  it("sends a signed-out visitor to sign in, without asking Paddle", async () => {
+  it("sends a signed-out visitor to sign in, without asking Stripe", async () => {
     signOut();
     expect(await target()).toBe("/login");
     expect(create).not.toHaveBeenCalled();
   });
 
-  it("says so when the account has no Paddle customer", async () => {
+  it("says so when the account has no Stripe customer", async () => {
     await signIn(await makeUser());
     expect(await target()).toBe("/account?billing=none");
     expect(create).not.toHaveBeenCalled();
   });
 
-  it("opens the portal for the account's own customer and subscriptions only", async () => {
+  it("opens the portal for the account's own customer only, returning to /account", async () => {
     const [me, other] = [await makeUser(), await makeUser()];
     const at = new Date();
-    await prisma.paddleCustomer.createMany({ data: [
-      { customerId: "ctm_mine", email: me.email, userId: me.id, paddleUpdatedAt: at },
-      { customerId: "ctm_theirs", email: other.email, userId: other.id, paddleUpdatedAt: at },
-    ] });
-    await prisma.paddleSubscription.createMany({ data: [
-      { subscriptionId: "sub_mine", customerId: "ctm_mine", status: "active", priceId: "p", productId: "p", paddleUpdatedAt: at },
-      { subscriptionId: "sub_theirs", customerId: "ctm_theirs", status: "active", priceId: "p", productId: "p", paddleUpdatedAt: at },
+    await prisma.stripeCustomer.createMany({ data: [
+      { customerId: "cus_mine", email: me.email, userId: me.id, stripeEventAt: at },
+      { customerId: "cus_theirs", email: other.email, userId: other.id, stripeEventAt: at },
     ] });
     await signIn(me);
-    expect(await target()).toBe("https://sandbox-customer-portal.paddle.com/cpl_x?token=ctm_mine");
-    expect(create).toHaveBeenCalledWith("ctm_mine", ["sub_mine"]);
+    expect(await target()).toBe("https://billing.stripe.com/p/session/test_cus_mine");
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create.mock.calls[0][0].customer).toBe("cus_mine");
+    expect(create.mock.calls[0][0].return_url).toMatch(/\/account$/);
+  });
+
+  it("says billing failed when Stripe does", async () => {
+    const me = await makeUser();
+    await prisma.stripeCustomer.create({ data: { customerId: "cus_err", userId: me.id, stripeEventAt: new Date() } });
+    await signIn(me);
+    create.mockRejectedValueOnce(new Error("Stripe is down"));
+    expect(await target()).toBe("/account?billing=error");
   });
 });

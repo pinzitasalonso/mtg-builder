@@ -40,15 +40,15 @@ export default function TermsPage() {
 
       <h2 style={H2}>Spellpool Pro (auto-renewing subscription)</h2>
       <p style={P}>
-        Spellpool Pro lifts the free plan&apos;s daily limits on AI asks, deck scans and practice games. It&apos;s
+        Spellpool Pro lifts the free plan&apos;s daily limits on deck editing by chat, deck scans and practice games. It&apos;s
         an auto-renewing subscription, monthly or yearly, at the price shown when you buy. It renews
         automatically at the end of each period until you cancel. Cancelling stops future charges, and Pro
         stays on until the end of the period you&apos;ve paid for.
       </p>
       <p style={P}>
-        <b>On spellpool.com</b>,{" "}our order process is conducted by our online reseller Paddle.com. Paddle.com
-        is the Merchant of Record for all our web orders: it takes the payment, handles sales tax, and
-        provides customer service for billing questions and returns. Manage or cancel from{" "}
+        <b>On spellpool.com</b>,{" "}Pro is sold through Link, the merchant of record of Stripe&apos;s Managed
+        Payments. Link (Stripe) is the seller of all our web orders: it takes the payment, handles VAT and
+        sales tax, sends your receipt, and provides customer service for billing questions and returns. Manage or cancel from{" "}
         <Link href="/account" style={{ color: "var(--gold)" }}>Account</Link> → Manage billing.
       </p>
       <p style={P}>

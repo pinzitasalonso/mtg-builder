@@ -1,7 +1,7 @@
 // Plan limits — the pure half (no Prisma import, so tests stay hermetic;
 // the DB-touching helpers live in lib/limits-db.ts). Tiers live on
 // User.tier: "free" is the default; "pro" (Spellpool Pro, on the web through
-// Paddle and in the iOS app) lifts every cap. Decks have no cap on any plan.
+// Stripe and in the iOS app) lifts every cap. Decks have no cap on any plan.
 
 export const FREE_AI_PER_DAY = 1;
 // Deck scans — the Score plus the AI's written analysis — are dearer than a

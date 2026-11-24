@@ -1,67 +1,48 @@
 // The pricing page's plans. Edit names, copy and features here. Amounts are
-// never written here: the page shows what Paddle's PricePreview returns for
-// the visitor's country.
+// never written here: the page shows the Stripe price that the lookup key
+// names (lib/stripe-billing.ts planPrices). The sandbox and the live account
+// each have their own price ids, but the same lookup keys
+// (scripts/stripe-setup.mjs creates them), so one list serves both.
 //
-// Each Paddle account has its own price IDs, so each environment has its own
-// list, picked by NEXT_PUBLIC_PADDLE_ENV (tiersFor). Live sells Spellpool Pro
-// (pro_01m3jc5f6c602f42wvfjzxyvrc), the same subscription as the iOS app;
-// RevenueCat tracks it and sets User.tier. Sandbox has no copy of that
-// product, so local dev shows the sandbox Pro plan (different amounts).
+// Spellpool Pro is the same subscription as the iOS app's; RevenueCat tracks
+// both and sets User.tier.
 
-import type { PaddleEnv } from "@/lib/paddle-config";
 import { FREE_AI_PER_DAY, FREE_PRACTICE_PER_DAY, FREE_SCANS_PER_DAY } from "@/lib/limits";
 
 export type BillingInterval = "month" | "year";
 
 export interface Tier {
-  name: "Starter" | "Pro" | "Advanced";
+  name: "Pro";
   description: string;
   features: string[];
-  featured?: boolean;
-  priceId: { month: string; year: string };
+  /** The Stripe price lookup key of each interval. */
+  lookupKey: Record<BillingInterval, string>;
+  /** A free trial, set at checkout (not on the price). Only for a first subscription. */
+  trialDays: Partial<Record<BillingInterval, number>>;
 }
 
-const PRO_COPY: Omit<Tier, "priceId"> = {
+export const PRO: Tier = {
   name: "Pro",
-  description: "Every scan, AI answer and practice game you want.",
+  description: "Edit, score and test your decks as often as you like.",
   features: [
-    "Unlimited AI assistant",
+    "Unlimited deck editing by chat: ask for swaps, cuts and upgrades",
+    "Unlimited practice games against the smart bot",
     "Unlimited Deck Score scans",
-    "Unlimited practice games vs AI",
   ],
-  featured: true,
+  // The iOS app's monthly plan has a 7-day trial; the yearly one has none.
+  lookupKey: { month: "spellpool_pro_monthly", year: "spellpool_pro_yearly" },
+  trialDays: { month: 7 },
 };
 
-/** The free plan, shown beside the paid ones for comparison. Not a Paddle product. */
+/** The free plan, shown beside the paid one for comparison. Not a Stripe product. */
 export const FREE_PLAN = {
   name: "Spellpool",
   description: "Everything you need to brew, for as long as you like.",
   features: [
     "Unlimited decks",
-    `${FREE_AI_PER_DAY} AI ask${FREE_AI_PER_DAY === 1 ? "" : "s"} a day, shared by the assistant, AI search and primers`,
+    `${FREE_AI_PER_DAY} chat request${FREE_AI_PER_DAY === 1 ? "" : "s"} a day, for deck edits, card search and primers`,
+    `Unlimited games against the basic bot, and ${FREE_PRACTICE_PER_DAY} a day against the smart bot`,
     `${FREE_SCANS_PER_DAY} Deck Score scan${FREE_SCANS_PER_DAY === 1 ? "" : "s"} a day`,
-    `${FREE_PRACTICE_PER_DAY} practice game${FREE_PRACTICE_PER_DAY === 1 ? "" : "s"} vs AI a day`,
     "Collection, wishlist, combos and playtesting",
   ],
 };
-
-const TIERS: Record<PaddleEnv, Tier[]> = {
-  production: [
-    {
-      ...PRO_COPY,
-      // Spellpool Pro: "Monthly subscription" (7-day trial) and "Annual subscription".
-      priceId: { month: "pri_01m3jc749gfkstxpd90fnw8tka", year: "pri_01m3jc886vgb57afky1f2qyv5f" },
-    },
-  ],
-  sandbox: [
-    {
-      ...PRO_COPY,
-      priceId: { month: "pri_01m7bj4vcsf75zgdsnkfwznybq", year: "pri_01m7bj4vgja995td59vejk70t8" },
-    },
-  ],
-};
-
-/** The plans with the price IDs of this Paddle environment. */
-export function tiersFor(env: PaddleEnv): Tier[] {
-  return TIERS[env];
-}

@@ -7,8 +7,8 @@ export const metadata: Metadata = {
   description: "How to cancel Spellpool Pro and get a refund, on the web and in the iOS app.",
 };
 
-// Plain reading page, styled like /terms and /privacy. Paddle's domain review
-// needs a refund policy linked from the site's navigation (the home footer).
+// Plain reading page, styled like /terms and /privacy, linked from the home
+// footer. Web purchases are sold through Link (Stripe's Managed Payments).
 const H2: React.CSSProperties = { fontFamily: "var(--font-display)", fontSize: 26, margin: "34px 0 10px", color: "var(--t1)" };
 const P: React.CSSProperties = { margin: "0 0 14px", lineHeight: 1.65, color: "var(--t2)", fontSize: 15.5 };
 const A: React.CSSProperties = { color: "var(--gold)" };
@@ -32,12 +32,12 @@ export default function RefundPage() {
 
       <h2 style={H2}>Bought on spellpool.com</h2>
       <p style={P}>
-        Web purchases are processed by Paddle.com, our reseller and Merchant of Record, which takes the
-        payment and issues your receipt.
+        Web purchases are sold through Link, the merchant of record of Stripe&apos;s Managed Payments. Link
+        (Stripe) takes the payment, handles the tax and sends your receipt.
       </p>
       <p style={P}>
-        <b>Cancelling.</b>{" "}Open <Link href="/account" style={A}>Account</Link> and choose <i>Manage billing</i>, or use
-        the link in any Paddle receipt. Cancelling stops future charges; Pro stays on until the end of the
+        <b>Cancelling.</b>{" "}Open <Link href="/account" style={A}>Account</Link> and choose <i>Manage billing</i>, or manage
+        the subscription at <a href="https://link.com" style={A}>link.com</a> with the email you paid with. Cancelling stops future charges; Pro stays on until the end of the
         current billing period.
       </p>
       <p style={P}>
@@ -47,7 +47,7 @@ export default function RefundPage() {
       <p style={P}>
         <b>Refunds.</b>{" "}Ask within 14 days of any payment, first or renewal, for a full refund of that
         payment: email <a href={`mailto:${CONTACT}`} style={A}>{CONTACT}</a> with the email address you paid
-        with, or contact Paddle at <a href="https://paddle.net" style={A}>paddle.net</a>. Refunds go back to
+        with, or contact Link support at <a href="https://support.link.com" style={A}>support.link.com</a>. Refunds go back to
         the original payment method, usually within 5–10 business days. A refunded subscription ends when
         the refund is made.
       </p>
