@@ -46,9 +46,9 @@ export default function TermsPage() {
         stays on until the end of the period you&apos;ve paid for.
       </p>
       <p style={P}>
-        <b>On spellpool.com</b>,{" "}our order process is conducted by our online reseller Paddle.com. Paddle.com
-        is the Merchant of Record for all our web orders: it takes the payment, handles sales tax, and
-        provides customer service for billing questions and returns. Manage or cancel from{" "}
+        <b>On spellpool.com</b>,{" "}Pro is sold through Link, the merchant of record of Stripe&apos;s Managed
+        Payments. Link (Stripe) is the seller of all our web orders: it takes the payment, handles VAT and
+        sales tax, sends your receipt, and provides customer service for billing questions and returns. Manage or cancel from{" "}
         <Link href="/account" style={{ color: "var(--gold)" }}>Account</Link> → Manage billing.
       </p>
       <p style={P}>

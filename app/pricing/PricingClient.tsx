@@ -1,104 +1,44 @@
 "use client";
 
-import { initializePaddle, type Paddle, type PricePreviewParams } from "@paddle/paddle-js";
 import { Check } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import { rememberAfterSignIn } from "@/lib/after-sign-in";
-import type { PaddleClientConfig } from "@/lib/paddle-config";
 import { FREE_PLAN, type BillingInterval, type Tier } from "@/lib/pricing-tiers";
+import { startCheckout } from "./actions";
+
+/** Each interval's price as the page shows it ("€4.99"), tax included. */
+export type Prices = Record<BillingInterval, string>;
 
 interface Props {
-  paddle: PaddleClientConfig;
-  /** The plans, with this environment's price IDs. */
-  tiers: Tier[];
-  /** The signed-in player's Paddle customer (ctm_…), for Paddle Retain. Never our own user id or an email. */
-  customerId?: string;
-  /** ISO country from the edge, or undefined to let Paddle detect it from the IP. */
-  country?: string;
-  email?: string;
-  userId?: number;
+  tier: Tier;
+  /** Null when Stripe couldn't be reached. */
+  prices: Prices | null;
+  /** Whether the free trial is on offer (only before a first web subscription). */
+  trial: boolean;
+  signedIn: boolean;
   /** Already on Pro (User.tier, from RevenueCat): no second subscription. */
   isPro?: boolean;
+  /** Back from a checkout that couldn't be opened. */
+  checkoutFailed?: boolean;
 }
 
-// priceId → Paddle's formatted total ("£8.00"), shown exactly as it comes back,
-// and the price's trial as Paddle reports it (null when it has none).
-type Prices = Record<string, { total: string; trial: string | null }>;
-
-function trialLabel(t: { interval: string; frequency: number } | null | undefined): string | null {
-  if (!t) return null;
-  return `${t.frequency}-${t.interval} free trial`;
-}
-
-export default function PricingClient({ paddle: config, tiers, customerId, country, email, userId, isPro }: Props) {
-  const [paddle, setPaddle] = useState<Paddle>();
+export default function PricingClient({ tier, prices, trial, signedIn, isPro, checkoutFailed }: Props) {
   const [interval, setInterval] = useState<BillingInterval>("month");
-  const [prices, setPrices] = useState<Prices>({});
-  const [error, setError] = useState<string>();
+  const price = prices?.[interval];
+  const trialDays = trial ? tier.trialDays[interval] : undefined;
+  const error = !prices
+    ? "Couldn't load prices. Try again in a moment."
+    : checkoutFailed
+      ? "Couldn't open checkout. Try again in a moment."
+      : undefined;
 
-  // One Paddle.js instance for the page. On a default-payment-link visit
-  // (?_ptxn=txn_…) Paddle.js opens that transaction's checkout by itself.
-  useEffect(() => {
-    let cancelled = false;
-    initializePaddle({
-      environment: config.environment,
-      token: config.token,
-      ...(customerId ? { pwCustomer: { id: customerId } } : {}),
-      checkout: {
-        settings: {
-          displayMode: "overlay",
-          variant: "one-page",
-          successUrl: `${window.location.origin}/welcome`,
-        },
-      },
-    })
-      .then((p) => { if (!cancelled && p) setPaddle(p); })
-      .catch(() => { if (!cancelled) setError("Couldn't load checkout. Try again in a moment."); });
-    return () => { cancelled = true; };
-  }, [config.environment, config.token, customerId]);
-
-  // Both intervals in one call, so the toggle never refetches.
-  useEffect(() => {
-    if (!paddle) return;
-    const params: PricePreviewParams = {
-      items: tiers.flatMap((t) => [
-        { priceId: t.priceId.month, quantity: 1 },
-        { priceId: t.priceId.year, quantity: 1 },
-      ]),
-      ...(country ? { address: { countryCode: country } } : {}),
-    };
-    paddle
-      .PricePreview(params)
-      .then((res) => {
-        const next: Prices = {};
-        for (const item of res.data.details.lineItems) {
-          next[item.price.id] = { total: item.formattedTotals.total, trial: trialLabel(item.price.trialPeriod) };
-        }
-        setPrices(next);
-      })
-      .catch(() => setError("Couldn't load prices. Try again in a moment."));
-  }, [paddle, country, tiers]);
-
-  function subscribe(priceId: string) {
-    // A purchase is credited to an account through customData.userId (the
-    // RevenueCat app user id, and the mirror's link), so checkout needs one.
-    if (!userId) {
-      rememberAfterSignIn("/pricing");
-      window.location.href = "/login";
-      return;
-    }
-    paddle?.Checkout.open({
-      items: [{ priceId, quantity: 1 }],
-      ...(email ? { customer: { email } } : {}),
-      customData: { userId: String(userId) },
-      settings: {
-        displayMode: "overlay",
-        variant: "one-page",
-        successUrl: `${window.location.origin}/welcome`,
-        ...(email ? { allowLogout: false } : {}),
-      },
-    });
+  // A purchase is credited to an account through the checkout's metadata
+  // (the RevenueCat app user id, and the mirror's link), so checkout needs one.
+  function signInFirst() {
+    rememberAfterSignIn("/pricing");
+    window.location.href = "/login";
   }
 
   return (
@@ -138,7 +78,7 @@ export default function PricingClient({ paddle: config, tiers, customerId, count
           <ul style={list}>
             {FREE_PLAN.features.map((f) => <Feature key={f} text={f} muted />)}
           </ul>
-          {userId ? (
+          {signedIn ? (
             <p style={{ ...footNote, marginTop: "auto", padding: "14px 0", textAlign: "center" }}>
               {isPro ? "Included with Pro." : "Your current plan."}
             </p>
@@ -147,52 +87,55 @@ export default function PricingClient({ paddle: config, tiers, customerId, count
           )}
         </section>
 
-        {tiers.map((tier) => {
-          const priceId = tier.priceId[interval];
-          const price = prices[priceId];
-          return (
-            <section key={tier.name} style={{ ...card, ...cardFeatured }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minHeight: 24 }}>
-                <div className="id-label" style={{ color: "var(--gold)" }}>{tier.name}</div>
-                {price?.trial && <span style={badge}>{price.trial}</span>}
-              </div>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 14, minHeight: 64 }} aria-live="polite">
-                {price ? (
-                  <>
-                    <span className="id-display" style={priceBig}>{price.total}</span>
-                    <span style={{ fontSize: 15, fontWeight: 600, color: "var(--t2)" }}>/ {interval}</span>
-                  </>
-                ) : (
-                  <span aria-label="Loading price" style={skeleton} />
-                )}
-              </div>
-              <p style={sub}>{tier.description}</p>
-              <ul style={list}>
-                <li style={{ ...item, color: "var(--t1)", fontWeight: 700 }}>Everything in Free, plus:</li>
-                {tier.features.map((f) => <Feature key={f} text={f} />)}
-              </ul>
-              {isPro ? (
-                <Link href="/account" className="id-ghost" style={{ ...ctaBase, marginTop: "auto" }}>You&apos;re on Pro · Manage</Link>
-              ) : (
-                <button
-                  type="button"
-                  className="id-btn"
-                  onClick={() => subscribe(priceId)}
-                  disabled={!paddle || !price}
-                  style={{ ...ctaBase, marginTop: "auto" }}
-                >
-                  {userId ? (price?.trial ? "Start free trial" : "Subscribe") : "Sign in to subscribe"}
-                </button>
-              )}
-            </section>
-          );
-        })}
+        <section style={{ ...card, ...cardFeatured }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, minHeight: 24 }}>
+            <div className="id-label" style={{ color: "var(--gold)" }}>{tier.name}</div>
+            {trialDays && <span style={badge}>{trialDays}-day free trial</span>}
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 14, minHeight: 64 }} aria-live="polite">
+            {price ? (
+              <>
+                <span className="id-display" style={priceBig}>{price}</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: "var(--t2)" }}>/ {interval}</span>
+              </>
+            ) : (
+              <span aria-label="Price unavailable" style={skeleton} />
+            )}
+          </div>
+          <p style={sub}>{tier.description}</p>
+          <ul style={list}>
+            <li style={{ ...item, color: "var(--t1)", fontWeight: 700 }}>Everything in Free, plus:</li>
+            {tier.features.map((f) => <Feature key={f} text={f} />)}
+          </ul>
+          {isPro ? (
+            <Link href="/account" className="id-ghost" style={{ ...ctaBase, marginTop: "auto" }}>You&apos;re on Pro · Manage</Link>
+          ) : signedIn ? (
+            <form action={startCheckout} style={{ marginTop: "auto" }}>
+              <input type="hidden" name="interval" value={interval} />
+              <SubmitButton disabled={!price} label={trialDays ? "Start free trial" : "Subscribe"} />
+            </form>
+          ) : (
+            <button type="button" className="id-btn" onClick={signInFirst} style={{ ...ctaBase, marginTop: "auto" }}>
+              Sign in to subscribe
+            </button>
+          )}
+        </section>
       </div>
 
       <p style={{ ...footNote, textAlign: "center", marginTop: 22 }}>
-        Cancel any time · Secure checkout by Paddle
+        Prices include tax · Cancel any time · Secure checkout by Stripe
       </p>
     </div>
+  );
+}
+
+// Shows that the click went through while the server makes the checkout.
+function SubmitButton({ disabled, label }: { disabled: boolean; label: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className="id-btn" disabled={disabled || pending} style={ctaBase}>
+      {pending ? "Opening checkout…" : label}
+    </button>
   );
 }
 

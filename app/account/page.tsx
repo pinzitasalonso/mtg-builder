@@ -3,9 +3,7 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import { currentUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { grantsAccess, subscriptionsFor } from "@/lib/paddle-billing";
-import { paddleEnv } from "@/lib/paddle-config";
-import { tiersFor } from "@/lib/pricing-tiers";
+import { grantsAccess, subscriptionsFor } from "@/lib/stripe-billing";
 import { openBillingPortal } from "./actions";
 
 export const metadata: Metadata = {
@@ -15,21 +13,26 @@ export const metadata: Metadata = {
 
 const P: React.CSSProperties = { margin: "0 0 12px", color: "var(--t2)", fontSize: 15.5, lineHeight: 1.6 };
 
-function planOf(priceId: string): string {
-  for (const t of tiersFor(paddleEnv())) {
-    if (t.priceId.month === priceId) return `${t.name} · monthly`;
-    if (t.priceId.year === priceId) return `${t.name} · yearly`;
-  }
-  return "Plan";
+function planOf(interval: string): string {
+  return interval === "month" ? "Pro · monthly" : interval === "year" ? "Pro · yearly" : "Pro";
 }
 
 const STATUS: Record<string, string> = {
   active: "Active",
   trialing: "Free trial",
-  past_due: "Payment failed — Paddle is retrying",
+  past_due: "Payment failed — Stripe is retrying",
+  unpaid: "Unpaid",
   paused: "Paused",
   canceled: "Canceled",
+  incomplete: "Waiting for payment",
+  incomplete_expired: "Payment not completed",
 };
+
+// When a subscription that's still on will end, if the player cancelled it.
+function endsAt(s: { status: string; cancelAt: Date | null; cancelAtPeriodEnd: boolean; currentPeriodEnd: Date | null }): Date | null {
+  if (!grantsAccess(s)) return null;
+  return s.cancelAt ?? (s.cancelAtPeriodEnd ? s.currentPeriodEnd : null);
+}
 
 function day(d: Date): string {
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
@@ -73,14 +76,12 @@ async function Billing({ user, notice }: { user: { id: number; email: string }; 
       <p style={{ ...P, color: "var(--t3)", fontSize: 14 }}>{user.email}</p>
       {current ? (
         <>
-          <h2 style={{ margin: "0 0 6px", fontSize: 22, color: "var(--t1)" }}>{planOf(current.priceId)}</h2>
-          <p style={P}>{STATUS[current.status] ?? current.status}</p>
-          {current.scheduledChangeAction && current.scheduledChangeAt && (
-            <p style={P}>
-              {current.scheduledChangeAction === "cancel" ? "Ends" : current.scheduledChangeAction === "pause" ? "Pauses" : "Resumes"} on{" "}
-              {day(current.scheduledChangeAt)}.
-            </p>
-          )}
+          <h2 style={{ margin: "0 0 6px", fontSize: 22, color: "var(--t1)" }}>{planOf(current.interval)}</h2>
+          <p style={P}>
+            {STATUS[current.status] ?? current.status}
+            {current.status === "trialing" && current.trialEnd && !endsAt(current) && <> · first payment on {day(current.trialEnd)}</>}
+          </p>
+          {endsAt(current) && <p style={P}>Ends on {day(endsAt(current)!)}.</p>}
         </>
       ) : (
         <p style={P}>
@@ -102,7 +103,7 @@ async function Billing({ user, notice }: { user: { id: number; email: string }; 
             Manage billing
           </button>
           <p style={{ ...P, fontSize: 13.5, color: "var(--t3)", margin: "10px 0 0" }}>
-            Update your card, cancel, or download invoices on Paddle&apos;s billing page.
+            Update your card, cancel, or download invoices on Stripe&apos;s billing page.
           </p>
         </form>
       )}

@@ -1,23 +1,21 @@
 import type { Metadata } from "next";
 import { ChevronDown } from "lucide-react";
-import { headers } from "next/headers";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { currentUser } from "@/lib/auth";
 import { isPro } from "@/lib/limits";
-import { customerIdsFor } from "@/lib/paddle-billing";
-import { countryFromHeaders, paddleClientConfig } from "@/lib/paddle-config";
-import { tiersFor } from "@/lib/pricing-tiers";
-import PricingClient from "./PricingClient";
+import { PRO } from "@/lib/pricing-tiers";
+import { formatPrice, hasPaidAccess, planPrices, trialEligible } from "@/lib/stripe-billing";
+import PricingClient, { type Prices } from "./PricingClient";
 
 export const metadata: Metadata = {
   title: "Pricing",
   description: "Spellpool is free to brew with. Spellpool Pro, monthly or yearly, removes the daily limits on the coach, deck scans and practice matches.",
 };
 
-// Rendered per request (it reads the visitor's country and session). Never
-// prerendered at build: a missing Paddle variable must fail this page when
-// it's opened, not every deploy of the site.
+// Rendered per request (it reads the session, and the prices from Stripe).
+// Never prerendered at build: a missing Stripe variable shows on this page
+// when it's opened, not on every deploy of the site.
 export const dynamic = "force-dynamic";
 
 const FAQ: { q: string; a: React.ReactNode }[] = [
@@ -37,16 +35,23 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "Who handles the payment?",
-    a: "Paddle, our reseller and Merchant of Record. It takes the payment, handles sales tax and sends your receipt. Your card details never reach Spellpool.",
+    a: "Stripe. Purchases are sold through Link, Stripe's merchant of record: it takes the payment, handles VAT and sales tax, and sends your receipt. Your card details never reach Spellpool.",
   },
 ];
 
-export default async function PricingPage() {
-  const [h, user] = await Promise.all([headers(), currentUser()]);
-  const paddle = paddleClientConfig();
-  const country = countryFromHeaders(h);
-  // Paddle Retain wants the signed-in player's Paddle customer id, once they have one.
-  const [customerId] = user ? await customerIdsFor(user) : [];
+export default async function PricingPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
+  const [user, { checkout }] = await Promise.all([currentUser(), searchParams]);
+  let prices: Prices | null = null;
+  try {
+    const p = await planPrices();
+    prices = { month: formatPrice(p.month), year: formatPrice(p.year) };
+  } catch (e) {
+    console.error("Stripe prices failed:", e instanceof Error ? e.message : e);
+  }
+  // The trial is for a first web subscription; a signed-out visitor sees it.
+  const trial = user ? await trialEligible(user) : true;
+  // Pro from either store, or a web subscription RevenueCat hasn't reported yet.
+  const pro = isPro(user) || (user ? await hasPaidAccess(user) : false);
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -70,19 +75,18 @@ export default async function PricingPage() {
             <span style={{ color: "var(--gold)" }}>the daily limits.</span>
           </h1>
           <p style={{ fontSize: "clamp(16px,1.5vw,19px)", lineHeight: 1.5, color: "var(--t2)", maxWidth: 520, margin: "0 auto" }}>
-            Spellpool is free to brew with. Pro is for the days you want the assistant, the Score and the practice table
-            as often as you like.
+            Spellpool is free to brew with. Pro is for the days you want to edit your deck with the coach, play practice
+            matches and score your deck as often as you like.
           </p>
         </div>
 
         <PricingClient
-          paddle={paddle}
-          tiers={tiersFor(paddle.environment)}
-          customerId={customerId}
-          country={country}
-          email={user?.email}
-          userId={user?.id}
-          isPro={isPro(user)}
+          tier={PRO}
+          prices={prices}
+          trial={trial}
+          signedIn={!!user}
+          isPro={pro}
+          checkoutFailed={checkout === "error"}
         />
 
         <section aria-labelledby="pricing-faq" style={{ maxWidth: 760, margin: "clamp(56px,7vw,88px) auto 0" }}>

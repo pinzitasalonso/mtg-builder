@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 // Where checkout lands after a successful payment. It only says thanks:
-// access is granted from Paddle's webhook, never from a visit to this page.
+// access comes from RevenueCat, which reads the purchase from Stripe, never from a visit to this page.
 export default function WelcomePage() {
   return (
     <main style={{ maxWidth: 640, margin: "0 auto", padding: "28px 20px 80px", width: "100%" }}>
@@ -17,7 +17,7 @@ export default function WelcomePage() {
         Welcome aboard
       </h1>
       <p style={{ color: "var(--t2)", fontSize: 16, lineHeight: 1.6, margin: "0 0 24px" }}>
-        Your Spellpool Pro subscription is set up. Paddle is emailing your receipt, and Pro unlocks on your account within a minute.
+        Your Spellpool Pro subscription is set up. Link (Stripe's checkout) is emailing your receipt, and Pro unlocks on your account within a minute.
       </p>
       <Link href="/" style={{ color: "var(--accent)", fontWeight: 600 }}>Go to your decks →</Link>
     </main>

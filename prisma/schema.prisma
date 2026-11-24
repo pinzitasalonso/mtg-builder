@@ -397,13 +397,54 @@ model PracticeGame {
   @@index([userId, deck])
 }
 
-// Paddle billing (web), mirrored from verified webhooks (app/api/paddle/webhook).
-// Paddle is the source of truth: these rows are only ever upserted from its
-// events, keyed on Paddle's ids, and never deleted. Each row keeps Paddle's own
-// updated_at, so a late, older delivery can't overwrite newer state.
-//
-// No foreign key from subscription to customer: deliveries arrive in any
-// order, and a subscription.created can land before its customer.created.
+// Stripe billing (web), mirrored from verified webhooks (app/api/stripe/webhook,
+// lib/stripe-webhook.ts). Stripe is the source of truth: rows are upserted
+// from its events, keyed on Stripe's ids. Each row keeps the time of the
+// event that last wrote it, so a late, older delivery can't overwrite newer
+// state. No foreign key from subscription to customer: deliveries arrive in
+// any order.
+model StripeCustomer {
+  customerId    String   @id // cus_…
+  email         String?
+  // The Spellpool account. The server creates the customer with
+  // metadata.userId before the first checkout, so this is known from the
+  // start. Set once, never moved to another account.
+  userId        Int?
+  stripeEventAt DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model StripeSubscription {
+  subscriptionId    String    @id // sub_…
+  customerId        String
+  // Stripe's status: trialing | active | past_due | unpaid | paused | canceled
+  // | incomplete | incomplete_expired. lib/stripe-billing.ts decides which
+  // grant access.
+  status            String
+  priceId           String
+  productId         String
+  interval          String // month | year
+  // A cancel the player asked for: access stays until the date.
+  cancelAtPeriodEnd Boolean   @default(false)
+  cancelAt          DateTime?
+  currentPeriodEnd  DateTime?
+  trialEnd          DateTime?
+  // From the subscription's metadata.userId, which only the server writes.
+  userId            Int?
+  stripeEventAt     DateTime
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([customerId])
+  @@index([userId])
+}
+
+// Paddle billing, no longer used (web billing moved to Stripe). Kept for one
+// deploy so prisma db push doesn't refuse to drop them in the same deploy
+// (see AGENTS.md); remove both models in a later deploy.
 model PaddleCustomer {
   customerId      String   @id // ctm_…
   email           String

@@ -58,12 +58,13 @@ export default function PrivacyPage() {
 
       <h2 style={H2}>Purchases</h2>
       <p style={P}>
-        Pro can be bought in the iOS app through Apple&apos;s App Store, or on spellpool.com through Paddle.com,
-        our reseller and Merchant of Record. Apple or Paddle handles all payment details — your card number
-        never reaches us. For a web purchase, Paddle receives your email, your country and postcode, your
-        payment details and your Spellpool account id, and processes them under its own privacy policy
-        (paddle.com/legal/privacy). We keep a copy of your Paddle customer and subscription records (their
-        ids, status and plan) to know what you&apos;ve bought. We use RevenueCat to know whether a subscription
+        Pro can be bought in the iOS app through Apple&apos;s App Store, or on spellpool.com through Stripe,
+        where it is sold through Link, Stripe&apos;s merchant of record. Apple or Stripe handles all payment
+        details — your card number never reaches us. For a web purchase, Stripe receives your email, your
+        name and billing address, your payment details and your Spellpool account id, and processes them
+        under its own privacy policies (stripe.com/privacy and link.com/privacy). We keep a copy of your
+        Stripe customer and subscription records (their ids, email, status and plan) to know what
+        you&apos;ve bought. We use RevenueCat to know whether a subscription
         is active: it receives your Spellpool account id and purchase state, nothing more.
       </p>
 
