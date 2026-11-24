@@ -4,6 +4,7 @@ import Logo from "@/components/Logo";
 import { currentUser } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { grantsAccess, subscriptionsFor } from "@/lib/stripe-billing";
+import { FREE_AI_PER_DAY, FREE_PRACTICE_PER_DAY, FREE_SCANS_PER_DAY, aiRemaining, isPro, scansRemaining, utcDay, type TierFields } from "@/lib/limits";
 import { openBillingPortal } from "./actions";
 
 export const metadata: Metadata = {
@@ -67,9 +68,22 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   );
 }
 
-async function Billing({ user, notice }: { user: { id: number; email: string }; notice?: string }) {
+async function Billing({ user, notice }: { user: { id: number; email: string } & TierFields; notice?: string }) {
   const subs = await subscriptionsFor(user);
   const current = subs.find(grantsAccess) ?? subs[0];
+  // Pro with no web subscription: bought somewhere else, so there is nothing to manage here.
+  const proElsewhere = isPro(user) && !subs.some(grantsAccess);
+  const free = !isPro(user) && !subs.some(grantsAccess);
+  const matchesToday = free
+    ? await prisma.practiceGame.count({ where: { userId: user.id, bot: false, createdAt: { gte: new Date(`${utcDay()}T00:00:00.000Z`) } } })
+    : 0;
+  const left: [string, number, number][] = free
+    ? [
+        ["Coach questions", aiRemaining(user) ?? 0, FREE_AI_PER_DAY],
+        ["Deck scans", scansRemaining(user) ?? 0, FREE_SCANS_PER_DAY],
+        ["Practice matches", Math.max(0, FREE_PRACTICE_PER_DAY - matchesToday), FREE_PRACTICE_PER_DAY],
+      ]
+    : [];
 
   return (
     <section style={{ padding: 22, borderRadius: 16, background: "var(--bg2)", border: "1px solid var(--border)" }}>
@@ -83,11 +97,31 @@ async function Billing({ user, notice }: { user: { id: number; email: string }; 
           </p>
           {endsAt(current) && <p style={P}>Ends on {day(endsAt(current)!)}.</p>}
         </>
+      ) : proElsewhere ? (
+        <>
+          <h2 style={{ margin: "0 0 6px", fontSize: 22, color: "var(--t1)" }}>Spellpool Pro</h2>
+          <p style={P}>Pro is on for this account. There are no daily limits.</p>
+        </>
       ) : (
-        <p style={P}>
-          No subscription yet.{" "}
-          <Link href="/pricing" style={{ color: "var(--accent)", fontWeight: 600 }}>See plans</Link>
-        </p>
+        <>
+          {/* The free plan, as numbers: what is left today, and the way to more. */}
+          <h2 style={{ margin: "0 0 4px", fontSize: 22, color: "var(--t1)" }}>Free plan</h2>
+          <p style={{ ...P, margin: "0 0 14px" }}>As many decks as you like. What&apos;s left today:</p>
+          <ul style={{ listStyle: "none", margin: "0 0 18px", padding: 0, borderTop: "1px solid var(--line)" }}>
+            {left.map(([what, n, of]) => (
+              <li key={what} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "11px 0", borderBottom: "1px solid var(--line)", fontSize: 15.5 }}>
+                <span style={{ color: "var(--t1)" }}>{what}</span>
+                <span style={{ color: n === 0 ? "var(--danger)" : "var(--t2)", fontVariantNumeric: "tabular-nums" }}>
+                  {n} of {of}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Link href="/pricing" className="id-btn" style={{ padding: "12px 20px", textDecoration: "none" }}>
+            Go Pro: no daily limits
+          </Link>
+          <p style={{ ...P, fontSize: 13.5, color: "var(--t3)", margin: "12px 0 0" }}>The counts start again at midnight UTC.</p>
+        </>
       )}
       {notice === "none" && <p style={{ ...P, color: "var(--danger)" }}>There&apos;s no billing account for this email yet.</p>}
       {notice === "error" && <p style={{ ...P, color: "var(--danger)" }}>Couldn&apos;t open billing. Try again in a moment.</p>}

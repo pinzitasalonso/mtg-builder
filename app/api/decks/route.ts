@@ -44,7 +44,7 @@ export async function GET(req: Request) {
   // page — so the home progress bar shows actual progress toward the format.
   const cards = await prisma.poolCard.findMany({
     where: { deckId: { in: decks.map((d) => d.id) } },
-    select: { deckId: true, colorIdentity: true, board: true, quantity: true, name: true, imageUri: true },
+    select: { deckId: true, colorIdentity: true, board: true, quantity: true, name: true, imageUri: true, typeLine: true },
   });
   // The commander's stored scan, for the tile's art: the tile cuts its art
   // crop from it on cards.scryfall.io instead of asking Scryfall's API by
@@ -54,6 +54,12 @@ export async function GET(req: Request) {
   for (const c of cards) {
     const want = firstCommander.get(c.deckId);
     if (want && c.imageUri && c.name.toLowerCase() === want && !coverByDeck.has(c.deckId)) coverByDeck.set(c.deckId, c.imageUri);
+  }
+  // A deck with no commander (another format, or one not chosen yet) is
+  // faced by its first non-land card, as its link preview is (lib/deck-meta).
+  for (const c of cards) {
+    if (coverByDeck.has(c.deckId) || firstCommander.get(c.deckId)) continue;
+    if (c.board === "deck" && c.imageUri && !c.typeLine?.includes("Land")) coverByDeck.set(c.deckId, c.imageUri);
   }
   const colorsByDeck = new Map<number, Set<string>>();
   const deckCountByDeck = new Map<number, number>();

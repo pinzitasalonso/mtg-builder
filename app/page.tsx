@@ -424,7 +424,7 @@ export default function HomePage() {
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 30, flexWrap: "wrap" }}>
             <div>
               <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Your decks</div>
-              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,52px)", margin: 0, color: "var(--t1)" }}>Pick up where you left off.</h2>
+              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,52px)", margin: 0, color: "var(--t1)", textWrap: "balance" }}>Pick up where you left off.</h2>
               {offline && (
                 <div role="status" style={{ marginTop: 10, fontSize: 13.5, fontWeight: 600, color: "var(--t2)" }}>
                   You’re offline — showing your decks as they were last saved.
@@ -925,7 +925,11 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
           }}
         >
           <div style={{ position: "relative", height: 132, flexShrink: 0 }}>
-            <CardArt name={commanderArtName(deck.commander)} src={deck.cover ?? undefined} label={deck.name} colors={colors} version="art_crop" radius={0} style={{ position: "absolute", inset: 0 }} />
+            {/* No commander and no cards: the deck's colour field alone. (The
+                placeholder used to spell the first two letters of its name.) */}
+            {(deck.commander || deck.cover) && (
+              <CardArt name={commanderArtName(deck.commander)} src={deck.cover ?? undefined} label={deck.name} colors={colors} version="art_crop" radius={0} style={{ position: "absolute", inset: 0 }} />
+            )}
             <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 30%, ${field.deep}ee)` }} />
             <div style={{ position: "absolute", top: 12, left: 14 }}>
               <ColorPips colors={colors} size={20} />
@@ -956,12 +960,18 @@ function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck:
             )}
           </div>
           <div style={{ padding: "14px 18px 16px" }}>
-            <div className="id-display" style={{ fontSize: 30, lineHeight: 0.9, marginBottom: 5, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {/* A line height that holds the descenders: at 0.9 the clip that
+                makes the ellipsis also cut the tails off g, y and p. */}
+            <div className="id-display" style={{ fontSize: 30, lineHeight: 1.2, marginBottom: 1, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               {deck.name}
             </div>
-            <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.78)", marginBottom: meta ? 12 : 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-              {deck.commander || "An untitled brew"}
-            </div>
+            {/* Under the name: who leads it. A Commander deck without one says
+                so; another format has no such line (its format is below). */}
+            {(deck.commander || isCommander) && (
+              <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.78)", marginBottom: meta ? 12 : 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {deck.commander || "No commander yet"}
+              </div>
+            )}
             {meta && (
               <div style={{ fontSize: 13, lineHeight: "20px", color: "rgba(255,255,255,.66)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                 {meta}
