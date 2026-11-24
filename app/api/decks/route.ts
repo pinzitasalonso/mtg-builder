@@ -8,6 +8,7 @@ import { SIGN_IN_FOR_DECKS_MSG } from "@/lib/limits";
 import { recordEvent } from "@/lib/analytics";
 import { scanSummary } from "@/lib/deck-analysis";
 import { sweepEmptyPublicDecks } from "@/lib/public-sweep";
+import { pickPublicBrews } from "@/lib/public-brews";
 
 // One-time: assign an unguessable publicId to any deck created before this
 // column existed, so every deck has a stable URL. No-op once all are filled.
@@ -33,7 +34,9 @@ export async function GET(req: Request) {
     // a day).
     where: listingPublic ? { userId: null, cards: { some: {} } } : { userId: user!.id },
     orderBy: [{ pinned: "desc" }, { createdAt: "desc" }],
-    take: 100,
+    // The public pool is cut down to its finished brews below, so read all
+    // of it (it no longer grows: new decks need an account).
+    take: listingPublic ? 1000 : 100,
   });
   // Aggregate each deck's color identity (WUBRG order) and its real deck size.
   // The card count must reflect only cards promoted to the decklist (board
@@ -66,16 +69,19 @@ export async function GET(req: Request) {
   // The last scan travels as its summary (Score and bracket, for the deck's
   // tile), not as the stored JSON: the full scan is several KB a deck, and
   // both clients read it from /scan on the deck's own page.
-  return jsonWithEtag(
-    req,
-    decks.map(({ analysis, ...d }) => ({
-      ...d,
-      _count: { cards: deckCountByDeck.get(d.id) ?? 0 },
-      colors: ["W", "U", "B", "R", "G"].filter((ch) => colorsByDeck.get(d.id)?.has(ch)),
-      scan: scanSummary(analysis),
-      cover: coverByDeck.get(d.id) ?? null,
-    }))
+  const listed = decks.map(({ analysis, ...d }) => ({
+    ...d,
+    _count: { cards: deckCountByDeck.get(d.id) ?? 0 },
+    colors: ["W", "U", "B", "R", "G"].filter((ch) => colorsByDeck.get(d.id)?.has(ch)),
+    scan: scanSummary(analysis),
+    cover: coverByDeck.get(d.id) ?? null,
+  }));
+  if (!listingPublic) return jsonWithEtag(req, listed);
+  // The public pool: only its finished brews, best first (lib/public-brews.ts).
+  const brews = pickPublicBrews(
+    listed.map((d) => ({ ...d, deckCount: d._count.cards, score: d.scan?.score ?? null })),
   );
+  return jsonWithEtag(req, brews.map(({ deckCount: _n, score: _s, ...d }) => d));
 }
 
 export async function POST(req: Request) {

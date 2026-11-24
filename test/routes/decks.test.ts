@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { jsonRequest, makeUser, params, prisma, signIn, signOut } from "@/test/db";
-import { POST as createDeck } from "@/app/api/decks/route";
+import { GET as listDecks, POST as createDeck } from "@/app/api/decks/route";
 import { POST as addCard } from "@/app/api/decks/[id]/cards/route";
 import { CARD_TEXT_MAX } from "@/lib/api";
 
@@ -91,5 +91,40 @@ describe("POST /api/decks/<id>/cards", () => {
     await addCard(jsonRequest("/x", sol), params({ id: deck.publicId! }));
     const row = await prisma.poolCard.findFirstOrThrow({ where: { deckId: deck.id } });
     expect([row.scryfallId, row.imageUri]).toEqual(["12345678-1234-1234-1234-123456789abc", mine]);
+  });
+});
+
+describe("GET /api/decks?public=1", () => {
+  // An ownerless deck (made before decks needed an account) with `count`
+  // cards in its decklist, the commander first.
+  async function ownerless(name: string, commander: string | null, count: number) {
+    const deck = await prisma.deck.create({ data: { name, commander, publicId: `p-${Math.random().toString(36).slice(2)}` } });
+    const names = [commander ?? "Forest", ...Array.from({ length: Math.max(0, count - 1) }, (_, i) => `Card ${i}`)];
+    await prisma.poolCard.createMany({
+      data: names.slice(0, count).map((n, i) => ({ deckId: deck.id, scryfallId: `${deck.id}-${i}`, name: n, imageUri: IMAGE, board: "deck", colorIdentity: "G" })),
+    });
+    return deck;
+  }
+
+  it("lists only the finished public brews", async () => {
+    signOut();
+    await ownerless("Toph Oppression", "Toph, the First Metalbender", 100);
+    await ownerless("Kwia", "Kwia Vigorbloom", 1);
+    await ownerless("Test Doran", "Doran, Besieged by Time", 100);
+    await ownerless("aloy", null, 100);
+    const res = await listDecks(jsonRequest("/api/decks?public=1"));
+    const names = (await res.json()).map((d: { name: string }) => d.name);
+    expect(names).toContain("Toph Oppression");
+    expect(names).not.toContain("Kwia");
+    expect(names).not.toContain("Test Doran");
+    expect(names).not.toContain("aloy");
+  });
+
+  it("still lists a signed-in player's own decks in full", async () => {
+    const user = await makeUser();
+    await signIn(user);
+    await prisma.deck.create({ data: { name: "Just started", userId: user.id, publicId: `m-${user.id}` } });
+    const res = await listDecks(jsonRequest("/api/decks"));
+    expect((await res.json()).map((d: { name: string }) => d.name)).toEqual(["Just started"]);
   });
 });
