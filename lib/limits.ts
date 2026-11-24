@@ -36,7 +36,12 @@ export const SCAN_LIMIT_MSG =
    messages? The screens that show a route's error use it to put the way to
    Spellpool Pro beside the message. */
 export function isLimitMessage(text: string | null | undefined): boolean {
-  return text === AI_LIMIT_MSG || text === PRACTICE_LIMIT_MSG || text === SCAN_LIMIT_MSG;
+  if (!text) return false;
+  if (text === AI_LIMIT_MSG || text === PRACTICE_LIMIT_MSG || text === SCAN_LIMIT_MSG) return true;
+  // The same messages with other numbers: a page loaded before a deploy that
+  // changed the free limits still gets the server's new wording, and must
+  // still show the way to Pro beside it.
+  return /^You've (used|played) today's .*free .* at midnight UTC\. Spellpool Pro /.test(text);
 }
 
 export interface TierFields {
