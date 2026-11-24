@@ -4,7 +4,7 @@ import Logo from "@/components/Logo";
 
 export const metadata: Metadata = {
   title: "Refund Policy",
-  description: "How to cancel Spellpool Pro and get a refund, on the web and in the iOS app.",
+  description: "How to cancel Spellpool Pro and get a refund.",
 };
 
 // Plain reading page, styled like /terms and /privacy, linked from the home
@@ -21,18 +21,18 @@ export default function RefundPage() {
       <h1 className="id-display" style={{ fontSize: "clamp(34px,6vw,52px)", margin: "26px 0 4px", color: "var(--t1)" }}>
         Refund Policy
       </h1>
-      <p style={{ ...P, color: "var(--t3)" }}>Last updated November 14, 2026 · Applies to Spellpool Pro, sold by Spellpool.</p>
+      <p style={{ ...P, color: "var(--t3)" }}>Last updated November 24, 2026 · Applies to Spellpool Pro, sold on spellpool.com through Link (Stripe).</p>
 
       <h2 style={H2}>The short version</h2>
       <p style={P}>
         You can cancel Spellpool Pro at any time, and you keep Pro until the end of the period you&apos;ve paid
-        for. If you&apos;re unhappy with a payment made on spellpool.com, ask within 14 days of that payment and
-        we&apos;ll refund it in full.
+        for. If you&apos;re unhappy with a payment, ask within 14 days of that payment and we&apos;ll refund it in
+        full.
       </p>
 
-      <h2 style={H2}>Bought on spellpool.com</h2>
+      <h2 style={H2}>Who sells it</h2>
       <p style={P}>
-        Web purchases are sold through Link, the merchant of record of Stripe&apos;s Managed Payments. Link
+        Spellpool Pro is sold through Link, the merchant of record of Stripe&apos;s Managed Payments. Link
         (Stripe) takes the payment, handles the tax and sends your receipt.
       </p>
       <p style={P}>
@@ -50,14 +50,6 @@ export default function RefundPage() {
         with, or contact Link support at <a href="https://support.link.com" style={A}>support.link.com</a>. Refunds go back to
         the original payment method, usually within 5–10 business days. A refunded subscription ends when
         the refund is made.
-      </p>
-
-      <h2 style={H2}>Bought in the iOS app</h2>
-      <p style={P}>
-        Purchases in the iOS app are made through your Apple ID, and Apple handles them: cancel in your Apple
-        ID subscription settings, and request a refund at{" "}
-        <a href="https://reportaproblem.apple.com" style={A}>reportaproblem.apple.com</a>. We can&apos;t refund App
-        Store purchases ourselves.
       </p>
 
       <h2 style={H2}>Your rights</h2>

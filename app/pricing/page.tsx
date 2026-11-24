@@ -30,10 +30,6 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     ),
   },
   {
-    q: "Does Pro work in the iOS app too?",
-    a: "Yes. Pro belongs to your Spellpool account, so it's on wherever you sign in: on the web and in the iOS app.",
-  },
-  {
     q: "Who handles the payment?",
     a: "Stripe. Purchases are sold through Link, Stripe's merchant of record: it takes the payment, handles VAT and sales tax, and sends your receipt. Your card details never reach Spellpool.",
   },

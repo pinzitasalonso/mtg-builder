@@ -19,7 +19,7 @@ export default function PrivacyPage() {
       <h1 className="id-display" style={{ fontSize: "clamp(34px,6vw,52px)", margin: "26px 0 4px", color: "var(--t1)" }}>
         Privacy Policy
       </h1>
-      <p style={{ ...P, color: "var(--t3)" }}>Last updated November 14, 2026 · Applies to spellpool.com and the Spellpool iOS app.</p>
+      <p style={{ ...P, color: "var(--t3)" }}>Last updated November 24, 2026 · Applies to spellpool.com.</p>
 
       <h2 style={H2}>The short version</h2>
       <p style={P}>
@@ -58,10 +58,9 @@ export default function PrivacyPage() {
 
       <h2 style={H2}>Purchases</h2>
       <p style={P}>
-        Pro can be bought in the iOS app through Apple&apos;s App Store, or on spellpool.com through Stripe,
-        where it is sold through Link, Stripe&apos;s merchant of record. Apple or Stripe handles all payment
-        details — your card number never reaches us. For a web purchase, Stripe receives your email, your
-        name and billing address, your payment details and your Spellpool account id, and processes them
+        Pro is bought through Stripe, and sold through Link, Stripe&apos;s merchant of record. Stripe handles
+        all payment details — your card number never reaches us. Stripe receives your email, your name and
+        billing address, your payment details and your Spellpool account id, and processes them
         under its own privacy policies (stripe.com/privacy and link.com/privacy). We keep a copy of your
         Stripe customer and subscription records (their ids, email, status and plan) to know what
         you&apos;ve bought. We use RevenueCat to know whether a subscription

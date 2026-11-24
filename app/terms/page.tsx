@@ -17,10 +17,10 @@ export default function TermsPage() {
       <h1 className="id-display" style={{ fontSize: "clamp(34px,6vw,52px)", margin: "26px 0 4px", color: "var(--t1)" }}>
         Terms of Use
       </h1>
-      <p style={{ ...P, color: "var(--t3)" }}>Last updated November 14, 2026 · Applies to spellpool.com and the Spellpool iOS app.</p>
+      <p style={{ ...P, color: "var(--t3)" }}>Last updated November 24, 2026 · Applies to spellpool.com.</p>
       <p style={P}>
-        Spellpool (&quot;Spellpool&quot;, &quot;we&quot;) runs spellpool.com and the Spellpool iOS app. By using either,
-        you agree to these terms.
+        Spellpool (&quot;Spellpool&quot;, &quot;we&quot;) runs spellpool.com. By using it, you agree to
+        these terms.
       </p>
 
       <h2 style={H2}>The service</h2>
@@ -46,15 +46,10 @@ export default function TermsPage() {
         stays on until the end of the period you&apos;ve paid for.
       </p>
       <p style={P}>
-        <b>On spellpool.com</b>,{" "}Pro is sold through Link, the merchant of record of Stripe&apos;s Managed
-        Payments. Link (Stripe) is the seller of all our web orders: it takes the payment, handles VAT and
-        sales tax, sends your receipt, and provides customer service for billing questions and returns. Manage or cancel from{" "}
+        Pro is sold through Link, the merchant of record of Stripe&apos;s Managed Payments. Link (Stripe) is
+        the seller of all our orders: it takes the payment, handles VAT and sales tax, sends your receipt,
+        and provides customer service for billing questions and returns. Manage or cancel from{" "}
         <Link href="/account" style={{ color: "var(--gold)" }}>Account</Link> → Manage billing.
-      </p>
-      <p style={P}>
-        <b>In the iOS app</b>,{" "}Pro is purchased through your Apple ID and charged to it at confirmation of
-        purchase. It renews unless cancelled at least 24 hours before the end of the current period; manage
-        or cancel it in your Apple ID subscription settings.
       </p>
       <p style={P}>
         Refunds are covered by our <Link href="/refund" style={{ color: "var(--gold)" }}>Refund Policy</Link>.
