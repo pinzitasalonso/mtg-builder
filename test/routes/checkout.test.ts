@@ -48,10 +48,10 @@ describe("startCheckout", () => {
     expect(createSession).not.toHaveBeenCalled();
   });
 
-  it("opens a Managed Payments checkout credited to the account, with the monthly trial", async () => {
+  it("opens a Managed Payments checkout credited to the account, with the yearly trial", async () => {
     const user = await makeUser();
     await signIn(user);
-    expect(await target("month")).toBe("https://checkout.stripe.com/c/pay/cs_test_1");
+    expect(await target("year")).toBe("https://checkout.stripe.com/c/pay/cs_test_1");
 
     // The customer is made with the account in its metadata, and kept.
     expect(createCustomer).toHaveBeenCalledTimes(1);
@@ -63,7 +63,7 @@ describe("startCheckout", () => {
       mode: "subscription",
       managed_payments: { enabled: true },
       customer: customer.customerId,
-      line_items: [{ price: "price_m", quantity: 1 }],
+      line_items: [{ price: "price_y", quantity: 1 }],
       client_reference_id: String(user.id),
       metadata: { userId: String(user.id) },
       subscription_data: { metadata: { userId: String(user.id) }, trial_period_days: 7 },
@@ -75,16 +75,16 @@ describe("startCheckout", () => {
     expect(p).not.toHaveProperty("payment_method_types");
 
     // A second checkout reuses the customer.
-    await target("year");
+    await target("month");
     expect(createCustomer).toHaveBeenCalledTimes(1);
     expect(sessionParams().customer).toBe(customer.customerId);
   });
 
-  it("gives no trial on the yearly plan", async () => {
+  it("gives no trial on the monthly plan", async () => {
     await signIn(await makeUser());
-    await target("year");
+    await target("month");
     const p = sessionParams();
-    expect(p.line_items).toEqual([{ price: "price_y", quantity: 1 }]);
+    expect(p.line_items).toEqual([{ price: "price_m", quantity: 1 }]);
     expect(p.subscription_data).not.toHaveProperty("trial_period_days");
   });
 
@@ -95,7 +95,7 @@ describe("startCheckout", () => {
       userId: user.id, stripeEventAt: new Date(),
     } });
     await signIn(user);
-    await target("month");
+    await target("year");
     expect(sessionParams().subscription_data).not.toHaveProperty("trial_period_days");
   });
 

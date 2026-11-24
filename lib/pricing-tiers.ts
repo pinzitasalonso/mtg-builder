@@ -29,9 +29,9 @@ export const PRO: Tier = {
     "Unlimited practice matches against the smart opponent",
     "Unlimited Deck Score scans",
   ],
-  // The iOS app's monthly plan has a 7-day trial; the yearly one has none.
+  // The yearly plan starts with a 7-day trial; the monthly one has none.
   lookupKey: { month: "spellpool_pro_monthly", year: "spellpool_pro_yearly" },
-  trialDays: { month: 7 },
+  trialDays: { year: 7 },
 };
 
 /** The free plan, shown beside the paid one for comparison. Not a Stripe product. */
