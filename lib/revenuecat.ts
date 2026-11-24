@@ -68,3 +68,37 @@ export function userIdFromAppUserId(appUserId: string): number | null {
   const id = Number(appUserId);
   return Number.isInteger(id) && id > 0 ? id : null;
 }
+
+/* Tell RevenueCat about a web purchase made through Stripe, the way its docs
+   describe for purchases made outside its own checkout: POST /v1/receipts with
+   the Stripe subscription id as the fetch token, the account's id as the app
+   user id, and the RevenueCat Stripe app's PUBLIC key (strp_…). RevenueCat
+   then grants the entitlement and sends its webhook, which sets User.tier.
+   Returns whether RevenueCat took it; never throws. */
+export async function postStripePurchase(
+  appUserId: string,
+  subscriptionId: string,
+  publicKey: string
+): Promise<boolean> {
+  try {
+    const res = await fetch(`${RC_API}/receipts`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${publicKey}`,
+        "X-Platform": "stripe",
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ app_user_id: appUserId, fetch_token: subscriptionId }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`RevenueCat receipt ${res.status}: ${body.slice(0, 300)}`);
+    }
+    return res.ok;
+  } catch (e) {
+    console.error("RevenueCat receipt failed:", e instanceof Error ? e.message : e);
+    return false;
+  }
+}

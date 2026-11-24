@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { isProOnRevenueCat, userIdFromAppUserId } from "@/lib/revenuecat";
 import prisma from "@/lib/prisma";
+import { resolveTier } from "@/lib/tier";
 
 export const runtime = "nodejs";
 
@@ -42,11 +43,12 @@ export async function POST(req: Request) {
   // Re-read the canonical entitlement state and mirror it onto the tier.
   // An indeterminate answer (bad API key, RC outage) changes NOTHING — and
   // returns 500 so RevenueCat retries the event once we're healthy again.
-  const entitled = await isProOnRevenueCat(appUserId as string, secret);
-  if (entitled === null) {
+  // A web (Stripe) subscription keeps the account Pro whatever RevenueCat
+  // says (lib/tier.ts).
+  const tier = await resolveTier(userId, await isProOnRevenueCat(appUserId as string, secret));
+  if (tier === null) {
     return NextResponse.json({ error: "entitlement check failed" }, { status: 500 });
   }
-  const tier = entitled ? "pro" : "free";
   await prisma.user.updateMany({ where: { id: userId }, data: { tier } });
   return NextResponse.json({ ok: true, tier });
 }
