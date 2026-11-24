@@ -1,5 +1,6 @@
 "use client";
 
+import { deckFace } from "@/lib/deck-face";
 import { LimitBar, LimitNotice, PlanPill } from "@/components/Upgrade";
 import { isLimitMessage } from "@/lib/limits";
 import { refreshPlan, usePlan } from "@/lib/plan-client";
@@ -984,7 +985,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   const assistant = useAssistant();
   const plan = usePlan();
   // What stands in for the commander's card when there is no commander.
-  const faceCard = deck?.commander ? null : deckCards.find((c) => c.imageUri && !c.typeLine?.includes("Land")) ?? null;
+  // The same card the home tile and the link preview show (lib/deck-face.ts).
+  const faceCard = deck?.commander ? null : deckFace(null, deckCards);
   const sharedChat = assistant.available === true && !!deck?.canEdit && !deck?.isPublic;
   const assistantFocus = useMemo<AssistantFocus | null>(
     () => (sharedChat && deck ? { publicId: deckId, name: deck.name, pool, ownedNames, onPoolChanged: reloadDeck } : null),

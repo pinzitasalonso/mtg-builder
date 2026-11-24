@@ -1,3 +1,4 @@
+import { deckFace } from "@/lib/deck-face";
 import { NextResponse } from "next/server";
 import { DECK_TEXT_MAX, jsonBody } from "@/lib/api";
 import { jsonWithEtag } from "@/lib/http-cache";
@@ -44,22 +45,23 @@ export async function GET(req: Request) {
   // page — so the home progress bar shows actual progress toward the format.
   const cards = await prisma.poolCard.findMany({
     where: { deckId: { in: decks.map((d) => d.id) } },
-    select: { deckId: true, colorIdentity: true, board: true, quantity: true, name: true, imageUri: true, typeLine: true },
+    select: { deckId: true, colorIdentity: true, board: true, quantity: true, name: true, imageUri: true, typeLine: true, manaCost: true },
   });
-  // The commander's stored scan, for the tile's art: the tile cuts its art
-  // crop from it on cards.scryfall.io instead of asking Scryfall's API by
-  // name, which allows two lookups a second (a home page of decks went over).
-  const firstCommander = new Map(decks.map((d) => [d.id, (d.commander ?? "").split("+")[0].trim().toLowerCase()]));
-  const coverByDeck = new Map<number, string>();
+  // The tile's art is the stored scan of the deck's face (lib/deck-face.ts):
+  // its commander, or with none the card its list is most about. The tile
+  // cuts its art crop from that scan on cards.scryfall.io instead of asking
+  // Scryfall's API by name, which allows two lookups a second (a home page
+  // of decks went over).
+  const cardsByDeck = new Map<number, typeof cards>();
   for (const c of cards) {
-    const want = firstCommander.get(c.deckId);
-    if (want && c.imageUri && c.name.toLowerCase() === want && !coverByDeck.has(c.deckId)) coverByDeck.set(c.deckId, c.imageUri);
+    const list = cardsByDeck.get(c.deckId);
+    if (list) list.push(c);
+    else cardsByDeck.set(c.deckId, [c]);
   }
-  // A deck with no commander (another format, or one not chosen yet) is
-  // faced by its first non-land card, as its link preview is (lib/deck-meta).
-  for (const c of cards) {
-    if (coverByDeck.has(c.deckId) || firstCommander.get(c.deckId)) continue;
-    if (c.board === "deck" && c.imageUri && !c.typeLine?.includes("Land")) coverByDeck.set(c.deckId, c.imageUri);
+  const coverByDeck = new Map<number, string>();
+  for (const d of decks) {
+    const face = deckFace(d.commander, cardsByDeck.get(d.id) ?? []);
+    if (face?.imageUri) coverByDeck.set(d.id, face.imageUri);
   }
   const colorsByDeck = new Map<number, Set<string>>();
   const deckCountByDeck = new Map<number, number>();
