@@ -54,7 +54,7 @@ describe("with an API key", () => {
     const body = sentBody(fetchFn);
     expect(body.from).toBe("Spellpool <hi@spellpool.com>");
     expect(body.to).toEqual(["a@b.co"]);
-    expect(body.subject).toContain("Verify");
+    expect(body.subject).toContain("Confirm your email");
     // Both parts carry the link — a text-only client still has a way through.
     expect(body.text).toContain("https://x/verify?token=t");
     expect(body.html).toContain("https://x/verify?token=t");
