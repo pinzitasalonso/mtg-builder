@@ -1,6 +1,6 @@
 import { prisma, makeUser } from "@/test/db";
 import Stripe from "stripe";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/stripe/webhook/route";
 import { customerIdFor, grantsAccess, hasPaidAccess, subscriptionsFor } from "@/lib/stripe-billing";
 
@@ -165,5 +165,67 @@ describe("grantsAccess", () => {
     for (const status of ["trialing", "active", "past_due"]) expect(grantsAccess({ status })).toBe(true);
     for (const status of ["unpaid", "paused", "canceled", "incomplete", "incomplete_expired"]) expect(grantsAccess({ status })).toBe(false);
     expect(grantsAccess(null)).toBe(false);
+  });
+});
+
+describe("Pro from a web subscription", () => {
+  const tierOf = async (id: number) => (await prisma.user.findUniqueOrThrow({ where: { id }, select: { tier: true } })).tier;
+
+  it("makes the account Pro as soon as its subscription grants access", async () => {
+    const user = await makeUser();
+    expect(await tierOf(user.id)).toBe("free");
+    await POST(delivery(event("customer.subscription.created", subscription({ id: "sub_pro", customer: "cus_pro", userId: String(user.id) }))));
+    expect(await tierOf(user.id)).toBe("pro");
+  });
+
+  it("asks RevenueCat when the subscription ends, and goes free only on its clear no", async () => {
+    const user = await makeUser();
+    const base = { id: "sub_end", customer: "cus_end", userId: String(user.id) };
+    await POST(delivery(event("customer.subscription.created", subscription(base), T0)));
+    expect(await tierOf(user.id)).toBe("pro");
+
+    process.env.REVENUECAT_API_KEY = "rc_test";
+    let rcAnswer: "down" | "none" = "down";
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      if (rcAnswer === "down") throw new Error("RevenueCat is down");
+      return Response.json({ subscriber: { entitlements: {} } });
+    }));
+    try {
+      // RevenueCat can't answer: nothing changes.
+      await POST(delivery(event("customer.subscription.deleted", subscription({ ...base, status: "canceled" }), T0 + 10)));
+      expect(await tierOf(user.id)).toBe("pro");
+      // RevenueCat says no entitlement: free.
+      rcAnswer = "none";
+      await POST(delivery(event("customer.subscription.updated", subscription({ ...base, status: "canceled" }), T0 + 20)));
+      expect(await tierOf(user.id)).toBe("free");
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env.REVENUECAT_API_KEY;
+    }
+  });
+
+  it("hands a finished checkout to RevenueCat with its Stripe app's public key", async () => {
+    const user = await makeUser();
+    process.env.REVENUECAT_STRIPE_PUBLIC_KEY = "strp_test";
+    const calls: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      return Response.json({});
+    }));
+    try {
+      await POST(delivery(event("checkout.session.completed", {
+        id: "cs_test_rc", object: "checkout.session", mode: "subscription", status: "complete",
+        customer: "cus_rc", subscription: "sub_rc", metadata: { userId: String(user.id) },
+      })));
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env.REVENUECAT_STRIPE_PUBLIC_KEY;
+    }
+    const receipt = calls.find((c) => c.url === "https://api.revenuecat.com/v1/receipts");
+    expect(receipt).toBeDefined();
+    const headers = receipt!.init.headers as Record<string, string>;
+    expect(headers.Authorization).toBe("Bearer strp_test");
+    expect(headers["X-Platform"]).toBe("stripe");
+    expect(JSON.parse(String(receipt!.init.body))).toEqual({ app_user_id: String(user.id), fetch_token: "sub_rc" });
   });
 });

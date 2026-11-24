@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth";
 import { isProOnRevenueCat } from "@/lib/revenuecat";
 import prisma from "@/lib/prisma";
+import { resolveTier } from "@/lib/tier";
 
 export const runtime = "nodejs";
 
@@ -21,10 +22,10 @@ export async function POST() {
 
   // Indeterminate (bad key / RC outage) also changes nothing: keep the stored
   // tier rather than stamping a paying subscriber back to free.
-  const entitled = await isProOnRevenueCat(String(user.id), secret);
-  if (entitled === null) return NextResponse.json({ tier: user.tier });
+  // A web (Stripe) subscription counts too (lib/tier.ts).
+  const tier = await resolveTier(user.id, await isProOnRevenueCat(String(user.id), secret));
+  if (tier === null) return NextResponse.json({ tier: user.tier });
 
-  const tier = entitled ? "pro" : "free";
   if (tier !== user.tier) {
     await prisma.user.update({ where: { id: user.id }, data: { tier } });
   }

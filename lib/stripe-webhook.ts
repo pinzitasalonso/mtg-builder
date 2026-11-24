@@ -8,6 +8,8 @@
 import type Stripe from "stripe";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { postStripePurchase } from "@/lib/revenuecat";
+import { refreshTier } from "@/lib/tier";
 
 export async function processStripeEvent(event: Stripe.Event): Promise<void> {
   const at = new Date(event.created * 1000);
@@ -88,6 +90,10 @@ async function upsertSubscription(sub: Stripe.Subscription, at: Date): Promise<v
   }
   const userId = await accountFrom(sub.metadata);
   if (userId) await linkAccount(userId, customerId, sub.id);
+  // Pro follows the subscription: on while it grants access, re-read when
+  // it stops (lib/tier.ts).
+  const linked = await prisma.stripeSubscription.findUnique({ where: { subscriptionId: sub.id }, select: { userId: true } });
+  if (linked?.userId) await refreshTier(linked.userId);
 }
 
 async function upsertCustomer(c: Stripe.Customer, at: Date): Promise<void> {
@@ -113,7 +119,15 @@ async function upsertCustomer(c: Stripe.Customer, at: Date): Promise<void> {
 async function linkCheckout(session: Stripe.Checkout.Session): Promise<void> {
   const userId = await accountFrom(session.metadata);
   const customerId = idOf(session.customer);
-  if (userId && customerId) await linkAccount(userId, customerId, idOf(session.subscription));
+  if (!userId || !customerId) return;
+  const subscriptionId = idOf(session.subscription);
+  await linkAccount(userId, customerId, subscriptionId);
+  // Hand the purchase to RevenueCat too (its Stripe app's public key), so it
+  // shows there and in its charts. A failure is logged, not retried: the
+  // tier doesn't depend on it.
+  const rcKey = process.env.REVENUECAT_STRIPE_PUBLIC_KEY?.trim();
+  if (subscriptionId && rcKey) await postStripePurchase(String(userId), subscriptionId, rcKey);
+  await refreshTier(userId);
 }
 
 // Fills an empty link only: a row linked to one account never moves to another.
