@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+import { LimitNotice } from "@/components/Upgrade";
+import { isLimitMessage } from "@/lib/limits";
+import { rememberUpgradeFrom } from "@/lib/plan-client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Search, Shuffle, Swords } from "lucide-react";
 import type { CommanderLevel } from "@/app/api/practice/commander/route";
@@ -14,7 +18,7 @@ import { ColorPips } from "@/components/mtg";
 
    Picking a tile doesn't start the game: it goes to the bar at the bottom,
    which says what you'd face (and, for a commander, at which bracket) and has
-   the Play button. A free account has one game a day, so the bar says so
+   the Play button. A free account has a few games a day, so the bar says so
    before it's spent. */
 
 type TabId = "suggested" | "search" | "tournament" | "mine";
@@ -150,7 +154,7 @@ export default function OpponentPicker({
             <h2 className="id-display pk-title">Pick an opponent</h2>
             {free && (
               <span className="pk-free" data-spent={spent || undefined}>
-                {spent ? "Today’s free game is used" : `${free.left} free ${free.left === 1 ? "game" : "games"} today`}
+                {spent ? (free.perDay === 1 ? "Today’s free match is used" : "Today’s free matches are used") : `${free.left} free ${free.left === 1 ? "match" : "matches"} left today`}
               </span>
             )}
           </div>
@@ -167,7 +171,10 @@ export default function OpponentPicker({
           </p>
           {spent && (
             <p className="pt-pick-note pk-spent">
-              A free account plays one match against the smart opponent a day: it’s back tomorrow, and unlimited with Spellpool Pro. The basic opponent is free, as often as you like.
+              A free account plays {free?.perDay === 1 ? "one match" : `${free?.perDay ?? 2} matches`} a day against the smart opponent. {free?.perDay === 1 ? "It’s" : "They’re"} back tomorrow. The basic opponent is free, as often as you like.{" "}
+              <Link href="/pricing" onClick={rememberUpgradeFrom} className="go-pro-link">
+                Go Pro for unlimited matches
+              </Link>
             </p>
           )}
           {saved && (
@@ -186,11 +193,14 @@ export default function OpponentPicker({
               </span>
             </div>
           )}
-          {(error || loadError) && (
-            <p className="pt-pick-error" role="alert">
-              {error || loadError}
-            </p>
-          )}
+          {(error || loadError) &&
+            (isLimitMessage(error) ? (
+              <LimitNotice text={error} style={{ margin: "0 0 12px" }} />
+            ) : (
+              <p className="pt-pick-error" role="alert">
+                {error || loadError}
+              </p>
+            ))}
 
           {!data && !loadError && (
             <div className="pt-pick-wait">
@@ -303,7 +313,7 @@ export default function OpponentPicker({
               <button type="button" className="pt-btn pt-btn-gold pk-play" disabled={blocked} onClick={play}>
                 {starting ? <Loader2 size={16} className="spin" /> : <Swords size={16} />} {starting ? "Shuffling up…" : bot ? "Play the bot" : "Play"}
               </button>
-              <span className="pk-bar-free">{bot ? "Free: the bot doesn’t plan ahead" : free ? "Uses today’s free game" : "A model plans its turns"}</span>
+              <span className="pk-bar-free">{bot ? "Free: the bot doesn’t plan ahead" : free ? (free.perDay === 1 ? "Uses today’s free match" : "Uses one of today’s free matches") : "A model plans its turns"}</span>
             </div>
           </div>
         </div>

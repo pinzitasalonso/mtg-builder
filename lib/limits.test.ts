@@ -34,10 +34,11 @@ describe("aiRemaining", () => {
 describe("scansRemaining", () => {
   const now = new Date("2026-07-11T10:00:00Z");
 
-  it("gives free users one scan a day, and pro unlimited", () => {
+  it("gives free users the day's scans, and pro unlimited", () => {
     expect(scansRemaining({ tier: "free", scanDay: null, scanCount: 0 }, now)).toBe(FREE_SCANS_PER_DAY);
     expect(scansRemaining({ tier: "free", scanDay: "2026-07-10", scanCount: 1 }, now)).toBe(FREE_SCANS_PER_DAY);
-    expect(scansRemaining({ tier: "free", scanDay: "2026-07-11", scanCount: 1 }, now)).toBe(0);
+    expect(scansRemaining({ tier: "free", scanDay: "2026-07-11", scanCount: FREE_SCANS_PER_DAY - 1 }, now)).toBe(1);
+    expect(scansRemaining({ tier: "free", scanDay: "2026-07-11", scanCount: FREE_SCANS_PER_DAY }, now)).toBe(0);
     expect(scansRemaining({ tier: "pro", scanDay: "2026-07-11", scanCount: 9 }, now)).toBeNull();
   });
 });

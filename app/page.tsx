@@ -11,6 +11,7 @@ import { DECKS_CHANGED_EVENT, useAssistant } from "@/components/assistant/Assist
 import { forget, forgetAll, peek, remember } from "@/lib/client-cache";
 import { forgetOfflineData, forgetSession, offlineSession, rememberSession } from "@/lib/offline-session";
 import LandingVisual from "@/components/LandingVisual";
+import { PlanPill } from "@/components/Upgrade";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollectionSummary } from "@/lib/collection-client";
@@ -277,44 +278,10 @@ export default function HomePage() {
     loadAll();
   }
 
-  /// The free plan's counter: AI asks left today. Rendered only for a free
-  /// account — pro has no numbers worth watching, which is what the PRO badge
-  /// says instead. A deck count shows only if the server ever sends a
-  /// `deckLimit` again (it sends null: decks have no cap).
-  const planMeter = (() => {
-    if (!me) return null;
-    const parts: string[] = [];
-    if (typeof me.deckLimit === "number") parts.push(`${decks.length}/${me.deckLimit} decks`);
-    if (typeof me.aiRemaining === "number") parts.push(`${me.aiRemaining} coach ${me.aiRemaining === 1 ? "question" : "questions"} left`);
-    if (parts.length === 0) return null;
-    const spent = typeof me.deckLimit === "number" && decks.length >= me.deckLimit;
-    // The meter and the way past it in one pill: what's left today, then Go Pro.
-    return (
-      <Link
-        href="/pricing"
-        className="home-meter home-meter-link"
-        title="Free plan. Spellpool Pro removes the daily limits."
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 8,
-          fontSize: 11.5,
-          fontWeight: 600,
-          letterSpacing: "0.02em",
-          border: "1px solid var(--line)",
-          padding: "3px 4px 3px 10px",
-          borderRadius: 999,
-          whiteSpace: "nowrap",
-          textDecoration: "none",
-        }}
-      >
-        <span className="home-meter-count" style={{ color: spent ? "var(--danger)" : "var(--t3)" }}>{parts.join(" · ")}</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 800, color: "var(--accent-ink)", background: "var(--gold)", padding: "2px 8px", borderRadius: 999 }}>
-          <Sparkles size={11} strokeWidth={2.5} aria-hidden="true" /> Go Pro
-        </span>
-      </Link>
-    );
-  })();
+  /// The free plan's pill: coach questions left today, then Go Pro. Only for
+  /// a free account: Pro has no numbers worth watching, which is what the PRO
+  /// badge says instead.
+  const planMeter = me && typeof me.aiRemaining === "number" ? <PlanPill left={me.aiRemaining} /> : null;
 
   // Pinned decks sort first; the list re-fetches so the order follows.
   async function pinDeck(id: string, pinned: boolean) {

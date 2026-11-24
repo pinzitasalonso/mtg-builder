@@ -23,6 +23,10 @@
 // is metered — so the pane reads whatever the last scan stored and offers the
 // button to run a new one.
 
+import Link from "next/link";
+import { refreshPlan, rememberUpgradeFrom } from "@/lib/plan-client";
+import { LimitNotice } from "@/components/Upgrade";
+import { isLimitMessage } from "@/lib/limits";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, Link2, ScanSearch } from "lucide-react";
 import type { DeckScoreReport } from "@/lib/deck-score-report";
@@ -658,6 +662,7 @@ export function InsightScan({
         body: JSON.stringify({ notes }),
       });
       const body = await res.json().catch(() => ({}));
+      refreshPlan();
       if (!res.ok) {
         setError(body?.error ?? "The scan failed.");
         if (res.status === 429) setRemaining(0);
@@ -675,6 +680,14 @@ export function InsightScan({
   const meter =
     remaining === undefined ? null : remaining === null ? "Unlimited scans on Pro" : `${remaining} free scan${remaining === 1 ? "" : "s"} left today`;
   const exhausted = remaining === 0;
+  // Out of scans for today: the way to more sits beside the meter, and a
+  // refused scan gets the full notice.
+  const goPro = exhausted && !isLimitMessage(error) && (
+    <Link href="/pricing" onClick={rememberUpgradeFrom} className="go-pro-link" style={{ fontSize: 12 }}>
+      Go Pro for unlimited scans
+    </Link>
+  );
+  const refused = isLimitMessage(error) && error ? <LimitNotice text={error} style={{ marginTop: 10, maxWidth: 560 }} /> : null;
 
   return (
     <div style={{ marginTop: 12 }}>
@@ -685,8 +698,10 @@ export function InsightScan({
           </Pill>
           {hasPrimer && !running && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>guided by your primer</span>}
           {meter && <span style={{ fontSize: 11.5, color: exhausted ? "var(--gold)" : "var(--w-3)" }}>{meter}</span>}
+          {goPro}
           {running && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>about half a minute — you can keep working</span>}
-          {error && <span style={{ fontSize: 12, color: "var(--gold)" }}>{error}</span>}
+          {error && !refused && <span style={{ fontSize: 12, color: "var(--gold)" }}>{error}</span>}
+          {refused && <div style={{ flexBasis: "100%" }}>{refused}</div>}
         </div>
       ) : (
         <div className="id-panel" style={{ padding: 14, maxWidth: 560 }}>
@@ -718,11 +733,13 @@ export function InsightScan({
               Cancel
             </button>
             {meter && <span style={{ fontSize: 11.5, color: exhausted ? "var(--gold)" : "var(--w-3)" }}>{meter}</span>}
+            {goPro}
           </div>
           {running && (
             <div style={{ fontSize: 12, color: "var(--w-3)", marginTop: 8 }}>Reading the list, goldfishing a few hundred hands, writing it up — about half a minute.</div>
           )}
-          {error && <div style={{ fontSize: 12.5, color: "var(--gold)", marginTop: 8, lineHeight: 1.5 }}>{error}</div>}
+          {error && !refused && <div style={{ fontSize: 12.5, color: "var(--gold)", marginTop: 8, lineHeight: 1.5 }}>{error}</div>}
+          {refused}
         </div>
       )}
     </div>
