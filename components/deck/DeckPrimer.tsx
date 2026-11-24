@@ -12,6 +12,9 @@
    working here without a second parser. Cards are styled but not clickable —
    a primer is for reading, not for adding cards. */
 
+import { LimitNotice } from "@/components/Upgrade";
+import { isLimitMessage } from "@/lib/limits";
+import { refreshPlan } from "@/lib/plan-client";
 import { useMemo, useRef, useState } from "react";
 import { Sparkles, Square } from "lucide-react";
 import { Block, InlineToken, parseBlocks } from "@/lib/chat-markdown";
@@ -60,6 +63,7 @@ export default function DeckPrimer({
         body: "{}",
         signal: abort.signal,
       });
+      refreshPlan();
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Couldn’t write a draft right now.");
@@ -154,7 +158,12 @@ export default function DeckPrimer({
         </div>
       </div>
 
-      {aiError && <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--danger)" }}>{aiError}</p>}
+      {aiError &&
+        (isLimitMessage(aiError) ? (
+          <LimitNotice text={aiError} style={{ margin: "0 0 10px" }} />
+        ) : (
+          <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--danger)" }}>{aiError}</p>
+        ))}
       {drafting ? (
         draft ? (
           <PrimerMarkdown text={draft} />

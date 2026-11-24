@@ -5,6 +5,8 @@
 // quota — if the app is ever scaled to multiple instances, move these buckets
 // to a shared store (Redis/DB).
 
+import { FREE_AI_PER_DAY } from "@/lib/limits";
+
 // key → recent hit timestamps (ms), pruned to the caller's window on access.
 const buckets = new Map<string, number[]>();
 let lastSweep = Date.now();
@@ -78,7 +80,7 @@ export function clientIp(req: Request): string {
    per-minute budget, but it had no daily ceiling, reset on every restart and
    spent the site's own Anthropic key; an account gives each player a daily
    meter instead (lib/limits). */
-export const SIGN_IN_FOR_AI_MSG = "Sign in to ask the coach — it's free, and you get a question a day.";
+export const SIGN_IN_FOR_AI_MSG = `Sign in to ask the coach — it's free, and you get ${FREE_AI_PER_DAY === 1 ? "a question" : `${FREE_AI_PER_DAY} questions`} a day.`;
 
 /* ---- auth throttles ----------------------------------------------------- */
 

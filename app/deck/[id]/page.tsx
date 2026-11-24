@@ -1,5 +1,8 @@
 "use client";
 
+import { LimitBar, LimitNotice, PlanPill } from "@/components/Upgrade";
+import { isLimitMessage } from "@/lib/limits";
+import { refreshPlan, usePlan } from "@/lib/plan-client";
 import { use, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -589,6 +592,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
           }),
         });
         const data = await res.json();
+        refreshPlan();
         if (!res.ok) {
           setSearchError(data.details?.details ?? data.error ?? "Search failed");
         } else {
@@ -978,6 +982,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // deck, told this is the deck on screen. Otherwise (signed out, someone
   // else's shared deck, an ownerless public one) it's this page's own chat.
   const assistant = useAssistant();
+  const plan = usePlan();
   const sharedChat = assistant.available === true && !!deck?.canEdit && !deck?.isPublic;
   const assistantFocus = useMemo<AssistantFocus | null>(
     () => (sharedChat && deck ? { publicId: deckId, name: deck.name, pool, ownedNames, onPoolChanged: reloadDeck } : null),
@@ -1056,6 +1061,10 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
               labels for Playtest and Share, and the Tools chevron drop out
               (see .deck-header in globals.css), and each keeps an aria-label. */}
           <div className="deck-header-actions" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", minWidth: 0 }}>
+            {/* A free account sees the way to Pro here too (wide screens:
+                on a phone this row is full, and the bar below says it once
+                today's allowance is gone). */}
+            {plan?.signedIn && !plan.pro && <PlanPill />}
             {/* Shown to a non-owner too. Copy decklist and Buy list were a hero
                 button and a top-bar button, both ungated; folding them in here
                 behind `canEdit` would have quietly taken them away from anyone
@@ -1108,6 +1117,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             )}
           </div>
         </header>
+        <LimitBar />
         {/* The Tools menu lives outside the header: the header's backdrop-filter
             makes it the containing block for fixed children, which shrank the
             click-away layer to the header's own height — so a click on the
@@ -1554,7 +1564,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             )}
 
             {searchMode === "scryfall" && searchError && (
-              <div style={{ marginTop: 12 }}><ErrorNote>{searchError}</ErrorNote></div>
+              <div style={{ marginTop: 12 }}>{isLimitMessage(searchError) ? <LimitNotice text={searchError} /> : <ErrorNote>{searchError}</ErrorNote>}</div>
             )}
             {searchMode === "scryfall" && !swipeOpen && searchResults.length > 0 && (
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, fontSize: 13.5, color: "var(--text-muted)" }}>

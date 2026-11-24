@@ -1,5 +1,8 @@
 "use client";
 
+import { LimitNotice } from "@/components/Upgrade";
+import { isLimitMessage } from "@/lib/limits";
+import { refreshPlan, rememberUpgradeFrom, usePlan } from "@/lib/plan-client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Plus, Sparkles, Square, X, ZoomIn } from "lucide-react";
@@ -315,9 +318,10 @@ export function useDeckChat({
           deckId,
         }),
       });
+      refreshPlan();
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "The assistant is unavailable right now.");
+        throw new Error(data.error || "The coach is unavailable right now.");
       }
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -404,6 +408,7 @@ export default function DeckChat({
    *  mount too, if it's already bumped). 0 never focuses. */
   focusSignal?: number;
 }) {
+  const plan = usePlan();
   const {
     messages,
     input,
@@ -530,9 +535,12 @@ export default function DeckChat({
         </div>
       )}
 
-      {error && (
-        <div style={{ fontSize: 13.5, color: "var(--danger)", padding: "0 2px" }}>{error}</div>
-      )}
+      {error &&
+        (isLimitMessage(error) ? (
+          <LimitNotice text={error} />
+        ) : (
+          <div style={{ fontSize: 13.5, color: "var(--danger)", padding: "0 2px" }}>{error}</div>
+        ))}
 
       {/* intro line + one-tap starters (only before the first message) */}
       {empty && (
@@ -594,7 +602,7 @@ export default function DeckChat({
               doSend(input);
             }
           }}
-          placeholder="Tell the assistant your idea…"
+          placeholder="Tell the coach your idea…"
           rows={1}
           style={{
             flex: 1,
@@ -673,6 +681,16 @@ export default function DeckChat({
           </button>
         )}
       </form>
+
+      {/* A free account's count, where the questions are asked. */}
+      {plan?.signedIn && !plan.pro && typeof plan.ai === "number" && !isLimitMessage(error) && (
+        <div className="coach-meter" data-spent={plan.ai === 0 || undefined}>
+          {plan.ai === 0 ? "No coach questions left today." : `${plan.ai} coach ${plan.ai === 1 ? "question" : "questions"} left today.`}{" "}
+          <Link href="/pricing" onClick={rememberUpgradeFrom} className="go-pro-link">
+            Go Pro
+          </Link>
+        </div>
+      )}
 
       {preview && <CardPreview preview={preview} onDismiss={() => setPreview(null)} />}
     </div>

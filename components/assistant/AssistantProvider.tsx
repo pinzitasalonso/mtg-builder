@@ -1,5 +1,6 @@
 "use client";
 
+import { refreshPlan } from "@/lib/plan-client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sparkles } from "lucide-react";
@@ -238,8 +239,10 @@ export default function AssistantProvider({ children }: { children: React.ReactN
         body: JSON.stringify({ content, deckId: focusRef.current?.publicId ?? null }),
       }).catch(() => null);
       const data = res ? await res.json().catch(() => ({})) : {};
+      // A question was spent, or refused: the plan pill and bar follow.
+      refreshPlan();
       if (!res || !res.ok) {
-        setSendError(data.error || "The assistant is unavailable right now.");
+        setSendError(data.error || "The coach is unavailable right now.");
         setInput((cur) => cur || content);
         return;
       }
