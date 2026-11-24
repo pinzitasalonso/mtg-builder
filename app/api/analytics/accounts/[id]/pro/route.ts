@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { isAnalyticsAdmin } from "@/lib/analytics";
 import { isProOnRevenueCat } from "@/lib/revenuecat";
+import { resolveTier } from "@/lib/tier";
 
 export const runtime = "nodejs";
 
@@ -22,11 +23,11 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
 
   const key = process.env.REVENUECAT_API_KEY;
   if (!key) return NextResponse.json({ error: "RevenueCat isn't set up on this server.", tier: user.tier }, { status: 503 });
-  const entitled = await isProOnRevenueCat(String(user.id), key);
-  if (entitled === null) {
+  // A web (Stripe) subscription counts too (lib/tier.ts).
+  const tier = await resolveTier(user.id, await isProOnRevenueCat(String(user.id), key));
+  if (tier === null) {
     return NextResponse.json({ error: "RevenueCat didn't give a clear answer, so nothing changed. Try again in a minute.", tier: user.tier }, { status: 502 });
   }
-  const tier = entitled ? "pro" : "free";
   if (tier !== user.tier) await prisma.user.update({ where: { id }, data: { tier } });
   console.log(`[admin] re-checked Pro for user ${id}: ${user.tier} -> ${tier}`);
   return NextResponse.json({ tier, was: user.tier });

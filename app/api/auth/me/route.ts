@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@/lib/auth";
 import { aiRemaining, scansRemaining } from "@/lib/limits";
+import { promoteIfSubscribed } from "@/lib/tier";
 
 export const runtime = "nodejs";
 
 export async function GET() {
   const user = await currentUser();
   if (!user) return NextResponse.json({ user: null });
+  // A web subscriber whose Pro isn't stored yet gets it now (lib/tier.ts).
+  user.tier = await promoteIfSubscribed(user);
   // Clients render plan state from this: null limits mean unlimited (pro).
   return NextResponse.json({
     user: {

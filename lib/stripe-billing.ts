@@ -32,7 +32,7 @@ export function grantsAccess(sub: { status: string } | null | undefined): boolea
 }
 
 /** The account's subscriptions, newest first. */
-export async function subscriptionsFor(user: BillingUser) {
+export async function subscriptionsFor(user: { id: number }) {
   const customers = await prisma.stripeCustomer.findMany({ where: { userId: user.id }, select: { customerId: true } });
   return prisma.stripeSubscription.findMany({
     where: { OR: [{ userId: user.id }, { customerId: { in: customers.map((c) => c.customerId) } }] },
@@ -41,7 +41,7 @@ export async function subscriptionsFor(user: BillingUser) {
 }
 
 /** Whether any of the account's subscriptions grants access now. */
-export async function hasPaidAccess(user: BillingUser): Promise<boolean> {
+export async function hasPaidAccess(user: { id: number }): Promise<boolean> {
   return (await subscriptionsFor(user)).some(grantsAccess);
 }
 
@@ -90,7 +90,7 @@ export async function ensureCustomer(user: BillingUser): Promise<string> {
 }
 
 /** Whether a free trial is still on offer: only before the account's first web subscription. */
-export async function trialEligible(user: BillingUser): Promise<boolean> {
+export async function trialEligible(user: { id: number }): Promise<boolean> {
   return (await subscriptionsFor(user)).length === 0;
 }
 
