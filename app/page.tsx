@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, Check, ChevronDown, Copy, Dices, Gauge, Heart, History, Library, Link2, LogOut, Pin, Plus, ShoppingCart, Smartphone, Sparkles, Trash2, type LucideIcon } from "lucide-react";
-import { LANDING_FAQ, LANDING_FEATURES, landingJsonLd, type LandingFeature } from "@/lib/landing";
+import { ArrowRight, Check, ChevronDown, Copy, Heart, Library, LogOut, Pin, Plus, Sparkles, Trash2 } from "lucide-react";
+import { LANDING_FAQ, LANDING_FEATURES, landingJsonLd } from "@/lib/landing";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
@@ -58,16 +58,6 @@ type Me = {
   deckLimit?: number | null;
 } | null;
 
-const FEATURE_ICON: Record<LandingFeature["icon"], LucideIcon> = {
-  sparkles: Sparkles,
-  gauge: Gauge,
-  link: Link2,
-  library: Library,
-  dices: Dices,
-  history: History,
-  cart: ShoppingCart,
-  phone: Smartphone,
-};
 
 const FEATURES: { n: string; t: string; d: string; v: "prompt" | "swipe" | "curve" }[] = [
   { v: "prompt", n: "01", t: "Pour in a theme", d: "Tell Spellpool a commander, a combo, or just a vibe. It reads the whole Oracle text database — not just card names." },
@@ -489,15 +479,19 @@ export default function HomePage() {
           <div style={{ maxWidth: 1180, margin: "0 auto" }}>
             <Reveal>
               <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>How it works</div>
-              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: "0 0 48px", maxWidth: 720, color: "var(--t1)" }}>
+              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: "0 0 48px", maxWidth: 720, color: "var(--t1)", textWrap: "balance" }}>
                 From a sentence to a sideboard.
               </h2>
             </Reveal>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 0 }}>
+            {/* Three equal columns: the rule above each is its own, so the
+                gap between columns shows as a break in the line. */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0 28px" }}>
               {FEATURES.map((f, i) => (
                 <Reveal key={f.n} delay={120 + i * 90}>
-                  <div style={{ padding: "28px 28px 28px 0", borderTop: "1px solid var(--line)", marginRight: i < FEATURES.length - 1 ? 28 : 0, height: "100%" }}>
-                    <LandingVisual icon={f.v} />
+                  <div style={{ padding: "28px 0", borderTop: "1px solid var(--line)", height: "100%" }}>
+                    <div className="lv-well">
+                      <LandingVisual kind={f.v} />
+                    </div>
                     <div className="id-mono" style={{ fontSize: 13, color: "var(--gold)", marginBottom: 10 }}>{f.n}</div>
                     <div className="id-display" style={{ fontSize: 26, marginBottom: 10, color: "var(--t1)" }}>{f.t}</div>
                     <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)", margin: 0 }}>{f.d}</p>
@@ -515,23 +509,21 @@ export default function HomePage() {
         <section aria-labelledby="features-title" style={{ padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px)" }}>
           <div style={{ maxWidth: 1180, margin: "0 auto" }}>
             <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Everything in the pool</div>
-            <h2 id="features-title" className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: "0 0 40px", maxWidth: 760, color: "var(--t1)" }}>
+            <h2 id="features-title" className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: "0 0 40px", maxWidth: 760, color: "var(--t1)", textWrap: "balance" }}>
               Build it, score it, play it, own it.
             </h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16 }}>
-              {LANDING_FEATURES.map((f) => {
-                const Icon = FEATURE_ICON[f.icon];
-                return (
-                  <article key={f.title} style={{ padding: "16px 16px 22px", borderRadius: 18, background: "var(--bg2)", boxShadow: "inset 0 0 0 1px var(--line)" }}>
-                    <LandingVisual icon={f.icon} />
-                    <h3 style={{ margin: "0 6px 8px", display: "flex", alignItems: "center", gap: 8, fontSize: 17, fontWeight: 700, color: "var(--t1)" }}>
-                      <Icon size={18} strokeWidth={2.25} color="var(--gold)" aria-hidden="true" style={{ flex: "none" }} />
-                      {f.title}
-                    </h3>
-                    <p style={{ margin: "0 6px", fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)" }}>{f.body}</p>
-                  </article>
-                );
-              })}
+            {/* One large tile and seven small ones. The words are short
+                because the pictures are the app's own screens. */}
+            <div className="lv-grid">
+              {LANDING_FEATURES.map((f, i) => (
+                <article key={f.title} className="lv-tile" data-wide={i === 0 || undefined}>
+                  <div className="lv-copy">
+                    <h3>{f.title}</h3>
+                    <p>{f.body}</p>
+                  </div>
+                  <LandingVisual kind={f.visual} />
+                </article>
+              ))}
             </div>
 
             <h2 id="faq-title" className="id-display" style={{ fontSize: "clamp(28px,3.6vw,40px)", margin: "clamp(56px,7vw,88px) 0 18px", color: "var(--t1)" }}>

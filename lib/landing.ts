@@ -11,60 +11,57 @@ export const SITE_DESCRIPTION =
   "collection, and ask a coach that reads all your decks at once.";
 
 export interface LandingFeature {
-  /** A lucide icon name, mapped to the component on the page. */
-  icon: "sparkles" | "gauge" | "link" | "library" | "dices" | "history" | "cart" | "phone";
-  // (No mention of the iPhone app, or of the AI model by name, until the app
+  /** Which picture the tile shows (components/LandingVisual.tsx). */
+  visual: "coach" | "score" | "combos" | "versions" | "playtest" | "buy" | "collection" | "phone";
+  // (No mention of the iPhone app, or of the model by name, until the app
   // ships — the web on a phone is the mobile story for now.)
   title: string;
+  /** One sentence: the picture beside it does the rest. */
   body: string;
 }
 
+// In the order the grid lays them out: the coach is the large tile, and no
+// two tiles side by side show the same kind of picture.
 export const LANDING_FEATURES: LandingFeature[] = [
   {
-    icon: "sparkles",
-    title: "An assistant for every deck",
-    body:
-      "Ask across all your decks and your collection at once: which is strongest, what to build next, what to buy. " +
-      "It can build a new deck or edit one, saving a version first.",
+    visual: "coach",
+    title: "A coach for every deck",
+    body: "Ask about one deck or all of them at once. It can make the changes for you, and it saves a version first.",
   },
   {
-    icon: "gauge",
+    visual: "score",
     title: "Deck Score and brackets",
-    body:
-      "Speed, consistency, interaction and resilience on DeckCheck's published scale, the Commander bracket it " +
-      "really plays at, and a written analysis of how it wins.",
+    body: "Speed, consistency, interaction and resilience out of 10, and the Commander bracket the deck really plays at.",
   },
   {
-    icon: "link",
+    visual: "combos",
     title: "Combos, found for you",
-    body: "Every combo your list can assemble, from Commander Spellbook, with the pieces, what it makes and how it goes off.",
+    body: "Every combo your list can assemble, with its pieces and what it makes.",
   },
   {
-    icon: "library",
-    title: "Your collection, imported",
-    body:
-      "Upload a CSV from ManaBox, Moxfield, Deckbox, TCGplayer or Archidekt. It keeps the exact printings you own, " +
-      "prices them, and marks owned cards in every deck.",
-  },
-  {
-    icon: "dices",
-    title: "Playtest with a battlefield",
-    body: "Draw opening hands, mulligan, play lands and spells onto a table, and see the odds of hitting what you need.",
-  },
-  {
-    icon: "history",
+    visual: "versions",
     title: "Versions",
-    body: "Save a deck before a big change, see what changed since, card by card, and restore it when a swap doesn't work out.",
+    body: "Save a deck before a big change, see what changed since, and go back when a swap doesn't work out.",
   },
   {
-    icon: "cart",
+    visual: "playtest",
+    title: "Playtest and practice matches",
+    body: "Draw opening hands on a table, or play a match against a real deck.",
+  },
+  {
+    visual: "buy",
     title: "Prices and a buy list",
-    body: "What the deck costs, what you already own, and a list of what's missing, ready to order.",
+    body: "What the deck costs, what you already own, and what is left to buy.",
   },
   {
-    icon: "phone",
+    visual: "collection",
+    title: "Your collection, imported",
+    body: "Bring a CSV from ManaBox, Moxfield, Deckbox, TCGplayer or Archidekt. Every deck marks the cards you own.",
+  },
+  {
+    visual: "phone",
     title: "On your phone, too",
-    body: "Spellpool works in your phone's browser. Add it to your home screen and your decks, collection and assistant come with you.",
+    body: "Spellpool works in your phone's browser. Add it to your home screen and your decks come with you.",
   },
 ];
 
