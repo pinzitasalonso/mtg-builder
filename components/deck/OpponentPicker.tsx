@@ -167,7 +167,7 @@ export default function OpponentPicker({
           </p>
           {spent && (
             <p className="pt-pick-note pk-spent">
-              A free account plays one match against the smart opponent a day: it’s back tomorrow, and unlimited with Spellpool Pro in the iOS app. The basic opponent is free, as often as you like.
+              A free account plays one match against the smart opponent a day: it’s back tomorrow, and unlimited with Spellpool Pro. The basic opponent is free, as often as you like.
             </p>
           )}
           {saved && (
