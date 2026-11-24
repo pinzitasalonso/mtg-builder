@@ -155,7 +155,7 @@ export default function OpponentPicker({
             )}
           </div>
           <p className="pt-pick-note">
-            The AI pilots a real deck against yours. You play your side by hand; it plays lands, casts what it can pay for, attacks and blocks.
+            Your opponent pilots a real deck against yours. You play your side by hand; it plays lands, casts what it can pay for, attacks and blocks.
             {record && record.won + record.lost > 0 && (
               <>
                 {" "}
@@ -167,7 +167,7 @@ export default function OpponentPicker({
           </p>
           {spent && (
             <p className="pt-pick-note pk-spent">
-              A free account plays one game against the AI a day: it’s back tomorrow, and unlimited with Spellpool Pro in the iOS app. The basic bot is free, as often as you like.
+              A free account plays one match against the smart opponent a day: it’s back tomorrow, and unlimited with Spellpool Pro in the iOS app. The basic opponent is free, as often as you like.
             </p>
           )}
           {saved && (
@@ -292,11 +292,11 @@ export default function OpponentPicker({
               {/* Who pilots it. The basic bot makes no AI call: it's free and its turns are instant. */}
               {!spent && (
                 <div className="pk-pilot" role="radiogroup" aria-label="Who plays the opponent">
-                  <button type="button" role="radio" aria-checked={pilot === "ai"} onClick={() => setPilot("ai")} title="A model plans each of its turns">
-                    AI
+                  <button type="button" role="radio" aria-checked={pilot === "ai"} onClick={() => setPilot("ai")} title="Thinks through each of its turns: what to cast, what to hold back, when to attack">
+                    Smart
                   </button>
                   <button type="button" role="radio" aria-checked={pilot === "bot"} onClick={() => setPilot("bot")} title="Plays its lands and creatures and attacks. It doesn’t plan ahead. Free, and its turns are instant.">
-                    Basic bot
+                    Basic
                   </button>
                 </div>
               )}

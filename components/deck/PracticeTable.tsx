@@ -958,7 +958,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     <header className="pt-top">
       <div className="pt-title">
         <span className="id-display" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 22, color: "#fff" }}>
-          <Bot size={21} strokeWidth={2} /> vs AI
+          <Bot size={21} strokeWidth={2} /> Practice match
         </span>
         {setup && <span className="pt-sub">against {setup.opp.label}</span>}
       </div>
@@ -998,7 +998,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
 
   if (mode === "pick" || mode === "loading" || !game || !setup) {
     return (
-      <div className="pt-root" role="dialog" aria-label="Play against the AI">
+      <div className="pt-root" role="dialog" aria-label="Play a practice match">
         {header}
         <OpponentPicker
           deckId={deckId}
@@ -1017,7 +1017,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     );
   }
 
-  const recordLine = record && record.won + record.lost > 0 ? `This deck against the AI: ${record.won} ${record.won === 1 ? "win" : "wins"}, ${record.lost} ${record.lost === 1 ? "loss" : "losses"}.` : "";
+  const recordLine = record && record.won + record.lost > 0 ? `This deck in practice matches: ${record.won} ${record.won === 1 ? "win" : "wins"}, ${record.lost} ${record.lost === 1 ? "loss" : "losses"}.` : "";
   const you = game.sides.you;
   const opp = game.sides.opp;
   const yourTurn = game.active === "you";
@@ -1162,7 +1162,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   );
 
   return (
-    <div className="pt-root pt-vs pt-table" data-mode={mode} role="dialog" aria-label="Practice game against the AI">
+    <div className="pt-root pt-vs pt-table" data-mode={mode} role="dialog" aria-label="Practice match">
       <RotateHint onClose={onClose} />
       {header}
 

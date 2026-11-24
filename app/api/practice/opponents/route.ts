@@ -43,7 +43,7 @@ export interface OpponentsAnswer {
 // A Commander deck can also face any commander (/api/practice/commanders).
 export async function GET(req: Request) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in to play against the AI." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Sign in to play a practice match." }, { status: 401 });
   const publicId = new URL(req.url).searchParams.get("deck") ?? "";
   const deck = await prisma.deck.findFirst({
     where: { publicId, OR: [{ userId: user.id }, { userId: null }, { shared: true }] },

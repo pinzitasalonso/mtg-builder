@@ -12,7 +12,7 @@ import PricingClient from "./PricingClient";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "Spellpool is free to brew with. Spellpool Pro, monthly or yearly, removes the daily limits on AI, deck scans and practice games.",
+  description: "Spellpool is free to brew with. Spellpool Pro, monthly or yearly, removes the daily limits on the coach, deck scans and practice matches.",
 };
 
 // Rendered per request (it reads the visitor's country and session). Never

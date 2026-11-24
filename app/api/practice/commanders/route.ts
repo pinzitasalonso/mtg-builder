@@ -38,7 +38,7 @@ export function commanderQuery(typed: string): string | null {
 
 export async function GET(req: Request) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in to play against the AI." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Sign in to play a practice match." }, { status: 401 });
   const typed = (new URL(req.url).searchParams.get("q") ?? "").trim().slice(0, 80);
   const q = commanderQuery(typed);
   if (!q) return NextResponse.json({ hits: [] });

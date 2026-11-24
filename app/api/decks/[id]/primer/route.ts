@@ -16,10 +16,10 @@ export const runtime = "nodejs";
 // away. The owner only, and it spends one of the day's AI questions.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in to write a primer with AI." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Sign in to draft a primer." }, { status: 401 });
   const deck = await accessibleDeckByPublicId((await params).id, user.id);
   if (!deck || deck.userId !== user.id) return NextResponse.json({ error: "deck not found" }, { status: 404 });
-  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "AI is not configured." }, { status: 503 });
+  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "Drafting a primer isn't available right now." }, { status: 503 });
 
   const body = await req.json().catch(() => ({}));
   const ask = typeof body?.ask === "string" ? body.ask.trim().slice(0, 600) : "";

@@ -30,7 +30,7 @@ const plexMono = IBM_Plex_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Spellpool — AI Magic: The Gathering deck builder for Commander",
+    default: "Spellpool — Magic: The Gathering deck builder and coach for Commander",
     // Pages that set a title read "Kaito, Bane of Nightmares · Spellpool".
     template: "%s · Spellpool",
   },
@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     "MTG deck builder",
     "Commander deck builder",
     "EDH deck builder",
-    "AI deck builder",
+    "deck coach",
     "Magic: The Gathering",
     "Commander brackets",
     "deck score",
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
   // page, marking them all as copies of the home page.
   robots: { index: true, follow: true },
   openGraph: {
-    title: "Spellpool — AI Magic: The Gathering deck builder",
+    title: "Spellpool — Magic: The Gathering deck builder and coach",
     description: SITE_DESCRIPTION,
     url: "/",
     siteName: "Spellpool",
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Spellpool — AI Magic: The Gathering deck builder",
+    title: "Spellpool — Magic: The Gathering deck builder and coach",
     description: SITE_DESCRIPTION,
   },
 };

@@ -113,7 +113,7 @@ export default function ReplaceMissing({ deckId, count, onClose, onDone }: { dec
                     <Sparkles size={15} strokeWidth={2.25} style={{ flex: "none" }} /> Find replacements
                   </button>
                 </div>
-                <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "var(--t3)", textAlign: "center" }}>Uses the AI. On the free plan it is today’s ask.</p>
+                <p style={{ margin: "10px 0 0", fontSize: 12.5, color: "var(--t3)", textAlign: "center" }}>On the free plan this uses today’s coach question.</p>
               </>
             )}
           </>

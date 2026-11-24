@@ -262,7 +262,7 @@ function SoloTable({
         </button>
         {onVsAi && (
           <button type="button" className="pt-btn pt-btn-ai" onClick={onVsAi}>
-            <Bot size={14} strokeWidth={2.25} /> vs AI
+            <Bot size={14} strokeWidth={2.25} /> Match
           </button>
         )}
         <button type="button" className="pt-btn" onClick={undo} disabled={history.length === 0} title="Undo (⌘Z / Ctrl+Z)" aria-label="Undo">

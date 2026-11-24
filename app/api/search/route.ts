@@ -139,7 +139,7 @@ export async function POST(req: Request) {
         if (cards.length >= 20) break;
       }
 
-      const query = rec.summary || "AI recommendations";
+      const query = rec.summary || "Recommendations";
 
       return NextResponse.json({
         cards,
@@ -156,7 +156,7 @@ export async function POST(req: Request) {
       const fallback = await scryfallSearch(prompt.trim());
       if ("error" in fallback) {
         return NextResponse.json(
-          { error: "AI search failed", details: detail },
+          { error: "Smart search failed", details: detail },
           { status: 502 }
         );
       }

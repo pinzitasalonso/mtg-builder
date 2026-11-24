@@ -51,6 +51,7 @@ Next.js 16 (App Router, Turbopack) + Prisma 7 on better-sqlite3. **Railway auto-
 
 - tsc + vitest green before committing. Commit + push verified work.
 - **Keep chat replies short.** Say what changed and what's unverified. Skip the rationale unless Kike asks for it, or it's a decision he has to make. The commit message and the PR body are where the reasoning goes.
+- **What people read never says "AI".** The assistant is "the deck coach" (or "the coach"); the daily AI ask is "a coach question"; AI search is "smart search"; the primer button is "Draft it for me"; vs AI is "a practice match" against a smart or a basic opponent. Code, comments and the admin page keep their names. The Privacy and Terms pages still say that Anthropic's language model writes the coach's answers: that disclosure stays.
 - **Use plain language, short sentences, and avoid dense or overly compressed phrasing.** One idea per sentence. Don't stack clauses to save a line.
 - No `Co-Authored-By: Claude …` trailer — not in commits, not in chat replies. GitHub adds one by itself to a squash merge when the branch's commits aren't the merger's. Pass the full commit message on the merge call (`commit_message`) and it doesn't.
 - Deeper context for a Claude Project (chat): `docs/claude-project-instructions.md` in the iOS repo.
