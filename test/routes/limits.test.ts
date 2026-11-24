@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { jsonRequest, makeUser, prisma, signIn, signOut } from "@/test/db";
 import { POST as cardTraderOrder } from "@/app/api/cardtrader/order/route";
+import { GET as me } from "@/app/api/auth/me/route";
 import { FREE_AI_PER_DAY, FREE_PRACTICE_PER_DAY, FREE_SCANS_PER_DAY } from "@/lib/limits";
 import { claimPractice, consumeAi, consumeScan, refundScan } from "@/lib/limits-db";
 
@@ -30,6 +31,18 @@ describe("the free plan's daily meters, with the requests arriving together", ()
     await refundScan(user);
     expect(await consumeScan(user)).toBe(true);
     expect(await consumeScan(user)).toBe(false);
+  });
+
+  // The meter the clients show. The scan count used to be left out of the
+  // signed-in user, so this said a full allowance whatever had been used.
+  it("tells the account what it has left of each", async () => {
+    const user = await makeUser();
+    await signIn(user);
+    const left = async () => (await (await me()).json()).user;
+    expect(await left()).toMatchObject({ aiRemaining: FREE_AI_PER_DAY, scansRemaining: FREE_SCANS_PER_DAY });
+    await consumeAi(user);
+    await together(FREE_SCANS_PER_DAY, () => consumeScan(user));
+    expect(await left()).toMatchObject({ aiRemaining: FREE_AI_PER_DAY - 1, scansRemaining: 0 });
   });
 
   it("never runs out on Pro", async () => {

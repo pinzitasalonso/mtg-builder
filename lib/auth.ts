@@ -72,6 +72,10 @@ export interface AuthUser {
   tier: string;
   aiDay: string | null;
   aiCount: number;
+  // The scan meter. Without these two, /api/auth/me reported a full allowance
+  // of scans to an account that had used them all.
+  scanDay: string | null;
+  scanCount: number;
   // Whether a password is set at all. False for accounts that only ever
   // signed in with Apple or Google, which is what tells the clients not to
   // ask for a current password they don't have.
@@ -87,7 +91,7 @@ export async function currentUser(): Promise<AuthUser | null> {
     where: { id: tokenHash(token) },
     include: {
       user: {
-        select: { id: true, email: true, tier: true, aiDay: true, aiCount: true, passwordHash: true },
+        select: { id: true, email: true, tier: true, aiDay: true, aiCount: true, scanDay: true, scanCount: true, passwordHash: true },
       },
     },
   });

@@ -1,5 +1,8 @@
 "use client";
 
+import { LimitNotice } from "@/components/Upgrade";
+import { isLimitMessage } from "@/lib/limits";
+import { refreshPlan } from "@/lib/plan-client";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bot, Flag, Loader2, Plus, Sparkles, Swords, Undo2, X } from "lucide-react";
@@ -703,6 +706,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     setReview({ open: true, busy: true, text: "", error: "" });
     try {
       const res = await fetch(`/api/practice/${setup.id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ game }) });
+      refreshPlan();
       if (!res.ok || !res.body) {
         const data = await res.json().catch(() => null);
         if (alive.current) setReview((r) => (r ? { ...r, busy: false, error: data?.error ?? "Couldn't write the review. Try again." } : r));
@@ -1638,9 +1642,13 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         <Panel title="The game, reviewed" onClose={() => setReview((r) => (r ? { ...r, open: false } : r))}>
           <div className="pt-review">
             {review.error ? (
-              <p className="pt-pick-error" role="alert">
-                {review.error}
-              </p>
+              isLimitMessage(review.error) ? (
+                <LimitNotice text={review.error} />
+              ) : (
+                <p className="pt-pick-error" role="alert">
+                  {review.error}
+                </p>
+              )
             ) : review.text ? (
               <PrimerMarkdown text={review.text} />
             ) : (

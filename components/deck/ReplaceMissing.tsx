@@ -1,5 +1,8 @@
 "use client";
 
+import { LimitNotice } from "@/components/Upgrade";
+import { isLimitMessage } from "@/lib/limits";
+import { refreshPlan } from "@/lib/plan-client";
 import { useState } from "react";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type { PlannedSwap, ReplacePlan } from "@/app/api/decks/[id]/assemble/replace/route";
@@ -32,6 +35,7 @@ export default function ReplaceMissing({ deckId, count, onClose, onDone }: { dec
     try {
       const r = await fetch(`/api/decks/${deckId}/assemble/replace`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const d = await r.json().catch(() => null);
+      refreshPlan();
       return { ok: r.ok, data: d as Record<string, unknown> | null };
     } catch {
       return { ok: false, data: null };
@@ -102,7 +106,12 @@ export default function ReplaceMissing({ deckId, count, onClose, onDone }: { dec
                 </li>
               ))}
             </ul>
-            {error && <p role="alert" style={{ margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.4, color: "#ff9c86" }}>{error}</p>}
+            {error &&
+              (isLimitMessage(error) ? (
+                <LimitNotice text={error} style={{ margin: "0 0 12px" }} />
+              ) : (
+                <p role="alert" style={{ margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.4, color: "#ff9c86" }}>{error}</p>
+              ))}
             {phase.at === "looking" ? (
               <p role="status" style={{ margin: "4px 0 2px", fontSize: 14.5, color: "var(--t1)", fontWeight: 600 }}>Looking through your collection… This can take a minute.</p>
             ) : (
@@ -137,7 +146,12 @@ export default function ReplaceMissing({ deckId, count, onClose, onDone }: { dec
               )}
             </div>
             <div style={{ paddingTop: 14 }}>
-              {error && <p role="alert" style={{ margin: "0 0 10px", fontSize: 13.5, lineHeight: 1.4, color: "#ff9c86" }}>{error}</p>}
+              {error &&
+                (isLimitMessage(error) ? (
+                  <LimitNotice text={error} style={{ margin: "0 0 10px" }} />
+                ) : (
+                  <p role="alert" style={{ margin: "0 0 10px", fontSize: 13.5, lineHeight: 1.4, color: "#ff9c86" }}>{error}</p>
+                ))}
               {phase.at === "making" ? (
                 <p role="status" style={{ margin: 0, fontSize: 14.5, color: "var(--t1)", fontWeight: 600 }}>Making the swaps…</p>
               ) : (

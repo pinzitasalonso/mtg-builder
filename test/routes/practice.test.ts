@@ -84,9 +84,11 @@ describe("/api/practice/start", () => {
 
     const body = await (await opponents(pick(mine.publicId!))).json();
     expect(body.recent.map((o: { label: string }) => o.label)).toEqual(["Foe"]);
-    // Today's free game is spent, and the picker says so before another is tried.
+    // One of today's free games is spent, and the picker says what's left before another is tried.
     expect(body.free).toEqual({ perDay: FREE_PRACTICE_PER_DAY, left: FREE_PRACTICE_PER_DAY - 1 });
-    expect((await start(jsonRequest("/api/practice/start", { deck: mine.publicId, opponent: option }))).status).toBe(429);
+    const again = () => start(jsonRequest("/api/practice/start", { deck: mine.publicId, opponent: option }));
+    for (let i = 1; i < FREE_PRACTICE_PER_DAY; i++) expect((await again()).status).toBe(200);
+    expect((await again()).status).toBe(429);
   });
 
   it("refuses an opponent that isn't one, and gives the game back when its deck won't load", async () => {
@@ -113,8 +115,8 @@ describe("a game against the basic bot", () => {
     expect(await first.json()).toMatchObject({ bot: true });
     // The bot's game didn't use the day's game against the AI…
     expect((await (await opponents(pick(mine.publicId!))).json()).free.left).toBe(FREE_PRACTICE_PER_DAY);
-    expect((await play(false)).status).toBe(200);
-    // …and with that one used, the bot still plays.
+    for (let i = 0; i < FREE_PRACTICE_PER_DAY; i++) expect((await play(false)).status).toBe(200);
+    // …and with those used, the bot still plays.
     expect((await play(false)).status).toBe(429);
     expect((await play(true)).status).toBe(200);
     expect(await prisma.practiceGame.count({ where: { userId: user.id, bot: true } })).toBe(2);
