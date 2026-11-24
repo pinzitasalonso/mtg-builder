@@ -13,7 +13,7 @@ import Stripe from "stripe";
 
 const PRODUCT = {
   name: "Spellpool Pro",
-  description: "Unlimited deck editing by chat, practice games against bots and Deck Score scans.",
+  description: "Unlimited deck coach, practice matches and Deck Score scans.",
   // Software as a service (SaaS) - personal use.
   tax_code: "txcd_10103000",
   metadata: { app: "spellpool" },

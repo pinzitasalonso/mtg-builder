@@ -134,7 +134,7 @@ export async function POST(req: Request) {
   }
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "AI is not configured." }, { status: 503 });
+    return NextResponse.json({ error: "The coach isn't available right now." }, { status: 503 });
   }
 
   const body = await req.json().catch(() => null);

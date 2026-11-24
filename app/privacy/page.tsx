@@ -42,10 +42,10 @@ export default function PrivacyPage() {
         contain no identifiers and can&apos;t be traced back to you.
       </p>
 
-      <h2 style={H2}>AI features</h2>
+      <h2 style={H2}>The deck coach and smart search</h2>
       <p style={P}>
-        When you use the deck assistant or AI search, your question and relevant deck/collection card
-        names are sent to Anthropic (our AI provider) to generate the answer, and to public deck-data
+        When you use the deck coach, smart search or a primer draft, your question and relevant deck/collection card
+        names are sent to Anthropic, whose language model writes the answer, and to public deck-data
         services (EDHREC, Reddit, Moxfield, Commander Spellbook) to ground it. These requests carry no
         account identifiers. Anthropic does not train models on this API data.
       </p>

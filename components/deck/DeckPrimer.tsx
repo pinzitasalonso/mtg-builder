@@ -122,7 +122,7 @@ export default function DeckPrimer({
                 onClick={() => void writeWithAi()}
                 title={has ? "Draft a new primer from the deck (you review it before it replaces this one)" : "Draft a primer from the deck"}
               >
-                <Sparkles size={14} strokeWidth={2.25} /> {has ? "Rewrite with AI" : "Write with AI"}
+                <Sparkles size={14} strokeWidth={2.25} /> {has ? "Redraft it for me" : "Draft it for me"}
               </button>
               <button
                 style={{ ...ghostBtn, padding: "6px 14px", fontSize: 13 }}
@@ -167,7 +167,7 @@ export default function DeckPrimer({
         <>
         {fromAi && (
           <p style={{ margin: "0 0 10px", fontSize: 12.5, color: "var(--w-3)" }}>
-            AI draft — change anything you like, then Save. {has ? "Cancel keeps the primer you had." : "Cancel throws it away."}
+            A first draft — change anything you like, then Save. {has ? "Cancel keeps the primer you had." : "Cancel throws it away."}
           </p>
         )}
         <textarea

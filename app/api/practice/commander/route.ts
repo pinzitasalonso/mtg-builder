@@ -18,7 +18,7 @@ export interface CommanderLevel {
 // picked (lib/practice/decks.ts deckFromEdhrec).
 export async function GET(req: Request) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in to play against the AI." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Sign in to play a practice match." }, { status: 401 });
   const name = (new URL(req.url).searchParams.get("name") ?? "").trim();
   if (!name || name.length > 200) return NextResponse.json({ error: "name required" }, { status: 400 });
   // Each new name is a request to EDHREC.

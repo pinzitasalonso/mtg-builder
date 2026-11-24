@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = (await req.json().catch(() => null)) as { game?: unknown } | null;
   const game = asGame(body?.game);
   if (!game || !game.winner) return NextResponse.json({ error: "The game isn't over yet." }, { status: 400 });
-  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "AI is not configured." }, { status: 503 });
+  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "Match reviews aren't available right now." }, { status: 503 });
   const deck = row.deck
     ? await prisma.deck.findFirst({
         where: { publicId: row.deck, OR: [{ userId: user.id }, { userId: null }, { shared: true }] },

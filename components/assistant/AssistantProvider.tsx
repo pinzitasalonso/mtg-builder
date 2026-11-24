@@ -360,7 +360,7 @@ export default function AssistantProvider({ children }: { children: React.ReactN
       {children}
       {available && isOpen && (
         <AssistantScreen
-          title={focus ? `Ask the AI · ${focus.name}` : "Ask the AI"}
+          title={focus ? `Deck coach · ${focus.name}` : "Deck coach"}
           subtitle={focus ? "This deck, and all your others." : "Sees all your decks and your collection."}
           onClose={close}
           onNew={messages.length ? () => void reset() : undefined}
@@ -413,7 +413,7 @@ export default function AssistantProvider({ children }: { children: React.ReactN
           }}
         >
           <Sparkles size={16} strokeWidth={2.25} style={running ? { animation: "mn-blink 1.1s infinite" } : undefined} />
-          {running ? "AI is answering…" : "AI answer ready"}
+          {running ? "The coach is answering…" : "The coach has answered"}
         </button>
       )}
     </Ctx.Provider>

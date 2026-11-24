@@ -59,7 +59,7 @@ export async function POST(
   const deck = await accessibleDeckByPublicId((await params).id, user.id);
   if (!deck) return NextResponse.json({ error: "deck not found" }, { status: 404 });
   if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "AI is not configured." }, { status: 503 });
+    return NextResponse.json({ error: "Deck scans aren't available right now." }, { status: 503 });
   }
 
   const body = await req.json().catch(() => ({}));

@@ -23,10 +23,10 @@ export interface Tier {
 
 export const PRO: Tier = {
   name: "Pro",
-  description: "Edit, score and test your decks as often as you like.",
+  description: "Every coach answer, deck scan and practice match you want.",
   features: [
-    "Unlimited deck editing by chat: ask for swaps, cuts and upgrades",
-    "Unlimited practice games against the smart bot",
+    "Unlimited deck coach: edit your deck by chat",
+    "Unlimited practice matches against the smart opponent",
     "Unlimited Deck Score scans",
   ],
   // The iOS app's monthly plan has a 7-day trial; the yearly one has none.
@@ -40,8 +40,8 @@ export const FREE_PLAN = {
   description: "Everything you need to brew, for as long as you like.",
   features: [
     "Unlimited decks",
-    `${FREE_AI_PER_DAY} chat request${FREE_AI_PER_DAY === 1 ? "" : "s"} a day, for deck edits, card search and primers`,
-    `Unlimited games against the basic bot, and ${FREE_PRACTICE_PER_DAY} a day against the smart bot`,
+    `${FREE_AI_PER_DAY} coach question${FREE_AI_PER_DAY === 1 ? "" : "s"} a day, shared by the coach, smart search and primers`,
+    `Unlimited practice matches against the basic opponent, and ${FREE_PRACTICE_PER_DAY} a day against the smart one`,
     `${FREE_SCANS_PER_DAY} Deck Score scan${FREE_SCANS_PER_DAY === 1 ? "" : "s"} a day`,
     "Collection, wishlist, combos and playtesting",
   ],

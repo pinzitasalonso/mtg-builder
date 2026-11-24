@@ -10,7 +10,7 @@ import PricingClient, { type Prices } from "./PricingClient";
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: "Spellpool is free to brew with. Spellpool Pro, monthly or yearly, removes the daily limits on deck editing by chat, practice games against bots and deck scans.",
+  description: "Spellpool is free to brew with. Spellpool Pro, monthly or yearly, removes the daily limits on the coach, deck scans and practice matches.",
 };
 
 // Rendered per request (it reads the session, and the prices from Stripe).
@@ -75,8 +75,8 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
             <span style={{ color: "var(--gold)" }}>the daily limits.</span>
           </h1>
           <p style={{ fontSize: "clamp(16px,1.5vw,19px)", lineHeight: 1.5, color: "var(--t2)", maxWidth: 520, margin: "0 auto" }}>
-            Spellpool is free to brew with. Pro is for the days you want to edit your deck by chat, play practice games
-            against bots and score your deck as often as you like.
+            Spellpool is free to brew with. Pro is for the days you want to edit your deck with the coach, play practice
+            matches and score your deck as often as you like.
           </p>
         </div>
 

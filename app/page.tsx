@@ -285,7 +285,7 @@ export default function HomePage() {
     if (!me) return null;
     const parts: string[] = [];
     if (typeof me.deckLimit === "number") parts.push(`${decks.length}/${me.deckLimit} decks`);
-    if (typeof me.aiRemaining === "number") parts.push(`${me.aiRemaining} AI left`);
+    if (typeof me.aiRemaining === "number") parts.push(`${me.aiRemaining} coach ${me.aiRemaining === 1 ? "question" : "questions"} left`);
     if (parts.length === 0) return null;
     const spent = typeof me.deckLimit === "number" && decks.length >= me.deckLimit;
     // The meter and the way past it in one pill: what's left today, then Go Pro.
@@ -431,7 +431,7 @@ export default function HomePage() {
           <div>
             <Reveal delay={40}>
               <div className="id-label" style={{ color: "var(--gold)", marginBottom: 18, display: "inline-flex", alignItems: "center", gap: 9 }}>
-                <span style={{ width: 22, height: 2, background: "var(--gold)" }} /> AI deck builder for Magic: The Gathering
+                <span style={{ width: 22, height: 2, background: "var(--gold)" }} /> Deck builder and coach for Magic: The Gathering
               </div>
             </Reveal>
             <Reveal delay={90}>
@@ -864,7 +864,7 @@ function CollectionBlock({ unique, total, pending, sample, wishlist, onOpen, onW
         </button>
       ) : (
         <p style={{ marginTop: 18, fontSize: 15, color: "var(--t2)", lineHeight: 1.5 }}>
-          Import the cards you own to track them across decks, see what you can build for free, and let the AI factor it in.{" "}
+          Import the cards you own to track them across decks, see what you can build for free, and let the coach factor it in.{" "}
           <button onClick={onOpen} style={{ background: "none", border: "none", padding: 0, color: "var(--gold)", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
             Import your collection
           </button>

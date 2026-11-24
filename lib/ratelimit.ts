@@ -78,7 +78,7 @@ export function clientIp(req: Request): string {
    per-minute budget, but it had no daily ceiling, reset on every restart and
    spent the site's own Anthropic key; an account gives each player a daily
    meter instead (lib/limits). */
-export const SIGN_IN_FOR_AI_MSG = "Sign in to use the AI — it's free, and you get a few questions a day.";
+export const SIGN_IN_FOR_AI_MSG = "Sign in to ask the coach — it's free, and you get a question a day.";
 
 /* ---- auth throttles ----------------------------------------------------- */
 

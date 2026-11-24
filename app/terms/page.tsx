@@ -26,9 +26,9 @@ export default function TermsPage() {
       <h2 style={H2}>The service</h2>
       <p style={P}>
         Spellpool is a Magic: The Gathering deck-building companion: build decks, browse your
-        collection, playtest, track games, and get AI-assisted suggestions. Use it for personal,
+        collection, playtest, track games, and get suggestions from the deck coach. Use it for personal,
         non-commercial deckbuilding. Don&apos;t abuse the service — no scraping at scale, no attempting to
-        break other people&apos;s accounts, no using the AI features to generate unrelated content.
+        break other people&apos;s accounts, no using the coach to generate content that has nothing to do with Magic.
       </p>
 
       <h2 style={H2}>Your account and content</h2>
@@ -40,7 +40,7 @@ export default function TermsPage() {
 
       <h2 style={H2}>Spellpool Pro (auto-renewing subscription)</h2>
       <p style={P}>
-        Spellpool Pro lifts the free plan&apos;s daily limits on deck editing by chat, deck scans and practice games. It&apos;s
+        Spellpool Pro lifts the free plan&apos;s daily limits on coach questions, deck scans and practice matches. It&apos;s
         an auto-renewing subscription, monthly or yearly, at the price shown when you buy. It renews
         automatically at the end of each period until you cancel. Cancelling stops future charges, and Pro
         stays on until the end of the period you&apos;ve paid for.
@@ -60,9 +60,9 @@ export default function TermsPage() {
         Refunds are covered by our <Link href="/refund" style={{ color: "var(--gold)" }}>Refund Policy</Link>.
       </p>
 
-      <h2 style={H2}>AI answers</h2>
+      <h2 style={H2}>Coach answers</h2>
       <p style={P}>
-        The deck assistant is a tool, not an oracle: suggestions can be wrong, and card legality or
+        The deck coach writes its answers automatically with a language model. It is a tool, not an oracle: suggestions can be wrong, and card legality or
         pricing shown in the app may lag reality. Verify anything that matters (tournament legality,
         purchase prices) against official sources.
       </p>
