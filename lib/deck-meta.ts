@@ -3,6 +3,7 @@
 // name never reaches a crawler or a link preview.
 
 import prisma from "@/lib/prisma";
+import { deckFace } from "@/lib/deck-face";
 import type { PublicDeckSummary } from "@/lib/deck-meta-text";
 
 export { deckDescription, formatName, type PublicDeckSummary } from "@/lib/deck-meta-text";
@@ -17,7 +18,7 @@ export async function publicDeckSummary(publicId: string): Promise<PublicDeckSum
         name: true,
         format: true,
         commander: true,
-        cards: { where: { board: "deck" }, select: { name: true, quantity: true, typeLine: true, colorIdentity: true, imageUri: true } },
+        cards: { where: { board: "deck" }, select: { name: true, quantity: true, typeLine: true, colorIdentity: true, imageUri: true, manaCost: true } },
       },
     })
     .catch(() => null);
@@ -28,11 +29,9 @@ export async function publicDeckSummary(publicId: string): Promise<PublicDeckSum
     .filter((c) => !c.typeLine?.includes("Land") && c.name !== deck.commander)
     .slice(0, 4)
     .map((c) => c.name);
-  // The deck's face: its (first) commander, else its first non-land card.
-  const head = (deck.commander ?? "").split("+")[0].trim().toLowerCase();
-  const cover =
-    (head && deck.cards.find((c) => c.name.toLowerCase() === head && c.imageUri)) ||
-    deck.cards.find((c) => c.imageUri && !c.typeLine?.includes("Land"));
+  // The deck's face, as its tile and its page show it. A commander that
+  // isn't in the list has no stored picture: the list's own face stands in.
+  const cover = deckFace(deck.commander, deck.cards) ?? deckFace(null, deck.cards);
   return {
     publicId: deck.publicId,
     name: deck.name,
