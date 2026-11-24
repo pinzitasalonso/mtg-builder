@@ -3,6 +3,7 @@
 import { refreshPlan } from "@/lib/plan-client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import DeckChat, { useDeckActions, type ChatMessage, type DeckChatController } from "@/components/deck/DeckChat";
 import AssistantScreen from "@/components/assistant/AssistantScreen";
@@ -358,10 +359,17 @@ export default function AssistantProvider({ children }: { children: React.ReactN
     return () => window.removeEventListener("keydown", onKey);
   }, [menu]);
 
+  // Pages where the coach stays out of the way: the plans page is about
+  // choosing Pro, and a chat panel over it only distracts. It stays open (or
+  // working) underneath, and comes back on the next page.
+  const pathname = usePathname();
+  const hiddenHere = pathname === "/pricing";
+  const shown = Boolean(available) && !hiddenHere;
+
   return (
     <Ctx.Provider value={api}>
       {children}
-      {available && isOpen && (
+      {shown && isOpen && (
         <AssistantScreen
           title={focus ? `Deck coach · ${focus.name}` : "Deck coach"}
           subtitle={focus ? "This deck, and all your others." : "Sees all your decks and your collection."}
@@ -382,15 +390,15 @@ export default function AssistantProvider({ children }: { children: React.ReactN
           />
         </AssistantScreen>
       )}
-      {available && isOpen && menu &&
+      {shown && isOpen && menu &&
         createPortal(<AddMenu name={menu.name} rect={menu.rect} decks={decks} onPick={(d) => void addTo(d, menu.name)} onClose={() => setMenu(null)} />, document.body)}
-      {available && isOpen && toast && (
+      {shown && isOpen && toast && (
         <div role="status" style={{ position: "fixed", left: "50%", bottom: "max(84px, calc(env(safe-area-inset-bottom) + 76px))", transform: "translateX(-50%)", zIndex: 92, background: "var(--text)", color: "var(--bg)", padding: "9px 16px", borderRadius: 999, fontSize: 13.5, fontWeight: 600, boxShadow: "0 10px 24px -8px rgba(0,0,0,.4)" }}>
           {toast}
         </div>
       )}
       {/* Closed, but the assistant is working (or has finished): a way back. */}
-      {available && !isOpen && (running || unseen) && (
+      {shown && !isOpen && (running || unseen) && (
         <button
           type="button"
           onClick={open}
