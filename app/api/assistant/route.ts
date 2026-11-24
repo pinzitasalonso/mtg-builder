@@ -62,7 +62,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: "Sign in to use the assistant." }, { status: 401 });
-  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "AI is not configured." }, { status: 503 });
+  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "The coach isn't available right now." }, { status: 503 });
 
   const body = await req.json().catch(() => null);
   const content = typeof body?.content === "string" ? body.content.trim().slice(0, MAX_MESSAGE_CHARS) : "";

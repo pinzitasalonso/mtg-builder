@@ -65,7 +65,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const names = ctx.missing.map((m) => m.name);
   // Nothing spare that fits this deck: no need to ask anyone.
   if (!ctx.candidates.length) return NextResponse.json({ swaps: [], unmatched: names } satisfies ReplacePlan);
-  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "The AI isn't set up on this server." }, { status: 503 });
+  if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ error: "This isn't available right now." }, { status: 503 });
   if (!rateLimit(`replace:${user.id}`, PLANS_PER_10_MIN, 10 * 60_000)) return NextResponse.json({ error: "That's a lot of looking. Wait a few minutes." }, { status: 429 });
   if (!(await consumeAi(user))) return NextResponse.json({ error: AI_LIMIT_MSG, code: "ai_limit" }, { status: 429 });
 
@@ -94,7 +94,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // An ask that gave nothing isn't one the player used.
     await refundAi(user).catch(() => {});
     console.error("[replace] failed", e instanceof Error ? e.message : e);
-    return NextResponse.json({ error: "Couldn't find replacements just now. Nothing was changed, and it didn't count as an AI ask. Try again." }, { status: 502 });
+    return NextResponse.json({ error: "Couldn't find replacements just now. Nothing was changed, and it didn't use up a coach question. Try again." }, { status: 502 });
   }
 
   // The replacements as real cards: their pictures for the review, and a

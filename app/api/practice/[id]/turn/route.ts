@@ -30,7 +30,7 @@ interface Setup {
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in to play against the AI." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Sign in to play a practice match." }, { status: 401 });
   const id = (await params).id;
   const row = await prisma.practiceGame.findFirst({ where: { id, userId: user.id }, select: { setup: true, bot: true } });
   if (!row) return NextResponse.json({ error: "game not found" }, { status: 404 });
@@ -96,20 +96,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
     if (res.stop_reason !== "end_turn") {
       console.error(`[practice] turn stopped: ${res.stop_reason}`);
-      return instinct(res.stop_reason === "max_tokens" ? "the AI ran out of room" : res.stop_reason === "refusal" ? "the AI declined" : `the AI stopped: ${res.stop_reason}`);
+      return instinct(res.stop_reason === "max_tokens" ? "its plan ran too long" : res.stop_reason === "refusal" ? "it couldn't plan this turn" : `its planning stopped: ${res.stop_reason}`);
     }
     const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
     const plan: TurnPlan | null = cleanPlan(extractJson(text));
     if (!plan) {
       console.error(`[practice] unreadable plan: ${text.slice(0, 300)}`);
-      return instinct("the AI's answer didn't fit");
+      return instinct("its plan didn't fit the game");
     }
     void recordEvent("practice_ai_turn");
     return NextResponse.json({ plan, source: "ai" });
   } catch (e) {
     console.error("[practice] turn failed", e instanceof Error ? e.message : e);
-    if (e instanceof Anthropic.APIConnectionTimeoutError) return instinct("the AI took too long");
-    if (e instanceof Anthropic.APIError && e.status) return instinct(`AI error ${e.status}`);
-    return instinct("the AI couldn't be reached");
+    if (e instanceof Anthropic.APIConnectionTimeoutError) return instinct("it took too long to think");
+    if (e instanceof Anthropic.APIError && e.status) return instinct(`planner error ${e.status}`);
+    return instinct("its planner couldn't be reached");
   }
 }

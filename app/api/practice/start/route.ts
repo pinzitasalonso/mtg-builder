@@ -24,7 +24,7 @@ export const runtime = "nodejs";
 // built from (docs/practice-vs-ai.md).
 export async function POST(req: Request) {
   const user = await currentUser();
-  if (!user) return NextResponse.json({ error: "Sign in to play against the AI." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: "Sign in to play a practice match." }, { status: 401 });
   const body = (await req.json().catch(() => null)) as { deck?: unknown; opponent?: unknown; bot?: unknown } | null;
   // Against the basic bot (the built-in planner, no model call): free, and
   // not one of the day's games. Each start still loads two decks.

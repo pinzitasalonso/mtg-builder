@@ -6,9 +6,9 @@ import { FREE_AI_PER_DAY, FREE_SCANS_PER_DAY } from "./limits";
 
 export const SITE_URL = "https://www.spellpool.com";
 export const SITE_DESCRIPTION =
-  "Spellpool is an AI Magic: The Gathering deck builder for Commander and constructed. Describe a deck and " +
+  "Spellpool is a Magic: The Gathering deck builder and coach for Commander and constructed. Describe a deck and " +
   "get a legal build, then score it with Deck Score and brackets, find its combos, playtest it, track your " +
-  "collection, and ask an assistant that reads all your decks at once.";
+  "collection, and ask a coach that reads all your decks at once.";
 
 export interface LandingFeature {
   /** A lucide icon name, mapped to the component on the page. */
@@ -77,7 +77,7 @@ export const LANDING_FAQ: FaqItem[] = [
   {
     q: "What is Spellpool?",
     a:
-      "Spellpool is a Magic: The Gathering deck builder with an AI assistant. You describe the deck you want — a " +
+      "Spellpool is a Magic: The Gathering deck builder with a built-in coach. You describe the deck you want — a " +
       "commander, a theme, a combo — and it suggests real cards from their rules text, builds to a legal list, " +
       "and helps you tune it with scores, combos and playtesting.",
   },
@@ -93,7 +93,7 @@ export const LANDING_FAQ: FaqItem[] = [
       // One template literal on purpose: the production minifier folded two
       // concatenated templates here into "with 41 deck scan a day", dropping
       // the words between the constants.
-      `Yes. The free plan has as many decks as you like, with ${FREE_AI_PER_DAY} AI question${FREE_AI_PER_DAY === 1 ? "" : "s"} and ${FREE_SCANS_PER_DAY} deck scan a day. Spellpool Pro removes the daily limits.`,
+      `Yes. The free plan has as many decks as you like, with ${FREE_AI_PER_DAY} coach question${FREE_AI_PER_DAY === 1 ? "" : "s"} and ${FREE_SCANS_PER_DAY} deck scan a day. Spellpool Pro removes the daily limits.`,
   },
   {
     q: "How does the Deck Score work?",

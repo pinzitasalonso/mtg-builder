@@ -93,6 +93,6 @@ export async function POST(
     // The SDK's message stays in the log, not in the response.
     console.error("[roles] AI tagging failed:", e instanceof Error ? e.message : e);
     // Lands may already be tagged; report what happened.
-    return NextResponse.json({ tagged, error: "AI tagging failed" }, { status: 502 });
+    return NextResponse.json({ tagged, error: "Role tagging failed" }, { status: 502 });
   }
 }

@@ -1089,8 +1089,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 the playtest, which a phone held upright never got to (the
                 solo table asks to be turned sideways first). */}
             {assistant.available === true && (
-              <button className="id-ghost hdr-icon-btn" style={{ padding: "9px 15px" }} onClick={() => setPlaytestOpen("ai")} disabled={deckCards.length === 0} aria-label="Play vs AI">
-                <Swords size={16} strokeWidth={2} /> <span className="hdr-hide">vs AI</span>
+              <button className="id-ghost hdr-icon-btn" style={{ padding: "9px 15px" }} onClick={() => setPlaytestOpen("ai")} disabled={deckCards.length === 0} aria-label="Play a practice match">
+                <Swords size={16} strokeWidth={2} /> <span className="hdr-hide">Match</span>
               </button>
             )}
             <button className="id-ghost hdr-icon-btn" style={{ padding: "9px 15px" }} onClick={shareDeck} disabled={sharing} aria-label={copied === "link" ? "Link copied" : "Share"}>
@@ -1143,7 +1143,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                         { label: "Add lands & staples", icon: Mountain, on: () => setTool("lands") },
                         { group: "At the table" },
                         { label: "Assemble deck", icon: PackageCheck, on: () => setAssembleOpen(true), disabled: deckCards.length === 0 },
-                        ...(assistant.available === true ? [{ label: "Play vs AI", icon: Swords, on: () => setPlaytestOpen("ai"), disabled: deckCards.length === 0 }] : []),
+                        ...(assistant.available === true ? [{ label: "Practice match", icon: Swords, on: () => setPlaytestOpen("ai"), disabled: deckCards.length === 0 }] : []),
                         { label: "Game code", icon: Ticket, on: () => setGameCodeOpen(true) },
                         // A Spellpool Dial carries the deck to the table: the dials page
                         // sends it. Only for a player who has one.
@@ -1253,7 +1253,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                   <button className="deck-action deck-action-ai" onClick={() => (sharedChat ? assistant.open() : assistant.available === false ? router.push("/login") : setChatOpen(true))}>
                     <span className="deck-action-icon" aria-hidden><Sparkles size={19} strokeWidth={2} /></span>
                     <span className="deck-action-text">
-                      <b>Ask the AI about this deck</b>
+                      <b>Ask the coach about this deck</b>
                       <i>Lines, cuts and combos.</i>
                     </span>
                     <span className="deck-action-chev" aria-hidden>›</span>
@@ -1704,7 +1704,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
       {/* The assistant, off the hero tile. Wide, because its answers carry card
           links you hover to preview. */}
       {chatOpen && canEdit && !sharedChat && (
-        <AssistantScreen title={`Ask the AI${deck?.name ? ` · ${deck.name}` : ""}`} subtitle="Build, judge and refine this deck." onClose={() => setChatOpen(false)}>
+        <AssistantScreen title={`Deck coach${deck?.name ? ` · ${deck.name}` : ""}`} subtitle="Build, judge and refine this deck." onClose={() => setChatOpen(false)}>
           <DeckChat chat={chat} fill />
         </AssistantScreen>
       )}

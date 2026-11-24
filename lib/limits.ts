@@ -18,8 +18,8 @@ export const PRACTICE_AI_TURNS = 40;
 export const SIGN_IN_FOR_DECKS_MSG = "Sign in to create a deck — it's free.";
 export const AI_LIMIT_MSG =
   FREE_AI_PER_DAY === 1
-    ? `You've used today's free AI ask — it resets at midnight UTC. Spellpool Pro lifts the limit.`
-    : `You've used your ${FREE_AI_PER_DAY} free AI asks for today — they reset at midnight UTC. Spellpool Pro lifts the limit.`;
+    ? `You've used today's free coach question — it resets at midnight UTC. Spellpool Pro lifts the limit.`
+    : `You've used your ${FREE_AI_PER_DAY} free coach questions for today — they reset at midnight UTC. Spellpool Pro lifts the limit.`;
 export const PRACTICE_LIMIT_MSG =
   FREE_PRACTICE_PER_DAY === 1
     ? `You've played today's free practice game — it resets at midnight UTC. Spellpool Pro makes them unlimited.`
