@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   adjustLife,
+  attachCard,
+  attaches,
+  detachCard,
   bottomCard,
   draw,
   moveCard,
@@ -226,5 +229,23 @@ describe("turns", () => {
     const s2 = adjustLife(adjustLife(s1, "opp", -5), "you", 3);
     expect(s2.oppLife).toBe(15);
     expect(s2.life).toBe(23);
+  });
+});
+
+describe("attaching", () => {
+  it("an Equipment goes on a card, comes off, and stays in play when the card leaves", () => {
+    const sword = { iid: 1, name: "Sword", imageUri: "", typeLine: "Artifact — Equipment", tapped: false, commander: false };
+    const bear = { iid: 2, name: "Bear", imageUri: "", typeLine: "Creature — Bear", tapped: false, commander: false };
+    const base = { library: [], hand: [], battlefield: [sword, bear], graveyard: [], exile: [], command: [], life: 20, turn: 1, mulligans: 0, toBottom: 0 } as unknown as PlaytestState;
+    expect(attaches(sword)).toBe(true);
+    expect(attaches(bear)).toBe(false);
+    const on = attachCard(base, 1, 2);
+    expect(on.battlefield.find((c) => c.iid === 1)?.attachedTo).toBe(2);
+    expect(detachCard(on, 1).battlefield.find((c) => c.iid === 1)?.attachedTo).toBeUndefined();
+    const gone = moveCard(on, 2, "graveyard");
+    expect(gone.battlefield.find((c) => c.iid === 1)?.attachedTo).toBeUndefined();
+    expect(gone.battlefield.some((c) => c.iid === 1)).toBe(true);
+    // Not onto itself.
+    expect(attachCard(base, 1, 1)).toBe(base);
   });
 });

@@ -107,7 +107,7 @@ export interface PendingTax {
 export interface Choice {
   /** discard: a card from your hand. sacrifice: one of your permanents.
       put: a permanent card from your hand onto the battlefield (The
-      Ur-Dragon). attach: the creature your Aura goes on. imprint: a
+      Ur-Dragon). attach: the creature your Aura (or Equipment) goes on. imprint: a
       nonartifact, nonland card from your hand, exiled with Chrome Mox. */
   kind: "discard" | "sacrifice" | "put" | "attach" | "imprint";
   /** The card asking, for the prompt. */
@@ -141,9 +141,11 @@ export interface Choice {
   /** A Treasure spell's extra cost (Big Score's discard, Deadly Dispute's
       sacrifice): what it does once the cost is paid. */
   then?: { draw: number; treasures: number };
-  /** attach: the Aura, and whether Light-Paws searches for another after. */
+  /** attach: the Aura (or Equipment), and whether Light-Paws searches for another after. */
   aura?: number;
   tutor?: number;
+  /** attach: an Equipment's equip, and what it costs (paid when you pick). */
+  equip?: string;
 }
 
 // ── The AI's plan, as the model writes it (and the fallback planner). ──

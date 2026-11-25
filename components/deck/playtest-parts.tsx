@@ -180,6 +180,19 @@ export function PtCard({
   );
 }
 
+/** A permanent with what's attached to it (an Equipment, an Aura): each
+    attached card tucked behind it, its name bar showing above. `under` are
+    the attached cards' elements, `children` the permanent's own. */
+export function AttachGroup({ under, children }: { under: React.ReactNode[]; children: React.ReactNode }) {
+  if (!under.length) return <>{children}</>;
+  return (
+    <div className="pt-attach" data-count={under.length}>
+      {under}
+      {children}
+    </div>
+  );
+}
+
 export function PileZone({ label, cards, top, onOpen }: { label: string; cards: PlayCard[]; top?: PlayCard; onOpen: () => void }) {
   return (
     <div className="pt-zone">

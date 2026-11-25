@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart3, Bot, Dices, RotateCw, Undo2, X } from "lucide-react";
 import { hasKnownBack } from "@/components/useCardFlip";
-import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, type MenuState, type Zoom, AttachGroup } from "@/components/deck/playtest-parts";
 import PracticeTable from "@/components/deck/PracticeTable";
 import { PoolEntry } from "@/lib/pool-client";
 import { hypergeometric, hypergeometricAtLeast } from "@/lib/probability";
@@ -26,8 +26,7 @@ import {
   startGame,
   toggleTap,
   turnOver,
-  untapAll,
-} from "@/lib/playtest";
+  untapAll, attachCard, attaches, detachCard } from "@/lib/playtest";
 
 type Pile = "library" | "graveyard" | "exile";
 
@@ -105,6 +104,8 @@ function SoloTable({
   const [zoom, setZoom] = useState<Zoom | null>(null);
   // A phone held sideways: whether the hand is raised over the board.
   const [handUp, setHandUp] = useState(false);
+  // An Equipment or an Aura waiting for the card it goes on (its id).
+  const [attaching, setAttaching] = useState<number | null>(null);
 
   // The page behind must not scroll while the table is up.
   useEffect(() => {
@@ -139,6 +140,10 @@ function SoloTable({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        if (attaching !== null) {
+          setAttaching(null);
+          return;
+        }
         if (menu || pile || oddsOpen || zoom) {
           setMenu(null);
           setPile(null);
@@ -175,6 +180,9 @@ function SoloTable({
   const commanderOut = [...state.battlefield, ...state.hand, ...state.graveyard, ...state.exile, ...state.library].some((c) => c.commander);
 
   const lands = state.battlefield.filter((c) => isLandCard(c.typeLine));
+  // An Equipment or an Aura on a nonland card sits tucked under it. (On a
+  // land it keeps its own place: the lands are a row of their own.)
+  const tucked = (c: PlayCard) => c.attachedTo !== undefined && state.battlefield.some((h) => h.iid === c.attachedTo && !isLandCard(h.typeLine));
   const perms = state.battlefield.filter((c) => !isLandCard(c.typeLine));
   const landsInHand = state.hand.filter((c) => isLandCard(c.typeLine)).length;
 
@@ -185,6 +193,12 @@ function SoloTable({
   } as React.CSSProperties;
 
   const onPrimary = (card: PlayCard, zone: Zone, anchor: DOMRect) => {
+    // Picking what an Equipment or an Aura goes on.
+    if (attaching !== null) {
+      if (zone === "battlefield" && card.iid !== attaching) act((s) => attachCard(s, attaching, card.iid));
+      setAttaching(null);
+      return;
+    }
     if (zone === "hand") {
       if (state.toBottom === 0) setHandUp(false);
       act((s) => (s.toBottom > 0 ? bottomCard(s, card.iid) : play(s, card.iid)));
@@ -206,6 +220,17 @@ function SoloTable({
     if (zone === "hand") out.push({ label: resolvesToGraveyard(card.typeLine) ? "Cast — to graveyard" : "Play", step: (s) => play(s, card.iid) });
     if (zone === "command") out.push({ label: "Cast", step: (s) => play(s, card.iid) });
     if (zone === "battlefield") out.push({ label: card.tapped ? "Untap" : "Tap", step: (s) => toggleTap(s, card.iid) });
+    // An Equipment or an Aura: put it on another card, or take it off.
+    if (zone === "battlefield" && attaches(card) && state.battlefield.some((c) => c.iid !== card.iid && !isLandCard(c.typeLine) && !attaches(c))) {
+      out.push({
+        label: card.attachedTo !== undefined ? "Move it to another card" : "Attach to…",
+        step: (s) => {
+          setAttaching(card.iid);
+          return s;
+        },
+      });
+    }
+    if (zone === "battlefield" && card.attachedTo !== undefined) out.push({ label: "Take it off", step: (s) => detachCard(s, card.iid) });
     if (zone !== "library" && hasKnownBack(card.name, card.imageUri)) {
       out.push({ label: card.flipped ? "Turn to the front" : "Turn over", step: (s) => turnOver(s, card.iid) });
     }
@@ -293,8 +318,15 @@ function SoloTable({
         </div>
         {/* The hand count is plain to see on a phone, so only the mulligan
             prompt shows there. */}
-        <span className={state.toBottom > 0 ? "pt-status" : "pt-status pt-status-idle"}>
-          {state.toBottom > 0 ? (
+        <span className={state.toBottom > 0 || attaching !== null ? "pt-status" : "pt-status pt-status-idle"}>
+          {attaching !== null ? (
+            <b style={{ color: "var(--gold)", display: "inline-flex", alignItems: "center", gap: 10 }}>
+              Click the card to put {state.battlefield.find((c) => c.iid === attaching)?.name ?? "it"} on
+              <button type="button" className="pt-btn" onClick={() => setAttaching(null)}>
+                Cancel
+              </button>
+            </b>
+          ) : state.toBottom > 0 ? (
             <b style={{ color: "var(--gold)" }}>
               Mulligan — click {state.toBottom} card{state.toBottom === 1 ? "" : "s"} in hand to put on the bottom
             </b>
@@ -349,9 +381,16 @@ function SoloTable({
             </div>
           ) : (
             <div className="pt-row pt-row-perms">
-              {perms.map((c) => (
-                <PtCard key={c.iid} card={c} zone="battlefield" {...cardProps} />
-              ))}
+              {perms
+                .filter((c) => !tucked(c))
+                .map((c) => (
+                  <AttachGroup
+                    key={c.iid}
+                    under={state.battlefield.filter((a) => a.attachedTo === c.iid && tucked(a)).map((a) => <PtCard key={a.iid} card={a} zone="battlefield" {...cardProps} />)}
+                  >
+                    <PtCard key={c.iid} card={c} zone="battlefield" {...cardProps} selected={attaching === c.iid} />
+                  </AttachGroup>
+                ))}
             </div>
           )}
           {lands.length > 0 && (

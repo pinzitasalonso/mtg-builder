@@ -10,12 +10,12 @@ import type { OpponentOption } from "@/app/api/practice/opponents/route";
 import { PrimerMarkdown } from "@/components/deck/DeckPrimer";
 import OpponentPicker from "@/components/deck/OpponentPicker";
 import { CardArt } from "@/components/mtg";
-import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom, AttachGroup } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, wheelAbilityOf, type Search } from "@/lib/practice/cards";
-import { tapTribeOf, untapLandsOf } from "@/lib/practice/abilities";
+import { equipOf, tapTribeOf, untapLandsOf } from "@/lib/practice/abilities";
 import { canPayNextTax, declineTax, payTax, playerDraws, concede,
   addCounters,
   adjustLife,
@@ -34,6 +34,9 @@ import { canPayNextTax, declineTax, payTax, playerDraws, concede,
   playerEndStep,
   playerTapTribe,
   playerUntapLands,
+  playerEquip,
+  playerUnattach,
+  canEquip,
   spellCost,
   aiRemovalAction,
   aiResponds,
@@ -833,6 +836,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       ];
     }
     const out: { label: string; step: Step }[] = [];
+    // An Equipment: equip it (in your main phase, with a creature to go on).
+    const eq = zone === "battlefield" ? equipOf(book, card) : null;
+    if (eq && game && canEquip(game, card.iid, book)) out.push({ label: `Equip ${eq.cost}${card.attachedTo !== undefined ? " (move it)" : ""}`, step: (g) => playerEquip(g, card.iid, book) });
     if (zone === "hand" || zone === "command") out.push({ label: "Play", step: castStep(card.iid) });
     if (zone === "battlefield") out.push({ label: card.tapped ? "Untap" : "Tap", step: (g) => tapToggle(g, card.iid) });
     out.push(...counters);
@@ -870,6 +876,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         },
       });
     }
+    if (zone === "battlefield" && card.attachedTo !== undefined) out.push({ label: "Take it off", step: (g) => playerUnattach(g, card.iid) });
     if (zone !== "battlefield" && zone !== "hand") out.push({ label: "Put onto battlefield", step: to("battlefield") });
     if (zone !== "hand") out.push({ label: "Return to hand", step: to("hand") });
     if (zone !== "graveyard") out.push({ label: zone === "hand" ? "Discard" : "Graveyard", step: to("graveyard") });
@@ -1025,7 +1032,21 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const you = game.sides.you;
   const opp = game.sides.opp;
   const yourTurn = game.active === "you";
-  const row = (cards: PlayCard[], seat: Seat) => cards.map((c) => <PtCard key={c.iid} {...cardProps(seat)(c, "battlefield")} />);
+  // An Equipment or an Aura sits tucked under what it's on (an opponent's
+  // Aura on your creature too). On a land it keeps its own place: the
+  // lands are a pile.
+  const field = [...you.battlefield, ...opp.battlefield];
+  const hostOf = (c: PlayCard) => (c.attachedTo === undefined ? undefined : field.find((h) => h.iid === c.attachedTo && !isLand(h)));
+  const tucked = (c: PlayCard) => hostOf(c) !== undefined;
+  const seatOf = (c: PlayCard): Seat => (you.battlefield.some((x) => x.iid === c.iid) ? "you" : "opp");
+  const row = (cards: PlayCard[], seat: Seat) =>
+    cards
+      .filter((c) => !tucked(c))
+      .map((c) => (
+        <AttachGroup key={c.iid} under={field.filter((a) => a.attachedTo === c.iid && tucked(a)).map((a) => <PtCard key={a.iid} {...cardProps(seatOf(a))(a, "battlefield")} />)}>
+          <PtCard key={c.iid} {...cardProps(seat)(c, "battlefield")} />
+        </AttachGroup>
+      ));
   // A side's lands in one pile, each on top of the one before: the same land
   // together, untapped first. However many there are, they take about one
   // card's width, so the cards beside them keep their size.
@@ -1040,7 +1061,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   // same land, 30% over another; every card brings an 8px gap, and the lands
   // their divider.
   const lineFit = (cards: PlayCard[]): React.CSSProperties => {
-    const perms = cards.filter((c) => !isLand(c));
+    const perms = cards.filter((c) => !isLand(c) && !tucked(c));
     const lands = [...cards.filter(isLand)].sort((a, b) => a.name.localeCompare(b.name));
     const landSlots = lands.reduce((n, c, i) => n + (i === 0 ? 1 : lands[i - 1]!.name === c.name ? 0.18 : 0.3), 0);
     const fixed = cards.length * 8 + (perms.length && lands.length ? 30 : 0);
@@ -1096,7 +1117,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
             : game.choice.kind === "put"
             ? "choose a permanent card from your hand to put onto the battlefield"
             : game.choice.kind === "attach"
-              ? "choose the creature it goes on"
+              ? game.choice.equip
+                ? `choose the creature to equip it to. It costs ${game.choice.equip}`
+                : "choose the creature it goes on"
               : game.choice.braids === "yours"
                 ? "sacrifice an artifact, creature, enchantment, land or planeswalker? The opponent then sacrifices one that shares a type, or loses 2 life and you draw"
                 : game.choice.types

@@ -59,6 +59,7 @@ import {
   auraBonusOf,
   auraTutorOf,
   enchantsOf,
+  equipOf,
   braidsOf,
   castFromGraveyardOnHitOf,
   copyOnEnterOf,
@@ -208,9 +209,14 @@ function moveTo(g: PracticeGame, iid: number, to: Zone, opts: { tapped?: boolean
     afterNext.set(g, [...(afterNext.get(g) ?? []), { seat: at.seat, text: `${at.card.name} goes to the command zone instead of ${to === "exile" ? "exile" : "the graveyard"}.` }]);
     to = "command";
   }
-  // The Auras on a permanent that leaves go to the graveyard.
+  // The Auras on a permanent that leaves go to the graveyard. Its
+  // Equipment stays, attached to nothing.
   if (at.zone === "battlefield" && to !== "battlefield") {
-    for (const s of ["you", "opp"] as Seat[]) for (const a of g.sides[s].battlefield.filter((c) => c.attachedTo === iid)) moveTo(g, a.iid, "graveyard");
+    for (const s of ["you", "opp"] as Seat[])
+      for (const a of g.sides[s].battlefield.filter((c) => c.attachedTo === iid)) {
+        if (/\bEquipment\b/.test(a.typeLine ?? "")) update(g, a.iid, (c) => ({ ...c, attachedTo: undefined }));
+        else moveTo(g, a.iid, "graveyard");
+      }
   }
   const side = g.sides[at.seat];
   // A token, or a token that's a copy (Inalla), ceases to exist off the battlefield.
@@ -1280,6 +1286,23 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     checkState(g, book);
     return { game: g, ok: true };
   }
+  // An Equipment activated for its equip cost: the table attaches it, in
+  // its own main phase, to a creature of its own.
+  const eq = equipOf(book, card);
+  if (eq && !action.tap_card && !action.sacrifice_card && totalOf(parseCost(action.mana)) === totalOf(parseCost(eq.cost))) {
+    if (g.active !== seat || g.combat) return fail(`(${card.name} can only be equipped in the opponent's own main phase.)`);
+    const host = aiEquipHost(g, seat, card, action.effects, book);
+    if (host === undefined) return fail(`(${card.name} has no creature to equip.)`);
+    const sources = availableMana(g, seat, book);
+    const paid = aiPay(g, seat, parseCost(eq.cost), sources, book);
+    if (!paid) return fail(`The opponent can't pay to equip ${card.name}.`);
+    spend(g, seat, paid, sources, book);
+    loseLife(g, seat, paid.life, book);
+    update(g, card.iid, (c) => ({ ...c, attachedTo: host }));
+    say(g, seat, `${who(seat)} ${verb(seat, "equip")} ${card.name} to ${findCard(g, host)?.card.name ?? "a creature"}.`, card);
+    checkState(g, book);
+    return { game: g, ok: true };
+  }
   if (action.tap_card) {
     if (card.tapped) return fail(`(${card.name} is already tapped.)`);
     if (isCreature(book, card) && isSick(book, card, g.turn)) return fail(`(${card.name} can't tap the turn it arrived.)`);
@@ -1695,6 +1718,42 @@ export function choiceTargets(g: PracticeGame, book: CardBook): number[] {
   }
 }
 
+/** Your Equipment's equip: in your main phase, with a creature of yours to
+    go on. It asks which creature; the cost is paid when you pick one, so
+    changing your mind costs nothing. */
+export function playerEquip(g0: PracticeGame, iid: number, book: CardBook): PracticeGame {
+  const at = findCard(g0, iid);
+  const eq = at && at.seat === "you" && at.zone === "battlefield" ? equipOf(book, at.card) : null;
+  if (!at || !eq || g0.choice || g0.winner) return g0;
+  if (g0.active !== "you" || g0.combat) return g0;
+  if (!auraHostsOf(g0, iid, book).some((h) => h !== at.card.attachedTo)) return g0;
+  const g = structuredClone(g0);
+  g.choice = { kind: "attach", source: at.card.name, by: "you", aura: iid, equip: eq.cost, decline: "Cancel" };
+  return g;
+}
+
+/** Whether your Equipment can be equipped now: your main phase, a creature
+    of yours to go on (other than the one it's on). */
+export function canEquip(g: PracticeGame, iid: number, book: CardBook): boolean {
+  const at = findCard(g, iid);
+  if (!at || at.seat !== "you" || at.zone !== "battlefield" || !equipOf(book, at.card)) return false;
+  if (g.active !== "you" || g.combat || g.choice || g.winner) return false;
+  return auraHostsOf(g, iid, book).some((h) => h !== at.card.attachedTo);
+}
+
+/** Take an Aura or an Equipment off what it's on, by hand. (An Aura
+    stays in play: the table leaves the rules to you here.) */
+export function playerUnattach(g0: PracticeGame, iid: number): PracticeGame {
+  const at = findCard(g0, iid);
+  if (!at || at.zone !== "battlefield" || at.card.attachedTo === undefined) return g0;
+  const g = structuredClone(g0);
+  const host = findCard(g, at.card.attachedTo)?.card.name;
+  update(g, iid, (c) => ({ ...c, attachedTo: undefined }));
+  say(g, at.seat, `${at.card.name} comes off ${host ?? "what it was on"}.`);
+  checkState(g, {});
+  return g;
+}
+
 /** The permanents your Aura (by its id) may go on. */
 function auraHostsOf(g: PracticeGame, aura: number | undefined, book: CardBook): number[] {
   const at = aura === undefined ? null : findCard(g, aura);
@@ -1726,6 +1785,10 @@ export function resolveChoice(g0: PracticeGame, iid: number, book: CardBook): Pr
     say(g, "you", `You put ${at.card.name} onto the battlefield (${choice.source}).`, at.card);
     if (isLand(at.card)) landEntered(g, "you", book);
     else entered(g, "you", at.card, book, { cast: false });
+  } else if (choice.equip) {
+    payForYou(g, parseCost(choice.equip), `equipping ${choice.source}`, book);
+    update(g, choice.aura!, (c) => ({ ...c, attachedTo: iid }));
+    say(g, "you", `You equip ${choice.source} to ${at.card.name}.`);
   } else {
     update(g, choice.aura!, (c) => ({ ...c, attachedTo: iid }));
     say(g, "you", `${choice.source} goes on ${at.card.name}.`);
@@ -1995,6 +2058,19 @@ function aiAuraHost(g: PracticeGame, seat: Seat, aura: PlayCard, effects: PlanAc
   const hostile = HOSTILE_AURA.test(faceText(infoOf(book, aura), aura).toLowerCase());
   // Never a curse on its own permanent, never a gift to the player's.
   return best(hostile ? other(seat) : seat)?.iid;
+}
+
+/** Where the AI equips: the creature of its own the plan targets, else its
+    biggest one not carrying this Equipment already. Undefined: none. */
+export function aiEquipHost(g: PracticeGame, seat: Seat, equipment: PlayCard, effects: PlanAction["effects"], book: CardBook): number | undefined {
+  const hosts = auraHosts(g, seat, equipment, book)
+    .map((h) => h.card)
+    .filter((c) => c.iid !== equipment.attachedTo);
+  const targeted = effects.map((e) => parseCardId(e.target)).find((t) => t !== null && hosts.some((c) => c.iid === t));
+  if (targeted !== undefined && targeted !== null) return targeted;
+  // Not one that's tapped or summoning sick when another can use it now.
+  const ready = (c: PlayCard) => !c.tapped && !isSick(book, c, g.turn);
+  return [...hosts].sort((a, b) => Number(ready(b)) - Number(ready(a)) || stats(book, b).power - stats(book, a).power)[0]?.iid;
 }
 
 /** The AI's Aura enters attached (see aiAuraHost). With nothing to enchant
