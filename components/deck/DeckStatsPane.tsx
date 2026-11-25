@@ -2,28 +2,34 @@
 
 // The deck page's Stats pane — everything ABOUT the deck rather than in it.
 //
-// Three parts, top to bottom:
-//   AT A GLANCE — the numbers that judge the deck, as a row of tiles (size,
-//     bracket, average cost, combos), and the Score with its working. Lands
-//     have their count in the composition just below.
-//   BUILD — what it's made of, in two pairs that belong together: the curve
-//     beside the composition (what it costs, what it is), then the colours and
-//     mana sources beside the roles (8×8) (what it needs, what it does).
-//     Side by side on a wide page, stacked on a phone.
-//   HOW IT PLAYS — the things you READ: the primer, the AI analysis, the
-//     combos. Last, because they're long, and the numbers are what you open
-//     this tab to glance at.
+// Top to bottom:
+//   THE SCORE — the pane's lead: the number, the bracket it plays at, the four
+//     axes with their working a click away, and the scan's verdict in words.
+//   Then two columns on a wide page:
+//     the main one — COMBOS (each with its cards), the GAME PLAN (the primer,
+//       or the scan's read of how to pilot it: one at a time, never both
+//       stacked), and the RECORD of games;
+//     the side one — the BUILD: the figures you glance at, the curve, the
+//       composition, the colours and the roles.
+//   On a phone it is one column: Score, combos, build, game plan, record. The
+//   long things to read come after the short things to glance at.
+//
+// Every card name on the pane can be pointed at to see the card
+// (components/deck/CardHover.tsx).
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  InsightAnalysis,
+  InsightCombos,
   InsightEightByEight,
-  InsightPlay,
-  InsightProfile,
+  InsightGamePlan,
+  InsightRecord,
   InsightScan,
+  InsightScoreHero,
+  InsightTiles,
   StatSection,
   useDeckInsight,
 } from "@/components/deck/DeckInsight";
+import { CardHoverProvider } from "@/components/deck/CardHover";
 import DeckPrimer from "@/components/deck/DeckPrimer";
 import {
   ColorPips,
@@ -37,6 +43,7 @@ import {
 } from "@/components/mtg";
 import type { PoolEntry } from "@/lib/pool-client";
 import type { InsightCard } from "@/lib/deck-insight";
+import type { ScanSummary } from "@/lib/deck-analysis";
 
 // Category accent colours for the composition matrix (matches the design).
 const CAT_COLOR: Record<string, string> = {
@@ -64,7 +71,13 @@ export default function DeckStatsPane({
   onHoverCurveBar,
   onClickCurveBar,
   target,
+  commanderFormat,
+  onScanned,
 }: {
+  /** The pane's scan, as its summary, whenever it loads or a new one is run: the page's top line shows it. */
+  onScanned?: (scan: ScanSummary | null) => void;
+  /** Whether the deck's format is Commander (brackets are Commander's). */
+  commanderFormat: boolean;
   /** The deck's size target: 100 for Commander, 60 otherwise. */
   target: number;
   deckId: string;
@@ -85,13 +98,37 @@ export default function DeckStatsPane({
   const insight = useDeckInsight(deckId, insightCards);
   const stats = deckStats(deckCards);
 
-  // The primer always shows, now that an empty one offers to write itself
-  // with the AI: an owner with none sees the offer, a viewer sees the owner's
-  // (or that there isn't one). Tools → Primer brings it into view.
+  // The game plan is one thing to read: the owner's primer, or the scan's
+  // read of how to pilot the deck. With both, a switch picks one; the primer
+  // leads, because its owner wrote it (or kept it).
+  const plan = insight.scan?.analysis ?? null;
+  const hasPrimer = primer.trim().length > 0;
+  const [planView, setPlanView] = useState<"primer" | "scan" | null>(null);
+  const view = !plan ? "primer" : (planView ?? (hasPrimer ? "primer" : "scan"));
+
+  // The page's top line carries the Score too, and follows a new scan.
+  const scanned = insight.scan;
+  const tell = useRef(onScanned);
+  tell.current = onScanned;
+  const scannedAt = scanned?.scannedAt ?? null;
+  useEffect(() => {
+    if (!scanned) return;
+    const { index, label, bracketFloor } = scanned.score;
+    tell.current?.({ score: index, label, bracket: Number.isInteger(bracketFloor) && bracketFloor >= 1 && bracketFloor <= 5 ? bracketFloor : null });
+    // Keyed on the scan's time: the same scan is told once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scannedAt]);
+
+  // Tools → Primer brings the primer into view.
   const primerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (primerOpen) requestAnimationFrame(() => primerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    if (!primerOpen) return;
+    setPlanView("primer");
+    requestAnimationFrame(() => primerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }, [primerOpen]);
+
+  // Every card on the page, for the names the pane lets you point at.
+  const hoverCards = useMemo(() => deckCards.map((c) => ({ name: c.name, imageUri: c.imageUri })), [deckCards]);
 
   if (deckCards.length === 0) {
     return (
@@ -104,67 +141,89 @@ export default function DeckStatsPane({
     );
   }
 
-  // Two blocks that read together: side by side where there's room.
-  const pair: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", columnGap: 40 };
+  const lands = stats.types.find((t) => t.name === "Lands")?.n ?? 0;
 
   return (
-    <div>
-      <StatSection title="At a glance">
-        <InsightProfile insight={insight} avgManaValue={avgManaValue} cardCount={stats.count} target={target} />
-        <div style={{ marginTop: 12 }}>
-          <InsightScan deckId={deckId} insight={insight} canEdit={canEdit} open={scanOpen} primer={primer} />
+    <CardHoverProvider cards={hoverCards}>
+      <div className="st">
+        <InsightScoreHero
+          insight={insight}
+          canEdit={canEdit}
+          commanderFormat={commanderFormat}
+          scanSlot={<InsightScan deckId={deckId} insight={insight} canEdit={canEdit} open={scanOpen} primer={primer} />}
+        />
+
+        <div className="st-main">
+          <div className="st-combos-slot">
+            <InsightCombos insight={insight} />
+          </div>
+
+          <div className="st-plan-slot" ref={primerRef} style={{ scrollMarginTop: 90 }}>
+            <StatSection
+              title="Game plan"
+              aside={
+                plan && (
+                  <div className="st-switch" role="tablist" aria-label="Which game plan">
+                    <button type="button" role="tab" aria-selected={view === "primer"} onClick={() => setPlanView("primer")}>
+                      Primer
+                    </button>
+                    <button type="button" role="tab" aria-selected={view === "scan"} onClick={() => setPlanView("scan")}>
+                      From the scan
+                    </button>
+                  </div>
+                )
+              }
+            >
+              {view === "scan" && plan ? (
+                <InsightGamePlan analysis={plan} />
+              ) : (
+                <DeckPrimer deckId={deckId} primer={primer} canEdit={canEdit} onSaved={onPrimerSaved} />
+              )}
+            </StatSection>
+          </div>
+
+          <div className="st-record-slot">
+            <InsightRecord insight={insight} />
+          </div>
         </div>
-      </StatSection>
 
-      <div style={pair}>
-        <StatSection title="Mana curve">
-          <ManaCurve
-            curve={stats.curve}
-            accent="var(--gold)"
-            onHoverBar={onHoverCurveBar}
-            onClickBar={onClickCurveBar}
-          />
-        </StatSection>
+        <aside className="st-side" aria-label="The build">
+          <StatSection title="At a glance">
+            <InsightTiles insight={insight} avgManaValue={avgManaValue} cardCount={stats.count} target={target} lands={lands} />
+          </StatSection>
 
-        <StatSection title={`Composition · ${stats.count} cards`}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 12 }}>
-            {stats.types.flatMap((t) =>
-              Array.from({ length: t.n }).map((_, i) => (
-                <span key={t.name + i} style={{ width: 9, height: 9, borderRadius: 2.5, background: CAT_COLOR[t.name] || "#ccc" }} />
-              ))
-            )}
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 14px" }}>
-            {stats.types.map((t) => (
-              <span key={t.name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--w-2)" }}>
-                <span style={{ width: 9, height: 9, borderRadius: 2.5, background: CAT_COLOR[t.name] || "#ccc" }} />
-                {t.name} <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{t.n}</b>
-              </span>
-            ))}
-          </div>
-        </StatSection>
-      </div>
+          <StatSection title="Mana curve">
+            <ManaCurve curve={stats.curve} accent="var(--gold)" onHoverBar={onHoverCurveBar} onClickBar={onClickCurveBar} />
+          </StatSection>
 
-      <div style={pair}>
-        <StatSection title="Colors & mana">
-          <ColorIdentity deckCards={deckCards} identity={identity} />
-        </StatSection>
-
-        <StatSection title="Roles · 8×8">
-          <InsightEightByEight insight={insight} />
-        </StatSection>
-      </div>
-
-      <StatSection title="How it plays">
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div ref={primerRef} style={{ scrollMarginTop: 90 }}>
-              <DeckPrimer deckId={deckId} primer={primer} canEdit={canEdit} onSaved={onPrimerSaved} />
+          <StatSection title={`Composition · ${stats.count} cards`}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 12 }}>
+              {stats.types.flatMap((t) =>
+                Array.from({ length: t.n }).map((_, i) => (
+                  <span key={t.name + i} style={{ width: 9, height: 9, borderRadius: 2.5, background: CAT_COLOR[t.name] || "#ccc" }} />
+                ))
+              )}
             </div>
-            {insight.scan?.analysis && <InsightAnalysis analysis={insight.scan.analysis} />}
-            <InsightPlay insight={insight} />
-          </div>
-        </StatSection>
-    </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px 14px" }}>
+              {stats.types.map((t) => (
+                <span key={t.name} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--w-2)" }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 2.5, background: CAT_COLOR[t.name] || "#ccc" }} />
+                  {t.name} <b style={{ color: "var(--w-1)", fontFamily: "var(--font-mono)" }}>{t.n}</b>
+                </span>
+              ))}
+            </div>
+          </StatSection>
+
+          <StatSection title="Colors & mana">
+            <ColorIdentity deckCards={deckCards} identity={identity} />
+          </StatSection>
+
+          <StatSection title="Roles · 8×8">
+            <InsightEightByEight insight={insight} />
+          </StatSection>
+        </aside>
+      </div>
+    </CardHoverProvider>
   );
 }
 

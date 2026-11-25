@@ -1,5 +1,6 @@
 "use client";
 
+import { BRACKET_TINT, type ScanSummary } from "@/lib/deck-analysis";
 import { deckFace } from "@/lib/deck-face";
 import { LimitBar, LimitNotice, PlanPill } from "@/components/Upgrade";
 import { isLimitMessage } from "@/lib/limits";
@@ -78,6 +79,8 @@ interface Deck {
   /** Game-night record — play-code results and the owner's tracker. */
   gamesPlayed?: number;
   gamesWon?: number;
+  /** The last scan's Score and bracket, or null when never scanned. */
+  scan?: ScanSummary | null;
 }
 
 const COLORS = [
@@ -984,6 +987,7 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // else's shared deck, an ownerless public one) it's this page's own chat.
   const assistant = useAssistant();
   const plan = usePlan();
+  const isCommanderFormat = (deck?.format ?? "commander").toLowerCase() === "commander";
   // What stands in for the commander's card when there is no commander.
   // The same card the home tile and the link preview show (lib/deck-face.ts).
   const faceCard = deck?.commander ? null : deckFace(null, deckCards);
@@ -1223,6 +1227,23 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
                 <span className="id-mono" style={{ fontSize: 12.5, color: "var(--w-2)", textTransform: "capitalize" }}>
                   {deck?.format}{identityPips.length ? ` · ${identityPips.map((c) => COLOR_NAME[c]).join(" / ")}` : ""}
                 </span>
+                {/* The last scan, as the home tile shows it: the bracket in its
+                    tint, joined to the Score. It opens the Stats pane, where
+                    the Score is explained. */}
+                {deck?.scan && (
+                  <button
+                    type="button"
+                    className="deck-score-pill"
+                    title={`${isCommanderFormat && deck.scan.bracket ? `Bracket ${deck.scan.bracket}, ` : ""}Score ${deck.scan.label}. See how it was counted.`}
+                    onClick={() => {
+                      setPane("stats");
+                      requestAnimationFrame(() => document.querySelector(".deck-panes")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+                    }}
+                  >
+                    {isCommanderFormat && deck.scan.bracket && <span style={{ background: BRACKET_TINT[deck.scan.bracket] }}>B{deck.scan.bracket}</span>}
+                    <span>Score {deck.scan.label}</span>
+                  </button>
+                )}
                 {(deck?.gamesPlayed ?? 0) > 0 && (
                   <span className="id-mono" title="Game-night record — wins–losses" style={{ fontSize: 12.5, color: "var(--gold)", padding: "3px 10px", borderRadius: 999, background: "var(--w-fill)", border: "1px solid var(--w-line)" }}>
                     {deck!.gamesWon ?? 0}–{(deck!.gamesPlayed ?? 0) - (deck!.gamesWon ?? 0)} record
@@ -1370,6 +1391,8 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
             <DeckStatsPane
               deckId={deckId}
               target={target}
+              commanderFormat={isCommanderFormat}
+              onScanned={(scan) => setDeck((d) => (d ? { ...d, scan } : d))}
               deckCards={deckCards}
               // Both boards. 8x8 and the bracket read the deck board out of
               // this themselves, and a Game Changer you are only CONSIDERING

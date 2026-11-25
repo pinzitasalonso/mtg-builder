@@ -27,8 +27,9 @@ import Link from "next/link";
 import { refreshPlan, rememberUpgradeFrom } from "@/lib/plan-client";
 import { LimitNotice } from "@/components/Upgrade";
 import { isLimitMessage } from "@/lib/limits";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Link2, ScanSearch } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { ChevronDown, ScanSearch } from "lucide-react";
+import { CardName, CardThumb, LinkedText } from "@/components/deck/CardHover";
 import type { DeckScoreReport } from "@/lib/deck-score-report";
 import type { AnalysisDocument, DeckScan } from "@/lib/deck-analysis";
 import {
@@ -167,10 +168,10 @@ export function useDeckInsight(deckId: string, cards: InsightCard[]): DeckInsigh
  * A labelled block: a kerned eyebrow with a gold hairline running off it, the
  * same chrome the iOS Stats pane gives every section.
  */
-export function StatSection({ title, children }: { title: string; children: ReactNode }) {
+export function StatSection({ title, aside, children }: { title: string; /** Sits at the end of the title's line. */ aside?: ReactNode; children: ReactNode }) {
   return (
-    <section style={{ marginBottom: 34 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+    <section>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, minHeight: 30 }}>
         <span className="id-label" style={{ color: "var(--w-2)", whiteSpace: "nowrap" }}>{title}</span>
         {/* Gold fading to nothing. Plain `var(--gold)` at half opacity rather
             than a color-mix() — lightningcss mangles those, and there is no
@@ -179,27 +180,14 @@ export function StatSection({ title, children }: { title: string; children: Reac
           aria-hidden
           style={{ flex: 1, height: 1, opacity: 0.5, background: "linear-gradient(to right, var(--gold), transparent)" }}
         />
+        {aside}
       </div>
       {children}
     </section>
   );
 }
 
-/** Label left, figure right, the reasoning under the figure. iOS `profileRow`. */
-function ProfileRow({ label, value, detail }: { label: string; value: string; detail?: string | null }) {
-  return (
-    <div style={{ display: "flex", alignItems: "baseline", gap: 12, padding: "9px 0", borderTop: "1px solid var(--w-line)" }}>
-      <span style={{ fontSize: 13.5, color: "var(--w-2)" }}>{label}</span>
-      <span style={{ flex: 1 }} />
-      <span style={{ textAlign: "right" }}>
-        <span style={{ display: "block", fontSize: 14, fontWeight: 600, color: "var(--w-1)" }}>{value}</span>
-        {detail && <span style={{ display: "block", fontSize: 11.5, color: "var(--w-3)", marginTop: 2 }}>{detail}</span>}
-      </span>
-    </div>
-  );
-}
-
-/** One figure of the at-a-glance row: a small label, the number, a note. */
+/** One figure of the at-a-glance tiles: a small label, the number, a note. */
 function StatTile({
   label,
   value,
@@ -212,76 +200,69 @@ function StatTile({
   value: string;
   detail?: string | null;
   warn?: boolean;
-  /** Makes the tile a button (e.g. Combos → the combo list). */
+  /** Makes the tile a button (Combos → the combo list). */
   onClick?: () => void;
   actionLabel?: string;
 }) {
-  const box: React.CSSProperties = { padding: "12px 14px", borderRadius: 14, background: "var(--w-fill)", boxShadow: "inset 0 0 0 1px var(--w-line)", minWidth: 0 };
   const body = (
     <>
-      <div className="id-label" style={{ fontSize: 10.5, color: "var(--w-3)", marginBottom: 6, display: "flex", justifyContent: "space-between", gap: 6 }}>
+      <div className="id-label st-tile-label">
         {label}
         {onClick && <ChevronDown size={13} strokeWidth={2.5} aria-hidden />}
       </div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: warn ? "#ffb4a3" : "var(--w-1)", lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{value}</div>
-      {detail && <div style={{ fontSize: 11.5, color: "var(--w-3)", marginTop: 4, lineHeight: 1.35 }}>{detail}</div>}
+      <div className="st-tile-value" data-warn={warn || undefined}>{value}</div>
+      {detail && <div className="st-tile-detail">{detail}</div>}
     </>
   );
-  if (!onClick) return <div style={box}>{body}</div>;
+  if (!onClick) return <div className="st-tile">{body}</div>;
   return (
-    <button type="button" onClick={onClick} aria-label={actionLabel} className="stat-tile-link" style={{ ...box, border: "none", textAlign: "left", font: "inherit", color: "inherit", cursor: "pointer" }}>
+    <button type="button" onClick={onClick} aria-label={actionLabel} className="st-tile stat-tile-link">
       {body}
     </button>
   );
 }
 
-/** The Combos tile asks the combo list (further down the Stats pane) to open
- *  and come into view. An event, because the two sit in different sections. */
-const SHOW_COMBOS = "spellpool:show-combos";
+/** Where the combos are, for the tile that jumps to them. */
+const COMBOS_ID = "deck-combos";
+
+/** What a combo list amounts to, in a few words. */
+function comboSummary(list: ComboResult["combos"], hasTwoCard: boolean): string | null {
+  const wins = list.filter(winsTheGame).length;
+  return (
+    [
+      wins ? `${wins} win${wins === 1 ? "s" : ""} the game` : null,
+      hasTwoCard ? "a two-card combo" : null,
+      // Otherwise, what they make: "infinite tokens · infinite damage".
+      ...(wins ? [] : [...new Set(list.map((c) => c.produces[0]?.toLowerCase()).filter(Boolean))].slice(0, 2)),
+    ]
+      .filter(Boolean)
+      .join(" · ") || null
+  );
+}
+const winsTheGame = (c: ComboResult["combos"][number]) => c.produces.some((p) => /win the game/i.test(p));
 
 /**
- * The verdict, at a glance: size, bracket, average cost, combos — a row of
- * tiles — and, under them, the Score with its working.
+ * The figures you glance at: size, average cost, lands, combos. The bracket
+ * and the Score used to be two more of these; they are the panel above now.
  */
-export function InsightProfile({
+export function InsightTiles({
   insight,
   avgManaValue,
   cardCount,
   target,
+  lands,
 }: {
   insight: DeckInsightData;
   avgManaValue: number;
   cardCount: number;
   target: number;
+  lands: number;
 }) {
-  const { bracket, changers, combos, scan } = insight;
-  const score = scan?.score ?? null;
-  // Nil at zero, deliberately — iOS `gameChangerDetail`. `changers` is also
-  // null before the list has loaded, and "from 0 game changers" would be
-  // claiming a measurement we have not taken.
-  const bracketDetail =
-    changers === null
-      ? "counting…"
-      : [
-          changers > 0 ? `${changers} game changer${changers === 1 ? "" : "s"}` : null,
-          combos?.hasTwoCardCombo ? "two-card combo" : null,
-        ]
-          .filter(Boolean)
-          .join(" · ") || null;
-
-  // When the deck plays above its rules bracket, the Score's floor is the
-  // bracket shown, and the rules one becomes the note — a deck that plays like
-  // a 3 is a 3 at the table, whatever its Game Changer count.
-  const shown = shownBracket(bracket, score?.bracketFloor);
-  const bracketNote = shown.byScore
-    ? [`plays like it, by its Score`, `rules alone: ${BRACKET_NUMBER[bracket]}${bracketDetail ? ` (${bracketDetail})` : ""}`].join(" · ")
-    : bracketDetail;
-
-  // Combos the deck can assemble (Commander Spellbook). Null while loading, or
-  // when Spellbook didn't answer — "0" would claim a count we don't have.
+  const { combos } = insight;
+  // Null while loading, or when Spellbook didn't answer: "0" would claim a
+  // count we don't have.
   const comboList = combos?.combos ?? null;
   const comboValue = comboList === null ? (insight.combosLoading ? "…" : "—") : String(comboList.length);
-  const wins = comboList?.filter((c) => c.produces.some((p) => /win the game/i.test(p))).length ?? 0;
   const comboDetail =
     comboList === null
       ? insight.combosLoading
@@ -289,42 +270,26 @@ export function InsightProfile({
         : "couldn’t check right now"
       : comboList.length === 0
         ? "none in the list"
-        : [
-            wins ? `${wins} win${wins === 1 ? "s" : ""} the game` : null,
-            combos?.hasTwoCardCombo ? "two-card combo" : null,
-            // Otherwise, what they make: "infinite tokens · infinite damage".
-            ...(wins
-              ? []
-              : [...new Set(comboList.map((c) => c.produces[0]?.toLowerCase()).filter(Boolean))].slice(0, 2)),
-          ]
-            .filter(Boolean)
-            .join(" · ") || null;
-
+        : comboSummary(comboList, combos?.hasTwoCardCombo ?? false);
   const missing = target - cardCount;
+  const toCombos = () => document.getElementById(COMBOS_ID)?.scrollIntoView({ behavior: "smooth", block: "start" });
   return (
-    <div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginBottom: score ? 14 : 0 }}>
-        <StatTile
-          label="Cards"
-          value={`${cardCount}/${target}`}
-          detail={missing > 0 ? `${missing} to go` : missing < 0 ? `${-missing} over` : "complete"}
-          warn={missing < 0}
-        />
-        <StatTile label="Bracket" value={`${BRACKET_NUMBER[shown.bracket]} · ${BRACKET_LABEL[shown.bracket]}`} detail={bracketNote} />
-        {Number.isFinite(avgManaValue) && <StatTile label="Average cost" value={avgManaValue.toFixed(2)} detail="mana value, lands excluded" />}
-        <StatTile
-          label="Combos"
-          value={comboValue}
-          detail={comboDetail}
-          onClick={comboList && comboList.length > 0 ? () => window.dispatchEvent(new Event(SHOW_COMBOS)) : undefined}
-          actionLabel={comboList && comboList.length > 0 ? `Show the ${comboList.length} combo${comboList.length === 1 ? "" : "s"}` : undefined}
-        />
-      </div>
-      {score && (
-        <div style={{ maxWidth: 620 }}>
-          <InsightScore score={score} scannedAt={scan?.scannedAt ?? null} />
-        </div>
-      )}
+    <div className="st-tiles">
+      <StatTile
+        label="Cards"
+        value={`${cardCount}/${target}`}
+        detail={missing > 0 ? `${missing} to go` : missing < 0 ? `${-missing} over` : "complete"}
+        warn={missing < 0}
+      />
+      {Number.isFinite(avgManaValue) && <StatTile label="Average cost" value={avgManaValue.toFixed(2)} detail="lands excluded" />}
+      <StatTile label="Lands" value={String(lands)} detail={cardCount ? `${Math.round((lands / cardCount) * 100)}% of the deck` : null} />
+      <StatTile
+        label="Combos"
+        value={comboValue}
+        detail={comboDetail}
+        onClick={comboList && comboList.length > 0 ? toCombos : undefined}
+        actionLabel={comboList && comboList.length > 0 ? `Go to the ${comboList.length} combo${comboList.length === 1 ? "" : "s"}` : undefined}
+      />
     </div>
   );
 }
@@ -332,206 +297,330 @@ export function InsightProfile({
 /** Trailing zeros off the quarter grid: 6.25 stays, 6.00 becomes 6. */
 const trim = (n: number): string => String(Number(n.toFixed(2)));
 
+/** What each axis measures, for a deck that hasn't been scanned. */
+const AXIS_MEANS: { key: string; label: string; means: string }[] = [
+  { key: "consistency", label: "Consistency", means: "How reliably it finds what it needs" },
+  { key: "resilience", label: "Resilience", means: "How well it recovers" },
+  { key: "interaction", label: "Interaction", means: "How much it can stop" },
+  { key: "speed", label: "Speed", means: "How early it takes a player out" },
+];
+
+const DEPENDENCY: Record<string, string> = {
+  none: "Plays fine without its commander",
+  moderate: "Leans on its commander",
+  high: "Needs its commander",
+};
+
 /**
- * The Score row. The four axes and the working sit behind a click on the
- * row itself, DeckCheck-style: the profile is a glance, and a real deck's
- * working runs to a few dozen lines.
+ * The Score, as the pane's lead: the number, the bracket it plays at, the
+ * four axes with their working a click away, and the scan's verdict in
+ * words (what the deck is, what beats it). A deck that hasn't been scanned
+ * gets the same panel with the offer to scan it.
  *
- * The axes are the first thing the detail shows because the index alone
- * hides the shape: 9/3/3/9 and 6/7/7/6 average to nearly the same number and
- * play nothing alike.
+ * The axes are bars beside the number because the index alone hides the
+ * shape: 9/3/3/9 and 6/7/7/6 average to nearly the same and play nothing alike.
  */
-function InsightScore({ score, scannedAt }: { score: DeckScoreReport; scannedAt: string | null }) {
-  const [open, setOpen] = useState(false);
+export function InsightScoreHero({
+  insight,
+  scanSlot,
+  canEdit,
+  commanderFormat,
+}: {
+  insight: DeckInsightData;
+  /** The scan button and its meter (nothing, for a viewer). */
+  scanSlot: ReactNode;
+  canEdit: boolean;
+  /** Brackets are Commander's: another format's deck shows none. */
+  commanderFormat: boolean;
+}) {
+  const { bracket, changers, combos, scan } = insight;
+  const score = scan?.score ?? null;
+  const analysis = scan?.analysis ?? null;
   const [openAxis, setOpenAxis] = useState<string | null>(null);
-  const when = scannedAt ? new Date(scannedAt).toLocaleDateString() : null;
+
+  // Nil at zero, deliberately. `changers` is also null before the list has
+  // loaded, and "from 0 game changers" would claim a measurement not taken.
+  const bracketDetail =
+    changers === null
+      ? "counting…"
+      : [changers > 0 ? `${changers} game changer${changers === 1 ? "" : "s"}` : null, combos?.hasTwoCardCombo ? "two-card combo" : null]
+          .filter(Boolean)
+          .join(" · ") || null;
+  // When the deck plays above its rules bracket, the Score's floor is the
+  // bracket shown and the rules one becomes the note: a deck that plays like
+  // a 3 is a 3 at the table, whatever its Game Changer count.
+  const shown = shownBracket(bracket, score?.bracketFloor);
+  const bracketNote = shown.byScore
+    ? `By its Score. By the rules alone: ${BRACKET_NUMBER[bracket]}${bracketDetail ? ` (${bracketDetail})` : ""}.`
+    : bracketDetail;
+  const when = scan?.scannedAt ? new Date(scan.scannedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
+  const noteFor = (key: string) => analysis?.axes.find((a) => a.key === key)?.note ?? null;
+  const turn = score && Number.isFinite(score.fundamentalTurn) ? Math.round(score.fundamentalTurn * 2) / 2 : null;
+
   return (
-    <div>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        style={{ display: "block", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", font: "inherit", color: "inherit", textAlign: "left" }}
-      >
-        <ProfileRow
-          label="Score"
-          value={`${score.label} ${open ? "▾" : "▸"}`}
-          detail={[score.axes.map((a) => `${a.label[0]} ${trim(a.score)}`).join(" · "), when ? `scanned ${when}` : null].filter(Boolean).join(" · ")}
-        />
-      </button>
-      {open && (
-        <div style={{ padding: "4px 0 12px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {score.axes.map((a) => {
-              const showAxis = openAxis === a.key;
-              return (
-                <div key={a.key}>
-                  <button
-                    onClick={() => setOpenAxis(showAxis ? null : a.key)}
-                    aria-expanded={showAxis}
-                    style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", background: "none", border: "none", padding: "4px 0", cursor: "pointer", font: "inherit", color: "inherit", textAlign: "left" }}
-                  >
-                    <span className="id-label" style={{ fontSize: 10, color: "var(--w-3)", width: 92 }}>{a.label}</span>
-                    <span style={{ fontFamily: "var(--font-mono)", fontSize: 13.5, color: "var(--w-1)", width: 38 }}>{trim(a.score)}</span>
-                    <span style={{ flex: 1, height: 6, borderRadius: 3, background: "var(--w-fill)", overflow: "hidden" }}>
-                      <span style={{ display: "block", height: "100%", width: `${Math.max(2, (a.score / 10) * 100)}%`, background: "var(--gold)", borderRadius: 3 }} />
-                    </span>
-                    <span style={{ fontSize: 11, color: "var(--w-2)", width: 140, textAlign: "right" }}>{a.descriptor}</span>
-                  </button>
-                  {showAxis && (
-                    <div style={{ padding: "4px 0 8px 102px" }}>
-                      <div style={{ fontSize: 12, color: "var(--w-3)" }}>{a.summary}</div>
-                      <ul style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 12.5, color: "var(--w-2)", lineHeight: 1.5 }}>
-                        {a.facts.map((f, i) => (
-                          <li key={i}>{f}</li>
-                        ))}
-                      </ul>
-                      {a.cards.map((g) => (
-                        <div key={g.label} style={{ marginTop: 8 }}>
-                          <span className="id-label" style={{ fontSize: 10, color: "var(--w-3)" }}>{g.label} · {g.names.length}</span>
-                          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px 12px", marginTop: 3 }}>
-                            {g.names.map((n) => (
-                              <span key={n} style={{ fontSize: 12, color: "var(--w-2)" }}>{n}</span>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          <p style={{ fontSize: 11.5, color: "var(--w-3)", lineHeight: 1.5, margin: "12px 0 0" }}>
-            Select an axis to see how it was calculated. {score.caveats.join(" ")}
-          </p>
+    <section className="st-hero" aria-label="Deck Score">
+      <div className="st-hero-top">
+        <div className="st-hero-score">
+          <div className="id-label st-eyebrow">Deck Score</div>
+          {score ? (
+            <div className="st-score-num">
+              {score.label}
+              <span>/10</span>
+            </div>
+          ) : (
+            <div className="st-score-none">Not scored yet</div>
+          )}
+          {commanderFormat && (
+            <>
+              <div className="st-bracket">
+                <b>Bracket {BRACKET_NUMBER[shown.bracket]}</b> · {BRACKET_LABEL[shown.bracket]}
+              </div>
+              {bracketNote && <div className="st-bracket-note">{bracketNote}</div>}
+            </>
+          )}
+          {score && (
+            <ul className="st-facts">
+              {turn !== null && <li>Takes a player out around turn {trim(turn)}</li>}
+              {DEPENDENCY[score.commanderDependency] && <li>{DEPENDENCY[score.commanderDependency]}</li>}
+            </ul>
+          )}
         </div>
-      )}
-    </div>
-  );
-}
 
-/**
- * The combos and the game record — the two readings that belong with the
- * primer rather than with the figures.
- *
- * Combos stay collapsed by default, the way the iOS deck page carries them:
- * reference material you consult when a game goes long, not something to read
- * on the way past.
- */
-export function InsightPlay({ insight }: { insight: DeckInsightData }) {
-  const [showCombos, setShowCombos] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const combosRef = useRef<HTMLDivElement>(null);
-  // Opened from the Combos tile: open the list and bring it into view.
-  useEffect(() => {
-    const show = () => {
-      setShowCombos(true);
-      requestAnimationFrame(() => combosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
-    };
-    window.addEventListener(SHOW_COMBOS, show);
-    return () => window.removeEventListener(SHOW_COMBOS, show);
-  }, []);
-  const { combos, history } = insight;
-  const comboCount = combos?.combos.length ?? 0;
-  const games = history?.games ?? [];
-  if (comboCount === 0 && games.length === 0) return null;
-
-  const won = games.filter((g) => g.won).length;
-
-  return (
-    <div ref={combosRef} id="deck-combos" style={{ scrollMarginTop: 90 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-        {comboCount > 0 && (
-          <Pill on={showCombos} onClick={() => setShowCombos((v) => !v)}>
-            <Link2 size={14} strokeWidth={2.25} /> {comboCount} combo{comboCount === 1 ? "" : "s"}
-          </Pill>
-        )}
-        {games.length > 0 && (
-          <Pill on={showHistory} onClick={() => setShowHistory((v) => !v)}>
-            ▤ Record {won}/{games.length}
-          </Pill>
-        )}
+        <div className="st-axes">
+          {score
+            ? score.axes.map((a) => {
+                const open = openAxis === a.key;
+                const note = noteFor(a.key);
+                return (
+                  <div key={a.key} className="st-axis" data-open={open || undefined}>
+                    <button type="button" className="st-axis-row" onClick={() => setOpenAxis(open ? null : a.key)} aria-expanded={open}>
+                      <span className="st-axis-label">{a.label}</span>
+                      <span className="st-axis-track">
+                        <span style={{ width: `${Math.max(2, (a.score / 10) * 100)}%` }} />
+                      </span>
+                      <span className="st-axis-score">{trim(a.score)}</span>
+                      <span className="st-axis-desc">{a.descriptor}</span>
+                      <ChevronDown size={15} strokeWidth={2.25} className="st-axis-chev" aria-hidden />
+                    </button>
+                    {open && (
+                      <div className="st-axis-work">
+                        {note && (
+                          <p className="st-axis-note">
+                            <LinkedText text={note} />
+                          </p>
+                        )}
+                        <div className="id-label st-work-label">How it was counted</div>
+                        <p className="st-work-summary">{a.summary}</p>
+                        <ul className="st-list">
+                          {a.facts.map((f, i) => (
+                            <li key={i}>{f}</li>
+                          ))}
+                        </ul>
+                        {a.cards.map((g) => (
+                          <div key={g.label} className="st-work-cards">
+                            <span className="id-label st-work-label">
+                              {g.label} · {g.names.length}
+                            </span>
+                            <div className="st-names">
+                              {g.names.map((n) => (
+                                <CardName key={n} name={n} />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            : AXIS_MEANS.map((a) => (
+                <div key={a.key} className="st-axis" data-empty>
+                  <div className="st-axis-row">
+                    <span className="st-axis-label">{a.label}</span>
+                    <span className="st-axis-track" />
+                    <span className="st-axis-means">{a.means}</span>
+                  </div>
+                </div>
+              ))}
+        </div>
       </div>
 
-      {showCombos && comboCount > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 16, maxWidth: 720 }}>
-          {combos!.combos.map((c) => (
-            <div key={c.id}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--w-1)" }}>{c.pieces.join("  +  ")}</div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 3 }}>
-                {c.produces.length > 0 && (
-                  <span style={{ fontSize: 12, color: "var(--gold)" }}>{c.produces.join(" · ")}</span>
-                )}
-                {c.manaNeeded && (
-                  <span style={{ fontSize: 11.5, fontFamily: "var(--font-mono)", color: "var(--w-3)" }}>
-                    {c.manaNeeded}
-                  </span>
-                )}
-              </div>
-              {c.steps && (
-                <div style={{ fontSize: 12.5, color: "var(--w-2)", lineHeight: 1.5, marginTop: 5, whiteSpace: "pre-line" }}>
-                  {c.steps}
+      {analysis && (analysis.overview || analysis.weaknesses.critical.length > 0 || analysis.weaknesses.minor.length > 0) && (
+        <div className="st-read">
+          {analysis.overview && (
+            <p className="st-read-lede">
+              <LinkedText text={analysis.overview} />
+            </p>
+          )}
+          {(analysis.weaknesses.critical.length > 0 || analysis.weaknesses.minor.length > 0) && (
+            <div className="st-weak">
+              {analysis.weaknesses.critical.length > 0 && (
+                <div>
+                  <div className="id-label st-weak-label" data-critical>What beats it</div>
+                  <ul className="st-list">
+                    {analysis.weaknesses.critical.map((t, i) => (
+                      <li key={i}><LinkedText text={t} /></li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {analysis.weaknesses.minor.length > 0 && (
+                <div>
+                  <div className="id-label st-weak-label">What slows it</div>
+                  <ul className="st-list">
+                    {analysis.weaknesses.minor.map((t, i) => (
+                      <li key={i}><LinkedText text={t} /></li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
-          ))}
+          )}
         </div>
       )}
 
-      {showHistory && games.length > 0 && (
-        <div style={{ display: "flex", flexDirection: "column", marginTop: 16, maxWidth: 720 }}>
-          {games.slice(0, 12).map((g) => (
-            <div
-              key={g.id}
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 10,
-                padding: "7px 0",
-                borderTop: "1px solid var(--w-line)",
-                fontSize: 13,
-              }}
-            >
-              <span style={{ color: g.won ? "var(--gold)" : "var(--w-3)", fontWeight: 600, minWidth: 34 }}>
-                {g.won ? "Won" : "Lost"}
-              </span>
-              <span style={{ color: "var(--w-2)", flex: 1, minWidth: 0 }}>
-                {g.opponents.length ? g.opponents.join(" · ") : "—"}
-              </span>
-              {g.isManual && <span style={{ fontSize: 11, color: "var(--w-3)" }}>typed in</span>}
-              <span style={{ fontSize: 11.5, color: "var(--w-3)", fontFamily: "var(--font-mono)" }}>
-                {new Date(g.playedAt).toLocaleDateString()}
-              </span>
-            </div>
-          ))}
+      <div className="st-hero-foot">
+        {!score && (
+          <p className="st-hero-pitch">
+            {canEdit
+              ? "A scan measures the deck on four axes and writes up how it plays: the plan, the hands to keep, the key cards and what beats it."
+              : "This deck hasn’t been scanned yet. A scan measures it on four axes and writes up how it plays."}
+          </p>
+        )}
+        {scanSlot}
+        {score && (
+          <p className="st-hero-small">
+            {[when ? `Scanned ${when}.` : null, "Open an axis to see how it was counted.", ...score.caveats].filter(Boolean).join(" ")}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** How many combos show before "Show all". Each one is a few lines tall. */
+const COMBOS_SHOWN = 4;
+/** How many of a combo's results show before its steps are opened. */
+const MAKES_SHOWN = 3;
+
+/**
+ * The combos the list can assemble, each with its pieces as cards you can
+ * point at, what it makes, and its steps a click away.
+ *
+ * They used to sit folded behind a pill at the very foot of the pane, as
+ * names in a line of text. A player looks for "how does this deck win", and
+ * a combo is the shortest answer to that: it belongs in view, near the top.
+ */
+export function InsightCombos({ insight }: { insight: DeckInsightData }) {
+  const [all, setAll] = useState(false);
+  const [openSteps, setOpenSteps] = useState<string | null>(null);
+  const { combos, combosLoading } = insight;
+  // The ones that end the game first, then the ones that need fewest cards.
+  const list = useMemo(
+    () => [...(combos?.combos ?? [])].sort((a, b) => Number(winsTheGame(b)) - Number(winsTheGame(a)) || a.pieces.length - b.pieces.length),
+    [combos]
+  );
+  const shown = all ? list : list.slice(0, COMBOS_SHOWN);
+
+  let body: ReactNode;
+  if (!combos) {
+    body = <p className="st-quiet">{combosLoading ? "Checking Commander Spellbook…" : "Couldn’t check for combos right now."}</p>;
+  } else if (list.length === 0) {
+    body = <p className="st-quiet">No combos in this list.</p>;
+  } else {
+    const summary = comboSummary(list, combos.hasTwoCardCombo);
+    body = (
+      <>
+        {summary && <p className="st-quiet" style={{ marginBottom: 12 }}>{summary.charAt(0).toUpperCase() + summary.slice(1)}.</p>}
+        <div className="st-combos">
+          {shown.map((c) => {
+            const open = openSteps === c.id;
+            // A win first, whatever order Spellbook gives them in.
+            const made = [...c.produces].sort((a, b) => Number(/win the game/i.test(b)) - Number(/win the game/i.test(a)));
+            return (
+              <article key={c.id} className="st-combo">
+                <div className="st-combo-thumbs">
+                  {c.pieces.map((n) => (
+                    <CardThumb key={n} name={n} width={58} />
+                  ))}
+                </div>
+                <div className="st-combo-body">
+                  <div className="st-combo-pieces">
+                    {c.pieces.map((n, i) => (
+                      <span key={n}>
+                        {i > 0 && <span className="st-combo-plus"> + </span>}
+                        <CardName name={n} />
+                      </span>
+                    ))}
+                  </div>
+                  {/* Spellbook lists every by-product ("infinite LTB", "infinite
+                      storm count"…). The first few say what the combo is for;
+                      the rest show with its steps. */}
+                  <div className="st-combo-makes">
+                    {(open ? made : made.slice(0, MAKES_SHOWN)).map((p) => (
+                      <span key={p} className="st-chip" data-win={/win the game/i.test(p) || undefined}>
+                        {p}
+                      </span>
+                    ))}
+                    {!open && made.length > MAKES_SHOWN && <span className="st-combo-also">and {made.length - MAKES_SHOWN} more</span>}
+                    {c.manaNeeded && <span className="st-combo-mana">{c.manaNeeded}</span>}
+                  </div>
+                  {c.steps && (
+                    <>
+                      <button type="button" className="st-more" onClick={() => setOpenSteps(open ? null : c.id)} aria-expanded={open}>
+                        How it goes off <ChevronDown size={14} strokeWidth={2.25} aria-hidden style={{ transform: open ? "rotate(180deg)" : undefined }} />
+                      </button>
+                      {open && (
+                        <ol className="st-list st-steps">
+                          {c.steps
+                            .split("\n")
+                            .map((t) => t.trim())
+                            .filter(Boolean)
+                            .map((t, i) => (
+                              <li key={i}><LinkedText text={t} /></li>
+                            ))}
+                        </ol>
+                      )}
+                    </>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
-      )}
+        {list.length > COMBOS_SHOWN && (
+          <button type="button" className="st-more" style={{ marginTop: 12 }} onClick={() => setAll((v) => !v)} aria-expanded={all}>
+            {all ? "Show fewer" : `Show all ${list.length}`}
+          </button>
+        )}
+      </>
+    );
+  }
+  return (
+    <div id={COMBOS_ID} style={{ scrollMarginTop: 90 }}>
+      <StatSection title={list.length ? `Combos · ${list.length}` : "Combos"}>{body}</StatSection>
     </div>
   );
 }
 
-function Pill({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
+/** The games played with the deck, newest first. Nothing when there are none. */
+export function InsightRecord({ insight }: { insight: DeckInsightData }) {
+  const games = insight.history?.games ?? [];
+  if (games.length === 0) return null;
+  const won = games.filter((g) => g.won).length;
   return (
-    <button
-      onClick={onClick}
-      aria-expanded={on}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "9px 14px",
-        background: on ? "var(--w-fill)" : "none",
-        border: "1px solid var(--w-line)",
-        borderRadius: 999,
-        cursor: "pointer",
-        color: "var(--w-1)",
-        font: "inherit",
-        fontSize: 13,
-      }}
-    >
-      {children}
-      <span style={{ color: "var(--w-3)", fontSize: 11.5 }}>{on ? "hide" : "show"}</span>
-    </button>
+    <StatSection title={`Record · ${won} won of ${games.length}`}>
+      <div className="st-record">
+        {games.slice(0, 12).map((g) => (
+          <div key={g.id} className="st-record-row">
+            <span data-won={g.won || undefined}>{g.won ? "Won" : "Lost"}</span>
+            <span>{g.opponents.length ? g.opponents.join(" · ") : "—"}</span>
+            {g.isManual && <small>typed in</small>}
+            <time>{new Date(g.playedAt).toLocaleDateString()}</time>
+          </div>
+        ))}
+      </div>
+    </StatSection>
   );
 }
 
@@ -580,7 +669,7 @@ export function InsightEightByEight({ insight }: { insight: DeckInsightData }) {
                   {b.entries.map((e) => (
                     <span key={e.name} style={{ fontSize: 12.5, color: "var(--w-2)" }}>
                       {e.quantity > 1 ? `${e.quantity}× ` : ""}
-                      {e.name}
+                      <CardName name={e.name} />
                     </span>
                   ))}
                 </div>
@@ -690,12 +779,21 @@ export function InsightScan({
   const refused = isLimitMessage(error) && error ? <LimitNotice text={error} style={{ marginTop: 10, maxWidth: 560 }} /> : null;
 
   return (
-    <div style={{ marginTop: 12 }}>
+    <div>
       {!showNotes ? (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <Pill on={running} onClick={() => (hasPrimer ? void run() : setShowNotes(true))}>
-            <ScanSearch size={14} strokeWidth={2.25} /> {running ? "Scanning…" : insight.scan ? "Scan again" : "Scan deck"}
-          </Pill>
+          {/* The first scan is the panel's one action, so it is the filled
+              button; scanning again is a quieter one. (It used to be a pill
+              that ended in the word "show".) */}
+          <button
+            type="button"
+            className={insight.scan ? "id-ghost" : "id-btn"}
+            style={{ padding: insight.scan ? "8px 14px" : "11px 20px", fontSize: insight.scan ? 13 : 14.5 }}
+            disabled={running}
+            onClick={() => (hasPrimer ? void run() : setShowNotes(true))}
+          >
+            <ScanSearch size={insight.scan ? 14 : 16} strokeWidth={2.25} /> {running ? "Scanning…" : insight.scan ? "Scan again" : "Scan this deck"}
+          </button>
           {hasPrimer && !running && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>guided by your primer</span>}
           {meter && <span style={{ fontSize: 11.5, color: exhausted ? "var(--gold)" : "var(--w-3)" }}>{meter}</span>}
           {goPro}
@@ -746,70 +844,61 @@ export function InsightScan({
   );
 }
 
-/** The scan's written analysis — the document a pilot would hand you. */
-export function InsightAnalysis({ analysis }: { analysis: AnalysisDocument }) {
-  const [open, setOpen] = useState(true);
-  const Section = ({ title, children }: { title: string; children: ReactNode }) => (
-    <div style={{ marginTop: 14 }}>
-      <div className="id-label" style={{ fontSize: 10, color: "var(--w-3)", marginBottom: 5 }}>{title}</div>
+/**
+ * The piloting half of the scan's write-up: the plan in steps, the hands to
+ * keep, the key cards, the tips. (Its other half, what the deck is and what
+ * beats it, and its note on each axis, sit with the Score they explain.)
+ */
+export function InsightGamePlan({ analysis }: { analysis: AnalysisDocument }) {
+  const Part = ({ title, children }: { title: string; children: ReactNode }) => (
+    <div className="st-plan-part">
+      <div className="id-label st-work-label">{title}</div>
       {children}
     </div>
   );
-  const List = ({ items, ordered }: { items: string[]; ordered?: boolean }) =>
-    items.length === 0 ? null : ordered ? (
-      <ol style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: "var(--w-2)", lineHeight: 1.55 }}>
-        {items.map((t, i) => <li key={i}>{t}</li>)}
-      </ol>
-    ) : (
-      <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--w-2)", lineHeight: 1.55 }}>
-        {items.map((t, i) => <li key={i}>{t}</li>)}
-      </ul>
-    );
   return (
-    <div className="id-panel" style={{ padding: 16, maxWidth: 720 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span className="id-label" style={{ color: "var(--w-2)" }}>Analysis</span>
-        <button onClick={() => setOpen((v) => !v)} aria-expanded={open} style={{ background: "none", border: "none", padding: 0, font: "inherit", fontSize: 11.5, color: "var(--w-3)", cursor: "pointer" }}>
-          {open ? "hide" : "show"}
-        </button>
-      </div>
-      <p style={{ fontSize: 13.5, color: "var(--w-1)", lineHeight: 1.55, margin: "8px 0 0" }}>{analysis.overview}</p>
-      {open && (
-        <>
-          {analysis.strategy.length > 0 && <Section title="Core strategy"><List items={analysis.strategy} ordered /></Section>}
-          {analysis.mulligan.length > 0 && <Section title="Mulligan priorities"><List items={analysis.mulligan} /></Section>}
-          {analysis.keyCards.length > 0 && (
-            <Section title="Key cards">
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--w-2)", lineHeight: 1.55 }}>
-                {analysis.keyCards.map((c) => (
-                  <li key={c.name}><b style={{ color: "var(--w-1)" }}>{c.name}</b>{" "}— {c.why}</li>
-                ))}
-              </ul>
-            </Section>
-          )}
-          {analysis.tips.length > 0 && <Section title="Key tips"><List items={analysis.tips} /></Section>}
-          {(analysis.weaknesses.critical.length > 0 || analysis.weaknesses.minor.length > 0) && (
-            <Section title="Weaknesses">
-              {analysis.weaknesses.critical.length > 0 && (
-                <div style={{ fontSize: 12, color: "var(--gold)", marginBottom: 3 }}>Critical</div>
-              )}
-              <List items={analysis.weaknesses.critical} />
-              {analysis.weaknesses.minor.length > 0 && (
-                <div style={{ fontSize: 12, color: "var(--w-3)", margin: "8px 0 3px" }}>Minor</div>
-              )}
-              <List items={analysis.weaknesses.minor} />
-            </Section>
-          )}
-          {analysis.axes.length > 0 && (
-            <Section title="On the axes">
-              <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "var(--w-2)", lineHeight: 1.55 }}>
-                {analysis.axes.map((a) => (
-                  <li key={a.key}><b style={{ color: "var(--w-1)", textTransform: "capitalize" }}>{a.key}</b>{" "}— {a.note}</li>
-                ))}
-              </ul>
-            </Section>
-          )}
-        </>
+    <div className="id-panel st-plan">
+      {analysis.strategy.length > 0 && (
+        <Part title="The plan">
+          <ol className="st-list st-steps">
+            {analysis.strategy.map((t, i) => (
+              <li key={i}><LinkedText text={t} /></li>
+            ))}
+          </ol>
+        </Part>
+      )}
+      {analysis.mulligan.length > 0 && (
+        <Part title="Opening hands">
+          <ul className="st-list">
+            {analysis.mulligan.map((t, i) => (
+              <li key={i}><LinkedText text={t} /></li>
+            ))}
+          </ul>
+        </Part>
+      )}
+      {analysis.keyCards.length > 0 && (
+        <Part title="Key cards">
+          <div className="st-keys">
+            {analysis.keyCards.map((c) => (
+              <div key={c.name} className="st-key">
+                <CardThumb name={c.name} width={46} />
+                <div>
+                  <CardName name={c.name} strong />
+                  <p><LinkedText text={c.why} /></p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Part>
+      )}
+      {analysis.tips.length > 0 && (
+        <Part title="Tips">
+          <ul className="st-list">
+            {analysis.tips.map((t, i) => (
+              <li key={i}><LinkedText text={t} /></li>
+            ))}
+          </ul>
+        </Part>
       )}
     </div>
   );

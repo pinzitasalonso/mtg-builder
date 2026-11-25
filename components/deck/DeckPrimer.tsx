@@ -9,8 +9,9 @@
    the primer is the one you'd hand to someone who asks.
 
    Rendering reuses the chat's Markdown tokenizer, so [[Card Name]] links keep
-   working here without a second parser. Cards are styled but not clickable —
-   a primer is for reading, not for adding cards. */
+   working here without a second parser. A card's name shows the card when
+   you point at it; it isn't a button, because a primer is for reading, not
+   for adding cards. */
 
 import { LimitNotice } from "@/components/Upgrade";
 import { isLimitMessage } from "@/lib/limits";
@@ -19,6 +20,7 @@ import { useMemo, useRef, useState } from "react";
 import { Sparkles, Square } from "lucide-react";
 import { Block, InlineToken, parseBlocks } from "@/lib/chat-markdown";
 import { ghostBtn, goldBtn } from "./ui";
+import { CardName } from "./CardHover";
 
 export default function DeckPrimer({
   deckId,
@@ -218,11 +220,8 @@ export function PrimerMarkdown({ text }: { text: string }) {
           </strong>
         );
       }
-      return (
-        <span key={key} style={{ color: "var(--gold)", fontWeight: 600 }}>
-          {t.value}
-        </span>
-      );
+      // A [[card]]: point at it to see it (where a CardHoverProvider is around).
+      return <CardName key={key} name={t.value} strong />;
     });
 
   return (
@@ -231,7 +230,8 @@ export function PrimerMarkdown({ text }: { text: string }) {
         if ("items" in b) {
           const Tag = b.type; // "ul" | "ol"
           return (
-            <Tag key={bi} style={{ margin: "6px 0", paddingLeft: 22, display: "flex", flexDirection: "column", gap: 4 }}>
+            // The marks are set here: the page's reset takes them off every list.
+            <Tag key={bi} style={{ margin: "6px 0", paddingLeft: 22, display: "flex", flexDirection: "column", gap: 4, listStyle: b.type === "ol" ? "decimal" : "disc" }}>
               {b.items.map((item, ii) => (
                 <li key={ii} style={{ paddingLeft: 2 }}>
                   {renderInline(item, `${bi}-${ii}`)}

@@ -49,6 +49,8 @@ export interface DeckScoreReport extends DeckScoreResult {
 }
 
 const trim = (n: number): string => String(Number(n.toFixed(2)));
+/** A reason as the middle of a sentence: its own full stop comes off (it read "half a turn.. The Score…"). */
+const sentence = (reason: string | undefined): string => (reason ?? "").trim().replace(/[.\s]+$/, "") || "no reason given";
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? "" : "s"}`;
 
 /** Spellbook's "{U}{U}{B}" → 3; "" → 0; X → treated as expensive. */
@@ -184,7 +186,7 @@ export function scoreDeck(
     `Commander dependency: ${c.commanderDependencyReason}`,
   ];
   if (j.commanderDependency) {
-    resilienceFacts.push(`The analysis reads commander dependency as ${j.commanderDependency}: ${j.dependencyReason ?? "no reason given"}. The Score keeps the computed read, so the same list always scores the same.`);
+    resilienceFacts.push(`The analysis reads commander dependency as ${j.commanderDependency}: ${sentence(j.dependencyReason)}. The Score keeps the computed read, so the same list always scores the same.`);
   }
   if ((c.resilience.engineExposure ?? 0) < 0 && c.exposure.className) {
     resilienceFacts.push(`Engine exposure ${c.resilience.engineExposure}: ${Math.round(c.exposure.share * 100)}% of the nonland cards are ${c.exposure.className}-based with ${plural(c.exposure.answers, "answer")} to an artifact or enchantment.`);
@@ -193,7 +195,7 @@ export function scoreDeck(
   const speedFacts = [...fish.notes];
   if (j.turnDelta) {
     const read = Math.max(1, Math.min(14, fish.fundamentalTurn + j.turnDelta));
-    speedFacts.push(`The analysis reads it as turn ${trim(read)}: ${j.turnReason ?? "no reason given"}. The Score keeps the goldfish's turn, so the same list always scores the same.`);
+    speedFacts.push(`The analysis reads it as turn ${trim(read)}: ${sentence(j.turnReason)}. The Score keeps the goldfish's turn, so the same list always scores the same.`);
   }
   if (speed !== result.speed) speedFacts.push(`Speed ${trim(speed)} capped at 8: Consistency is ${trim(consistency.score)} and a turn-3 deck needs a 7.5 or better.`);
 
