@@ -275,6 +275,15 @@ export function readStoredScan(raw: string | null | undefined): DeckScan | null 
  * bracket at the time, or the Score's floor when that is higher — so it is
  * the deck as of its scan, like the Score beside it.
  */
+/** A tint per bracket, for the badge beside a Score: cool to hot. */
+export const BRACKET_TINT: Record<number, string> = {
+  1: "#B8C4D6",
+  2: "#6FD8A4",
+  3: "#B9A2FF",
+  4: "#FFA266",
+  5: "#FF7474",
+};
+
 export interface ScanSummary {
   /** The Score, 0–10 on the quarter grid. */
   score: number;

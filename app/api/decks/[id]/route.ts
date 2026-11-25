@@ -1,3 +1,4 @@
+import { scanSummary } from "@/lib/deck-analysis";
 import { NextResponse } from "next/server";
 import { DECK_TEXT_MAX, jsonBody } from "@/lib/api";
 import { jsonWithEtag } from "@/lib/http-cache";
@@ -19,6 +20,9 @@ export async function GET(
   });
   return jsonWithEtag(req, {
     ...counted,
+    // The last scan as its summary (Score and bracket), for the page's top
+    // line: the same pair the home tile shows.
+    scan: scanSummary(counted?.analysis),
     isPublic: deck.userId === null,
     canEdit: canEditDeck(deck, user?.id ?? null),
   });

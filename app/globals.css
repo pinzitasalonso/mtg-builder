@@ -4422,3 +4422,207 @@ button {
   border-radius: 50%;
   background: var(--w-fill-2);
 }
+
+/* ── The deck page's Stats pane (components/deck/DeckStatsPane.tsx). ──
+   The Score across the top, then two columns: what you read (combos, the
+   game plan, the record) and the build (figures, curve, colours, roles).
+   One column on a narrow screen, where the short things come before the
+   long ones. */
+.st {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 34px 44px;
+  align-items: start;
+}
+.st-hero { grid-column: 1 / -1; }
+.st-main,
+.st-side { min-width: 0; display: flex; flex-direction: column; gap: 34px; }
+.st-record-slot:empty { display: none; }
+@media (max-width: 1020px) {
+  .st { display: flex; flex-direction: column; gap: 30px; align-items: stretch; }
+  /* The main column's three parts take their own places in the one column. */
+  .st-main { display: contents; }
+  .st-hero { order: 0; }
+  .st-combos-slot { order: 1; }
+  .st-side { order: 2; }
+  .st-plan-slot { order: 3; }
+  .st-record-slot { order: 4; }
+}
+
+/* The Score. */
+.st-hero {
+  border-radius: 24px;
+  background: var(--w-fill);
+  box-shadow: inset 0 0 0 1px var(--w-line);
+  padding: clamp(20px, 3vw, 32px);
+}
+.st-hero-top {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 20px clamp(24px, 4vw, 56px);
+  align-items: start;
+}
+.st-eyebrow { color: var(--w-2); }
+.st-score-num {
+  font-family: var(--font-display);
+  font-size: clamp(76px, 9vw, 112px);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+  color: var(--w-1);
+  margin: 6px 0 12px -3px;
+  font-variant-numeric: tabular-nums;
+}
+.st-score-num span { font-size: 0.24em; font-weight: 600; letter-spacing: 0; color: var(--w-3); margin-left: 6px; }
+.st-score-none { font-family: var(--font-display); font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; color: var(--w-2); margin: 10px 0 14px; }
+.st-bracket { font-size: 17px; color: var(--w-2); }
+.st-bracket b { color: var(--w-1); font-weight: 700; }
+.st-bracket-note { font-size: 12.5px; line-height: 1.45; color: var(--w-3); margin-top: 3px; }
+.st-facts { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--w-2); }
+.st-facts li::before { content: "·"; margin-right: 7px; color: var(--w-3); }
+
+.st-axes { display: flex; flex-direction: column; }
+.st-axis + .st-axis { border-top: 1px solid var(--w-line); }
+.st-axis-row {
+  display: grid;
+  grid-template-columns: 104px minmax(60px, 1fr) 42px minmax(0, 170px) 16px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+button.st-axis-row { cursor: pointer; }
+.st-axis-label { font-size: 14.5px; font-weight: 600; color: var(--w-1); }
+.st-axis-track { display: block; height: 8px; border-radius: 4px; background: var(--w-fill-2); overflow: hidden; }
+.st-axis-track span { display: block; height: 100%; border-radius: 4px; background: var(--gold); }
+.st-axis-score { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--w-1); text-align: right; }
+.st-axis-desc { font-size: 12.5px; color: var(--w-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.st-axis-chev { color: var(--w-3); transition: transform 0.16s; }
+.st-axis[data-open] .st-axis-chev { transform: rotate(180deg); }
+.st-axis[data-empty] .st-axis-row { grid-template-columns: 104px minmax(60px, 1fr) minmax(0, 230px); }
+.st-axis-means { font-size: 12.5px; color: var(--w-3); }
+.st-axis-work { padding: 0 0 16px; max-width: 640px; }
+.st-axis-note { margin: 0 0 12px; font-size: 14px; line-height: 1.55; color: var(--w-1); }
+.st-work-label { font-size: 10.5px; color: var(--w-3); }
+.st-work-summary { margin: 4px 0 0; font-size: 12.5px; color: var(--w-2); }
+.st-work-cards { margin-top: 10px; }
+.st-names { display: flex; flex-wrap: wrap; gap: 3px 12px; margin-top: 4px; font-size: 12.5px; color: var(--w-2); }
+
+/* The page's reset takes the marks off every list: these put them back. */
+.st-list { margin: 6px 0 0; padding-left: 20px; list-style: disc; font-size: 13.5px; line-height: 1.55; color: var(--w-2); display: flex; flex-direction: column; gap: 4px; }
+ol.st-list { list-style: decimal; }
+.st-list li::marker { color: var(--w-3); }
+.st-steps { color: var(--w-1); }
+
+.st-read { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--w-line); }
+.st-read-lede { margin: 0; max-width: 78ch; font-size: 15px; line-height: 1.6; color: var(--w-1); }
+.st-weak { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px 40px; margin-top: 18px; }
+.st-weak-label { font-size: 10.5px; color: var(--w-3); }
+.st-weak-label[data-critical] { color: var(--gold); }
+.st-hero-foot { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--w-line); display: flex; flex-direction: column; gap: 12px; }
+.st-hero-pitch { margin: 0; max-width: 62ch; font-size: 14.5px; line-height: 1.55; color: var(--w-2); }
+.st-hero-small { margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--w-3); max-width: 90ch; }
+/* Below this the axes sit under the number: beside it their bars had no room. */
+@media (max-width: 900px) {
+  .st-hero-top { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .st-axis-row { grid-template-columns: 96px minmax(40px, 1fr) 38px 16px; gap: 10px; }
+  .st-axis-desc { display: none; }
+  .st-axis[data-empty] .st-axis-row { grid-template-columns: 96px minmax(0, 1fr); }
+  .st-axis[data-empty] .st-axis-track { display: none; }
+}
+
+/* The figures you glance at. */
+.st-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.st-tile { padding: 12px 14px; border-radius: 14px; background: var(--w-fill); box-shadow: inset 0 0 0 1px var(--w-line); min-width: 0; text-align: left; font: inherit; color: inherit; border: none; }
+button.st-tile { cursor: pointer; }
+.st-tile-label { font-size: 10.5px; color: var(--w-3); margin-bottom: 6px; display: flex; justify-content: space-between; gap: 6px; }
+.st-tile-value { font-size: 20px; font-weight: 700; color: var(--w-1); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.st-tile-value[data-warn] { color: #ffb4a3; }
+.st-tile-detail { font-size: 11.5px; color: var(--w-3); margin-top: 4px; line-height: 1.35; }
+@media (min-width: 560px) and (max-width: 1020px) {
+  .st-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.st-quiet { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--w-2); }
+
+/* A combo: its pieces as cards, then what it makes. */
+.st-combos { display: flex; flex-direction: column; gap: 10px; }
+.st-combo { display: flex; gap: 16px; padding: 14px; border-radius: 16px; background: var(--w-fill); box-shadow: inset 0 0 0 1px var(--w-line); }
+.st-combo-thumbs { display: flex; gap: 6px; flex: none; align-items: flex-start; }
+.st-combo-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.st-combo-pieces { font-size: 14.5px; font-weight: 600; line-height: 1.4; color: var(--w-1); }
+.st-combo-plus { color: var(--w-3); font-weight: 400; }
+.st-combo-makes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.st-chip { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; color: var(--w-1); background: var(--w-fill-2); white-space: nowrap; }
+.st-chip[data-win] { background: var(--gold); color: var(--accent-ink); }
+.st-combo-mana { font-family: var(--font-mono); font-size: 11.5px; color: var(--w-3); margin-left: 4px; }
+.st-combo-also { font-size: 12px; color: var(--w-3); }
+.st-more { display: inline-flex; align-items: center; gap: 5px; padding: 0; border: none; background: none; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--w-2); }
+.st-more:hover { color: var(--w-1); }
+@media (max-width: 560px) {
+  .st-combo { flex-direction: column; gap: 12px; }
+  .st-combo-thumbs { flex-wrap: wrap; }
+}
+
+/* The game plan. */
+.st-switch { display: inline-flex; flex: none; padding: 3px; border-radius: 999px; background: var(--w-fill); box-shadow: inset 0 0 0 1px var(--w-line); }
+.st-switch button { border: none; background: none; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 12px; border-radius: 999px; color: var(--w-2); white-space: nowrap; }
+.st-switch button[aria-selected="true"] { background: var(--gold); color: var(--accent-ink); }
+.st-plan { padding: 18px; display: flex; flex-direction: column; gap: 20px; }
+.st-keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 20px; margin-top: 8px; }
+.st-key { display: flex; gap: 12px; align-items: flex-start; min-width: 0; }
+.st-key p { margin: 2px 0 0; font-size: 13px; line-height: 1.45; color: var(--w-2); }
+.st-key .card-ref { font-size: 14px; }
+
+/* The record. */
+.st-record { display: flex; flex-direction: column; }
+.st-record-row { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-top: 1px solid var(--w-line); font-size: 13px; color: var(--w-2); }
+.st-record-row > span:first-child { min-width: 34px; font-weight: 600; color: var(--w-3); }
+.st-record-row > span[data-won] { color: var(--gold); }
+.st-record-row > span:nth-child(2) { flex: 1; min-width: 0; }
+.st-record-row small { font-size: 11px; color: var(--w-3); }
+.st-record-row time { font-family: var(--font-mono); font-size: 11.5px; color: var(--w-3); }
+
+/* A card's name you can point at, and its small picture
+   (components/deck/CardHover.tsx). */
+.card-ref {
+  font-weight: 600;
+  color: var(--w-1, var(--t1));
+  text-decoration: underline dotted;
+  text-decoration-color: var(--w-3, var(--t3));
+  text-underline-offset: 3px;
+  cursor: default;
+  border-radius: 3px;
+}
+.card-ref[data-strong] { color: var(--gold); text-decoration-color: var(--gold); }
+.card-ref[data-plain] { text-decoration: none; }
+.card-ref:focus-visible,
+.card-thumb:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.card-thumb { display: block; flex: none; border-radius: 4px; box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.5); cursor: default; }
+
+/* The deck page's top line: its last Score, as the home tile shows it. */
+.deck-score-pill {
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 24px;
+  color: #181228;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.14s;
+}
+.deck-score-pill:hover { transform: translateY(-1px); }
+.deck-score-pill span { padding: 0 9px; font-weight: 600; background: #f4f0e6; }
+.deck-score-pill span:first-child:not(:last-child) { font-weight: 800; }

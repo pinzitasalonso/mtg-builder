@@ -19,7 +19,7 @@ import { fetchWishlistCount } from "@/lib/wishlist-client";
 import { track } from "@/lib/track";
 import { rememberAfterSignIn, takeAfterSignIn } from "@/lib/after-sign-in";
 import { getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
-import type { ScanSummary } from "@/lib/deck-analysis";
+import { BRACKET_TINT, type ScanSummary } from "@/lib/deck-analysis";
 
 /* The home view wears the commander-blue identity field — the same immersive
    look the deck pages use, matching the Color Identity design. */
@@ -835,15 +835,6 @@ function CollectionBlock({ unique, total, pending, sample, wishlist, onOpen, onW
 }
 
 /* ---------- color-identity deck tiles ---------- */
-
-/** A tint per bracket, for the badge on a tile's art: cool to hot. */
-const BRACKET_TINT: Record<number, string> = {
-  1: "#B8C4D6",
-  2: "#6FD8A4",
-  3: "#B9A2FF",
-  4: "#FFA266",
-  5: "#FF7474",
-};
 
 /** The action buttons' slots, from the tile's top-right corner inward. */
 const actionRight = (slot: number): number => 10 + slot * 38;
