@@ -44,7 +44,7 @@ export interface PlayCard {
       you control get +1/+1"), the Auras on it, "All creatures have haste".
       Worked out again after every move (lib/practice refreshStatics). */
   boost?: { power: number; toughness: number; keywords: string[] };
-  /** An Aura: the permanent it's attached to. */
+  /** An Aura or an Equipment: the permanent it's attached to. */
   attachedTo?: number;
   /** A token that's a copy of a card (Inalla): it ceases to exist off the
       battlefield, like any token. */
@@ -196,7 +196,11 @@ export function moveCard(
     delete card.loyalty;
     delete card.imprint;
   }
-  const next = { ...state, [from]: state[from].filter((c) => c.iid !== iid) } as PlaytestState;
+  let next = { ...state, [from]: state[from].filter((c) => c.iid !== iid) } as PlaytestState;
+  // What was attached to it stays in play, attached to nothing.
+  if (from === "battlefield" && to !== "battlefield" && next.battlefield.some((c) => c.attachedTo === iid)) {
+    next = { ...next, battlefield: next.battlefield.map((c) => (c.attachedTo === iid ? { ...c, attachedTo: undefined } : c)) };
+  }
   const target = [...next[to]];
   if (to === "library" && opts.position !== "bottom") target.unshift(card);
   else target.push(card);
@@ -248,4 +252,24 @@ export function shuffleLibrary(state: PlaytestState, shuffle: Shuffle = shuffled
 
 export function adjustLife(state: PlaytestState, who: "you" | "opp", delta: number): PlaytestState {
   return who === "you" ? { ...state, life: state.life + delta } : { ...state, oppLife: state.oppLife + delta };
+}
+
+/** Whether a card attaches to another: an Equipment or an Aura. */
+export const attaches = (card: PlayCard) => /\b(Equipment|Aura)\b/.test(card.typeLine ?? "");
+
+/** Put an Equipment or an Aura on another permanent of the battlefield.
+    (The solo table leaves the rules to you: any permanent will do.) */
+export function attachCard(state: PlaytestState, iid: number, host: number): PlaytestState {
+  if (iid === host) return state;
+  const card = state.battlefield.find((c) => c.iid === iid);
+  if (!card || !state.battlefield.some((c) => c.iid === host)) return state;
+  // Not onto something that is itself attached to this card.
+  if (state.battlefield.find((c) => c.iid === host)?.attachedTo === iid) return state;
+  return { ...state, battlefield: state.battlefield.map((c) => (c.iid === iid ? { ...c, attachedTo: host } : c)) };
+}
+
+/** Take a card off what it's attached to. */
+export function detachCard(state: PlaytestState, iid: number): PlaytestState {
+  if (!state.battlefield.some((c) => c.iid === iid && c.attachedTo !== undefined)) return state;
+  return { ...state, battlefield: state.battlefield.map((c) => (c.iid === iid ? { ...c, attachedTo: undefined } : c)) };
 }

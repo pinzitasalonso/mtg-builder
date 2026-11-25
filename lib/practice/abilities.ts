@@ -84,11 +84,12 @@ export function lordsOf(book: CardBook, card: PlayCard): Lord[] {
   return out;
 }
 
-/** "Enchanted creature gets +2/+2 and has flying." */
+/** "Enchanted creature gets +2/+2 and has flying." An Equipment's
+    "Equipped creature gets +2/+0." reads the same way. */
 export function auraBonusOf(book: CardBook, card: PlayCard): { power: number; toughness: number; keywords: string[] } | null {
   const text = textOf(book, card);
-  const gets = /enchanted creature gets ([+-]\d+)\/([+-]\d+)(?: and has ([a-z ,]+?))?(?:\.|$)/im.exec(text);
-  const hasOnly = /enchanted creature has ([a-z ,]+?)\./im.exec(text);
+  const gets = /(?:enchanted|equipped) creature gets ([+-]\d+)\/([+-]\d+)(?: and has ([a-z ,]+?))?(?:\.|$)/im.exec(text);
+  const hasOnly = /(?:enchanted|equipped) creature has ([a-z ,]+?)\./im.exec(text);
   if (!gets && !hasOnly) return null;
   return { power: gets ? Number(gets[1]) : 0, toughness: gets ? Number(gets[2]) : 0, keywords: kwList(gets?.[3] ?? hasOnly?.[1]) };
 }
@@ -107,7 +108,23 @@ export interface Enchants {
 
 const ENCHANT_FILLER = new Set(["a", "an", "another", "target", "tapped", "untapped"]);
 
+/** An Equipment's "Equip {2}" (or "Equip legendary creature {3}"): its
+    cost, and the kind of creature it may go on, if the line names one. */
+export function equipOf(book: CardBook, card: PlayCard): { cost: string; only: string | null } | null {
+  if (!isType(book, card, "equipment")) return null;
+  const m = /^equip(?: ([a-z][a-z -]*?))? ((?:\{[^}]+\})+)/im.exec(textOf(book, card));
+  if (!m) return null;
+  const only = (m[1] ?? "").replace(/\bcreature\b/, "").trim();
+  return { cost: m[2]!, only: only || null };
+}
+
 export function enchantsOf(book: CardBook, aura: PlayCard): Enchants {
+  // An Equipment goes on a creature its controller controls (of the kind
+  // its "Equip legendary creature" line names, if it names one).
+  if (isType(book, aura, "equipment")) {
+    const only = equipOf(book, aura)?.only ?? null;
+    return { player: false, whose: "yours", fits: (host) => isCreature(book, host) && (!only || only.split(/\s+/).every((w) => isType(book, host, w))) };
+  }
   // No "Enchant" line to read (a card with no text on file): a creature, anyone's.
   const words = (/^enchant ([^\n(.]+)/im.exec(textOf(book, aura))?.[1] ?? "creature").toLowerCase().trim();
   const whose = /\byou control\b/.test(words) ? "yours" : /\ban opponent controls\b|\byou don't control\b/.test(words) ? "theirs" : "any";

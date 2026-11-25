@@ -4,7 +4,8 @@
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
 import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, searchOnCast, stats, wheelSpellOf } from "./cards";
-import { aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, indestructible, lifeFor, spellCost } from "./game";
+import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, indestructible, lifeFor, spellCost } from "./game";
+import { equipOf } from "./abilities";
 import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
 import { treasureSpellOf } from "./treasure";
 import { drawSpellOf, tutorOf, wipeOf } from "./spells";
@@ -482,6 +483,18 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
       sim = structuredClone(sim);
       sim.sides[seat] = { ...sim.sides[seat], life: sim.sides[seat].life - drawSpell.lose };
     } else main.push(blankAction("cast", c.iid));
+  }
+  // Then the Equipment that's on nothing, onto its best creature, while it
+  // can pay. (An Equipment cast this turn waits for the next: it isn't on
+  // the battlefield the planner looks at.)
+  for (const e of sim.sides[seat].battlefield) {
+    const eq = equipOf(book, e);
+    if (!eq || e.attachedTo !== undefined) continue;
+    const host = aiEquipHost(sim, seat, e, [], book);
+    if (host === undefined || !payIn(parseCost(eq.cost))) continue;
+    main.push({ ...blankAction("activate", e.iid), mana: eq.cost, effects: [{ ...blank("note"), target: cardId(host), text: "equip" }] });
+    sim = structuredClone(sim);
+    sim.sides[seat] = { ...sim.sides[seat], battlefield: sim.sides[seat].battlefield.map((x) => (x.iid === e.iid ? { ...x, attachedTo: host } : x)) };
   }
   return {
     main,

@@ -27,8 +27,7 @@ import {
   tribeAttackOf,
   untapLandsOf,
   upkeepTokenOf,
-  winotaOf,
-} from "./abilities";
+  winotaOf, equipOf } from "./abilities";
 import { hasTriggers } from "./triggers";
 import { manaSummary, manaTotal } from "./mana";
 import { makesTreasures, treasureSpellOf } from "./treasure";
@@ -204,6 +203,8 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (tribeAttackOf(book, front)) notes.push("when your Dragons attack, the app draws for them and puts your priciest permanent from your hand onto the battlefield");
     if (upkeepTokenOf(book, front)) notes.push("its upkeep tokens happen by itself");
     if (untapLandsOf(book, front)) notes.push(`to untap your lands, activate it with "life":${untapLandsOf(book, front)!.life} and no mana or effects`);
+    const eq = equipOf(book, front);
+    if (eq) notes.push(`to equip it, activate it in your main phase with "mana":"${eq.cost}" and one effect whose target is your creature: the app pays and attaches it (with no target, to your best creature). Its bonus is then in that creature's stats`);
     if (hasTriggers(book, front))
       notes.push("its simple triggers (a card, life, tokens or counters when it enters or attacks, at your upkeep or end step, when lands or creatures enter, when creatures die, when the player draws or casts) happen by themselves: give it no effects for them");
     if (punishesIdleOf(book, front)) notes.push("the end-step damage for creatures that didn't attack happens by itself, to both players: attack with what you can");
@@ -237,6 +238,11 @@ const describe = (g: PracticeGame, book: CardBook, c: PlayCard, opts: { text?: b
   const loyalty = loyaltyOf(book, c);
   if (loyalty !== null) bits.push(`loyalty ${loyalty}`);
   if (c.commander) bits.push("commander");
+  // What it's on (an Aura, an Equipment), so the model knows what's equipped.
+  if (c.attachedTo !== undefined) {
+    const host = [...g.sides.you.battlefield, ...g.sides.opp.battlefield].find((x) => x.iid === c.attachedTo);
+    if (host) bits.push(`attached to ${cardId(host.iid)} ${host.name}`);
+  }
   if (c.flipped && c.name.includes(" // ")) bits.push(`transformed: ${c.name.split(" // ")[1]!.trim()}`);
   const kind = c.token ? "token" : isLand(c) ? "land" : (infoOf(book, c)?.typeLine ?? c.typeLine ?? "").split(" — ")[0];
   const text = opts.text && !c.token ? faceText(infoOf(book, c), c).replace(/\s*\n\s*/g, " ").slice(0, 300) : "";

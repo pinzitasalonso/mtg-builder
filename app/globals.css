@@ -4626,3 +4626,18 @@ button.st-tile { cursor: pointer; }
 .deck-score-pill:hover { transform: translateY(-1px); }
 .deck-score-pill span { padding: 0 9px; font-weight: 600; background: #f4f0e6; }
 .deck-score-pill span:first-child:not(:last-child) { font-weight: 800; }
+
+/* An Equipment or an Aura, tucked behind the permanent it's on: its top
+   (the name bar and the ⋯) shows above it. A card is 1.4 widths tall. */
+.pt-attach {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: var(--pt-card);
+}
+.pt-attach > .pt-card:not(:last-child) {
+  margin-bottom: calc(var(--pt-card) * -1.14);
+}
+.pt-attach > .pt-card:not(:last-child) .pt-card-inner {
+  filter: brightness(0.9);
+}

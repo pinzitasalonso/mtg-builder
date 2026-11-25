@@ -6,8 +6,12 @@ import {
   applyAction,
   availableMana,
   canAttack,
+  canEquip,
   cardId,
   castable,
+  choiceTargets,
+  moveAnyCard,
+  playerEquip,
   declareAttackers,
   declineChoice,
   endTurn,
@@ -25,6 +29,8 @@ import {
   type DeckCard,
 } from "./game";
 import { automatedNotes } from "./brief";
+import { equipOf } from "./abilities";
+import { fallbackPlan } from "./ai";
 import type { CardBook, CardInfo, PlanAction, PracticeGame } from "./types";
 
 const keep = <T,>(a: T[]) => [...a];
@@ -137,6 +143,8 @@ const BOOK: CardBook = Object.fromEntries(
     info("Wings Aura", { typeLine: "Enchantment — Aura", manaCost: "{1}{W}", manaValue: 2, oracleText: "Enchant creature\nEnchanted creature gets +2/+2 and has flying." }),
     info("Strength Aura", { typeLine: "Enchantment — Aura", manaCost: "{W}", manaValue: 1, oracleText: "Enchant creature\nEnchanted creature gets +1/+1 and has first strike." }),
     info("Big Aura", { typeLine: "Enchantment — Aura", manaCost: "{3}{W}", manaValue: 4, oracleText: "Enchant creature\nEnchanted creature gets +4/+4." }),
+    info("Test Sword", { typeLine: "Artifact — Equipment", manaCost: "{2}", manaValue: 2, oracleText: "Equipped creature gets +2/+1 and has first strike.\nEquip {2}" }),
+    info("Legend Blade", { typeLine: "Artifact — Equipment", manaCost: "{1}", manaValue: 1, oracleText: "Equipped creature gets +3/+3.\nEquip legendary creature {1}\nEquip {4}" }),
     info("Arrest Aura", { typeLine: "Enchantment — Aura", manaCost: "{1}{W}", manaValue: 2, oracleText: "Enchant creature\nEnchanted creature can't attack or block." }),
     info("Growth Aura", { typeLine: "Enchantment — Aura", manaCost: "{W}", manaValue: 1, oracleText: "Enchant land\nWhenever enchanted land is tapped for mana, its controller adds an additional {G}." }),
     info("Own Aura", { typeLine: "Enchantment — Aura", manaCost: "{W}", manaValue: 1, oracleText: "Enchant creature you control\nEnchanted creature gets +1/+1." }),
@@ -446,6 +454,56 @@ describe("Light-Paws and Auras", () => {
     expect(g.choice).toMatchObject({ kind: "attach", aura });
     const on = resolveChoice(g, at(g, "you", "Goblin Guide").iid, BOOK);
     expect(stats(BOOK, at(on, "you", "Goblin Guide"))).toEqual({ power: 4, toughness: 4 });
+  });
+});
+
+describe("Equipment", () => {
+  it("you equip it in your main phase: pick the creature, then it's paid and attached", () => {
+    const g0 = table({ you: { field: ["Test Sword", "Goblin Guide", "Mountain", "Mountain"] }, active: "you" });
+    const sword = at(g0, "you", "Test Sword").iid;
+    expect(canEquip(g0, sword, BOOK)).toBe(true);
+    const g = playerEquip(g0, sword, BOOK);
+    expect(g.choice).toMatchObject({ kind: "attach", aura: sword, equip: "{2}" });
+    // Only your creatures.
+    expect(choiceTargets(g, BOOK)).toEqual([at(g, "you", "Goblin Guide").iid]);
+    const on = resolveChoice(g, at(g, "you", "Goblin Guide").iid, BOOK);
+    expect(at(on, "you", "Test Sword").attachedTo).toBe(at(on, "you", "Goblin Guide").iid);
+    expect(on.sides.you.battlefield.filter((c) => c.name === "Mountain").every((c) => c.tapped)).toBe(true);
+    expect(stats(BOOK, at(on, "you", "Goblin Guide"))).toEqual({ power: 4, toughness: 3 });
+    expect(has(BOOK, at(on, "you", "Goblin Guide"), "First strike")).toBe(true);
+  });
+
+  it("cancelling costs nothing, and it's only in your main phase", () => {
+    const g0 = table({ you: { field: ["Test Sword", "Goblin Guide", "Mountain", "Mountain"] }, active: "you" });
+    const sword = at(g0, "you", "Test Sword").iid;
+    const back = declineChoice(playerEquip(g0, sword, BOOK), BOOK);
+    expect(back.choice).toBeNull();
+    expect(back.sides.you.battlefield.every((c) => !c.tapped)).toBe(true);
+    const theirs = table({ you: { field: ["Test Sword", "Goblin Guide", "Mountain", "Mountain"] } });
+    expect(canEquip(theirs, at(theirs, "you", "Test Sword").iid, BOOK)).toBe(false);
+  });
+
+  it("it stays when its creature dies, on nothing", () => {
+    const g0 = table({ you: { field: ["Test Sword", "Goblin Guide", "Mountain", "Mountain"] }, active: "you" });
+    const sword = at(g0, "you", "Test Sword").iid;
+    const g = resolveChoice(playerEquip(g0, sword, BOOK), at(g0, "you", "Goblin Guide").iid, BOOK);
+    const gone = moveAnyCard(g, at(g, "you", "Goblin Guide").iid, "graveyard");
+    expect(at(gone, "you", "Test Sword").attachedTo).toBeUndefined();
+    expect(gone.sides.you.battlefield.some((c) => c.name === "Test Sword")).toBe(true);
+  });
+
+  it("an \"Equip legendary creature\" line reads its kind", () => {
+    expect(equipOf(BOOK, { iid: 0, name: "Legend Blade", imageUri: "", typeLine: "Artifact — Equipment", tapped: false, commander: false })).toEqual({ cost: "{1}", only: "legendary" });
+  });
+
+  it("the opponent equips by its plan, and the built-in planner equips too", () => {
+    const g0 = table({ opp: { field: ["Test Sword", "Goblin Guide", "Mountain", "Mountain"] } });
+    const sword = at(g0, "opp", "Test Sword").iid;
+    const g = applyAction(g0, "opp", action("activate", sword, { mana: "{2}" }), BOOK).game;
+    expect(at(g, "opp", "Test Sword").attachedTo).toBe(at(g, "opp", "Goblin Guide").iid);
+    expect(texts(g).join(" ")).toMatch(/equips Test Sword to Goblin Guide/);
+    const plan = fallbackPlan(g0, BOOK);
+    expect(plan.main.some((a) => a.kind === "activate" && a.card === cardId(sword) && a.mana === "{2}")).toBe(true);
   });
 });
 
