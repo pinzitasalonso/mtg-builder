@@ -5,7 +5,7 @@
 // (game.ts) decides when they happen; this file only reads the cards.
 
 import { faceUpType, type PlayCard } from "../playtest";
-import { cardTypes, faceText, has, infoOf, isCreature } from "./cards";
+import { cardTypes, faceText, has, infoOf, isCreature, isLand } from "./cards";
 import type { CardBook } from "./types";
 
 const textOf = (book: CardBook, card: PlayCard) => (card.token ? "" : faceText(infoOf(book, card), card));
@@ -91,6 +91,37 @@ export function auraBonusOf(book: CardBook, card: PlayCard): { power: number; to
   const hasOnly = /enchanted creature has ([a-z ,]+?)\./im.exec(text);
   if (!gets && !hasOnly) return null;
   return { power: gets ? Number(gets[1]) : 0, toughness: gets ? Number(gets[2]) : 0, keywords: kwList(gets?.[3] ?? hasOnly?.[1]) };
+}
+
+/** What an Aura may be put on, read from its "Enchant …" line: "Enchant
+    creature", "Enchant land you control", "Enchant artifact or creature",
+    "Enchant nonland permanent", "Enchant Forest", "Enchant player". */
+export interface Enchants {
+  /** It enchants a player, so it needs no permanent to go on. */
+  player: boolean;
+  /** Whose permanent: anyone's, its controller's, or an opponent's. */
+  whose: "any" | "yours" | "theirs";
+  /** Whether this permanent is the kind it names. */
+  fits: (host: PlayCard) => boolean;
+}
+
+const ENCHANT_FILLER = new Set(["a", "an", "another", "target", "tapped", "untapped"]);
+
+export function enchantsOf(book: CardBook, aura: PlayCard): Enchants {
+  // No "Enchant" line to read (a card with no text on file): a creature, anyone's.
+  const words = (/^enchant ([^\n(.]+)/im.exec(textOf(book, aura))?.[1] ?? "creature").toLowerCase().trim();
+  const whose = /\byou control\b/.test(words) ? "yours" : /\ban opponent controls\b|\byou don't control\b/.test(words) ? "theirs" : "any";
+  if (/\b(player|opponent)\b/.test(words) && whose === "any") return { player: true, whose, fits: () => false };
+  // A card in a graveyard, a card in exile: nothing on the battlefield carries it.
+  if (/\bcard\b/.test(words)) return { player: false, whose, fits: () => false };
+  const kinds = words
+    .replace(/\b(?:you control|an opponent controls|you don't control)\b/g, "")
+    .split(/\s+or\s+|,\s*/)
+    .map((k) => k.split(/\s+/).filter((w) => w && !ENCHANT_FILLER.has(w)))
+    .filter((k) => k.length);
+  const is = (host: PlayCard, word: string): boolean =>
+    word === "permanent" ? true : word.startsWith("non") ? !is(host, word.slice(3)) : word === "creature" ? isCreature(book, host) : word === "land" ? isLand(host) : isType(book, host, word);
+  return { player: false, whose, fits: (host) => kinds.some((k) => k.every((w) => is(host, w))) };
 }
 
 /** "All creatures have haste." (Kratos, God of War) */

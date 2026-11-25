@@ -58,6 +58,7 @@ import {
   affinityOf,
   auraBonusOf,
   auraTutorOf,
+  enchantsOf,
   braidsOf,
   castFromGraveyardOnHitOf,
   copyOnEnterOf,
@@ -999,7 +1000,7 @@ export function playerEnters(g0: PracticeGame, iid: number, book: CardBook): Pra
   const copied = entered(g, "you", at.card, book, { cast: true });
   if (copied && /\benters\b/i.test(faceText(infoOf(book, at.card), at.card))) say(g, "you", `Resolve: the copy's enters ability (${at.card.name}).`);
   if (discardTriggerOf(book, at.card)?.enters && !g.choice) discardTrigger(g, "you", at.card, book);
-  if (isType(book, at.card, "aura") && !g.choice && [...g.sides.you.battlefield, ...g.sides.opp.battlefield].some((c) => isCreature(book, c))) {
+  if (isType(book, at.card, "aura") && !g.choice && auraHosts(g, "you", at.card, book).length) {
     const lightPaws = g.sides.you.battlefield.find((c) => auraTutorOf(book, c));
     g.choice = { kind: "attach", source: at.card.name, by: "you", aura: iid, tutor: lightPaws?.iid };
   }
@@ -1139,12 +1140,16 @@ export interface Step {
 }
 
 /** Why the AI can't cast a card it could pay for: it has no mana cost
-    (Lotus Bloom is suspended, not cast), or it's a Mox Diamond with no
-    land card to discard. */
-function uncastable(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook): string | null {
+    (Lotus Bloom is suspended, not cast), it's a Mox Diamond with no land
+    card to discard, or it's an Aura with nothing to go on. `effects` are the
+    plan's, for the target it names. */
+export function uncastable(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, effects: PlanAction["effects"] = []): string | null {
   const info = infoOf(book, card);
   if (info && !info.manaCost && /^suspend \d+/im.test(info.oracleText ?? "")) return `${card.name} has no mana cost: it can only be suspended.`;
   if (entersForALand(book, card) && !g.sides[seat].hand.some(isLand)) return `The opponent has no land card to discard for ${card.name}.`;
+  // An Aura needs something to go on as it's cast. (The AI used to pay for
+  // one with no creature in play, and lose it to the graveyard.)
+  if (isType(book, card, "aura") && aiAuraHost(g, seat, card, effects, book) === undefined) return `${card.name} has nothing to enchant.`;
   return null;
 }
 
@@ -1205,7 +1210,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
       resolveCast(g, seat, card, action, book);
       return { game: g, ok: true };
     }
-    const no = uncastable(g, seat, card, book);
+    const no = uncastable(g, seat, card, book, action.effects);
     if (no) return fail(`(${no})`);
     const cost = spellCost(g, seat, card, book, at.zone);
     const sources = availableMana(g, seat, book, [], { commander: card.commander });
@@ -1685,8 +1690,15 @@ export function choiceTargets(g: PracticeGame, book: CardBook): number[] {
     case "put":
       return you.hand.filter((x) => isPermanentCard(book, x)).map((x) => x.iid);
     case "attach":
-      return [...you.battlefield, ...g.sides.opp.battlefield].filter((x) => x.iid !== c.aura && isCreature(book, x)).map((x) => x.iid);
+      // What the Aura's "Enchant …" line allows: a creature, a land, yours only…
+      return auraHostsOf(g, c.aura, book);
   }
+}
+
+/** The permanents your Aura (by its id) may go on. */
+function auraHostsOf(g: PracticeGame, aura: number | undefined, book: CardBook): number[] {
+  const at = aura === undefined ? null : findCard(g, aura);
+  return at ? auraHosts(g, "you", at.card, book).map((h) => h.card.iid) : [];
 }
 
 /** Your pick for the choice the game is waiting on: the card you discard,
@@ -1954,29 +1966,49 @@ function aiAuraTutor(g: PracticeGame, lightPaws: PlayCard, aura: PlayCard, book:
   say(g, "opp", `${faceName(lightPaws)}: the opponent finds ${pick.name} and puts it on ${faceName(lightPaws)}.`, pick);
 }
 
-/** The AI's Aura goes on what its plan targets, else on the player's best
-    creature if it's a curse (can't attack or block, -N/-N), else on its own
-    best: Light-Paws, its commander, its biggest. Nothing to enchant: it's
-    put into the graveyard. */
+/** The permanents an Aura could go on, by its "Enchant …" line. */
+function auraHosts(g: PracticeGame, seat: Seat, aura: PlayCard, book: CardBook): { seat: Seat; card: PlayCard }[] {
+  const e = enchantsOf(book, aura);
+  const seats: Seat[] = e.whose === "yours" ? [seat] : e.whose === "theirs" ? [other(seat)] : [seat, other(seat)];
+  return seats.flatMap((s) => g.sides[s].battlefield.filter((c) => c.iid !== aura.iid && e.fits(c)).map((card) => ({ seat: s, card })));
+}
+
+/** An Aura that hurts what it's on: it goes on the other player's permanent. */
+const HOSTILE_AURA = /can't attack|can't block|gets -\d|doesn't untap|loses all|you control enchanted|enchanted \w+'s controller (?:loses|sacrifices|discards)/;
+
+/** Where the AI's Aura goes: on what its plan targets, else on the
+    player's best permanent if it hurts (can't attack or block, -N/-N, you
+    control it), else on its own best (Light-Paws, its commander, its
+    biggest). "player" when it enchants a player; undefined when there is
+    nothing for it to go on, which is also why it can't be cast. */
+function aiAuraHost(g: PracticeGame, seat: Seat, aura: PlayCard, effects: PlanAction["effects"], book: CardBook): number | "player" | undefined {
+  if (enchantsOf(book, aura).player) return "player";
+  const hosts = auraHosts(g, seat, aura, book);
+  const targeted = effects.map((e) => parseCardId(e.target)).find((t) => t !== null && hosts.some((h) => h.card.iid === t));
+  if (targeted !== undefined && targeted !== null) return targeted;
+  const best = (s: Seat) => {
+    const cs = hosts.filter((h) => h.seat === s).map((h) => h.card);
+    // Its own: Light-Paws first, then its commander. Then the biggest creature.
+    const first = s === seat ? (cs.find((c) => auraTutorOf(book, c)) ?? cs.find((c) => c.commander)) : undefined;
+    return first ?? [...cs].sort((a, b) => Number(isCreature(book, b)) - Number(isCreature(book, a)) || stats(book, b).power - stats(book, a).power)[0];
+  };
+  const hostile = HOSTILE_AURA.test(faceText(infoOf(book, aura), aura).toLowerCase());
+  // Never a curse on its own permanent, never a gift to the player's.
+  return best(hostile ? other(seat) : seat)?.iid;
+}
+
+/** The AI's Aura enters attached (see aiAuraHost). With nothing to enchant
+    by then (its target left in response), it's put into the graveyard. */
 function aiAttach(g: PracticeGame, seat: Seat, aura: PlayCard, action: PlanAction, book: CardBook) {
-  const creatures = (s: Seat) => g.sides[s].battlefield.filter((c) => c.iid !== aura.iid && isCreature(book, c));
-  const targeted = action.effects.map((e) => parseCardId(e.target)).find((t) => t !== null && [...creatures("you"), ...creatures("opp")].some((c) => c.iid === t));
-  const text = faceText(infoOf(book, aura), aura).toLowerCase();
-  const curse = /can't attack|can't block|gets -\d|doesn't untap/.test(text);
-  const biggest = (cs: PlayCard[]) => [...cs].sort((a, b) => stats(book, b).power - stats(book, a).power)[0];
-  const mine = creatures(seat);
-  const host =
-    targeted ??
-    (curse
-      ? biggest(creatures(other(seat)))?.iid
-      : (mine.find((c) => auraTutorOf(book, c)) ?? mine.find((c) => c.commander) ?? biggest(mine))?.iid);
+  const host = aiAuraHost(g, seat, aura, action.effects, book);
+  if (host === "player") return;
   if (host === undefined) {
     moveTo(g, aura.iid, "graveyard");
     say(g, seat, `${aura.name} has nothing to enchant.`);
     return;
   }
   update(g, aura.iid, (c) => ({ ...c, attachedTo: host }));
-  say(g, seat, `${aura.name} goes on ${findCard(g, host)?.card.name ?? "a creature"}.`);
+  say(g, seat, `${aura.name} goes on ${findCard(g, host)?.card.name ?? "a permanent"}.`);
 }
 
 /** Winota: a non-Human attacker looks at the top six for a Human to put

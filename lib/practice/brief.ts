@@ -5,7 +5,7 @@
 
 import type { PlayCard } from "../playtest";
 import { canPlayAsLand, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
-import { availableMana, castable, cardId, lifeFor, loyaltyOf } from "./game";
+import { availableMana, castable, cardId, lifeFor, loyaltyOf, uncastable } from "./game";
 import {
   affinityOf,
   auraTutorOf,
@@ -254,9 +254,11 @@ export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[]):
     const info = infoOf(book, c);
     if (isLand(c)) return `- ${cardId(c.iid)} ${c.name} (land)${g.landPlayed ? "" : " — you can play it"}`;
     const can = castable(g, "opp", c, book, "hand");
+    // An Aura with nothing to go on, a Mox Diamond with no land to discard…
+    const stuck = can ? null : uncastable(g, "opp", c, book);
     const counter = counterOf(info) ? " — counterspell: leave its mana untapped and the app casts it on the player's turn" : "";
     const land = canPlayAsLand(c) ? ` — or play it as your land (its back face)${g.landPlayed ? ", but your land drop is used" : ""}` : "";
-    return `- ${cardId(c.iid)} ${c.name} ${info?.manaCost ?? ""} (${(info?.typeLine ?? "").split(" — ")[0]}) — ${can ? "you can pay for it now" : "can't pay for it yet"}${counter}${land}`;
+    return `- ${cardId(c.iid)} ${c.name} ${info?.manaCost ?? ""} (${(info?.typeLine ?? "").split(" — ")[0]}) — ${can ? "you can pay for it now" : stuck ? `can't be cast now: ${stuck}` : "can't pay for it yet"}${counter}${land}`;
   });
   const command = me.command.map((c) => {
     const info = infoOf(book, c);

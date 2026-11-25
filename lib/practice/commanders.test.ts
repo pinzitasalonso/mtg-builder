@@ -7,6 +7,7 @@ import {
   availableMana,
   canAttack,
   cardId,
+  castable,
   declareAttackers,
   declineChoice,
   endTurn,
@@ -136,6 +137,10 @@ const BOOK: CardBook = Object.fromEntries(
     info("Wings Aura", { typeLine: "Enchantment — Aura", manaCost: "{1}{W}", manaValue: 2, oracleText: "Enchant creature\nEnchanted creature gets +2/+2 and has flying." }),
     info("Strength Aura", { typeLine: "Enchantment — Aura", manaCost: "{W}", manaValue: 1, oracleText: "Enchant creature\nEnchanted creature gets +1/+1 and has first strike." }),
     info("Big Aura", { typeLine: "Enchantment — Aura", manaCost: "{3}{W}", manaValue: 4, oracleText: "Enchant creature\nEnchanted creature gets +4/+4." }),
+    info("Arrest Aura", { typeLine: "Enchantment — Aura", manaCost: "{1}{W}", manaValue: 2, oracleText: "Enchant creature\nEnchanted creature can't attack or block." }),
+    info("Growth Aura", { typeLine: "Enchantment — Aura", manaCost: "{W}", manaValue: 1, oracleText: "Enchant land\nWhenever enchanted land is tapped for mana, its controller adds an additional {G}." }),
+    info("Own Aura", { typeLine: "Enchantment — Aura", manaCost: "{W}", manaValue: 1, oracleText: "Enchant creature you control\nEnchanted creature gets +1/+1." }),
+    info("Player Curse", { typeLine: "Enchantment — Aura Curse", manaCost: "{W}", manaValue: 1, oracleText: "Enchant player\nAt the beginning of enchanted player's upkeep, that player loses 1 life." }),
     info("Thranduil, Sindarin Liege // Silvan Rally", {
       typeLine: "Legendary Creature — Elf Noble // Sorcery — Adventure",
       manaCost: "{2}{G/U}{G/U} // {1}{G/U}{G/U}",
@@ -376,6 +381,58 @@ describe("Light-Paws and Auras", () => {
     expect(stats(BOOK, lp)).toEqual({ power: 5, toughness: 5 });
     expect(has(BOOK, lp, "Flying")).toBe(true);
     expect(has(BOOK, lp, "First strike")).toBe(true);
+  });
+
+  // An Aura is cast onto something. The AI used to pay for one with no
+  // creature in play and lose it to the graveyard.
+  it("the AI can't cast an Aura with nothing to enchant", () => {
+    const g0 = table({ opp: { field: ["Plains", "Plains"], hand: ["Wings Aura"] } });
+    const aura = at(g0, "opp", "Wings Aura", "hand");
+    expect(castable(g0, "opp", aura, BOOK, "hand")).toBe(false);
+    const step = applyAction(g0, "opp", action("cast", aura.iid), BOOK);
+    expect(step.ok).toBe(false);
+    // Still in hand, and nothing was tapped for it.
+    expect(at(step.game, "opp", "Wings Aura", "hand").iid).toBe(aura.iid);
+    expect(step.game.sides.opp.battlefield.every((c) => !c.tapped)).toBe(true);
+    expect(texts(step.game).join(" ")).toMatch(/Wings Aura has nothing to enchant/);
+  });
+
+  it("a gift doesn't go on your creature, a curse does", () => {
+    // Only you have a creature: the AI won't cast its +2/+2 onto it…
+    const g0 = table({ you: { field: ["Goblin Guide"] }, opp: { field: ["Plains", "Plains"], hand: ["Wings Aura", "Arrest Aura", "Own Aura"] } });
+    expect(castable(g0, "opp", at(g0, "opp", "Wings Aura", "hand"), BOOK, "hand")).toBe(false);
+    expect(castable(g0, "opp", at(g0, "opp", "Own Aura", "hand"), BOOK, "hand")).toBe(false);
+    // …but "can't attack or block" has somewhere to go.
+    const arrest = at(g0, "opp", "Arrest Aura", "hand");
+    expect(castable(g0, "opp", arrest, BOOK, "hand")).toBe(true);
+    const g = applyAction(g0, "opp", action("cast", arrest.iid), BOOK).game;
+    expect(at(g, "opp", "Arrest Aura").attachedTo).toBe(at(g, "you", "Goblin Guide").iid);
+    // And with only its own creature, the curse stays in hand.
+    const g1 = table({ opp: { field: ["Goblin Guide", "Plains", "Plains"], hand: ["Arrest Aura"] } });
+    expect(castable(g1, "opp", at(g1, "opp", "Arrest Aura", "hand"), BOOK, "hand")).toBe(false);
+  });
+
+  it("an Aura goes on what it names: a land, or a player", () => {
+    const g0 = table({ opp: { field: ["Plains", "Plains"], hand: ["Growth Aura", "Player Curse"] } });
+    const growth = at(g0, "opp", "Growth Aura", "hand");
+    expect(castable(g0, "opp", growth, BOOK, "hand")).toBe(true);
+    const g = applyAction(g0, "opp", action("cast", growth.iid), BOOK).game;
+    expect(g.sides.opp.battlefield.find((c) => c.iid === at(g, "opp", "Growth Aura").attachedTo)?.name).toBe("Plains");
+    // A Curse enchants a player: it needs no permanent, and stays in play.
+    const curse = at(g, "opp", "Player Curse", "hand");
+    expect(castable(g, "opp", curse, BOOK, "hand")).toBe(true);
+    const g2 = applyAction(g, "opp", action("cast", curse.iid), BOOK).game;
+    expect(g2.sides.opp.battlefield.some((c) => c.name === "Player Curse")).toBe(true);
+  });
+
+  it("your Aura that enchants a land asks among lands", () => {
+    const g0 = table({ you: { field: ["Goblin Guide", "Plains", "Plains"], hand: ["Growth Aura"] }, active: "you" });
+    const aura = at(g0, "you", "Growth Aura", "hand").iid;
+    const g = playerEnters(playerCast(g0, aura, BOOK), aura, BOOK);
+    expect(g.choice).toMatchObject({ kind: "attach", aura });
+    expect(resolveChoice(g, at(g, "you", "Goblin Guide").iid, BOOK)).toBe(g);
+    const on = resolveChoice(g, at(g, "you", "Plains").iid, BOOK);
+    expect(at(on, "you", "Growth Aura").attachedTo).toBe(at(on, "you", "Plains").iid);
   });
 
   it("casting Light-Paws itself searches nothing", () => {
