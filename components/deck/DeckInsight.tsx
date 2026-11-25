@@ -353,7 +353,6 @@ export function InsightScoreHero({
   const bracketNote = shown.byScore
     ? `By its Score. By the rules alone: ${BRACKET_NUMBER[bracket]}${bracketDetail ? ` (${bracketDetail})` : ""}.`
     : bracketDetail;
-  const when = scan?.scannedAt ? new Date(scan.scannedAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : null;
   const noteFor = (key: string) => analysis?.axes.find((a) => a.key === key)?.note ?? null;
   const turn = score && Number.isFinite(score.fundamentalTurn) ? Math.round(score.fundamentalTurn * 2) / 2 : null;
 
@@ -428,6 +427,10 @@ export function InsightScoreHero({
                             </div>
                           </div>
                         ))}
+                        {/* What is estimated rather than counted. It sat under
+                            the scan button as a paragraph of small print; it
+                            belongs with the working it qualifies. */}
+                        {score.caveats.length > 0 && <p className="st-hero-small" style={{ marginTop: 12 }}>{score.caveats.join(" ")}</p>}
                       </div>
                     )}
                   </div>
@@ -479,21 +482,20 @@ export function InsightScoreHero({
         </div>
       )}
 
-      <div className="st-hero-foot">
-        {!score && (
-          <p className="st-hero-pitch">
-            {canEdit
-              ? "A scan measures the deck on four axes and writes up how it plays: the plan, the hands to keep, the key cards and what beats it."
-              : "This deck hasn’t been scanned yet. A scan measures it on four axes and writes up how it plays."}
-          </p>
-        )}
-        {scanSlot}
-        {score && (
-          <p className="st-hero-small">
-            {[when ? `Scanned ${when}.` : null, "Open an axis to see how it was counted.", ...score.caveats].filter(Boolean).join(" ")}
-          </p>
-        )}
-      </div>
+      {/* The foot is the scan button (the owner's) or, before any scan, what
+          a scan is. A viewer of a scanned deck has neither. */}
+      {(canEdit || !score) && (
+        <div className="st-hero-foot">
+          {!score && (
+            <p className="st-hero-pitch">
+              {canEdit
+                ? "A scan measures the deck on four axes and writes up how it plays: the plan, the hands to keep, the key cards and what beats it."
+                : "This deck hasn’t been scanned yet. A scan measures it on four axes and writes up how it plays."}
+            </p>
+          )}
+          {scanSlot}
+        </div>
+      )}
     </section>
   );
 }
@@ -769,6 +771,7 @@ export function InsightScan({
   const meter =
     remaining === undefined ? null : remaining === null ? "Unlimited scans on Pro" : `${remaining} free scan${remaining === 1 ? "" : "s"} left today`;
   const exhausted = remaining === 0;
+  const scannedOn = insight.scan?.scannedAt ? new Date(insight.scan.scannedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : null;
   // Out of scans for today: the way to more sits beside the meter, and a
   // refused scan gets the full notice.
   const goPro = exhausted && !isLimitMessage(error) && (
@@ -782,18 +785,19 @@ export function InsightScan({
     <div>
       {!showNotes ? (
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          {/* The first scan is the panel's one action, so it is the filled
-              button; scanning again is a quieter one. (It used to be a pill
-              that ended in the word "show".) */}
+          {/* The panel's one action, so it is the filled button, for a first
+              scan and for another. (It used to be a pill that ended in the
+              word "show".) */}
           <button
             type="button"
-            className={insight.scan ? "id-ghost" : "id-btn"}
-            style={{ padding: insight.scan ? "8px 14px" : "11px 20px", fontSize: insight.scan ? 13 : 14.5 }}
+            className="id-btn"
+            style={{ padding: "11px 20px", fontSize: 14.5 }}
             disabled={running}
             onClick={() => (hasPrimer ? void run() : setShowNotes(true))}
           >
-            <ScanSearch size={insight.scan ? 14 : 16} strokeWidth={2.25} /> {running ? "Scanning…" : insight.scan ? "Scan again" : "Scan this deck"}
+            <ScanSearch size={16} strokeWidth={2.25} /> {running ? "Scanning…" : insight.scan ? "Scan again" : "Scan this deck"}
           </button>
+          {scannedOn && !running && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>last scanned {scannedOn}</span>}
           {hasPrimer && !running && <span style={{ fontSize: 11.5, color: "var(--w-3)" }}>guided by your primer</span>}
           {meter && <span style={{ fontSize: 11.5, color: exhausted ? "var(--gold)" : "var(--w-3)" }}>{meter}</span>}
           {goPro}
