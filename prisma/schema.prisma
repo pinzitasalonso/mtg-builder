@@ -41,6 +41,9 @@ model User {
   // Plan: "free" (its limits are in lib/limits.ts) or "pro", which lifts
   // every cap.
   tier         String    @default("free")
+  // Home's "Your free plan" block (lib/first-steps.ts): when the account put
+  // it away. Null: it shows until all three things are tried.
+  firstStepsOffAt DateTime?
   // Daily AI meter: calls made on aiDay (UTC); stale aiDay means zero used.
   aiDay        String?
   aiCount      Int       @default(0)

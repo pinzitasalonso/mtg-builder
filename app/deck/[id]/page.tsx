@@ -347,6 +347,19 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // playtest table
   // The playtest table: alone, or straight into a game against the AI.
   const [playtestOpen, setPlaytestOpen] = useState<false | "solo" | "ai">(false);
+  // Home's "Your free plan" block leads here with ?open=match or
+  // ?open=score (components/FirstSteps). The ask is taken off the address
+  // at once, so a reload doesn't open it again, and carried out below once
+  // the deck's cards are here.
+  const [openAsk, setOpenAsk] = useState<"match" | "score" | null>(null);
+  useEffect(() => {
+    const ask = new URLSearchParams(window.location.search).get("open");
+    if (ask !== "match" && ask !== "score") return;
+    setOpenAsk(ask);
+    // A Score is asked for on the Stats pane (nothing is spent by the link).
+    if (ask === "score") setPane("stats");
+    window.history.replaceState(window.history.state, "", window.location.pathname);
+  }, []);
   const [gameCodeOpen, setGameCodeOpen] = useState(false);
   // saved versions of the deck — runs in <VersionsModal> while open
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -986,6 +999,20 @@ export default function DeckPage({ params }: { params: Promise<{ id: string }> }
   // deck, told this is the deck on screen. Otherwise (signed out, someone
   // else's shared deck, an ownerless public one) it's this page's own chat.
   const assistant = useAssistant();
+  // The rest of the ask waits for the deck's cards. A match opens on its
+  // opponent picker (nothing is spent until a match starts). For a Score
+  // the Stats pane is brought up, as the Score pill does: before the cards
+  // are drawn the page is too short to scroll that far.
+  useEffect(() => {
+    if (!openAsk || deckCards.length === 0) return;
+    if (openAsk === "match") {
+      if (assistant.available !== true) return;
+      setPlaytestOpen("ai");
+    } else {
+      setTimeout(() => document.querySelector(".deck-panes")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+    }
+    setOpenAsk(null);
+  }, [openAsk, deckCards.length, assistant.available]);
   const plan = usePlan();
   const isCommanderFormat = (deck?.format ?? "commander").toLowerCase() === "commander";
   // What stands in for the commander's card when there is no commander.

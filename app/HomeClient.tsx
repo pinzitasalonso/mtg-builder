@@ -12,6 +12,8 @@ import { forget, forgetAll, peek, remember } from "@/lib/client-cache";
 import { forgetOfflineData, forgetSession, offlineSession, rememberSession } from "@/lib/offline-session";
 import LandingVisual from "@/components/LandingVisual";
 import { PlanPill } from "@/components/Upgrade";
+import FirstSteps from "@/components/FirstSteps";
+import type { FirstSteps as FirstStepsState } from "@/lib/first-steps";
 import CommanderInput from "@/components/CommanderInput";
 import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
 import { fetchCollectionSummary } from "@/lib/collection-client";
@@ -84,6 +86,9 @@ export interface HomeStart {
   decks: Deck[] | null;
   collection?: HomeCache["collection"] | null;
   wishlist?: number | null;
+  /** A free account that hasn't tried everything its plan gives a day:
+      which of the three it has (lib/first-steps.ts). Null: nothing to show. */
+  steps?: FirstStepsState | null;
 }
 
 export default function HomeClient({ start }: { start?: HomeStart }) {
@@ -285,6 +290,13 @@ export default function HomeClient({ start }: { start?: HomeStart }) {
   /// The free plan's pill: coach questions left today, then Go Pro. Only for
   /// a free account: Pro has no numbers worth watching, which is what the PRO
   /// badge says instead.
+  // The free plan's block (components/FirstSteps), and the deck its match
+  // and Score steps open: the fullest one, the first of them as listed.
+  const steps = start?.steps ?? null;
+  const stepsDeck = decks.reduce<{ publicId: string; name: string; cards: number } | null>(
+    (best, d) => (d._count.cards > (best?.cards ?? -1) ? { publicId: d.publicId, name: d.name, cards: d._count.cards } : best),
+    null
+  );
   const planMeter = me && typeof me.aiRemaining === "number" ? <PlanPill left={me.aiRemaining} /> : null;
 
   // Pinned decks sort first; the list re-fetches so the order follows.
@@ -438,7 +450,8 @@ export default function HomeClient({ start }: { start?: HomeStart }) {
           <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 30, flexWrap: "wrap" }}>
             <div>
               <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Your decks</div>
-              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,52px)", margin: 0, color: "var(--t1)", textWrap: "balance" }}>Pick up where you left off.</h2>
+              {/* A new account has nothing to pick up yet. */}
+              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,52px)", margin: 0, color: "var(--t1)", textWrap: "balance" }}>{loaded && decks.length === 0 ? "Start with a deck." : "Pick up where you left off."}</h2>
               {offline && (
                 <div role="status" style={{ marginTop: 10, fontSize: 13.5, fontWeight: 600, color: "var(--t2)" }}>
                   You’re offline — showing your decks as they were last saved.
@@ -462,7 +475,10 @@ export default function HomeClient({ start }: { start?: HomeStart }) {
           </div>
           {/* The assistant that sees every deck at once. Styled as the box you'd
               type into, because that's what tapping it opens. */}
-          {decks.length > 0 && (
+          {/* What the free plan gives a day, until it's all been tried. It
+              has the way to the coach, so the box below waits its turn. */}
+          {steps && <FirstSteps steps={steps} deck={stepsDeck} onCoach={assistant.open} onNewDeck={newDeck} />}
+          {decks.length > 0 && !steps && (
             <button
               type="button"
               onClick={assistant.open}
