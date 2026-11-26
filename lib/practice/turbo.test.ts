@@ -6,14 +6,15 @@
 import { describe, expect, it } from "vitest";
 import { aiMulligan, fallbackPlan, guardPlan, winningTurn } from "./ai";
 import { comboBrief, lineBrief } from "./brief";
-import { handManaOf, manaOutput, sacManaOf, searchAbility } from "./cards";
+import { handManaOf, manaOutput, manaSinkOf, sacManaOf, searchAbility } from "./cards";
 import { comboNeeds, type DeckCombo } from "./combos";
+import { report, selfplay } from "./selfplay";
 import { applyAction, availableMana, cardId, comboStatus, endTurn, newGame, playerSpellResolves, startTurn, uncastable, type DeckCard } from "./game";
 import { manaTotal } from "./mana";
 import { cardTypesAmong, drawSpellOf, tutorOf, tutorSearch } from "./spells";
 import { readTriggers } from "./triggers";
 import type { CardBook, CardInfo, PlanAction, PracticeGame } from "./types";
-import { adNauseamOf, extraTurnLosesOf, ritualMana, sacrificeCostOf } from "./wincons";
+import { adNauseamOf, extraTurnLosesOf, impulseOf, ritualMana, sacrificeCostOf } from "./wincons";
 import CARDS from "./fixtures/turbo.json";
 import COMBOS from "./fixtures/turbo-combos.json";
 
@@ -271,38 +272,39 @@ describe("going for the combo", () => {
 });
 
 describe("draw engines", () => {
-  it("Necropotence: no draw step, and cards for life at the end step, keeping 12", () => {
+  it("Necropotence: no draw step, and at its end step every life above 15 becomes a card", () => {
     const g0 = table({ opp: { field: ["Necropotence", "Swamp"], hand: ["Bear"] }, life: 30 });
     const g1 = endTurn(g0, BOOK);
-    // Six cards to fill the hand to seven: 30 life down to 24.
+    // Fifteen cards for fifteen life; the best seven are kept.
+    expect(g1.sides.opp.life).toBe(15);
     expect(g1.sides.opp.hand).toHaveLength(7);
-    expect(g1.sides.opp.life).toBe(24);
-    expect(said(g1)).toMatch(/Necropotence: the opponent pays 6 life for 6 cards/);
-    // Its next turn: no draw.
+    expect(said(g1)).toMatch(/Necropotence: the opponent pays 15 life for 15 cards/);
+    // Its next turn: no draw. At its end step, two more while it has the life.
     const g2 = endTurn(g1, BOOK);
     expect(g2.active).toBe("opp");
     expect(g2.sides.opp.hand).toHaveLength(7);
     expect(said(g2)).toMatch(/Necropotence: The opponent skips the draw step/);
+    expect(endTurn(g2, BOOK).sides.opp.life).toBe(13);
   });
 
-  it("with a full hand it still digs four, and throws the worst away", () => {
-    const g0 = table({ opp: { field: ["Necropotence", "Swamp"], hand: ["Thassa's Oracle", "Demonic Consultation", "Bear", "Bear", "Bear", "Bear", "Bear"] }, life: 40 });
+  it("what it digs up is sorted at cleanup: the win stays", () => {
+    const g0 = table({ opp: { field: ["Necropotence", "Swamp"], hand: ["Thassa's Oracle", "Demonic Consultation", "Bear", "Bear", "Bear", "Bear", "Bear"] }, life: 30 });
     const g = endTurn(g0, BOOK);
-    expect(g.sides.opp.life).toBe(36);
+    expect(g.sides.opp.life).toBe(15);
     expect(g.sides.opp.hand).toHaveLength(7);
     expect(g.sides.opp.hand.map((c) => c.name)).toEqual(expect.arrayContaining(["Thassa's Oracle", "Demonic Consultation"]));
   });
 
-  it("near its floor it pays nothing", () => {
-    const g = endTurn(table({ opp: { field: ["Necropotence"], hand: [] }, life: 12 }), BOOK);
-    expect(g.sides.opp.life).toBe(12);
+  it("at 8 life it pays nothing more", () => {
+    const g = endTurn(table({ opp: { field: ["Necropotence"], hand: [] }, life: 8 }), BOOK);
+    expect(g.sides.opp.life).toBe(8);
     expect(g.sides.opp.hand).toHaveLength(0);
   });
 
   it("Necrodominance: draws, and the hand size is five", () => {
-    const g0 = table({ opp: { field: ["Necrodominance"], hand: ["Bear", "Bear", "Bear", "Bear", "Bear", "Bear", "Bear"] }, life: 40 });
+    const g0 = table({ opp: { field: ["Necrodominance"], hand: ["Bear", "Bear", "Bear", "Bear", "Bear", "Bear", "Bear"] }, life: 25 });
     const g = endTurn(g0, BOOK);
-    expect(g.sides.opp.life).toBe(36);
+    expect(g.sides.opp.life).toBe(15);
     expect(g.sides.opp.hand).toHaveLength(5);
     expect(said(g)).toMatch(/discards down to 5 cards/);
   });
@@ -451,5 +453,104 @@ describe("the smart opponent's plan", () => {
     expect(guardPlan(g, plan, BOOK)).toBe(plan);
     const combo = { main: [act("combo", 0, { card: ORACLE.id })], attack: [], after_combat: [], say: "" };
     expect(guardPlan(g, combo, BOOK)).toBe(combo);
+  });
+});
+
+describe("a line over two turns", () => {
+  it("a ritual pays for the tutor that finds the missing half; the win is next turn's", () => {
+    // Your log: Cabal Ritual and Beseech the Mirror sat in hand for ten
+    // turns, because the whole win didn't fit in one.
+    const g0 = table({ opp: { field: ["Badlands", "Underground Sea", "Underground Sea"], hand: ["Cabal Ritual", "Beseech the Mirror", "Demonic Consultation"], top: ["Bear", "Thassa's Oracle"] } });
+    expect(winningTurn(g0, BOOK, "opp", [ORACLE])).toBeNull();
+    const plan = fallbackPlan(g0, BOOK, "opp", {}, [ORACLE]);
+    expect(names(g0, plan)).toEqual(["cast:Cabal Ritual", "cast:Beseech the Mirror"]);
+    let g = g0;
+    for (const a of plan.main) g = applyAction(g, "opp", a, BOOK, { combos: [ORACLE] }).game;
+    expect(at(g, "opp", "Thassa's Oracle")).toBeDefined();
+    // Its next turn, with its lands untapped: the win.
+    const next = endTurn(endTurn(g, BOOK, [ORACLE]), BOOK, [ORACLE]);
+    expect(winningTurn(next, BOOK, "opp", [ORACLE])).not.toBeNull();
+  });
+
+  it("a tutor that can't find the piece finds one that can", () => {
+    // Mystical Tutor can't find a creature: with Consultation in hand it
+    // used to fetch Tainted Pact, a second copy of what it held.
+    const g0 = table({ opp: { field: ["Underground Sea"], hand: ["Mystical Tutor", "Demonic Consultation"], top: ["Bear", "Tainted Pact", "Demonic Tutor", "Thassa's Oracle"] } });
+    const plan = fallbackPlan(g0, BOOK, "opp", {}, COMBOS as DeckCombo[]);
+    expect(plan.main.flatMap((a) => a.effects).find((e) => e.type === "search")?.name).toBe("Demonic Tutor");
+  });
+
+  it("at cleanup it keeps a piece of its combo over a card it could cast", () => {
+    const g0 = table({ opp: { hand: ["Brain Freeze", "Bear", "Bear", "Bear", "Bear", "Bear", "Bear", "Bear"] } });
+    expect(said(endTurn(g0, BOOK, [BREACH]))).toMatch(/discards down to 7 cards: Bear\./);
+  });
+});
+
+describe("refilling the hand", () => {
+  it("Wheel of Fortune throws away a hand of answers, never both halves of a win", () => {
+    const lands = ["Badlands", "Volcanic Island", "Underground Sea"];
+    const dead = table({ opp: { field: lands, hand: ["Wheel of Fortune", "Counterspell", "Counterspell", "Counterspell", "Counterspell", "Sol Ring"] } });
+    expect(names(dead, fallbackPlan(dead, BOOK))).toContain("cast:Wheel of Fortune");
+    const win = table({ opp: { field: ["Badlands"], hand: ["Wheel of Fortune", "Thassa's Oracle", "Demonic Consultation", "Counterspell", "Counterspell"] } });
+    expect(names(win, fallbackPlan(win, BOOK, "opp", {}, [ORACLE]))).not.toContain("cast:Wheel of Fortune");
+    const live = table({ opp: { field: lands, hand: ["Wheel of Fortune", "Bear", "Bear", "Demonic Tutor", "Sol Ring"] } });
+    expect(names(live, fallbackPlan(live, BOOK))).not.toContain("cast:Wheel of Fortune");
+  });
+
+  it("Jeska's Will with a commander out: the mana, and three cards for the turn only", () => {
+    expect(impulseOf(of("Jeska's Will"))).toBe(3);
+    const g0 = table({
+      opp: { field: ["Badlands", "Volcanic Island", "Volcanic Island"], hand: ["Jeska's Will"], top: ["Sol Ring", "Bear", "Counterspell"], command: ["Rograkh, Son of Rohgahh"] },
+      you: { hand: ["Bear", "Bear", "Bear", "Bear"] },
+    });
+    // Rograkh first (it costs nothing), so the Will has a commander.
+    const g1 = cast(g0, "Rograkh, Son of Rohgahh").game;
+    expect(names(g1, fallbackPlan(g1, BOOK))[0]).toBe("cast:Jeska's Will");
+    const g2 = cast(g1, "Jeska's Will").game;
+    expect(g2.pool!.opp).toEqual(["R", "R", "R", "R"]);
+    expect(g2.sides.opp.hand.map((c) => c.name)).toEqual(["Sol Ring", "Bear", "Counterspell"]);
+    expect(said(g2)).toMatch(/Jeska's Will: the opponent exiles the top 3 cards of its library, and may play them this turn/);
+    // It plays what it can; the rest is gone at the end of the turn.
+    const g3 = applyAction(g2, "opp", act("cast", at(g2, "opp", "Sol Ring")!.iid), BOOK).game;
+    const over = endTurn(g3, BOOK);
+    expect(at(over, "opp", "Sol Ring", "battlefield")).toBeDefined();
+    expect(over.sides.opp.hand.map((c) => c.name)).not.toContain("Counterspell");
+    expect(at(over, "opp", "Counterspell", "exile")).toBeDefined();
+    expect(said(over)).toMatch(/stay in exile: not played this turn/);
+  });
+});
+
+describe("endless mana", () => {
+  const LOOP: DeckCombo = { id: "9-9", pieces: [{ name: "Sol Ring", zones: ["B"] }, { name: "Lotus Petal", zones: ["B"] }], produces: ["Infinite colored mana"], manaNeeded: "", steps: "Loop.", prerequisites: "" };
+  const go = (g: PracticeGame) => applyAction(g, "opp", act("combo", 0, { card: LOOP.id }), BOOK, { combos: [LOOP] }).game;
+
+  it("with a way to spend it for ever on the table, it's the game", () => {
+    expect(manaSinkOf(of("Kinnan, Bonder Prodigy"))).toBe("{5}{G}{U}");
+    expect(manaSinkOf(of("Sol Ring"))).toBeNull();
+    const g = go(table({ opp: { field: ["Sol Ring", "Lotus Petal", "Kinnan, Bonder Prodigy"] } }));
+    expect(g.winner).toBe("opp");
+    expect(said(g)).toMatch(/With endless mana, Kinnan, Bonder Prodigy's ability takes the opponent through its whole library/);
+  });
+
+  it("without one it's mana for the turn, as before", () => {
+    const g = go(table({ opp: { field: ["Sol Ring", "Lotus Petal"] } }));
+    expect(g.winner).toBeFalsy();
+    expect(g.pool!.opp.length).toBeGreaterThan(20);
+  });
+});
+
+describe("the benchmark's self-play", () => {
+  it("a seed is the same game every time, and the report counts its wins", () => {
+    const cards = [...Array(30).fill("Swamp"), ...Array(8).fill("Bear"), "Sol Ring", "Thassa's Oracle", "Demonic Consultation", "Demonic Tutor", "Underground Sea", "Underground Sea", "Underground Sea"].map((name) => ({ name, imageUri: "", typeLine: of(name).typeLine }));
+    const list = { cards, commander: null, book: BOOK, combos: [ORACLE] };
+    const a = selfplay(list, 7, 6);
+    const b = selfplay(list, 7, 6);
+    expect(a).toEqual(b);
+    expect(a.turns.length).toBeGreaterThan(0);
+    expect(a.turns[0]!.hand.length).toBeGreaterThan(0);
+    const r = report([a, selfplay(list, 8, 6)], 6);
+    expect(r.games).toBe(2);
+    expect(r.wonBy[6]).toBeLessThanOrEqual(2);
+    expect(r.idle).toBeGreaterThanOrEqual(0);
   });
 });

@@ -9,7 +9,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "postinstall": "prisma generate",
-    "calibrate": "vitest run --config calibration/vitest.config.ts"
+    "calibrate": "vitest run --config calibration/vitest.config.ts",
+    "practice:bench": "vitest run --config calibration/practice/vitest.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.101.0",

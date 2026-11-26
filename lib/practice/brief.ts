@@ -4,7 +4,7 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { canPlayAsLand, handManaOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
+import { canPlayAsLand, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
 import { availableMana, castable, cardId, comboStatus, lifeFor, loyaltyOf, uncastable } from "./game";
 import { comboHeadline, type DeckCombo } from "./combos";
 import {
@@ -32,7 +32,7 @@ import {
 import { hasTriggers, triggersOf } from "./triggers";
 import { manaSummary, manaTotal } from "./mana";
 import { makesTreasures, treasureSpellOf } from "./treasure";
-import { adNauseamOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
+import { adNauseamOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, impulseOf, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import { damageRuleOf } from "./damage";
 import { cardTypesAmong, tutorOf } from "./spells";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
@@ -115,6 +115,7 @@ HOW TO PLAY WELL
 COMBOS
 - When your deck has combos, they are listed after your decklist, each with an id, its pieces, where each piece has to be, its mana and its steps. Each turn the brief says where every one stands: READY, what to cast first, or which piece is missing and where it is.
 - A combo deck wins with its combos. Assembling one comes before attacking: find the missing piece with a tutor or card draw, keep the mana for it, and don't spend a piece on anything else.
+- Endless mana is a win when you have a way to spend it over and over: an ability whose whole cost is mana and that draws, digs or deals damage (Kinnan, Thrasios). The app ends the game there.
 - To go for a combo that is READY: {"kind":"combo","card":"<combo id>"}, every other field null and effects []. The app pays its mana, casts the pieces it uses from your hand, and carries out what it makes: a combo that wins ends the game; endless mana fills your pool for the rest of the phase, so put what you spend it on right after. The player gets a moment to answer first, as for any spell.
 - A piece that has to be on the battlefield is cast first, with an ordinary cast action earlier in the same turn. The brief tells you which.
 - Hold the combo pieces that do nothing alone (Thassa's Oracle, Demonic Consultation, Underworld Breach, Brain Freeze) and your rituals until the turn you can finish. Everything else is for using now: mana rocks, draw engines (Necropotence, Rhystic Study, Mystic Remora), tutors for the piece you lack. A combo deck that passes its early turns has lost its edge.
@@ -178,9 +179,11 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (triggersOf(book, front).endSacrifice) notes.push("the app sacrifices it at the end of the turn: cast it only on the turn you finish its combo");
     if (sacrificeCostOf(info) && !treasureSpellOf(book, front)) notes.push(`the app sacrifices your cheapest ${sacrificeCostOf(info)} as you cast it (a commander that costs {0} first): have one out`);
     if (ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 })) notes.push("the app adds its mana as it resolves: give it no mana effect");
+    if (impulseOf(info)) notes.push("with a commander of yours out, the app also gives you its other mode: the top three cards of your library, yours to play this turn only. Cast it first, with no effects");
+    if (manaSinkOf(info)) notes.push("with endless mana from a combo, the app wins the game through this ability: have it on the battlefield (or in your command zone) when you go off");
     if (adNauseamOf(info)) notes.push("the app puts cards into your hand until you're at 8 life: give it no effects, and cast it with life to spend");
     const lfc = lifeForCardsOf(book, front);
-    if (lfc) notes.push(`you skip your draw step; at your end step the app pays life for cards (up to your hand size, keeping 10 life): don't activate it, and cast it early`);
+    if (lfc) notes.push(`you skip your draw step; at your end step the app pays life for cards (every life above 15, twenty at most, and it keeps the best at cleanup): don't activate it, and cast it early`);
     else if (skipsDrawOf(book, front)) notes.push("you skip your draw step while it's out");
     if (handSizeOf(book, front)) notes.push(`your maximum hand size is ${handSizeOf(book, front)} while it's out`);
     const cu = cumulativeUpkeepOf(book, front);

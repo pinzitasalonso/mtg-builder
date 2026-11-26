@@ -1,0 +1,2705 @@
+{
+ "name": "Kinnan, Bonder Prodigy",
+ "source": {
+  "kind": "mtgtop8",
+  "detail": "Sterling Sellards [monolith] #2 at Power Clash 3K! Bronze Event (22/11/26) · MTGTop8",
+  "fetchedAt": "2026-11-26"
+ },
+ "commander": "Kinnan, Bonder Prodigy",
+ "cards": [
+  {
+   "name": "Badgermole Cub",
+   "quantity": 1,
+   "typeLine": "Creature — Badger Mole"
+  },
+  {
+   "name": "Biomancer's Familiar",
+   "quantity": 1,
+   "typeLine": "Creature — Mutant"
+  },
+  {
+   "name": "Birds of Paradise",
+   "quantity": 1,
+   "typeLine": "Creature — Bird"
+  },
+  {
+   "name": "Bloom Tender",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Brutalizer Exarch",
+   "quantity": 1,
+   "typeLine": "Creature — Phyrexian Cleric"
+  },
+  {
+   "name": "Circle of Dreams Druid",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Citanul Stalwart",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid Soldier"
+  },
+  {
+   "name": "Clever Impersonator",
+   "quantity": 1,
+   "typeLine": "Creature — Shapeshifter"
+  },
+  {
+   "name": "Deadeye Navigator",
+   "quantity": 1,
+   "typeLine": "Creature — Spirit"
+  },
+  {
+   "name": "Delighted Halfling",
+   "quantity": 1,
+   "typeLine": "Creature — Halfling Citizen"
+  },
+  {
+   "name": "Devoted Druid",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Disciple of Freyalise // Garden of Freyalise",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid // Land"
+  },
+  {
+   "name": "Elvish Mystic",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Elvish Spirit Guide",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Spirit"
+  },
+  {
+   "name": "Enduring Vitality",
+   "quantity": 1,
+   "typeLine": "Enchantment Creature — Elk Glimmer"
+  },
+  {
+   "name": "Fanatic of Rhonas",
+   "quantity": 1,
+   "typeLine": "Creature — Snake Druid"
+  },
+  {
+   "name": "Flesh Duplicate",
+   "quantity": 1,
+   "typeLine": "Creature — Shapeshifter Rebel"
+  },
+  {
+   "name": "Formidable Speaker",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Fyndhorn Elves",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Gene Pollinator",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Robot Insect"
+  },
+  {
+   "name": "Gigantoplasm",
+   "quantity": 1,
+   "typeLine": "Creature — Shapeshifter"
+  },
+  {
+   "name": "Glasspool Mimic // Glasspool Shore",
+   "quantity": 1,
+   "typeLine": "Creature — Shapeshifter Rogue // Land"
+  },
+  {
+   "name": "Great Oak Guardian",
+   "quantity": 1,
+   "typeLine": "Creature — Treefolk"
+  },
+  {
+   "name": "Hydroelectric Specimen // Hydroelectric Laboratory",
+   "quantity": 1,
+   "typeLine": "Creature — Weird // Land"
+  },
+  {
+   "name": "Ilysian Caryatid",
+   "quantity": 1,
+   "typeLine": "Creature — Plant"
+  },
+  {
+   "name": "Incubation Druid",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Jaspera Sentinel",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Rogue"
+  },
+  {
+   "name": "Knacksaw Clique",
+   "quantity": 1,
+   "typeLine": "Creature — Faerie Rogue"
+  },
+  {
+   "name": "Llanowar Elves",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Llanowar Loamspeaker",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Loam Dryad",
+   "quantity": 1,
+   "typeLine": "Creature — Dryad Horror"
+  },
+  {
+   "name": "Manglehorn",
+   "quantity": 1,
+   "typeLine": "Creature — Beast"
+  },
+  {
+   "name": "Marang River Regent // Coil and Catch",
+   "quantity": 1,
+   "typeLine": "Creature — Dragon // Instant — Omen"
+  },
+  {
+   "name": "Marvin, Murderous Mimic",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact Creature — Toy"
+  },
+  {
+   "name": "Murkfiend Liege",
+   "quantity": 1,
+   "typeLine": "Creature — Horror"
+  },
+  {
+   "name": "Nyxbloom Ancient",
+   "quantity": 1,
+   "typeLine": "Enchantment Creature — Elemental"
+  },
+  {
+   "name": "Overgrown Zealot",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Phantasmal Image",
+   "quantity": 1,
+   "typeLine": "Creature — Illusion"
+  },
+  {
+   "name": "Phyrexian Metamorph",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Phyrexian Shapeshifter"
+  },
+  {
+   "name": "Pili-Pala",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Scarecrow"
+  },
+  {
+   "name": "Priest of Titania",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Progenitor Mimic",
+   "quantity": 1,
+   "typeLine": "Creature — Shapeshifter"
+  },
+  {
+   "name": "Riptide Shapeshifter",
+   "quantity": 1,
+   "typeLine": "Creature — Shapeshifter"
+  },
+  {
+   "name": "Rok-Tahk, Budding Scientist",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Brikar Scientist"
+  },
+  {
+   "name": "Sanctum Weaver",
+   "quantity": 1,
+   "typeLine": "Enchantment Creature — Dryad"
+  },
+  {
+   "name": "Saruli Caretaker",
+   "quantity": 1,
+   "typeLine": "Creature — Dryad"
+  },
+  {
+   "name": "Seedborn Muse",
+   "quantity": 1,
+   "typeLine": "Creature — Spirit"
+  },
+  {
+   "name": "Shang-Chi, Master of Kung Fu",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Warrior Hero"
+  },
+  {
+   "name": "Spellskite",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Phyrexian Horror"
+  },
+  {
+   "name": "Trailtracker Scout",
+   "quantity": 1,
+   "typeLine": "Creature — Raccoon Scout"
+  },
+  {
+   "name": "Ulvenwald Oddity // Ulvenwald Behemoth",
+   "quantity": 1,
+   "typeLine": "Creature — Beast // Creature — Beast Horror"
+  },
+  {
+   "name": "Wandering Archaic // Explore the Vastlands",
+   "quantity": 1,
+   "typeLine": "Creature — Avatar // Sorcery"
+  },
+  {
+   "name": "Woodland Bellower",
+   "quantity": 1,
+   "typeLine": "Creature — Beast"
+  },
+  {
+   "name": "Arcane Signet",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Chrome Mox",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Lotus Petal",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mox Amber",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact"
+  },
+  {
+   "name": "Mox Diamond",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Paradise Mantle",
+   "quantity": 1,
+   "typeLine": "Artifact — Equipment"
+  },
+  {
+   "name": "Sol Ring",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Springleaf Drum",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Trinisphere",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "An Offer You Can't Refuse",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Fierce Guardianship",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Flusterstorm",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Legolas's Quick Reflexes",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Mental Misstep",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Mindbreak Trap",
+   "quantity": 1,
+   "typeLine": "Instant — Trap"
+  },
+  {
+   "name": "Pact of Negation",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Summoner's Pact",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Swan Song",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Green Sun's Zenith",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Cryptolith Rite",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Training Grounds",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Barkchannel Pathway // Tidechannel Pathway",
+   "quantity": 1,
+   "typeLine": "Land // Land"
+  },
+  {
+   "name": "Boseiju, Who Endures",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Botanical Sanctum",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Breeding Pool",
+   "quantity": 1,
+   "typeLine": "Land — Forest Island"
+  },
+  {
+   "name": "City of Brass",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Command Tower",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Flooded Strand",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Forbidden Orchard",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Forest",
+   "quantity": 1,
+   "typeLine": "Basic Land — Forest"
+  },
+  {
+   "name": "Gaea's Cradle",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Gemstone Caverns",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Island",
+   "quantity": 1,
+   "typeLine": "Basic Land — Island"
+  },
+  {
+   "name": "Mana Confluence",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Misty Rainforest",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Multiversal Passage",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Otawara, Soaring City",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Polluted Delta",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Rejuvenating Springs",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Scalding Tarn",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Tropical Island",
+   "quantity": 1,
+   "typeLine": "Land — Forest Island"
+  },
+  {
+   "name": "Verdant Catacombs",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Waterlogged Grove",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Windswept Heath",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Wooded Foothills",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Yavimaya Coast",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Kinnan, Bonder Prodigy",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Druid"
+  }
+ ],
+ "book": {
+  "badgermole cub": {
+   "name": "Badgermole Cub",
+   "imageUri": "",
+   "typeLine": "Creature — Badger Mole",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "When this creature enters, earthbend 1. (Target land you control becomes a 0/0 creature with haste that's still a land. Put a +1/+1 counter on it. When it dies or is exiled, return it to the battlefield tapped.)\nWhenever you tap a creature for mana, add an additional {G}.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Earthbend"
+   ],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "biomancer's familiar": {
+   "name": "Biomancer's Familiar",
+   "imageUri": "",
+   "typeLine": "Creature — Mutant",
+   "manaCost": "{G}{U}",
+   "manaValue": 2,
+   "oracleText": "Activated abilities of creatures you control cost {2} less to activate. This effect can't reduce the mana in that cost to less than one mana.\n{T}: The next time target creature adapts this turn, it adapts as though it had no +1/+1 counters on it.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "birds of paradise": {
+   "name": "Birds of Paradise",
+   "imageUri": "",
+   "typeLine": "Creature — Bird",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "Flying\n{T}: Add one mana of any color.",
+   "power": 0,
+   "toughness": 1,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "bloom tender": {
+   "name": "Bloom Tender",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "Vivid — {T}: For each color among permanents you control, add one mana of that color.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Vivid"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "brutalizer exarch": {
+   "name": "Brutalizer Exarch",
+   "imageUri": "",
+   "typeLine": "Creature — Phyrexian Cleric",
+   "manaCost": "{5}{G}",
+   "manaValue": 6,
+   "oracleText": "When this creature enters, choose one —\n• Search your library for a creature card, reveal it, then shuffle and put that card on top.\n• Put target noncreature permanent on the bottom of its owner's library.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": []
+  },
+  "circle of dreams druid": {
+   "name": "Circle of Dreams Druid",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{G}{G}{G}",
+   "manaValue": 3,
+   "oracleText": "{T}: Add {G} for each creature you control.",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "citanul stalwart": {
+   "name": "Citanul Stalwart",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid Soldier",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "{T}, Tap an untapped artifact or creature you control: Add one mana of any color.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "clever impersonator": {
+   "name": "Clever Impersonator",
+   "imageUri": "",
+   "typeLine": "Creature — Shapeshifter",
+   "manaCost": "{2}{U}{U}",
+   "manaValue": 4,
+   "oracleText": "You may have this creature enter as a copy of any nonland permanent on the battlefield.",
+   "power": 0,
+   "toughness": 0,
+   "keywords": [],
+   "producedMana": []
+  },
+  "deadeye navigator": {
+   "name": "Deadeye Navigator",
+   "imageUri": "",
+   "typeLine": "Creature — Spirit",
+   "manaCost": "{4}{U}{U}",
+   "manaValue": 6,
+   "oracleText": "Soulbond (You may pair this creature with another unpaired creature when either enters. They remain paired for as long as you control both of them.)\nAs long as Deadeye Navigator is paired with another creature, each of those creatures has \"{1}{U}: Exile this creature, then return it to the battlefield under your control.\"",
+   "power": 5,
+   "toughness": 5,
+   "keywords": [
+    "Soulbond"
+   ],
+   "producedMana": []
+  },
+  "delighted halfling": {
+   "name": "Delighted Halfling",
+   "imageUri": "",
+   "typeLine": "Creature — Halfling Citizen",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast a legendary spell, and that spell can't be countered.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "devoted druid": {
+   "name": "Devoted Druid",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add {G}.\nPut a -1/-1 counter on this creature: Untap this creature.",
+   "power": 0,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "disciple of freyalise // garden of freyalise": {
+   "name": "Disciple of Freyalise // Garden of Freyalise",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid // Land",
+   "manaCost": "{3}{G}{G}{G}",
+   "manaValue": 6,
+   "oracleText": "When this creature enters, you may sacrifice another creature. If you do, you gain X life and draw X cards, where X is that creature's power.\n//\nAs this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {G}.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "elvish mystic": {
+   "name": "Elvish Mystic",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "{T}: Add {G}.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "elvish spirit guide": {
+   "name": "Elvish Spirit Guide",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Spirit",
+   "manaCost": "{2}{G}",
+   "manaValue": 3,
+   "oracleText": "Exile this card from your hand: Add {G}.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "enduring vitality": {
+   "name": "Enduring Vitality",
+   "imageUri": "",
+   "typeLine": "Enchantment Creature — Elk Glimmer",
+   "manaCost": "{1}{G}{G}",
+   "manaValue": 3,
+   "oracleText": "Vigilance\nCreatures you control have \"{T}: Add one mana of any color.\"\nWhen Enduring Vitality dies, if it was a creature, return it to the battlefield under its owner's control. It's an enchantment. (It's not a creature.)",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [
+    "Vigilance"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "fanatic of rhonas": {
+   "name": "Fanatic of Rhonas",
+   "imageUri": "",
+   "typeLine": "Creature — Snake Druid",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add {G}.\nFerocious — {T}: Add {G}{G}{G}{G}. Activate only if you control a creature with power 4 or greater.\nEternalize {2}{G}{G} ({2}{G}{G}, Exile this card from your graveyard: Create a token that's a copy of it, except it's a 4/4 black Zombie Snake Druid with no mana cost. Eternalize only as a sorcery.)",
+   "power": 1,
+   "toughness": 4,
+   "keywords": [
+    "Ferocious",
+    "Eternalize"
+   ],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "flesh duplicate": {
+   "name": "Flesh Duplicate",
+   "imageUri": "",
+   "typeLine": "Creature — Shapeshifter Rebel",
+   "manaCost": "{U}{U}",
+   "manaValue": 2,
+   "oracleText": "You may have this creature enter as a copy of any creature on the battlefield, except it has vanishing 3 if that creature doesn't have vanishing. (A permanent with vanishing 3 enters with three time counters on it. At the beginning of your upkeep, remove a time counter from it. When the last is removed, sacrifice it.)",
+   "power": 0,
+   "toughness": 0,
+   "keywords": [],
+   "producedMana": []
+  },
+  "formidable speaker": {
+   "name": "Formidable Speaker",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{2}{G}",
+   "manaValue": 3,
+   "oracleText": "When this creature enters, you may discard a card. If you do, search your library for a creature card, reveal it, put it into your hand, then shuffle.\n{1}, {T}: Untap another target permanent.",
+   "power": 2,
+   "toughness": 4,
+   "keywords": [],
+   "producedMana": []
+  },
+  "fyndhorn elves": {
+   "name": "Fyndhorn Elves",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "{T}: Add {G}.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "gene pollinator": {
+   "name": "Gene Pollinator",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Robot Insect",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "{T}, Tap an untapped permanent you control: Add one mana of any color.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "gigantoplasm": {
+   "name": "Gigantoplasm",
+   "imageUri": "",
+   "typeLine": "Creature — Shapeshifter",
+   "manaCost": "{3}{U}",
+   "manaValue": 4,
+   "oracleText": "You may have this creature enter as a copy of any creature on the battlefield, except it has \"{X}: This creature has base power and toughness X/X.\"",
+   "power": 0,
+   "toughness": 0,
+   "keywords": [],
+   "producedMana": []
+  },
+  "glasspool mimic // glasspool shore": {
+   "name": "Glasspool Mimic // Glasspool Shore",
+   "imageUri": "",
+   "typeLine": "Creature — Shapeshifter Rogue // Land",
+   "manaCost": "{2}{U}",
+   "manaValue": 3,
+   "oracleText": "You may have this creature enter as a copy of a creature you control, except it's a Shapeshifter Rogue in addition to its other types.\n//\nThis land enters tapped.\n{T}: Add {U}.",
+   "power": 0,
+   "toughness": 0,
+   "keywords": [],
+   "producedMana": [
+    "U"
+   ]
+  },
+  "great oak guardian": {
+   "name": "Great Oak Guardian",
+   "imageUri": "",
+   "typeLine": "Creature — Treefolk",
+   "manaCost": "{5}{G}",
+   "manaValue": 6,
+   "oracleText": "Flash (You may cast this spell any time you could cast an instant.)\nReach\nWhen this creature enters, creatures target player controls get +2/+2 until end of turn. Untap them.",
+   "power": 4,
+   "toughness": 5,
+   "keywords": [
+    "Reach",
+    "Flash"
+   ],
+   "producedMana": []
+  },
+  "hydroelectric specimen // hydroelectric laboratory": {
+   "name": "Hydroelectric Specimen // Hydroelectric Laboratory",
+   "imageUri": "",
+   "typeLine": "Creature — Weird // Land",
+   "manaCost": "{2}{U}",
+   "manaValue": 3,
+   "oracleText": "Flash\nWhen this creature enters, you may change the target of target instant or sorcery spell with a single target to this creature.\n//\nAs this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {U}.",
+   "power": 1,
+   "toughness": 4,
+   "keywords": [
+    "Flash"
+   ],
+   "producedMana": [
+    "U"
+   ]
+  },
+  "ilysian caryatid": {
+   "name": "Ilysian Caryatid",
+   "imageUri": "",
+   "typeLine": "Creature — Plant",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add one mana of any color. If you control a creature with power 4 or greater, add two mana of any one color instead.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "incubation druid": {
+   "name": "Incubation Druid",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add one mana of any type that a land you control could produce. If this creature has a +1/+1 counter on it, add three mana of that type instead.\n{3}{G}{G}: Adapt 3. (If this creature has no +1/+1 counters on it, put three +1/+1 counters on it.)",
+   "power": 0,
+   "toughness": 2,
+   "keywords": [
+    "Adapt"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "jaspera sentinel": {
+   "name": "Jaspera Sentinel",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Rogue",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "Reach\n{T}, Tap an untapped creature you control: Add one mana of any color.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [
+    "Reach"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "knacksaw clique": {
+   "name": "Knacksaw Clique",
+   "imageUri": "",
+   "typeLine": "Creature — Faerie Rogue",
+   "manaCost": "{3}{U}",
+   "manaValue": 4,
+   "oracleText": "Flying\n{1}{U}, {Q}: Target opponent exiles the top card of their library. Until end of turn, you may play that card. ({Q} is the untap symbol.)",
+   "power": 1,
+   "toughness": 4,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": []
+  },
+  "llanowar elves": {
+   "name": "Llanowar Elves",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "{T}: Add {G}.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "llanowar loamspeaker": {
+   "name": "Llanowar Loamspeaker",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add one mana of any color.\n{T}: Target land you control becomes a 3/3 Elemental creature with haste until end of turn. It's still a land. Activate only as a sorcery.",
+   "power": 1,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "loam dryad": {
+   "name": "Loam Dryad",
+   "imageUri": "",
+   "typeLine": "Creature — Dryad Horror",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "{T}, Tap an untapped creature you control: Add one mana of any color.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "manglehorn": {
+   "name": "Manglehorn",
+   "imageUri": "",
+   "typeLine": "Creature — Beast",
+   "manaCost": "{2}{G}",
+   "manaValue": 3,
+   "oracleText": "When this creature enters, you may destroy target artifact.\nArtifacts your opponents control enter tapped.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "marang river regent // coil and catch": {
+   "name": "Marang River Regent // Coil and Catch",
+   "imageUri": "",
+   "typeLine": "Creature — Dragon // Instant — Omen",
+   "manaCost": "{4}{U}{U} // {3}{U}",
+   "manaValue": 6,
+   "oracleText": "Flying\nWhen this creature enters, return up to two other target nonland permanents to their owners' hands.\n//\nDraw three cards, then discard a card. (Then shuffle this card into its owner's library.)",
+   "power": 6,
+   "toughness": 7,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": []
+  },
+  "marvin, murderous mimic": {
+   "name": "Marvin, Murderous Mimic",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact Creature — Toy",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "Marvin has all activated abilities of creatures you control that don't have the same name as this creature.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "murkfiend liege": {
+   "name": "Murkfiend Liege",
+   "imageUri": "",
+   "typeLine": "Creature — Horror",
+   "manaCost": "{2}{G/U}{G/U}{G/U}",
+   "manaValue": 5,
+   "oracleText": "Other green creatures you control get +1/+1.\nOther blue creatures you control get +1/+1.\nUntap all green and/or blue creatures you control during each other player's untap step.",
+   "power": 4,
+   "toughness": 4,
+   "keywords": [],
+   "producedMana": []
+  },
+  "nyxbloom ancient": {
+   "name": "Nyxbloom Ancient",
+   "imageUri": "",
+   "typeLine": "Enchantment Creature — Elemental",
+   "manaCost": "{4}{G}{G}{G}",
+   "manaValue": 7,
+   "oracleText": "Trample\nIf you tap a permanent for mana, it produces three times as much of that mana instead.",
+   "power": 5,
+   "toughness": 5,
+   "keywords": [
+    "Trample"
+   ],
+   "producedMana": []
+  },
+  "overgrown zealot": {
+   "name": "Overgrown Zealot",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add one mana of any color.\n{T}: Add two mana of any one color. Spend this mana only to turn permanents face up.",
+   "power": 0,
+   "toughness": 4,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "phantasmal image": {
+   "name": "Phantasmal Image",
+   "imageUri": "",
+   "typeLine": "Creature — Illusion",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "You may have this creature enter as a copy of any creature on the battlefield, except it's an Illusion in addition to its other types and it has \"When this creature becomes the target of a spell or ability, sacrifice it.\"",
+   "power": 0,
+   "toughness": 0,
+   "keywords": [],
+   "producedMana": []
+  },
+  "phyrexian metamorph": {
+   "name": "Phyrexian Metamorph",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Phyrexian Shapeshifter",
+   "manaCost": "{3}{U/P}",
+   "manaValue": 4,
+   "oracleText": "({U/P} can be paid with either {U} or 2 life.)\nYou may have this creature enter as a copy of any artifact or creature on the battlefield, except it's an artifact in addition to its other types.",
+   "power": 0,
+   "toughness": 0,
+   "keywords": [],
+   "producedMana": []
+  },
+  "pili-pala": {
+   "name": "Pili-Pala",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Scarecrow",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "Flying\n{2}, {Q}: Add one mana of any color. ({Q} is the untap symbol.)",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "priest of titania": {
+   "name": "Priest of Titania",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add {G} for each Elf on the battlefield.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "progenitor mimic": {
+   "name": "Progenitor Mimic",
+   "imageUri": "",
+   "typeLine": "Creature — Shapeshifter",
+   "manaCost": "{4}{G}{U}",
+   "manaValue": 6,
+   "oracleText": "You may have this creature enter as a copy of any creature on the battlefield, except it has \"At the beginning of your upkeep, if this creature isn't a token, create a token that's a copy of this creature.\"",
+   "power": 0,
+   "toughness": 0,
+   "keywords": [],
+   "producedMana": []
+  },
+  "riptide shapeshifter": {
+   "name": "Riptide Shapeshifter",
+   "imageUri": "",
+   "typeLine": "Creature — Shapeshifter",
+   "manaCost": "{3}{U}{U}",
+   "manaValue": 5,
+   "oracleText": "{2}{U}{U}, Sacrifice this creature: Choose a creature type. Reveal cards from the top of your library until you reveal a creature card of that type. Put that card onto the battlefield and shuffle the rest into your library.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": []
+  },
+  "rok-tahk, budding scientist": {
+   "name": "Rok-Tahk, Budding Scientist",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Brikar Scientist",
+   "manaCost": "{4}{G}{G}",
+   "manaValue": 6,
+   "oracleText": "Creatures you control have \"{T}: Add {G}{G}.\"\nWhen Rok-Tahk enters, create Murf, a legendary 0/1 green Ooze Slug creature token with indestructible.",
+   "power": 5,
+   "toughness": 5,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "sanctum weaver": {
+   "name": "Sanctum Weaver",
+   "imageUri": "",
+   "typeLine": "Enchantment Creature — Dryad",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add X mana of any one color, where X is the number of enchantments you control.",
+   "power": 0,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "saruli caretaker": {
+   "name": "Saruli Caretaker",
+   "imageUri": "",
+   "typeLine": "Creature — Dryad",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "Defender\n{T}, Tap an untapped creature you control: Add one mana of any color.",
+   "power": 0,
+   "toughness": 3,
+   "keywords": [
+    "Defender"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "seedborn muse": {
+   "name": "Seedborn Muse",
+   "imageUri": "",
+   "typeLine": "Creature — Spirit",
+   "manaCost": "{3}{G}{G}",
+   "manaValue": 5,
+   "oracleText": "Untap all permanents you control during each other player's untap step.",
+   "power": 2,
+   "toughness": 4,
+   "keywords": [],
+   "producedMana": []
+  },
+  "shang-chi, master of kung fu": {
+   "name": "Shang-Chi, Master of Kung Fu",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Warrior Hero",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "You may activate abilities of creatures you control as though those creatures had haste.\n{T}: Add two mana of any one color. Spend this mana only to activate abilities of creature sources.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "spellskite": {
+   "name": "Spellskite",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Phyrexian Horror",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "{U/P}: Change a target of target spell or ability to this creature. ({U/P} can be paid with either {U} or 2 life.)",
+   "power": 0,
+   "toughness": 4,
+   "keywords": [],
+   "producedMana": []
+  },
+  "trailtracker scout": {
+   "name": "Trailtracker Scout",
+   "imageUri": "",
+   "typeLine": "Creature — Raccoon Scout",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add one mana of any color.\nWhenever you expend 8, return up to one target permanent card from your graveyard to your hand. (You expend 8 as you spend your eighth total mana to cast spells during a turn.)",
+   "power": 1,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "ulvenwald oddity // ulvenwald behemoth": {
+   "name": "Ulvenwald Oddity // Ulvenwald Behemoth",
+   "imageUri": "",
+   "typeLine": "Creature — Beast // Creature — Beast Horror",
+   "manaCost": "{2}{G}{G}",
+   "manaValue": 4,
+   "oracleText": "Trample, haste\n{5}{G}{G}: Transform this creature.\n//\nTrample, haste\nOther creatures you control get +1/+1 and have trample and haste.",
+   "power": 4,
+   "toughness": 4,
+   "keywords": [
+    "Transform",
+    "Haste",
+    "Trample"
+   ],
+   "producedMana": [],
+   "back": {
+    "power": 8,
+    "toughness": 8
+   }
+  },
+  "wandering archaic // explore the vastlands": {
+   "name": "Wandering Archaic // Explore the Vastlands",
+   "imageUri": "",
+   "typeLine": "Creature — Avatar // Sorcery",
+   "manaCost": "{5}",
+   "manaValue": 5,
+   "oracleText": "Whenever an opponent casts an instant or sorcery spell, they may pay {2}. If they don't, you may copy that spell. You may choose new targets for the copy.\n//\nEach player looks at the top five cards of their library and may reveal a land card and/or an instant or sorcery card from among them. Each player puts the cards they revealed this way into their hand and the rest on the bottom of their library in a random order. Each player gains 3 life.",
+   "power": 4,
+   "toughness": 4,
+   "keywords": [],
+   "producedMana": []
+  },
+  "woodland bellower": {
+   "name": "Woodland Bellower",
+   "imageUri": "",
+   "typeLine": "Creature — Beast",
+   "manaCost": "{4}{G}{G}",
+   "manaValue": 6,
+   "oracleText": "When this creature enters, you may search your library for a nonlegendary green creature card with mana value 3 or less, put it onto the battlefield, then shuffle.",
+   "power": 6,
+   "toughness": 5,
+   "keywords": [],
+   "producedMana": []
+  },
+  "arcane signet": {
+   "name": "Arcane Signet",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "chrome mox": {
+   "name": "Chrome Mox",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Imprint — When this artifact enters, you may exile a nonartifact, nonland card from your hand.\n{T}: Add one mana of any of the exiled card's colors.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Imprint"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "lotus petal": {
+   "name": "Lotus Petal",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "{T}, Sacrifice this artifact: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mox amber": {
+   "name": "Mox Amber",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "{T}: Add one mana of any color among legendary creatures and planeswalkers you control.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mox diamond": {
+   "name": "Mox Diamond",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "If this artifact would enter, you may discard a land card instead. If you do, put this artifact onto the battlefield. If you don't, put it into its owner's graveyard.\n{T}: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "paradise mantle": {
+   "name": "Paradise Mantle",
+   "imageUri": "",
+   "typeLine": "Artifact — Equipment",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Equipped creature has \"{T}: Add one mana of any color.\"\nEquip {1}",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Equip"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "sol ring": {
+   "name": "Sol Ring",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "{T}: Add {C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "springleaf drum": {
+   "name": "Springleaf Drum",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "{T}, Tap an untapped creature you control: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "trinisphere": {
+   "name": "Trinisphere",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{3}",
+   "manaValue": 3,
+   "oracleText": "As long as this artifact is untapped, each spell that would cost less than three mana to cast costs three mana to cast. (Additional mana in the cost may be paid with any color of mana or colorless mana. For example, a spell that would cost {1}{B} to cast costs {2}{B} to cast instead.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "an offer you can't refuse": {
+   "name": "An Offer You Can't Refuse",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Counter target noncreature spell. Its controller creates two Treasure tokens. (They're artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "fierce guardianship": {
+   "name": "Fierce Guardianship",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{2}{U}",
+   "manaValue": 3,
+   "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nCounter target noncreature spell.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "flusterstorm": {
+   "name": "Flusterstorm",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Counter target instant or sorcery spell unless its controller pays {1}.\nStorm (When you cast this spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Storm"
+   ],
+   "producedMana": []
+  },
+  "legolas's quick reflexes": {
+   "name": "Legolas's Quick Reflexes",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nUntap target creature. Until end of turn, it gains reach, hexproof, and \"Whenever this creature becomes tapped, it deals damage equal to its power to up to one target creature.\"",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Split second"
+   ],
+   "producedMana": []
+  },
+  "mental misstep": {
+   "name": "Mental Misstep",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U/P}",
+   "manaValue": 1,
+   "oracleText": "({U/P} can be paid with either {U} or 2 life.)\nCounter target spell with mana value 1.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "mindbreak trap": {
+   "name": "Mindbreak Trap",
+   "imageUri": "",
+   "typeLine": "Instant — Trap",
+   "manaCost": "{2}{U}{U}",
+   "manaValue": 4,
+   "oracleText": "If an opponent cast three or more spells this turn, you may pay {0} rather than pay this spell's mana cost.\nExile any number of target spells.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "pact of negation": {
+   "name": "Pact of Negation",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Counter target spell.\nAt the beginning of your next upkeep, pay {3}{U}{U}. If you don't, you lose the game.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "summoner's pact": {
+   "name": "Summoner's Pact",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Search your library for a green creature card, reveal it, put it into your hand, then shuffle.\nAt the beginning of your next upkeep, pay {2}{G}{G}. If you don't, you lose the game.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "swan song": {
+   "name": "Swan Song",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Counter target enchantment, instant, or sorcery spell. Its controller creates a 2/2 blue Bird creature token with flying.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "green sun's zenith": {
+   "name": "Green Sun's Zenith",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{X}{G}",
+   "manaValue": 1,
+   "oracleText": "Search your library for a green creature card with mana value X or less, put it onto the battlefield, then shuffle. Shuffle Green Sun's Zenith into its owner's library.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "cryptolith rite": {
+   "name": "Cryptolith Rite",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "Creatures you control have \"{T}: Add one mana of any color.\"",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "training grounds": {
+   "name": "Training Grounds",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Activated abilities of creatures you control cost {2} less to activate. This effect can't reduce the mana in that cost to less than one mana.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "barkchannel pathway // tidechannel pathway": {
+   "name": "Barkchannel Pathway // Tidechannel Pathway",
+   "imageUri": "",
+   "typeLine": "Land // Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {G}.\n//\n{T}: Add {U}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G",
+    "U"
+   ]
+  },
+  "boseiju, who endures": {
+   "name": "Boseiju, Who Endures",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {G}.\nChannel — {1}{G}, Discard this card: Destroy target artifact, enchantment, or nonbasic land an opponent controls. That player may search their library for a land card with a basic land type, put it onto the battlefield, then shuffle. This ability costs {1} less to activate for each legendary creature you control.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Channel"
+   ],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "botanical sanctum": {
+   "name": "Botanical Sanctum",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "This land enters tapped unless you control two or fewer other lands.\n{T}: Add {G} or {U}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G",
+    "U"
+   ]
+  },
+  "breeding pool": {
+   "name": "Breeding Pool",
+   "imageUri": "",
+   "typeLine": "Land — Forest Island",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {G} or {U}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G",
+    "U"
+   ]
+  },
+  "city of brass": {
+   "name": "City of Brass",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "Whenever this land becomes tapped, it deals 1 damage to you.\n{T}: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "command tower": {
+   "name": "Command Tower",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "flooded strand": {
+   "name": "Flooded Strand",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Plains or Island card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "forbidden orchard": {
+   "name": "Forbidden Orchard",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add one mana of any color.\nWhenever you tap this land for mana, target opponent creates a 1/1 colorless Spirit creature token.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "forest": {
+   "name": "Forest",
+   "imageUri": "",
+   "typeLine": "Basic Land — Forest",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {G}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "gaea's cradle": {
+   "name": "Gaea's Cradle",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {G} for each creature you control.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "gemstone caverns": {
+   "name": "Gemstone Caverns",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "If this card is in your opening hand and you're not the starting player, you may begin the game with Gemstone Caverns on the battlefield with a luck counter on it. If you do, exile a card from your hand.\n{T}: Add {C}. If Gemstone Caverns has a luck counter on it, instead add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "island": {
+   "name": "Island",
+   "imageUri": "",
+   "typeLine": "Basic Land — Island",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {U}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "U"
+   ]
+  },
+  "mana confluence": {
+   "name": "Mana Confluence",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "misty rainforest": {
+   "name": "Misty Rainforest",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Forest or Island card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "multiversal passage": {
+   "name": "Multiversal Passage",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "As this land enters, choose a basic land type. Then you may pay 2 life. If you don't, it enters tapped.\nThis land is the chosen type.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "otawara, soaring city": {
+   "name": "Otawara, Soaring City",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {U}.\nChannel — {3}{U}, Discard this card: Return target artifact, creature, enchantment, or planeswalker to its owner's hand. This ability costs {1} less to activate for each legendary creature you control.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Channel"
+   ],
+   "producedMana": [
+    "U"
+   ]
+  },
+  "polluted delta": {
+   "name": "Polluted Delta",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for an Island or Swamp card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "rejuvenating springs": {
+   "name": "Rejuvenating Springs",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "This land enters tapped unless you have two or more opponents.\n{T}: Add {G} or {U}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G",
+    "U"
+   ]
+  },
+  "scalding tarn": {
+   "name": "Scalding Tarn",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for an Island or Mountain card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "tropical island": {
+   "name": "Tropical Island",
+   "imageUri": "",
+   "typeLine": "Land — Forest Island",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {G} or {U}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G",
+    "U"
+   ]
+  },
+  "verdant catacombs": {
+   "name": "Verdant Catacombs",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Swamp or Forest card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "waterlogged grove": {
+   "name": "Waterlogged Grove",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life: Add {G} or {U}.\n{1}, {T}, Sacrifice this land: Draw a card.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G",
+    "U"
+   ]
+  },
+  "windswept heath": {
+   "name": "Windswept Heath",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Forest or Plains card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "wooded foothills": {
+   "name": "Wooded Foothills",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Mountain or Forest card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "yavimaya coast": {
+   "name": "Yavimaya Coast",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{T}: Add {G} or {U}. This land deals 1 damage to you.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C",
+    "G",
+    "U"
+   ]
+  },
+  "kinnan, bonder prodigy": {
+   "name": "Kinnan, Bonder Prodigy",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Druid",
+   "manaCost": "{G}{U}",
+   "manaValue": 2,
+   "oracleText": "Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.\n{5}{G}{U}: Look at the top five cards of your library. You may put a non-Human creature card from among them onto the battlefield. Put the rest on the bottom of your library in a random order.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  }
+ },
+ "combos": [
+  {
+   "id": "129-1247-6006",
+   "pieces": [
+    {
+     "name": "Kinnan, Bonder Prodigy",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Enduring Vitality",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala by tapping it, adding one mana of any color.\nKinnan triggers, adding one mana of the color that was produced.\nActivate Pili-Pala's other ability by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "1247-6006-7008",
+   "pieces": [
+    {
+     "name": "Badgermole Cub",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Enduring Vitality",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala by tapping it, adding {1}.\nBadgermole Cub triggers, adding {G}.\nActivate Pili-Pala by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "129-1247-4289",
+   "pieces": [
+    {
+     "name": "Kinnan, Bonder Prodigy",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Cryptolith Rite",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala by tapping it, adding one mana of any color.\nKinnan triggers, adding one mana of the color that was produced.\nActivate Pili-Pala's other ability by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "1247-4289-7008",
+   "pieces": [
+    {
+     "name": "Badgermole Cub",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Cryptolith Rite",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala by tapping it, adding {1}.\nBadgermole Cub triggers, adding {G}.\nActivate Pili-Pala by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "1247-5168-5963",
+   "pieces": [
+    {
+     "name": "Marvin, Murderous Mimic",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Bloom Tender",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Marvin using Bloom Tender's ability by tapping it, adding at least {1}{G}.\nActivate Marvin using Pili-Pala's ability by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "There are at least two colors among permanents you control."
+  },
+  {
+   "id": "1247-3990-5963",
+   "pieces": [
+    {
+     "name": "Marvin, Murderous Mimic",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Incubation Druid",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana",
+    "Infinite mana lands you control can produce"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Marvin using Incubation Druid's ability by tapping it, adding three mana of any type a land you control can produce.\nActivate Marvin using Pili-Pala's ability by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "Marvin does not have summoning sickness and has a +1/+1 counter on it.\nYou control a mana-producing land."
+  },
+  {
+   "id": "1247-1912-4289",
+   "pieces": [
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Cryptolith Rite",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Biomancer's Familiar",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala by tapping it, adding {1}.\nActivate Pili-Pala by paying {1} due to Biomancer's Familiar and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "Pili-Pala does not have summoning sickness."
+  },
+  {
+   "id": "1247-3430-4289",
+   "pieces": [
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Nyxbloom Ancient",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Cryptolith Rite",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala using Paradise Mantle's ability by tapping it, adding three mana of any color.\nActivate Pili-Pala's other ability by paying {2} and untapping it, adding three mana of any one color.\nRepeat.",
+   "prerequisites": "Pili-Pala does not have summoning sickness."
+  },
+  {
+   "id": "129-1247-4474",
+   "pieces": [
+    {
+     "name": "Kinnan, Bonder Prodigy",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Paradise Mantle",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala by tapping it, adding one mana of any color.\nKinnan triggers, adding one mana of the color that was produced.\nActivate Pili-Pala's other ability by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "1247-4289-4893",
+   "pieces": [
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Cryptolith Rite",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Training Grounds",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala by tapping it, adding {1}.\nActivate Pili-Pala by paying {1} due to Training Grounds and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "Pili-Pala does not have summoning sickness."
+  },
+  {
+   "id": "1247-1376-5963",
+   "pieces": [
+    {
+     "name": "Marvin, Murderous Mimic",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Priest of Titania",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Marvin using Priest of Titania's ability by tapping it, adding at least {G}{G}.\nActivate Marvin using Pili-Pala's ability by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "There are at least two Elves on the battlefield.\nMarvin does not have summoning sickness."
+  },
+  {
+   "id": "1247-1526-5963",
+   "pieces": [
+    {
+     "name": "Marvin, Murderous Mimic",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Circle of Dreams Druid",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Marvin using Circle of Dreams Druid's ability by tapping it, adding at least {G}{G}{G}.\nActivate Marvin using Pili-Pala's ability by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "Marvin does not have summoning sickness."
+  },
+  {
+   "id": "1247-5711-5963",
+   "pieces": [
+    {
+     "name": "Marvin, Murderous Mimic",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Fanatic of Rhonas",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Marvin using Fanatic of Rhonas's ability by tapping it, adding {G}{G}{G}{G}.\nActivate Marvin using Pili-Pala's ability by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "You control a creature with power 4 or greater.\nMarvin does not have summoning sickness."
+  },
+  {
+   "id": "1247-4474-4893",
+   "pieces": [
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Paradise Mantle",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Training Grounds",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala by tapping it, adding {1}.\nActivate Pili-Pala by paying {1} due to Training Grounds and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "Paradise Mantle attached to Pili-Pala.\nPili-Pala does not have summoning sickness."
+  },
+  {
+   "id": "1247-4474-7008",
+   "pieces": [
+    {
+     "name": "Badgermole Cub",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Paradise Mantle",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala by tapping it, adding {1}.\nBadgermole Cub triggers, adding {G}.\nActivate Pili-Pala by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "1247-1355-5963",
+   "pieces": [
+    {
+     "name": "Marvin, Murderous Mimic",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Sanctum Weaver",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Marvin using Sanctum Weaver's ability by tapping it, adding at least two mana of any color.\nActivate Marvin using Pili-Pala's ability by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "You control at least two enchantments.\nMarvin does not have summoning sickness."
+  },
+  {
+   "id": "1247-1912-4474",
+   "pieces": [
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Paradise Mantle",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Biomancer's Familiar",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala by tapping it, adding {1}.\nActivate Pili-Pala by paying {1} due to Biomancer's Familiar and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "Paradise Mantle attached to Pili-Pala.\nPili-Pala does not have summoning sickness."
+  },
+  {
+   "id": "1247-3430-4474",
+   "pieces": [
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Nyxbloom Ancient",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Paradise Mantle",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Pili-Pala using Paradise Mantle's ability by tapping it, adding three mana of any color.\nActivate Pili-Pala's other ability by paying {2} and untapping it, adding three mana of any one color.\nRepeat.",
+   "prerequisites": "Paradise Mantle attached to Pili-Pala.\nPili-Pala does not have summoning sickness."
+  },
+  {
+   "id": "1247-2691-5963",
+   "pieces": [
+    {
+     "name": "Marvin, Murderous Mimic",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Pili-Pala",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Ilysian Caryatid",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite colored mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Marvin using Ilysian Caryatid's ability by tapping it, adding two mana of any color.\nActivate Marvin using Pili-Pala's ability by paying {2} and untapping it, adding one mana of any color.\nRepeat.",
+   "prerequisites": "You control a creature with power 4 or greater.\nMarvin does not have summoning sickness."
+  },
+  {
+   "id": "800-1912-4474",
+   "pieces": [
+    {
+     "name": "Knacksaw Clique",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Paradise Mantle",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Biomancer's Familiar",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Exile each opponent's library"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Knacksaw Clique by tapping it, adding {U}.\nActivate Knacksaw Clique by paying {U} and untap it, exiling the top card of target opponent's library.\nRepeat.",
+   "prerequisites": "Paradise Mantle attached to Knacksaw Clique.\nKnacksaw Clique does not have summoning sickness."
+  },
+  {
+   "id": "800-4474-4893",
+   "pieces": [
+    {
+     "name": "Knacksaw Clique",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Paradise Mantle",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Training Grounds",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Exile each opponent's library"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Knacksaw Clique by tapping it, adding {U}.\nActivate Knacksaw Clique by paying {U} and untap it, exiling the top card of target opponent's library.\nRepeat.",
+   "prerequisites": "Paradise Mantle attached to Knacksaw Clique.\nKnacksaw Clique does not have summoning sickness."
+  },
+  {
+   "id": "129-1409-6006-7730",
+   "pieces": [
+    {
+     "name": "Deadeye Navigator",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Kinnan, Bonder Prodigy",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Enduring Vitality",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Shang-Chi, Master of Kung Fu",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite creature ETB",
+    "Infinite creature LTB"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Deadeye Navigator by tapping it, adding {U}.\nKinnan triggers, adding {U}.\nActivate Deadeye Navigator by paying {1}{U}, blinking it.\nWhen Deadeye Navigator enters the battlefield, its soulbond ability triggers, repairing it with another creature.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "129-1409-4289-7730",
+   "pieces": [
+    {
+     "name": "Deadeye Navigator",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Kinnan, Bonder Prodigy",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Cryptolith Rite",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Shang-Chi, Master of Kung Fu",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite creature ETB",
+    "Infinite creature LTB"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Deadeye Navigator by tapping it, adding {U}.\nKinnan triggers, adding {U}.\nActivate Deadeye Navigator by paying {1}{U}, blinking it.\nWhen Deadeye Navigator enters the battlefield, its soulbond ability triggers, repairing it with another creature.\nRepeat.",
+   "prerequisites": ""
+  }
+ ]
+}

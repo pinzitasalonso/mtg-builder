@@ -53,7 +53,7 @@ import {
   wheelSpellOf,
   type Wheel,
   type Edict,
-  type SearchAbility, handManaOf, sacManaOf, equipManaOf, searchAbility, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf } from "./cards";
+  type SearchAbility, handManaOf, sacManaOf, equipManaOf, manaSinkOf, searchAbility, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf } from "./cards";
 import {
   affinityHits,
   affinityOf,
@@ -86,7 +86,7 @@ import {
 import { triggersOf, type Outcome } from "./triggers";
 import { scaleDamage } from "./damage";
 import { drawSpellOf, tutorOf } from "./spells";
-import { adNauseamOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
+import { adNauseamOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, impulseOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import {
   extraTreasureOf,
   oneOfEachOf,
@@ -963,7 +963,7 @@ export function playerCleanup(g0: PracticeGame, book: CardBook): PracticeGame {
 
 /** End the turn: damage and "until end of turn" wear off, and the other
     player's turn starts. */
-export function endTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
+export function endTurn(g0: PracticeGame, book: CardBook = {}, combos: DeckCombo[] = []): PracticeGame {
   if (g0.winner) return g0;
   const g = structuredClone(g0);
   g.combat = null;
@@ -978,12 +978,19 @@ export function endTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   }
   endStep(g, book);
   if (g.winner) return g;
+  // Cards that were only its to play this turn (Jeska's Will) are gone.
+  for (const seat of ["you", "opp"] as Seat[]) {
+    const gone = g.sides[seat].hand.filter((c) => c.fleeting);
+    if (!gone.length) continue;
+    for (const c of gone) moveTo(g, c.iid, "exile", { exact: true });
+    say(g, seat, `${gone.map((c) => c.name).join(", ")} ${gone.length === 1 ? "stays" : "stay"} in exile: not played this turn.`);
+  }
   // The AI discards down to seven (you're asked: playerCleanup).
   if (g.active === "opp") {
     const max = maxHandSize(g, "opp", book);
     const gone: string[] = [];
     while (g.sides.opp.hand.length > max) {
-      const pick = aiDiscardPick(g, "opp", book);
+      const pick = aiDiscardPick(g, "opp", book, combos);
       if (!pick) break;
       moveTo(g, pick.iid, "graveyard");
       gone.push(pick.name);
@@ -1031,9 +1038,8 @@ function endStep(g: PracticeGame, book: CardBook) {
       say(g, s, `The copy of ${c.name} is exiled.`);
     }
   }
-  // Necropotence, Necrodominance: cards for life. The opponent fills its
-  // hand up to its hand size (four at least), keeping 12 life (more when
-  // the player's creatures hit harder). Yours are yours to take by hand.
+  // Necropotence, Necrodominance: cards for life. Yours are yours to take
+  // by hand.
   for (const c of [...g.sides[seat].battlefield]) {
     const kind = lifeForCardsOf(book, c);
     if (!kind || g.winner) continue;
@@ -1042,10 +1048,13 @@ function endStep(g: PracticeGame, book: CardBook) {
       continue;
     }
     const side = g.sides[seat];
-    // Up to its hand size, and at least four to dig for what it lacks:
-    // what's over the hand size goes at cleanup (the worst cards).
-    const room = Math.max(4, Math.min(7, maxHandSize(g, seat, book)) - side.hand.length);
-    const n = Math.max(0, Math.min(room, side.life - Math.max(12, lifeFloor(g, seat, book)), side.library.length));
+    // It digs deep, as the card is played: every life above 15 (or what
+    // the player's creatures threaten, and four) becomes a card, twenty at
+    // most, and the best of them are kept at cleanup. Below that, two a
+    // turn while it has 8 life left: it has no draw step.
+    const safe = Math.max(15, lifeFloor(g, seat, book) + 4);
+    const spare = side.life > safe ? Math.min(20, side.life - safe) : side.life > Math.max(8, lifeFloor(g, seat, book)) ? 2 : 0;
+    const n = Math.max(0, Math.min(spare, side.library.length));
     if (!n) continue;
     loseLife(g, seat, n, book);
     if (kind === "draw") drawCards(g, seat, n, book);
@@ -1415,6 +1424,19 @@ export function comboStatus(g: PracticeGame, seat: Seat, combo: DeckCombo, book:
     ends the game, a mill empties the player's library, endless mana fills
     the pool for the rest of the phase, and anything else is said in the
     log. With no stage, both at once. */
+/** A permanent of the seat's (or its commander, which endless mana casts)
+    with an ability that turns endless mana into a win, payable from the
+    mana floating now. */
+export function comboSink(g: PracticeGame, seat: Seat, book: CardBook): PlayCard | null {
+  const pool = poolSources(g.pool?.[seat]);
+  for (const c of [...g.sides[seat].battlefield, ...g.sides[seat].command]) {
+    if (c.token) continue;
+    const cost = manaSinkOf(infoOf(book, c), !!c.flipped);
+    if (cost && payCost(parseCost(cost), pool)) return c;
+  }
+  return null;
+}
+
 export function applyCombo(g0: PracticeGame, seat: Seat, combo: DeckCombo, book: CardBook, opts: { stage?: "pay" | "resolve" } = {}): Step {
   if (g0.winner) return { game: g0, ok: false };
   const g = structuredClone(g0);
@@ -1474,6 +1496,13 @@ export function applyCombo(g0: PracticeGame, seat: Seat, combo: DeckCombo, book:
     if (!g.pool) g.pool = { you: [], opp: [] };
     g.pool[seat] = [...g.pool[seat], ...Array<string>(40).fill(colourless ? "C" : "WUBRG")];
     say(g, seat, `${names}: ${headline.toLowerCase()}. ${who(seat)} ${seat === "you" ? "have" : "has"} all the ${colourless ? "colourless " : ""}mana ${seat === "you" ? "you" : "it"} can use this phase.`);
+    // With a way to spend it over and over (Kinnan's ability, Thrasios's),
+    // endless mana is the game: the whole library, one activation at a time.
+    const sink = comboSink(g, seat, book);
+    if (sink && seat === "opp") {
+      say(g, seat, `With endless mana, ${faceName(sink)}'s ability takes the opponent through its whole library. The opponent wins.`);
+      g.winner = seat;
+    }
   } else {
     say(g, seat, `${names}: ${combo.produces.slice(0, 3).join(", ").toLowerCase() || "a loop"}. (The table doesn't carry this one out: resolve it by hand.)`);
   }
@@ -1962,7 +1991,7 @@ function castTaxes(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBook)
 
 /** The card the AI would rather lose from its hand: a land it has plenty
     of, else its most expensive card. */
-function aiDiscardPick(g: PracticeGame, seat: Seat, book: CardBook): PlayCard | null {
+function aiDiscardPick(g: PracticeGame, seat: Seat, book: CardBook, combos: DeckCombo[] = []): PlayCard | null {
   const side = g.sides[seat];
   if (!side.hand.length) return null;
   const landsOut = side.battlefield.filter(isLand).length;
@@ -1971,9 +2000,12 @@ function aiDiscardPick(g: PracticeGame, seat: Seat, book: CardBook): PlayCard | 
   // What it would least like to lose goes last: a way to win, a tutor, Ad
   // Nauseam, a card that only works on the right turn, a ritual. Of the
   // rest, the dearest to cast goes first.
+  // A piece of one of its combos that wins.
+  const pieces = new Set(combos.filter((k) => comboOutcome(k.produces) !== "other").flatMap((k) => k.pieces.map((p) => p.name.toLowerCase())));
   const keep = (c: PlayCard) => {
     const info = infoOf(book, c);
     if (oracleWinOf(book, c) || libraryExilerOf(info)) return 5;
+    if (pieces.has(c.name.toLowerCase()) || pieces.has(c.name.split(" // ")[0]!.toLowerCase())) return 4;
     if (tutorOf(info) || adNauseamOf(info) || triggersOf(book, c).endSacrifice) return 4;
     if (ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 }) || handManaOf(info)) return 2;
     // A mana rock: the mana it'll need.
@@ -2761,6 +2793,14 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
       if (made?.length) applyEffects(g, seat, [{ type: "mana", target: null, player: null, amount: null, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: made.map((u) => `{${u}}`).join("") }], book, i ? `${card.name} (copy)` : card.name, card);
       applyEffects(g, seat, effects, book, i ? `${card.name} (copy)` : card.name, card);
       checkState(g, book);
+    }
+    // Jeska's Will with a commander out: its other mode too. The top
+    // three cards are its to play this turn (in hand until the turn ends).
+    const impulse = g.sides[seat].battlefield.some((c) => c.commander) ? impulseOf(infoOf(book, card)) : 0;
+    if (impulse && seat === "opp") {
+      const top = g.sides[seat].library.slice(0, impulse).map((c) => ({ ...c, fleeting: true }));
+      g.sides[seat] = { ...g.sides[seat], library: g.sides[seat].library.slice(top.length), hand: [...g.sides[seat].hand, ...top] };
+      say(g, seat, `${card.name}: the opponent exiles the top ${top.length} cards of its library, and may play them this turn.`);
     }
     // Brainstorm: after the draw, the cards it would least like to keep go
     // back on top (the last one picked ends up on top).

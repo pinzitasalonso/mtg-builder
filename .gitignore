@@ -58,3 +58,6 @@ dev.db-*
 # scripts/dial-sim.mjs: the simulated dial's token and pictures
 .dial-sim.json
 /dial-art/
+
+# The practice benchmark's game logs (npm run practice:bench).
+calibration/practice/.out/

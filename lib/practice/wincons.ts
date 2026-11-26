@@ -74,6 +74,17 @@ export const extraTurnLosesOf = (info: CardInfo | undefined) => extraTurnOf(info
 export const adNauseamOf = (info: CardInfo | undefined) =>
   /^reveal the top card of your library and put that card into your hand\. you lose life equal to its mana value\. you may repeat this process any number of times\.?$/i.test(ownText(info?.oracleText ?? "").trim());
 
+/** Jeska's Will's other mode: "Exile the top three cards of your library.
+    You may play them this turn." With a commander out its caster gets
+    both modes. How many cards, or 0. */
+export function impulseOf(info: CardInfo | undefined): number {
+  const lines = sentences(info?.oracleText ?? "");
+  if (!lines.some((s) => /^if you control a commander as you cast this spell, you may choose both instead$/i.test(s))) return 0;
+  const i = lines.findIndex((s) => /^• exile the top (two|three|four) cards of your library$/i.test(s));
+  if (i < 0 || !/^you may play them this turn$/i.test(lines[i + 1] ?? "")) return 0;
+  return { two: 2, three: 3, four: 4 }[/top (\w+) cards/i.exec(lines[i]!)![1]!.toLowerCase()] ?? 0;
+}
+
 /** A spell that asks for a sacrifice as it's cast: "As an additional cost
     to cast this spell, sacrifice a creature" (Culling the Weak, Diabolic
     Intent, Infernal Plunge). What it wants, in the card's words. */
