@@ -4,12 +4,12 @@
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
 import { BASIC_COLOR, burdenDrawOf, canPlayAsLand, counterOf, digAbilityOf, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, ninjutsuOf, ownTurnOf, permanentFetchOf, removalOf, sacManaOf, searchOnCast, stats, transmuteOf, wheelSpellOf, type Search } from "./cards";
-import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, colourNeeds, comboStatus, indestructible, lifeFor, spellCost, uncastable } from "./game";
+import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, colourNeeds, comboStatus, indestructible, lifeFor, loopPayoff, spellCost, uncastable } from "./game";
 import { comboOutcome, type DeckCombo } from "./combos";
-import { equipOf, punishesIdleOf } from "./abilities";
+import { equipOf, powerManaOf, punishesIdleOf } from "./abilities";
 import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
 import { treasureSpellOf } from "./treasure";
-import { drawSpellOf, tutorOf, tutorSearch, wipeOf, type Tutor } from "./spells";
+import { drawSpellOf, lootOf, pumpSpellOf, tutorOf, tutorSearch, wipeOf, type Tutor } from "./spells";
 import { adNauseamOf, burnOf, devotion, impulseOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, landsForManaOf, libraryExilerOf, oracleWinOf, ritualMana, ritualOf, sacrificeCostOf } from "./wincons";
 import { triggersOf } from "./triggers";
 import { lifeForCardsOf, searchAbility, type SearchAbility } from "./cards";
@@ -189,7 +189,8 @@ function landColors(book: CardBook, land: PlayCard): string[] {
 function drawOnly(book: CardBook, c: PlayCard, life = Infinity): number {
   const d = drawSpellOf(infoOf(book, c));
   // The life it keeps is only a matter for a spell that costs life.
-  return d && (!d.lose || life - d.lose >= 10) ? d.draw : 0;
+  // Cards exiled to play (Reckless Impulse) count as cards.
+  return d && (!d.lose || life - d.lose >= 10) ? d.draw + (d.impulse ?? 0) : 0;
 }
 
 const blank = (type: Effect["type"]): Effect => ({ ...drawEffect(0), type, player: null, amount: null });
@@ -414,7 +415,10 @@ function heldForCombo(book: CardBook, c: PlayCard, combos: DeckCombo[]): boolean
     ones that ask), a creature fed to Phyrexian Tower. Nothing is cast
     unless the whole line gets there. */
 function goOff(g: PracticeGame, book: CardBook, seat: Seat, combos: DeckCombo[], land: PlanAction | null): { actions: PlanAction[]; attack: string[]; wins: boolean } | null {
-  const lines = combos.filter((c) => comboOutcome(c.produces) !== "other");
+  // What the table carries out: a win, a mill, endless mana, and a loop
+  // that something on the table or in the deck turns into the game (Vivi's
+  // hit for each spell, Grapeshot's copies).
+  const lines = combos.filter((c) => comboOutcome(c.produces) !== "other" || !!loopPayoff(g, seat, c, book));
   if (!lines.length || g.choice) return null;
   // The table once the land is down (a fetch land has fetched).
   let start = g;
@@ -430,15 +434,20 @@ function goOff(g: PracticeGame, book: CardBook, seat: Seat, combos: DeckCombo[],
   for (const c of [...lines].sort((a, b) => far(a) - far(b))) {
     // Milling a library that's already empty does nothing more.
     if (comboOutcome(c.produces) === "mill" && !start.sides[other(seat)].library.length) continue;
+    const outcome = comboOutcome(c.produces);
+    // Endless mana it already has this phase.
+    if (outcome === "mana" && (start.pool?.[seat].length ?? 0) >= 30) continue;
     const line = comboLine(start, book, seat, c, combos);
     if (!line) continue;
-    const outcome = comboOutcome(c.produces);
     // A win, or the player's library gone: the turn is this and nothing
     // else. Endless mana with a way to spend it for ever is a win too.
     if (outcome !== "mana" || line.after.winner === seat) return { actions: line.actions, attack: [], wins: true };
     // Endless mana: the rest of the turn is planned with it in the pool.
     const out: { wins?: boolean } = {};
     const rest = fallbackPlan(line.after, book, seat, out, combos.filter((x) => x.id !== c.id));
+    // With nothing to spend it on, the combo isn't announced: the player
+    // would be stopped for an answer to a loop that does nothing.
+    if (!out.wins && !rest.main.some((a) => a.kind !== "land") && line.actions.length === 1) continue;
     return { actions: [...line.actions, ...rest.main], attack: rest.attack, wins: !!out.wins };
   }
   return null;
@@ -468,7 +477,11 @@ function comboLine(g0: PracticeGame, book: CardBook, seat: Seat, combo: DeckComb
       const where = search?.to[0]!.zone;
       // To the hand, or straight onto the battlefield when that's where the combo wants it.
       const onto = where === "battlefield" && !!combo.pieces.find((p) => p.name.toLowerCase() === name.toLowerCase())?.zones.includes("B");
-      if (!tu || !search || tu.discardRandom || (where !== "hand" && !onto) || !search.test(want.typeLine, infoOf(book, want))) continue;
+      // Gamble's random discard may take the piece: fine for one the
+      // combo takes from the graveyard as well (Brain Freeze under
+      // Underworld Breach), never for another.
+      const fromGrave = !!combo.pieces.find((p) => p.name.toLowerCase() === name.toLowerCase())?.zones.includes("G");
+      if (!tu || !search || (tu.discardRandom && !fromGrave) || (where !== "hand" && !onto) || !search.test(want.typeLine, infoOf(book, want))) continue;
       if (tu.lose > 0 && t.sides[seat].life - tu.lose < 1) continue;
       const effects: Effect[] = [{ ...blank("search"), name: want.name, to: onto ? "battlefield" : "hand" }];
       if (tu.lose) effects.push({ ...blank("life"), player: "ai", amount: -tu.lose });
@@ -495,6 +508,19 @@ function comboLine(g0: PracticeGame, book: CardBook, seat: Seat, combo: DeckComb
       if (step(blankAction("cast", c.iid))) {
         if (manaTotal(availableMana(t, seat, book)) > before) return true;
         // It gave nothing (a Mox with no way to turn it on): take it back.
+        t = saved.t;
+        actions.length = saved.n;
+      }
+    }
+    // A pump on the creature whose mana counts its power (Vivi), while
+    // that mana is still to be made.
+    const engine = side.battlefield.find((c) => powerManaOf(book, c) && !t.once?.includes(c.iid));
+    for (const c of engine ? spare : []) {
+      if (!pumpSpellOf(infoOf(book, c))) continue;
+      const before = manaTotal(availableMana(t, seat, book));
+      const saved = { t, n: actions.length };
+      if (step({ ...blankAction("cast", c.iid), effects: [{ ...blank("pump"), target: cardId(engine!.iid) }] })) {
+        if (manaTotal(availableMana(t, seat, book)) > before) return true;
         t = saved.t;
         actions.length = saved.n;
       }
@@ -696,6 +722,78 @@ function liveInHand(book: CardBook, c: PlayCard): boolean {
     the biggest permanents it can pay for, then spells that only draw, then
     safe attacks. */
 export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp", out: { wins?: boolean } = {}, combos: DeckCombo[] = []): TurnPlan {
+  const base = turnPlan(g, book, seat, out, combos);
+  if (out.wins) return base;
+  return pumpedPlan(g, book, seat, out, combos, base) ?? base;
+}
+
+/** A turn that starts by making its mana creature bigger. Vivi's mana is
+    its power, once a turn, so Wild Ride on it is four mana for one, and
+    Blazing Shoal paid with a red card is mana for nothing. The pumps are
+    played on a copy of the table, the rest of the turn is planned from
+    there, and the line is taken only when it casts more than the turn
+    without them would: a pump with nothing to spend it on is kept. */
+function pumpedPlan(g: PracticeGame, book: CardBook, seat: Seat, out: { wins?: boolean }, combos: DeckCombo[], base: TurnPlan): TurnPlan | null {
+  if (g.active !== seat || g.winner) return null;
+  const pumps = g.sides[seat].hand.filter((c) => pumpSpellOf(infoOf(book, c)));
+  if (!pumps.length) return null;
+  const zones = (x: PracticeGame) => [...x.sides[seat].hand, ...x.sides[seat].command];
+  if (![...g.sides[seat].battlefield, ...zones(g)].some((c) => powerManaOf(book, c))) return null;
+  let t = g;
+  const lead: PlanAction[] = [];
+  const step = (a: PlanAction) => {
+    const r = applyAction(t, seat, a, book, { combos });
+    if (!r.ok || r.game.choice || r.game.winner === other(seat)) return false;
+    t = r.game;
+    lead.push(a);
+    return true;
+  };
+  if (base.main[0]?.kind === "land") step(base.main[0]);
+  // The creature: in play with its mana still to make, or cast now (its
+  // ability needs no tap, so it works the turn it comes).
+  const inPlay = () => t.sides[seat].battlefield.find((c) => powerManaOf(book, c) && !t.once?.includes(c.iid));
+  if (!inPlay()) {
+    const held = zones(t).find((c) => powerManaOf(book, c));
+    if (!held || !step(blankAction("cast", held.iid))) return null;
+  }
+  // Each pump is kept only when it adds more than the counter its own cast
+  // brings: a switch (Twisted Image) after a +3/+0 changes nothing, since
+  // the switch is counted after everything else.
+  const size = (c: PlayCard) => {
+    const p = pumpSpellOf(infoOf(book, c))!;
+    return p.power === "x" ? 50 : p.base ? 40 : p.power === "switch" ? 30 : p.power;
+  };
+  let cast = 0;
+  for (const c of [...pumps].sort((a, b) => size(b) - size(a))) {
+    const engine = inPlay();
+    if (!engine) break;
+    const before = stats(book, engine).power;
+    const saved = { t, n: lead.length };
+    if (!step({ ...blankAction("cast", c.iid), effects: [{ ...blank("pump"), target: cardId(engine.iid) }] })) continue;
+    const now = t.sides[seat].battlefield.find((x) => x.iid === engine.iid);
+    if (now && stats(book, now).power - before >= 2) cast += 1;
+    else {
+      t = saved.t;
+      lead.length = saved.n;
+    }
+  }
+  if (!cast) return null;
+  const after: { wins?: boolean } = {};
+  const rest = turnPlan(t, book, seat, after, combos);
+  // What a line is worth: the mana value of what it casts, the pumps aside.
+  const worth = (x: PracticeGame, actions: PlanAction[]) =>
+    actions.reduce((n, a) => {
+      if (a.kind === "combo") return n + 100;
+      const c = a.kind === "cast" ? zones(x).find((h) => cardId(h.iid) === a.card) : undefined;
+      return n + (c && !pumpSpellOf(infoOf(book, c)) ? Math.max(1, infoOf(book, c)?.manaValue ?? 0) : 0);
+    }, 0);
+  const pumped = worth(g, lead) + worth(t, rest.main);
+  if (!after.wins && pumped <= worth(g, base.main)) return null;
+  if (after.wins) out.wins = true;
+  return { ...rest, main: [...lead, ...rest.main] };
+}
+
+function turnPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp", out: { wins?: boolean } = {}, combos: DeckCombo[] = []): TurnPlan {
   const side = g.sides[seat];
   const main: PlanAction[] = [];
   const lands = side.hand.filter(canPlayAsLand);
@@ -1003,11 +1101,14 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     const found = tutorOf(infoOf(book, c)) ? tutorPick(sim, seat, c, book, combos) : null;
     if (tutorOf(infoOf(book, c)) && !found) continue;
     const drawSpell = drawSpellOf(infoOf(book, c));
+    // "Discard a card, then draw two": with a card to discard.
+    if (drawSpell?.discardFirst && sim.sides[seat].hand.filter((h) => h.iid !== c.iid).length < (drawSpell.discard ?? 0)) continue;
     const x = found ? tutorX(sim, seat, c, found, book) : 0;
     if (!payIn(spellCost(sim, seat, c, book, zone), x)) continue;
     if (found) main.push({ ...blankAction("cast", c.iid), x: x || null, effects: found });
     else if (drawSpell && !wheelWorth(sim, seat, c, book) && !treasureSpellOf(book, c)) {
-      const effects = [drawEffect(drawSpell.draw)];
+      // (One that discards or exiles cards to play is carried out by the table.)
+      const effects = lootOf(infoOf(book, c)) ? [] : [drawEffect(drawSpell.draw)];
       if (drawSpell.lose) effects.push({ ...blank("life"), player: "ai", amount: -drawSpell.lose });
       main.push({ ...blankAction("cast", c.iid), effects });
       sim = structuredClone(sim);

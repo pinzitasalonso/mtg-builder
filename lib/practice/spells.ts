@@ -171,15 +171,56 @@ export interface DrawSpell {
   /** "…then put two cards from your hand on top of your library"
       (Brainstorm): cards that go back after the draw. */
   back?: number;
+  /** Cards discarded: before the draw ("Discard a card, then draw two
+      cards", "You may discard a card. If you do, draw two cards", or as an
+      additional cost), or after it (Frantic Search). The table picks them. */
+  discard?: number;
+  discardFirst?: boolean;
+  /** "Exile the top two cards of your library. Until the end of your next
+      turn, you may play those cards" (Reckless Impulse): how many. With
+      `impulseNow`, this turn only (Rob the Archives). */
+  impulse?: number;
+  impulseNow?: boolean;
+  /** "Untap up to three lands" (Frantic Search). */
+  untap?: number;
 }
 export function drawSpellOf(info: CardInfo | undefined): DrawSpell | null {
   if (!isSpell(info)) return null;
   let draw = 0;
   let lose = 0;
   let back = 0;
+  let discard = 0;
+  let discardFirst = false;
+  let impulse = 0;
+  let impulseNow = false;
+  let untap = 0;
   for (const s of sentences(info)) {
     let m: RegExpExecArray | null;
-    if ((m = /^(?:scry \d+, then )?(?:you )?draw (a|one|two|three|four) cards?(?: and (?:you )?lose (\d+) life)?$/i.exec(s))) {
+    // Other ways to cast it that the table doesn't use.
+    if (/^(?:plot|casualty|flashback)\b/i.test(s)) continue;
+    // A card for the cards: "You may discard a card. If you do, draw two
+    // cards" (Abandon Attachments; Vision of Love and Highway Robbery,
+    // whose other payment the table doesn't use), or as an additional cost
+    // (Demand Answers), or "Discard a card, then draw two cards".
+    if (/^you may (?:sacrifice an artifact or )?discard a card(?: or sacrifice a land)?$/i.test(s) || /^as an additional cost to cast this spell, (?:sacrifice an artifact or )?discard a card$/i.test(s)) {
+      discard += 1;
+      discardFirst = true;
+    } else if (discardFirst && (m = /^if you do, draw (a|one|two|three) cards?$/i.exec(s))) draw += num(m[1]!);
+    else if ((m = /^discard a card, then draw (a|one|two|three) cards?$/i.exec(s))) {
+      discard += 1;
+      discardFirst = true;
+      draw += num(m[1]!);
+    } else if ((m = /^draw (a|one|two|three) cards?, then discard (a|one|two|three) cards?$/i.exec(s))) {
+      draw += num(m[1]!);
+      discard += num(m[2]!);
+    } else if ((m = /^untap up to (one|two|three|four) lands$/i.exec(s))) untap = num(m[1]!);
+    // Reckless Impulse, Wrenn's Resolve, Rob the Archives.
+    else if ((m = /^exile the top (two|three) cards of your library$/i.exec(s))) impulse += num(m[1]!);
+    else if (impulse && /^until the end of your next turn, you may play those cards$/i.test(s)) continue;
+    else if (impulse && /^you may play those cards this turn$/i.test(s)) impulseNow = true;
+    // What changes nothing the table tracks.
+    else if (/^if this spell wasn't cast from your hand, draw two cards instead$/i.test(s) || /^lands you control gain all basic land types until end of turn$/i.test(s)) continue;
+    else if ((m = /^(?:scry \d+, then )?(?:you )?draw (a|one|two|three|four) cards?(?: and (?:you )?lose (\d+) life)?$/i.exec(s))) {
       draw += num(m[1]!);
       lose += Number(m[2] ?? 0);
     } else if ((m = /^target player draws (a|one|two|three) cards? and loses (\d+) life$/i.exec(s))) {
@@ -196,5 +237,83 @@ export function drawSpellOf(info: CardInfo | undefined): DrawSpell | null {
       back += num(m[2]!);
     } else return null;
   }
-  return draw ? { draw, lose, ...(back ? { back } : {}) } : null;
+  if (!draw && !impulse) return null;
+  return { draw, lose, ...(back ? { back } : {}), ...(discard ? { discard, discardFirst } : {}), ...(impulse ? { impulse, ...(impulseNow ? { impulseNow } : {}) } : {}), ...(untap ? { untap } : {}) };
+}
+
+/** A draw spell the table carries out whole, whatever the plan says: one
+    that discards, exiles cards to play, or untaps lands. */
+export const lootOf = (info: CardInfo | undefined): DrawSpell | null => {
+  const d = drawSpellOf(info);
+  return d && (d.discard || d.impulse || d.untap) ? d : null;
+};
+
+/** A spell that makes one creature bigger for the turn: "Target creature
+    gets +3/+0 and gains haste until end of turn" (Wild Ride), "…gets +1/+0
+    and gains first strike…" (Crowd's Favor), "Switch target creature's
+    power and toughness until end of turn. Draw a card" (Twisted Image),
+    "Target creature gets +X/+0 until end of turn" (Blazing Shoal, which may
+    be paid for with a red card from the hand, X its mana value). Also one
+    mode of a "Choose one —" spell (Secret Identity's 3/4, Siege Smash's
+    +3/+2): `modal`, and the table pumps only when the plan asks for it. */
+export interface PumpSpell {
+  /** A number; "x", the X that was paid; "switch", power and toughness swapped. */
+  power: number | "x" | "switch";
+  toughness: number;
+  /** "…becomes a Hero with base power and toughness 3/4": its base, in
+      place of the card's own. */
+  base?: { power: number; toughness: number };
+  draw: number;
+  keywords: string[];
+  /** "You may exile a red card with mana value X from your hand rather
+      than pay this spell's mana cost": the colour. */
+  pitch?: string;
+  modal?: boolean;
+}
+const COLOUR_LETTER: Record<string, string> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
+const keywordsIn = (words: string | undefined) => (words ? words.split(/,? and |, /).map((k) => k.trim()) : []);
+type PumpLine = Pick<PumpSpell, "power" | "toughness" | "base" | "keywords">;
+function pumpLine(s: string): PumpLine | null {
+  let m: RegExpExecArray | null;
+  if ((m = /^(?:one or two )?target creatures? (?:each )?gets? \+(\d+|x)\/\+(\d+)(?: and gains? ([a-z ,]+?))? until end of turn$/i.exec(s))) {
+    return { power: m[1]!.toLowerCase() === "x" ? "x" : Number(m[1]), toughness: Number(m[2]), keywords: keywordsIn(m[3]) };
+  }
+  if (/^switch target creature's power and toughness until end of turn$/i.test(s)) return { power: "switch", toughness: 0, keywords: [] };
+  if ((m = /^until end of turn, target creature you control becomes an? [a-z ]+ with base power and toughness (\d+)\/(\d+)(?: and gains ([a-z ,]+?))?$/i.exec(s))) {
+    return { power: 0, toughness: 0, base: { power: Number(m[1]), toughness: Number(m[2]) }, keywords: keywordsIn(m[3]) };
+  }
+  return null;
+}
+export function pumpSpellOf(info: CardInfo | undefined): PumpSpell | null {
+  if (!isSpell(info)) return null;
+  const lines = (info?.oracleText ?? "")
+    .split("\n//\n")[0]!
+    .replace(/\([^)]*\)/g, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const head = lines.findIndex((l) => /^choose one —$/i.test(l));
+  if (head >= 0) {
+    const modes = lines.slice(head + 1);
+    if (lines.slice(0, head).some((l) => !/^split second$/i.test(l)) || modes.some((l) => !l.startsWith("•"))) return null;
+    const size = (p: PumpLine) => (p.base ? p.base.power : typeof p.power === "number" ? p.power : 0);
+    const best = modes
+      .map((l) => pumpLine(l.replace(/^•\s*(?:[A-Z][a-z]+ — )?/, "").replace(/\.$/, "")))
+      .filter((x): x is PumpLine => !!x)
+      .sort((a, b) => size(b) - size(a))[0];
+    return best ? { ...best, draw: 0, modal: true } : null;
+  }
+  let pump: PumpLine | null = null;
+  let draw = 0;
+  let pitch: string | undefined;
+  for (const s of sentences(info)) {
+    let m: RegExpExecArray | null;
+    // Other ways to cast it that the table doesn't use.
+    if (/^(?:convoke|harmonize\b.*|flashback\b.*)$/i.test(s)) continue;
+    if ((m = /^you may exile an? (white|blue|black|red|green) card with mana value x from your hand rather than pay this spell's mana cost$/i.exec(s))) pitch = COLOUR_LETTER[m[1]!.toLowerCase()];
+    else if (!pump && pumpLine(s)) pump = pumpLine(s);
+    else if (/^draw a card$/i.test(s)) draw += 1;
+    else return null;
+  }
+  return pump ? { ...pump, draw, ...(pitch ? { pitch } : {}) } : null;
 }

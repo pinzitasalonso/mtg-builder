@@ -34,12 +34,17 @@ export interface PlayCard {
   counters?: number;
   /** Until end of turn. */
   pump?: { power: number; toughness: number };
+  /** Its power and toughness are switched until end of turn (after every
+      other change to them, as the rules have it). */
+  switched?: boolean;
   /** A token: its own stats. It ceases to exist off the battlefield. */
   /** A token: its stats, and whether it's an artifact (Treasure, Food,
       Clue) rather than a creature. */
   token?: { power: number; toughness: number; keywords: string[]; kind?: "creature" | "artifact" };
   /** Keywords until end of turn ("gains indestructible until end of turn"). */
   eot?: string[];
+  /** A spell being cast: the X it was paid with (a practice match). */
+  paidX?: number;
   /** What other permanents give it while they're there: lords ("Other Elves
       you control get +1/+1"), the Auras on it, "All creatures have haste".
       Worked out again after every move (lib/practice refreshStatics). */
@@ -63,6 +68,9 @@ export interface PlayCard {
   /** In hand for this turn only ("You may play them this turn", Jeska's
       Will): exiled at the end of the turn if it's still there. */
   fleeting?: boolean;
+  /** With `fleeting`: the game turn it lasts through ("until the end of
+      your next turn", Reckless Impulse). None: this turn only. */
+  fleetingUntil?: number;
   /** A card that entered as a copy of another (Copy Enchantment, Clone):
       what it is itself, to go back to when it leaves the battlefield. */
   cloneOf?: { name: string; typeLine: string | null; imageUri: string };
@@ -229,12 +237,14 @@ export function moveCard(
   const found = state[from].find((c) => c.iid === iid)!;
   const card: PlayCard = { ...found, tapped: false, flipped: to === "battlefield" ? !!found.flipped : false };
   delete card.fleeting;
+  delete card.fleetingUntil;
   delete card.sought;
   if (from === "battlefield" && to !== "battlefield") {
     delete card.enteredTurn;
     delete card.damage;
     delete card.counters;
     delete card.pump;
+    delete card.switched;
     delete card.eot;
     delete card.boost;
     delete card.attachedTo;
