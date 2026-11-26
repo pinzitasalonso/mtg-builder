@@ -4,7 +4,7 @@
 // (calibration/practice/coverage.bench.ts lists them for the benchmark's decks.)
 
 import { counterOf, removalOf, wheelSpellOf } from "./cards";
-import { drawSpellOf, tutorOf, wipeOf } from "./spells";
+import { drawSpellOf, pumpSpellOf, tutorOf, wipeOf } from "./spells";
 import { treasureSpellOf } from "./treasure";
 import type { PlayCard } from "../playtest";
 import type { CardBook, CardInfo } from "./types";
@@ -27,5 +27,6 @@ export function spellKnown(info: CardInfo, book: CardBook): string | null {
   if (counterOf(info)) return "counterspell";
   if (removalOf(info) || removalOf(info, "sorcery")) return "removal";
   if (burnOf(info) > 0) return "burn";
+  if (pumpSpellOf(info)) return "pump";
   return null;
 }

@@ -38,6 +38,13 @@ const MILLS = /^(?:near-)?infinite mill$|\bexile (?:all |each )?opponent(?:'s|s'
 /** A loop that casts spells without end: with a permanent that hurts the
     other player each time one is cast (Vivi, Crystal), that is the game. */
 export const castsWithoutEnd = (produces: string[]) => produces.some((p) => /\binfinite (?:storm count|magecraft triggers)\b/i.test(p));
+/** A loop that puts its own library within reach: endless looting or
+    drawing, or the library exiled to be played ("Infinite looting",
+    "Infinite draw triggers for all players", "Exile your library with the
+    ability to play the exiled cards until end of turn"). Not "…for
+    opponents". */
+export const reachesLibrary = (produces: string[]) =>
+  produces.some((p) => /^(?:near-)?infinite (?:looting|draw triggers|card draw)(?: for all players)?$|^exile your library with the ability to play\b/i.test(p));
 const MANA = /\binfinite\b.*\bmana\b/i;
 
 export function comboOutcome(produces: string[]): ComboOutcome {

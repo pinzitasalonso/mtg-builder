@@ -1,5 +1,17 @@
 [
  {
+  "name": "Abandon Attachments",
+  "imageUri": "",
+  "typeLine": "Instant — Lesson",
+  "manaCost": "{1}{U/R}",
+  "manaValue": 2,
+  "oracleText": "You may discard a card. If you do, draw two cards.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
   "name": "Arcane Signet",
   "imageUri": "",
   "typeLine": "Artifact",
@@ -48,6 +60,45 @@
    "U",
    "W"
   ]
+ },
+ {
+  "name": "Blazing Shoal",
+  "imageUri": "",
+  "typeLine": "Instant — Arcane",
+  "manaCost": "{X}{R}{R}",
+  "manaValue": 2,
+  "oracleText": "You may exile a red card with mana value X from your hand rather than pay this spell's mana cost.\nTarget creature gets +X/+0 until end of turn.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Bonus Round",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}{R}",
+  "manaValue": 3,
+  "oracleText": "Until end of turn, whenever a player casts an instant or sorcery spell, that player copies it and may choose new targets for the copy.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Brain Freeze",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{1}{U}",
+  "manaValue": 2,
+  "oracleText": "Target player mills three cards.\nStorm (When you cast this spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Storm",
+   "Mill"
+  ],
+  "producedMana": []
  },
  {
   "name": "Breeding Pool",
@@ -151,6 +202,20 @@
   "producedMana": []
  },
  {
+  "name": "Crowd's Favor",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{R}",
+  "manaValue": 1,
+  "oracleText": "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nTarget creature gets +1/+0 and gains first strike until end of turn. (It deals combat damage before creatures without first strike.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Convoke"
+  ],
+  "producedMana": []
+ },
+ {
   "name": "Cryptolith Rite",
   "imageUri": "",
   "typeLine": "Enchantment",
@@ -186,6 +251,46 @@
    "U",
    "W"
   ]
+ },
+ {
+  "name": "Curiosity",
+  "imageUri": "",
+  "typeLine": "Enchantment — Aura",
+  "manaCost": "{U}",
+  "manaValue": 1,
+  "oracleText": "Enchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Enchant"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Demand Answers",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "As an additional cost to cast this spell, sacrifice an artifact or discard a card.\nDraw two cards.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Dizzy Spell",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{U}",
+  "manaValue": 1,
+  "oracleText": "Target creature gets -3/-0 until end of turn.\nTransmute {1}{U}{U} ({1}{U}{U}, Discard this card: Search your library for a card with the same mana value as this card, reveal it, put it into your hand, then shuffle. Transmute only as a sorcery.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Transmute"
+  ],
+  "producedMana": []
  },
  {
   "name": "Dwarven Grunt",
@@ -237,6 +342,18 @@
   ]
  },
  {
+  "name": "Energybending",
+  "imageUri": "",
+  "typeLine": "Instant — Lesson",
+  "manaCost": "{2}",
+  "manaValue": 2,
+  "oracleText": "Lands you control gain all basic land types until end of turn.\nDraw a card.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
   "name": "Eternal Witness",
   "imageUri": "",
   "typeLine": "Creature — Human Shaman",
@@ -261,6 +378,18 @@
   "producedMana": []
  },
  {
+  "name": "Flow State",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{U}",
+  "manaValue": 2,
+  "oracleText": "Look at the top three cards of your library. Put one of them into your hand and the rest on the bottom of your library in any order. If there is an instant card and a sorcery card in your graveyard, instead put two of them into your hand and the rest on the bottom of your library in any order.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
   "name": "Forest",
   "imageUri": "",
   "typeLine": "Basic Land — Forest",
@@ -275,6 +404,18 @@
   ]
  },
  {
+  "name": "Frantic Search",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{2}{U}",
+  "manaValue": 3,
+  "oracleText": "Draw two cards, then discard two cards. Untap up to three lands.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
   "name": "Gaea's Cradle",
   "imageUri": "",
   "typeLine": "Legendary Land",
@@ -287,6 +428,44 @@
   "producedMana": [
    "G"
   ]
+ },
+ {
+  "name": "Gamble",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{R}",
+  "manaValue": 1,
+  "oracleText": "Search your library for a card, put that card into your hand, discard a card at random, then shuffle.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Gandalf, Goblins' Bane // Flameshape",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Avatar Wizard // Sorcery — Adventure",
+  "manaCost": "{2}{R} // {1}{R}",
+  "manaValue": 3,
+  "oracleText": "Whenever you cast a noncreature spell, Gandalf gets +1/+1 until end of turn and deals 1 damage to each opponent.\n//\nLook at the top two cards of your library and exile them face down. For as long as they remain exiled, you may play them if you control a Wizard.",
+  "power": 2,
+  "toughness": 3,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Grapeshot",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Grapeshot deals 1 damage to any target.\nStorm (When you cast this spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Storm"
+  ],
+  "producedMana": []
  },
  {
   "name": "Green Sun's Zenith",
@@ -327,6 +506,32 @@
   "producedMana": []
  },
  {
+  "name": "Hex Magic",
+  "imageUri": "",
+  "typeLine": "Sorcery — Arcane",
+  "manaCost": "{2}{R}",
+  "manaValue": 3,
+  "oracleText": "Exile all the cards from your hand, then draw that many cards. Until the end of your next turn, you may play cards exiled this way.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Highway Robbery",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "You may discard a card or sacrifice a land. If you do, draw two cards.\nPlot {1}{R} (You may pay {1}{R} and exile this card from your hand. Cast it as a sorcery on a later turn without paying its mana cost. Plot only as a sorcery.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Plot"
+  ],
+  "producedMana": []
+ },
+ {
   "name": "Hullbreaker Horror",
   "imageUri": "",
   "typeLine": "Creature — Kraken Horror",
@@ -355,6 +560,20 @@
   ]
  },
  {
+  "name": "Jeska's Will",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{R}",
+  "manaValue": 3,
+  "oracleText": "Choose one. If you control a commander as you cast this spell, you may choose both instead.\n• Add {R} for each card in target opponent's hand.\n• Exile the top three cards of your library. You may play them this turn.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ]
+ },
+ {
   "name": "Jeskai Ascendancy",
   "imageUri": "",
   "typeLine": "Enchantment",
@@ -375,6 +594,24 @@
   "oracleText": "Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.\n{5}{G}{U}: Look at the top five cards of your library. You may put a non-Human creature card from among them onto the battlefield. Put the rest on the bottom of your library in a random order.",
   "power": 2,
   "toughness": 2,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Lion's Eye Diamond",
+  "imageUri": "",
+  "typeLine": "Artifact",
+  "manaCost": "{0}",
+  "manaValue": 0,
+  "oracleText": "Discard your hand, Sacrifice this artifact: Add three mana of any one color. Activate only as an instant.",
+  "power": null,
+  "toughness": null,
   "keywords": [],
   "producedMana": [
    "B",
@@ -483,6 +720,20 @@
   ]
  },
  {
+  "name": "Mana Vault",
+  "imageUri": "",
+  "typeLine": "Artifact",
+  "manaCost": "{1}",
+  "manaValue": 1,
+  "oracleText": "This artifact doesn't untap during your untap step.\nAt the beginning of your upkeep, you may pay {4}. If you do, untap this artifact.\nAt the beginning of your draw step, if this artifact is tapped, it deals 1 damage to you.\n{T}: Add {C}{C}{C}.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ]
+ },
+ {
   "name": "Mountain",
   "imageUri": "",
   "typeLine": "Basic Land — Mountain",
@@ -541,6 +792,47 @@
   "producedMana": []
  },
  {
+  "name": "Niv-Mizzet, Visionary",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Dragon Wizard",
+  "manaCost": "{4}{U}{R}",
+  "manaValue": 6,
+  "oracleText": "Flying\nYou have no maximum hand size.\nWhenever a source you control deals noncombat damage to an opponent, you draw that many cards.",
+  "power": 5,
+  "toughness": 5,
+  "keywords": [
+   "Flying"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Opera Love Song",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Choose one —\n• Exile the top two cards of your library. You may play those cards until your next end step.\n• One or two target creatures each get +2/+0 until end of turn.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Ophidian Eye",
+  "imageUri": "",
+  "typeLine": "Enchantment — Aura",
+  "manaCost": "{2}{U}",
+  "manaValue": 3,
+  "oracleText": "Flash (You may cast this spell any time you could cast an instant.)\nEnchant creature\nWhenever enchanted creature deals damage to an opponent, you may draw a card.",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Enchant",
+   "Flash"
+  ],
+  "producedMana": []
+ },
+ {
   "name": "Pili-Pala",
   "imageUri": "",
   "typeLine": "Artifact Creature — Scarecrow",
@@ -575,6 +867,30 @@
   ]
  },
  {
+  "name": "Pyrokinesis",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{4}{R}{R}",
+  "manaValue": 6,
+  "oracleText": "You may exile a red card from your hand rather than pay this spell's mana cost.\nPyrokinesis deals 4 damage divided as you choose among any number of target creatures.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Quicksilver Elemental",
+  "imageUri": "",
+  "typeLine": "Creature — Elemental",
+  "manaCost": "{3}{U}{U}",
+  "manaValue": 5,
+  "oracleText": "{U}: This creature gains all activated abilities of target creature until end of turn. (If any of the abilities use that creature's name, use this creature's name instead.)\nYou may spend blue mana as though it were mana of any color to pay the activation costs of this creature's abilities.",
+  "power": 3,
+  "toughness": 4,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
   "name": "Ragavan, Nimble Pilferer",
   "imageUri": "",
   "typeLine": "Legendary Creature — Monkey Pirate",
@@ -590,6 +906,46 @@
   "producedMana": []
  },
  {
+  "name": "Ral, Monsoon Mage // Ral, Leyline Prodigy",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Human Wizard // Legendary Planeswalker — Ral",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Instant and sorcery spells you cast cost {1} less to cast.\nWhenever you cast an instant or sorcery spell during your turn, flip a coin. If you lose the flip, Ral deals 1 damage to you. If you win the flip, you may exile Ral. If you do, return him to the battlefield transformed under his owner's control.\n//\nRal enters with an additional loyalty counter on him for each instant and sorcery spell you've cast this turn.\n+1: Until your next turn, instant and sorcery spells you cast cost {1} less to cast.\n−2: Ral deals 2 damage divided as you choose among one or two targets. Draw a card if you control a blue permanent other than Ral.\n−8: Exile the top eight cards of your library. You may cast instant and sorcery spells from among them this turn without paying their mana costs.",
+  "power": 1,
+  "toughness": 3,
+  "keywords": [
+   "Transform"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Reckless Impulse",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Exile the top two cards of your library. Until the end of your next turn, you may play those cards.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Reiterate",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{1}{R}{R}",
+  "manaValue": 3,
+  "oracleText": "Buyback {3} (You may pay an additional {3} as you cast this spell. If you do, put this card into your hand as it resolves.)\nCopy target instant or sorcery spell. You may choose new targets for the copy.",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Buyback"
+  ],
+  "producedMana": []
+ },
+ {
   "name": "Retraction Helix",
   "imageUri": "",
   "typeLine": "Instant",
@@ -599,6 +955,32 @@
   "power": null,
   "toughness": null,
   "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Rhystic Study",
+  "typeLine": "Enchantment",
+  "manaCost": "{2}{U}",
+  "manaValue": 3,
+  "oracleText": "Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [],
+  "imageUri": ""
+ },
+ {
+  "name": "Rob the Archives",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Casualty 1 (As you cast this spell, you may sacrifice a creature with power 1 or greater. When you do, copy this spell.)\nExile the top two cards of your library. You may play those cards this turn.",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Casualty"
+  ],
   "producedMana": []
  },
  {
@@ -616,6 +998,60 @@
   ]
  },
  {
+  "name": "Romantic Rendezvous",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Discard a card, then draw two cards.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Secret Identity",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{U}",
+  "manaValue": 1,
+  "oracleText": "Choose one —\n• Conceal — Until end of turn, target creature you control becomes a Citizen with base power and toughness 1/1 and gains hexproof.\n• Reveal — Until end of turn, target creature you control becomes a Hero with base power and toughness 3/4 and gains flying and vigilance.",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Conceal"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Seething Song",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{2}{R}",
+  "manaValue": 3,
+  "oracleText": "Add {R}{R}{R}{R}{R}.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ]
+ },
+ {
+  "name": "Siege Smash",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nChoose one —\n• Destroy target artifact.\n• Target creature gets +3/+2 and gains trample until end of turn.",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Split second"
+  ],
+  "producedMana": []
+ },
+ {
   "name": "Sisay, Weatherlight Captain",
   "imageUri": "",
   "typeLine": "Legendary Creature — Human Soldier",
@@ -625,6 +1061,21 @@
   "power": 2,
   "toughness": 2,
   "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Snake Umbra",
+  "imageUri": "",
+  "typeLine": "Enchantment — Aura",
+  "manaCost": "{2}{G}",
+  "manaValue": 3,
+  "oracleText": "Enchant creature\nEnchanted creature gets +1/+1 and has \"Whenever this creature deals damage to an opponent, you may draw a card.\"\nUmbra armor (If enchanted creature would be destroyed, instead remove all damage from it and destroy this Aura.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Umbra armor",
+   "Enchant"
+  ],
   "producedMana": []
  },
  {
@@ -651,6 +1102,34 @@
   "power": null,
   "toughness": null,
   "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Tandem Lookout",
+  "imageUri": "",
+  "typeLine": "Creature — Human Scout",
+  "manaCost": "{2}{U}",
+  "manaValue": 3,
+  "oracleText": "Soulbond (You may pair this creature with another unpaired creature when either enters. They remain paired for as long as you control both of them.)\nAs long as Tandem Lookout is paired with another creature, each of those creatures has \"Whenever this creature deals damage to an opponent, draw a card.\"",
+  "power": 2,
+  "toughness": 1,
+  "keywords": [
+   "Soulbond"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Thor, Guardian of Midgard",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — God Warrior Hero",
+  "manaCost": "{3}{R}{R}",
+  "manaValue": 5,
+  "oracleText": "Flying\nWhenever a source you control deals noncombat damage to an opponent, you may exile that many cards from the top of your library. You may play those cards this turn.",
+  "power": 5,
+  "toughness": 5,
+  "keywords": [
+   "Flying"
+  ],
   "producedMana": []
  },
  {
@@ -684,6 +1163,68 @@
   ]
  },
  {
+  "name": "Twinned Vision",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{1}{U/R}",
+  "manaValue": 2,
+  "oracleText": "Draw a card. If this spell wasn't cast from your hand, draw two cards instead.\nFlashback—{1}{U/R}{U/R}, Discard a card. (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Flashback"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Twisted Image",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{U}",
+  "manaValue": 1,
+  "oracleText": "Switch target creature's power and toughness until end of turn.\nDraw a card.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Underworld Breach",
+  "imageUri": "",
+  "typeLine": "Enchantment",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exile three other cards from your graveyard. (You may cast cards from your graveyard for their escape cost.)\nAt the beginning of the end step, sacrifice this enchantment.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Virtue of Courage // Embereth Blaze",
+  "imageUri": "",
+  "typeLine": "Enchantment // Instant — Adventure",
+  "manaCost": "{3}{R}{R} // {1}{R}",
+  "manaValue": 5,
+  "oracleText": "Whenever a source you control deals noncombat damage to an opponent, you may exile that many cards from the top of your library. You may play those cards this turn.\n//\nEmbereth Blaze deals 2 damage to any target. (Then exile this card. You may cast the enchantment later from exile.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Vision of Love",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "You may sacrifice an artifact or discard a card. If you do, draw two cards.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
   "name": "Vivi Ornitier",
   "imageUri": "",
   "typeLine": "Legendary Creature — Wizard",
@@ -699,6 +1240,35 @@
   ]
  },
  {
+  "name": "Volcanic Island",
+  "imageUri": "",
+  "typeLine": "Land — Island Mountain",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "({T}: Add {U} or {R}.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "R",
+   "U"
+  ]
+ },
+ {
+  "name": "Wild Ride",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{R}",
+  "manaValue": 1,
+  "oracleText": "Target creature gets +3/+0 and gains haste until end of turn.\nHarmonize {4}{R} (You may cast this card from your graveyard for its harmonize cost. You may tap a creature you control to reduce that cost by {X}, where X is its power. Then exile this spell.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Harmonize"
+  ],
+  "producedMana": []
+ },
+ {
   "name": "Woodland Bellower",
   "imageUri": "",
   "typeLine": "Creature — Beast",
@@ -707,6 +1277,18 @@
   "oracleText": "When this creature enters, you may search your library for a nonlegendary green creature card with mana value 3 or less, put it onto the battlefield, then shuffle.",
   "power": 6,
   "toughness": 5,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Wrenn's Resolve",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Exile the top two cards of your library. Until the end of your next turn, you may play those cards.",
+  "power": null,
+  "toughness": null,
   "keywords": [],
   "producedMana": []
  }

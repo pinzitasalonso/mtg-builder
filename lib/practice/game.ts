@@ -38,6 +38,10 @@ import {
   has,
   hasAltCost,
   hitTriggersOf,
+  drawsOnDamageAura,
+  soulbondDrawOf,
+  noncombatDrawOf,
+  noncombatImpulseOf,
   imprintsFromHand,
   indestructibleOnYourTurn,
   infoOf,
@@ -94,8 +98,8 @@ import {
 } from "./abilities";
 import { triggersOf, type Outcome } from "./triggers";
 import { scaleDamage } from "./damage";
-import { drawSpellOf, tutorOf, tutorSearch } from "./spells";
-import { adNauseamOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, impulseOf, extraTurnOf, hasStorm, landsForManaOf, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
+import { drawSpellOf, lootOf, pumpSpellOf, tutorOf, tutorSearch } from "./spells";
+import { adNauseamOf, burnOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, impulseOf, extraTurnOf, hasStorm, landsForManaOf, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import {
   extraTreasureOf,
   oneOfEachOf,
@@ -110,7 +114,7 @@ import {
   winsWithTreasures,
 } from "./treasure";
 import { colorsOfCost, manaSources, manaTotal, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
-import { castsWithoutEnd, comboHeadline, comboNeeds, comboOutcome, type DeckCombo } from "./combos";
+import { castsWithoutEnd, comboHeadline, comboNeeds, comboOutcome, reachesLibrary, type DeckCombo } from "./combos";
 import { type PendingTax, other, type CardBook, type Choice, type Combat, type Effect, type LogLine, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
@@ -1103,16 +1107,16 @@ export function endTurn(g0: PracticeGame, book: CardBook = {}, combos: DeckCombo
   // end step's checks, which only touch players and copies).
   for (const seat of ["you", "opp"] as Seat[]) {
     const side = g.sides[seat];
-    g.sides[seat] = { ...side, battlefield: side.battlefield.map(({ damage: _d, pump: _p, eot: _e, ...c }) => c) };
+    g.sides[seat] = { ...side, battlefield: side.battlefield.map(({ damage: _d, pump: _p, switched: _s, eot: _e, ...c }) => c) };
   }
   endStep(g, book);
   if (g.winner) return g;
   // Cards that were only its to play this turn (Jeska's Will) are gone.
   for (const seat of ["you", "opp"] as Seat[]) {
-    const gone = g.sides[seat].hand.filter((c) => c.fleeting);
+    const gone = g.sides[seat].hand.filter((c) => c.fleeting && (c.fleetingUntil === undefined || g.turn >= c.fleetingUntil));
     if (!gone.length) continue;
     for (const c of gone) moveTo(g, c.iid, "exile", { exact: true });
-    say(g, seat, `${gone.map((c) => c.name).join(", ")} ${gone.length === 1 ? "stays" : "stay"} in exile: not played this turn.`);
+    say(g, seat, `${gone.map((c) => c.name).join(", ")} ${gone.length === 1 ? "stays" : "stay"} in exile: not played ${gone.some((c) => c.fleetingUntil !== undefined) ? "in time" : "this turn"}.`);
   }
   // The AI discards down to seven (you're asked: playerCleanup).
   if (g.active === "opp") {
@@ -1611,6 +1615,51 @@ export function comboSink(g: PracticeGame, seat: Seat, book: CardBook): PlayCard
   return null;
 }
 
+/** A loop's payoff, carried out (see loopPayoff). */
+function loopEnds(g: PracticeGame, seat: Seat, payoff: NonNullable<ReturnType<typeof loopPayoff>>) {
+  const foe = other(seat);
+  if (payoff.how === "pinger") {
+    say(g, seat, `Every spell of the loop is a hit from ${faceName(payoff.by)}. The opponent wins.`);
+    g.winner = seat;
+  } else if (payoff.kind === "win") {
+    say(g, seat, `${payoff.by.name}, copied for every spell of the loop, ends it. The opponent wins.`);
+    g.winner = seat;
+  } else {
+    g.sides[foe] = { ...g.sides[foe], graveyard: [...g.sides[foe].graveyard, ...g.sides[foe].library], library: [] };
+    say(g, seat, `${payoff.by.name}, copied for every spell of the loop, puts ${foe === "you" ? "your" : "the opponent's"} whole library into the graveyard.`);
+  }
+}
+
+/** What a loop that isn't a win by itself comes to at this table:
+    - it casts spells without end, and a permanent hurts the player with
+      each one (Vivi, Crystal, Gandalf): a win;
+    - it casts without end, or puts the whole library within reach, and a
+      storm spell finishes: Grapeshot is a win, Brain Freeze the player's
+      library. The spell is in the hand, or anywhere in the deck when the
+      loop reaches the library.
+    Null: the loop does nothing the table can carry out. */
+export function loopPayoff(g: PracticeGame, seat: Seat, combo: Pick<DeckCombo, "produces">, book: CardBook): { kind: "win" | "mill"; by: PlayCard; how: "pinger" | "storm" } | null {
+  const casts = castsWithoutEnd(combo.produces);
+  const reaches = reachesLibrary(combo.produces);
+  if (!casts && !reaches) return null;
+  const side = g.sides[seat];
+  if (casts) {
+    // Its commander counts from the command zone: a loop's mana casts it.
+    const pinger = [...side.battlefield, ...side.command].find((c) => {
+      const t = castTriggerOf(book, c);
+      return !!t && (t.damage > 0 || t.drain > 0 || !!t.damagePerColor);
+    });
+    if (pinger) return { kind: "win", by: pinger, how: "pinger" };
+  }
+  const within = reaches ? [...side.hand, ...side.library, ...side.graveyard] : side.hand;
+  const storms = within.filter((c) => hasStorm(infoOf(book, c)));
+  const burn = storms.find((c) => burnOf(infoOf(book, c)) > 0);
+  if (burn) return { kind: "win", by: burn, how: "storm" };
+  const mill = storms.find((c) => /\btarget player mills\b/i.test(infoOf(book, c)?.oracleText ?? ""));
+  if (mill && g.sides[other(seat)].library.length) return { kind: "mill", by: mill, how: "storm" };
+  return null;
+}
+
 export function applyCombo(g0: PracticeGame, seat: Seat, combo: DeckCombo, book: CardBook, opts: { stage?: "pay" | "resolve" } = {}): Step {
   if (g0.winner) return { game: g0, ok: false };
   const g = structuredClone(g0);
@@ -1666,31 +1715,30 @@ export function applyCombo(g0: PracticeGame, seat: Seat, combo: DeckCombo, book:
   } else if (outcome === "mana") {
     // Endless mana, as much as a turn can use, until the phase ends. A
     // unit of every colour pays for anything.
-    const colourless = !combo.produces.some((p) => /colored mana|mana nonland permanents|infinite mana$/i.test(p));
+    // Of the colours it names ("Infinite red mana"), or of any colour.
+    // Mana that only pays for abilities isn't mana for the hand.
+    const any = combo.produces.some((p) => /colored mana|mana nonland permanents|infinite mana$/i.test(p) && !/only be spent to activate abilities/i.test(p));
+    const letters: Record<string, string> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
+    const named = [...new Set(combo.produces.flatMap((p) => letters[/^infinite (white|blue|black|red|green) mana\b/i.exec(p)?.[1]?.toLowerCase() ?? ""] ?? []))];
+    const colourless = !any && !named.length;
     if (!g.pool) g.pool = { you: [], opp: [] };
-    g.pool[seat] = [...g.pool[seat], ...Array<string>(40).fill(colourless ? "C" : "WUBRG")];
+    g.pool[seat] = [...g.pool[seat], ...Array<string>(40).fill(any ? "WUBRG" : named.length ? named.join("") : "C")];
     say(g, seat, `${names}: ${headline.toLowerCase()}. ${who(seat)} ${seat === "you" ? "have" : "has"} all the ${colourless ? "colourless " : ""}mana ${seat === "you" ? "you" : "it"} can use this phase.`);
     // With a way to spend it over and over (Kinnan's ability, Thrasios's),
     // endless mana is the game: the whole library, one activation at a time.
     const sink = comboSink(g, seat, book);
-    // Or a permanent that hurts you each time a spell is cast (Vivi,
-    // Crystal), when the loop is one that casts without end. Its commander
-    // counts from the command zone: endless mana casts it.
-    const pinger = castsWithoutEnd(combo.produces)
-      ? [...g.sides[seat].battlefield, ...g.sides[seat].command].find((c) => {
-          const t = castTriggerOf(book, c);
-          return !!t && (t.damage > 0 || t.drain > 0 || !!t.damagePerColor);
-        })
-      : undefined;
+    // Or a loop that casts without end with something to make that count
+    // (Vivi's hit for each spell, Grapeshot's copies), or one that reaches
+    // the whole library and finds it there.
+    const payoff = seat === "opp" ? loopPayoff(g, seat, combo, book) : null;
     if (sink && seat === "opp") {
       say(g, seat, `With endless mana, ${faceName(sink)}'s ability takes the opponent through its whole library. The opponent wins.`);
       g.winner = seat;
-    } else if (pinger && seat === "opp") {
-      say(g, seat, `Every spell of the loop is a hit from ${faceName(pinger)}. The opponent wins.`);
-      g.winner = seat;
-    }
+    } else if (payoff) loopEnds(g, seat, payoff);
   } else {
-    say(g, seat, `${names}: ${combo.produces.slice(0, 3).join(", ").toLowerCase() || "a loop"}. (The table doesn't carry this one out: resolve it by hand.)`);
+    const payoff = seat === "opp" ? loopPayoff(g, seat, combo, book) : null;
+    if (payoff) loopEnds(g, seat, payoff);
+    else say(g, seat, `${names}: ${combo.produces.slice(0, 3).join(", ").toLowerCase() || "a loop"}. (The table doesn't carry this one out: resolve it by hand.)`);
   }
   checkState(g, book);
   return { game: g, ok: true };
@@ -1749,16 +1797,36 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
       return { game: g, ok: true };
     }
     if (opts.stage === "resolve") {
-      resolveCast(g, seat, card, action, book);
+      resolveCast(g, seat, card, action, book, opts.combos ?? []);
       return { game: g, ok: true };
     }
     const no = uncastable(g, seat, card, book, action.effects) ?? mistargeted(g, card, action.effects, book);
     if (no) return fail(`(${no})`);
     const cost = spellCost(g, seat, card, book, at.zone);
-    const sources = availableMana(g, seat, book, [card.iid], { commander: card.commander });
-    const paid = aiPay(g, seat, cost, sources, book, { x: action.x ?? 0, keep: opts.keep });
+    // A pump spell needs a creature of its own to go on.
+    // (One mode of a "Choose one —" spell is a pump only when the plan says so.)
+    const pump = pumpAsked(pumpSpellOf(info), action);
+    const pumpHost = pump ? aiPumpHost(g, seat, action.effects, book) : undefined;
+    if (pump && !pumpHost) return fail(`(${card.name} needs a creature of the opponent's to go on.)`);
+    // Blazing Shoal: a red card from the hand instead of its mana, X that card's mana value.
+    const pitched = pump?.pitch && !(action.x ?? 0) ? aiPitchPick(g, seat, card, pump.pitch, book, opts.combos ?? []) : undefined;
+    // On a creature whose mana counts its power (Vivi), the pump comes
+    // first: something else pays for it while anything else can.
+    const held = pumpHost && powerManaOf(book, pumpHost) && !g.once?.includes(pumpHost.iid) ? [pumpHost.iid] : [];
+    let sources = availableMana(g, seat, book, [card.iid, ...held], { commander: card.commander });
+    let paid = pitched ? { tap: [], life: 0, used: {}, pain: 0 } : aiPay(g, seat, cost, sources, book, { x: action.x ?? 0, keep: opts.keep });
+    if (!paid && held.length) {
+      sources = availableMana(g, seat, book, [card.iid], { commander: card.commander });
+      paid = aiPay(g, seat, cost, sources, book, { x: action.x ?? 0, keep: opts.keep });
+    }
     if (!paid) return fail(`The opponent can't pay for ${card.name} yet.`);
     spend(g, seat, paid, sources, book);
+    if (pitched) {
+      moveTo(g, pitched.iid, "exile");
+      say(g, seat, `${who(seat)} ${verb(seat, "exile")} ${pitched.name} from ${seat === "you" ? "your" : "its"} hand to pay for ${card.name}.`);
+    }
+    // The X it was cast with, for when it resolves.
+    if (pump) update(g, card.iid, (c) => ({ ...c, paidX: pitched ? (infoOf(book, pitched)?.manaValue ?? 0) : (action.x ?? 0) }));
     // Its sacrifice, as it's cast (Culling the Weak, Diabolic Intent). A
     // Treasure spell's (Deadly Dispute) is taken as it resolves.
     const sacCost = treasureSpellOf(book, card) ? null : sacrificeCostOf(info);
@@ -1770,16 +1838,16 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     }
     if (at.zone === "command") g.tax[seat] += 1;
     if (fromGrave) g.mayCast = g.mayCast!.filter((i) => i !== card.iid);
-    const x = cost.xCount ? ` (X = ${action.x ?? 0})` : "";
+    const x = cost.xCount ? ` (X = ${pitched ? (infoOf(book, pitched)?.manaValue ?? 0) : (action.x ?? 0)})` : "";
     const target = action.effects.map((e) => parseCardId(e.target)).find((t) => t !== null);
-    const on = target !== undefined && target !== null ? findCard(g, target)?.card.name : undefined;
+    const on = pumpHost ? pumpHost.name : target !== undefined && target !== null ? findCard(g, target)?.card.name : undefined;
     if (paid.life) say(g, seat, `${who(seat)} ${verb(seat, "pay")} ${paid.life} life for ${card.name}.`);
     loseLife(g, seat, paid.life, book);
     say(g, seat, `${who(seat)} casts ${card.name}${x}${on ? ` on ${on}` : ""}.`, card);
     castTriggers(g, seat, card, book);
     checkState(g, book);
     if (opts.stage === "pay" || g.winner) return { game: g, ok: true };
-    resolveCast(g, seat, card, action, book);
+    resolveCast(g, seat, card, action, book, opts.combos ?? []);
     return { game: g, ok: true };
   }
 
@@ -2207,6 +2275,61 @@ export function addLoyalty(g0: PracticeGame, iid: number, n: number, book: CardB
 
 /** A seat casts a spell: its permanents' "whenever you cast a … spell"
     triggers (K'rrik's counter, Vivi's counter and damage, prowess). */
+/** The creature Tandem Lookout is paired with: its controller's creature
+    that hurts with every spell (Vivi), else their biggest other one. */
+function soulbondPartner(g: PracticeGame, seat: Seat, lookout: PlayCard, book: CardBook): PlayCard | undefined {
+  const others = g.sides[seat].battlefield.filter((c) => c.iid !== lookout.iid && isCreature(book, c));
+  return others.find((c) => (castTriggerOf(book, c)?.damage ?? 0) > 0) ?? [...others].sort((a, b) => stats(book, b).power - stats(book, a).power)[0];
+}
+
+/** A source of `seat`'s dealt damage to the other player: the cards that
+    brings (Curiosity on the creature, Tandem Lookout's pair, Niv-Mizzet
+    for damage outside combat), and for the opponent Thor's cards to play
+    this turn. `source` is the permanent, when it is one. */
+function dealtDamage(g: PracticeGame, seat: Seat, source: PlayCard | null, amount: number, combat: boolean, book: CardBook) {
+  if (amount <= 0 || g.winner) return;
+  const field = g.sides[seat].battlefield;
+  const by: string[] = [];
+  let draw = 0;
+  if (source && field.some((c) => c.iid === source.iid)) {
+    for (const a of field) {
+      if (a.attachedTo === source.iid && drawsOnDamageAura(infoOf(book, a))) {
+        draw += 1;
+        by.push(a.name);
+      }
+      if (!a.token && soulbondDrawOf(infoOf(book, a))) {
+        const partner = soulbondPartner(g, seat, a, book);
+        if (partner && (source.iid === a.iid || source.iid === partner.iid)) {
+          draw += 1;
+          by.push(faceName(a));
+        }
+      }
+    }
+  }
+  if (!combat) {
+    for (const c of field) {
+      if (c.token || !noncombatDrawOf(infoOf(book, c))) continue;
+      draw += amount;
+      by.push(faceName(c));
+    }
+  }
+  if (draw) {
+    say(g, seat, `${who(seat)} ${verb(seat, "draw")} ${draw === 1 ? "a card" : `${draw} cards`} (${by.join(", ")}).`);
+    drawCards(g, seat, draw, book);
+  }
+  // Thor, Virtue of Courage: that many cards from the top, the opponent's
+  // to play this turn (in its hand until the turn ends).
+  if (!combat && seat === "opp" && g.active === seat) {
+    for (const c of field) {
+      if (c.token || !noncombatImpulseOf(infoOf(book, c))) continue;
+      const top = g.sides[seat].library.slice(0, amount).map((x) => ({ ...x, fleeting: true }));
+      if (!top.length) continue;
+      g.sides[seat] = { ...g.sides[seat], library: g.sides[seat].library.slice(top.length), hand: [...g.sides[seat].hand, ...top] };
+      say(g, seat, `${faceName(c)}: the opponent exiles the top ${top.length === 1 ? "card" : `${top.length} cards`} of its library, and may play ${top.length === 1 ? "it" : "them"} this turn.`);
+    }
+  }
+}
+
 function castTriggers(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBook) {
   // The second spell a player casts in a turn: Lotho, Monologue Tax.
   if (!g.spells) g.spells = { you: 0, opp: 0 };
@@ -2250,6 +2373,7 @@ function castTriggers(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBo
       const dealt = scaleDamage(g, book, seat, c, foe, hit);
       say(g, seat, `${name} deals ${dealt} damage to ${foe === "you" ? "you" : "the opponent"}.`);
       loseLife(g, foe, dealt, book);
+      dealtDamage(g, seat, c, dealt, false, book);
     }
     if (t.drain) {
       say(g, seat, `${foe === "you" ? "You lose" : "The opponent loses"} ${t.drain} life (${name}).`);
@@ -2795,6 +2919,35 @@ function aiAuraHost(g: PracticeGame, seat: Seat, aura: PlayCard, effects: PlanAc
   return best(hostile ? other(seat) : seat)?.iid;
 }
 
+/** A pump spell as this cast uses it: always, when it's all the card does;
+    for one mode of a "Choose one —" spell, only when the plan has a pump effect. */
+const pumpAsked = (pump: ReturnType<typeof pumpSpellOf>, action: PlanAction) => (pump && (!pump.modal || action.effects.some((e) => e.type === "pump")) ? pump : null);
+
+/** The creature the AI's pump spell goes on: its own creature that the
+    plan targets; else the one whose mana counts its power (Vivi), while
+    that mana is still to be made this turn; else its biggest that can
+    attack. Undefined: it has no creature. */
+export function aiPumpHost(g: PracticeGame, seat: Seat, effects: PlanAction["effects"], book: CardBook): PlayCard | undefined {
+  const own = g.sides[seat].battlefield.filter((c) => isCreature(book, c));
+  const targeted = effects.map((e) => parseCardId(e.target)).find((t) => t !== null && own.some((c) => c.iid === t));
+  if (targeted !== undefined && targeted !== null) return own.find((c) => c.iid === targeted);
+  const engine = own.find((c) => powerManaOf(book, c) && !g.once?.includes(c.iid) && g.active === seat);
+  if (engine) return engine;
+  const ready = own.filter((c) => !c.tapped && !isSick(book, c, g.turn));
+  return [...(ready.length ? ready : own)].sort((a, b) => stats(book, b).power - stats(book, a).power)[0];
+}
+
+/** The card of a colour the AI exiles from its hand to pay for a spell
+    (Blazing Shoal): the dearest one it can spare, never a way to win or a
+    tutor, and none that costs less than two (two cards for +1/+0).
+    Undefined: none. */
+function aiPitchPick(g: PracticeGame, seat: Seat, spell: PlayCard, colour: string, book: CardBook, combos: DeckCombo[]): PlayCard | undefined {
+  const mv = (c: PlayCard) => infoOf(book, c)?.manaValue ?? 0;
+  return g.sides[seat].hand
+    .filter((c) => c.iid !== spell.iid && !isLand(c) && mv(c) >= 2 && colorsOfCost(infoOf(book, c)).includes(colour) && handWorth(c, book, combos) < 4)
+    .sort((a, b) => mv(b) - mv(a) || handWorth(a, book, combos) - handWorth(b, book, combos))[0];
+}
+
 /** Where the AI equips: the creature of its own the plan targets, else its
     biggest one not carrying this Equipment already. Undefined: none. */
 export function aiEquipHost(g: PracticeGame, seat: Seat, equipment: PlayCard, effects: PlanAction["effects"], book: CardBook): number | undefined {
@@ -3074,7 +3227,7 @@ export function playerUseSearch(g0: PracticeGame, iid: number, ability: SearchAb
 }
 
 /** A paid-for cast takes effect: a permanent enters, a spell resolves. */
-function resolveCast(g: PracticeGame, seat: Seat, card0: PlayCard, action: PlanAction, book: CardBook) {
+function resolveCast(g: PracticeGame, seat: Seat, card0: PlayCard, action: PlanAction, book: CardBook, combos: DeckCombo[] = []) {
   let card = card0;
   // A wheel is the table's to carry out, whatever effects the plan gave it.
   const w = wheelSpellOf(book, card);
@@ -3149,7 +3302,31 @@ function resolveCast(g: PracticeGame, seat: Seat, card0: PlayCard, action: PlanA
     }
     const tutor = tutorOf(infoOf(book, card));
     const randomDiscard = !!tutor?.discardRandom;
-    let effects = action.effects.filter((e) => !(made && e.type === "mana") && !(randomDiscard && e.type === "discard" && e.player !== (seat === "opp" ? "player" : "ai")));
+    // A pump spell is the table's to carry out: on the creature it was
+    // cast for, with the X that was paid.
+    const pump = seat === "opp" ? pumpAsked(pumpSpellOf(infoOf(book, card)), action) : null;
+    const pumpHost = pump ? aiPumpHost(g, seat, action.effects, book) : undefined;
+    if (pump && pumpHost) {
+      const x = findCard(g, card.iid)?.card.paidX ?? action.x ?? 0;
+      // A new base (Secret Identity's 3/4) counts from the card's own.
+      const printed = (n: number | null | undefined) => (typeof n === "number" ? n : 0);
+      const own = pumpHost.token ?? { power: printed(infoOf(book, pumpHost)?.power), toughness: printed(infoOf(book, pumpHost)?.toughness) };
+      const up = pump.base ? pump.base.power - own.power : pump.power === "x" ? x : pump.power === "switch" ? 0 : pump.power;
+      const tough = pump.base ? pump.base.toughness - own.toughness : pump.toughness;
+      update(g, pumpHost.iid, (c) => ({
+        ...c,
+        pump: { power: (c.pump?.power ?? 0) + up, toughness: (c.pump?.toughness ?? 0) + tough },
+        // Two switches are none.
+        ...(pump.power === "switch" ? { switched: !c.switched } : {}),
+        ...(pump.keywords.length ? { eot: [...(c.eot ?? []), ...pump.keywords.map((k) => k[0]!.toUpperCase() + k.slice(1))] } : {}),
+      }));
+      const after = stats(book, findCard(g, pumpHost.iid)!.card);
+      say(g, seat, `${card.name}: ${pumpHost.name} is ${after.power}/${after.toughness} until end of turn.`);
+      if (pump.draw && !action.effects.some((e) => e.type === "draw")) drawCards(g, seat, pump.draw, book);
+    }
+    let effects = action.effects.filter(
+      (e) => !(made && e.type === "mana") && !(randomDiscard && e.type === "discard" && e.player !== (seat === "opp" ? "player" : "ai")) && !(pump && e.type === "pump")
+    );
     if (tutor) {
       // A tutor's find goes where the card says (the top, for Mystical
       // Tutor), whatever the plan said; and it finds one card.
@@ -3187,10 +3364,53 @@ function resolveCast(g: PracticeGame, seat: Seat, card0: PlayCard, action: PlanA
         return [{ ...e, to }];
       });
     }
+    // A draw spell that discards, exiles cards to play or untaps lands is
+    // the table's to carry out (below): the plan's own draw and discard
+    // would make it two.
+    const loot = seat === "opp" ? lootOf(infoOf(book, card)) : null;
+    if (loot) effects = effects.filter((e) => e.type !== "draw" && !(e.type === "discard" && e.player !== "player"));
     for (let i = 0; i <= copies && !g.winner; i++) {
       if (made?.length) applyEffects(g, seat, [{ type: "mana", target: null, player: null, amount: null, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: made.map((u) => `{${u}}`).join("") }], book, i ? `${card.name} (copy)` : card.name, card);
       applyEffects(g, seat, effects, book, i ? `${card.name} (copy)` : card.name, card);
       checkState(g, book);
+    }
+    if (loot && !g.winner) {
+      // The spell itself is on its way to the graveyard, not a card to discard.
+      moveTo(g, card.iid, "graveyard");
+      const discard = (n: number) => {
+        const gone: string[] = [];
+        for (let i = 0; i < n; i++) {
+          const pick = aiDiscardPick(g, seat, book, combos);
+          if (!pick) break;
+          moveTo(g, pick.iid, "graveyard");
+          gone.push(pick.name);
+        }
+        return gone;
+      };
+      const before = loot.discardFirst ? discard(loot.discard ?? 0) : [];
+      // "If you do": with no card to discard, no cards.
+      const paid = !loot.discardFirst || before.length === (loot.discard ?? 0);
+      if (before.length) say(g, seat, `${card.name}: ${who(seat)} ${verb(seat, "discard")} ${before.join(", ")}.`);
+      if (paid && loot.draw) {
+        say(g, seat, `${card.name}: ${who(seat)} ${verb(seat, "draw")} ${loot.draw === 1 ? "a card" : `${loot.draw} cards`}.`);
+        drawCards(g, seat, loot.draw, book);
+      }
+      const after = loot.discardFirst ? [] : discard(loot.discard ?? 0);
+      if (after.length) say(g, seat, `${card.name}: ${who(seat)} ${verb(seat, "discard")} ${after.join(", ")}.`);
+      if (loot.impulse) {
+        // Its to play until the end of its next turn: in its hand till then.
+        const until = g.turn + (g.active === seat ? 2 : 1);
+        const top = g.sides[seat].library.slice(0, loot.impulse).map((c) => ({ ...c, fleeting: true, ...(loot.impulseNow ? {} : { fleetingUntil: until }) }));
+        g.sides[seat] = { ...g.sides[seat], library: g.sides[seat].library.slice(top.length), hand: [...g.sides[seat].hand, ...top] };
+        if (top.length) {
+          say(g, seat, `${card.name}: the opponent exiles the top ${top.length === 1 ? "card" : `${top.length} cards`} of its library, and may play ${top.length === 1 ? "it" : "them"} ${loot.impulseNow ? "this turn" : "until the end of its next turn"}.`);
+        }
+      }
+      if (loot.untap) {
+        const lands = g.sides[seat].battlefield.filter((c) => c.tapped && isLand(c)).slice(0, loot.untap);
+        for (const l of lands) update(g, l.iid, (c) => ({ ...c, tapped: false }));
+        if (lands.length) say(g, seat, `${card.name}: ${who(seat)} ${verb(seat, "untap")} ${lands.map((l) => l.name).join(", ")}.`);
+      }
     }
     // Jeska's Will with a commander out: its other mode too. The top
     // three cards are its to play this turn (in hand until the turn ends).
@@ -3318,6 +3538,7 @@ function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: Ca
           const dealt = scaleDamage(g, book, caster, src, s, amount);
           say(g, caster, `${source} deals ${dealt} damage to ${s === "you" ? "you" : "the opponent"}.`);
           loseLife(g, s, dealt, book);
+          if (s !== caster) dealtDamage(g, caster, src ?? null, dealt, false, book);
         } else if (onField && isCreature(book, onField.card)) {
           const dealt = scaleDamage(g, book, caster, src, onField.seat, amount, false, true);
           update(g, onField.card.iid, (c) => ({ ...c, damage: (c.damage ?? 0) + dealt }));
@@ -3681,6 +3902,7 @@ export function resolveCombat(g0: PracticeGame, book: CardBook): PracticeGame {
     player, draw a card". */
 function hitTriggers(g: PracticeGame, seat: Seat, hitter: PlayCard, book: CardBook, damage = 0) {
   const foe = other(seat);
+  dealtDamage(g, seat, hitter, damage, true, book);
   // Treasures for the hit: the creature's own (Ragavan, Ancient Copper
   // Dragon's d20), and Old Gnawbone's "that many" for any of yours.
   const own = treasureOnHitOf(book, hitter);

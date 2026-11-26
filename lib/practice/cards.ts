@@ -29,10 +29,10 @@ export function stats(book: CardBook, card: PlayCard): { power: number; toughnes
   const face = card.flipped && info?.back ? info.back : info;
   const base = card.token ?? { power: face?.power ?? 1, toughness: face?.toughness ?? 1 };
   const plus = card.counters ?? 0;
-  return {
-    power: base.power + plus + (card.pump?.power ?? 0) + (card.boost?.power ?? 0),
-    toughness: base.toughness + plus + (card.pump?.toughness ?? 0) + (card.boost?.toughness ?? 0),
-  };
+  const power = base.power + plus + (card.pump?.power ?? 0) + (card.boost?.power ?? 0);
+  const toughness = base.toughness + plus + (card.pump?.toughness ?? 0) + (card.boost?.toughness ?? 0);
+  // A switch (Twisted Image) comes after everything else.
+  return card.switched ? { power: toughness, toughness: power } : { power, toughness };
 }
 
 /** A keyword, from Scryfall's list or the card's text ("can't be blocked"). */
@@ -951,6 +951,25 @@ export function hitTriggersOf(book: CardBook, card: PlayCard): HitTrigger[] {
   }
   return out;
 }
+
+/** What a hit on an opponent brings, beyond combat-damage triggers:
+    - an Aura on the creature: "Whenever enchanted creature deals damage to
+      an opponent, you may draw a card" (Curiosity, Ophidian Eye), or the
+      same given in quotes (Snake Umbra);
+    - Tandem Lookout, for itself and the creature it's paired with;
+    - "Whenever a source you control deals noncombat damage to an opponent,
+      you draw that many cards" (Niv-Mizzet, Visionary);
+    - "…you may exile that many cards from the top of your library. You may
+      play those cards this turn" (Thor, Guardian of Midgard; Virtue of
+      Courage). */
+export const drawsOnDamageAura = (info: CardInfo | undefined) =>
+  /\bAura\b/.test((info?.typeLine ?? "").split(" // ")[0]!) &&
+  /whenever enchanted creature deals damage to an opponent, (?:you may )?draw a card|has "whenever this creature deals damage to an opponent, (?:you may )?draw a card\."/i.test(frontText(info));
+export const soulbondDrawOf = (info: CardInfo | undefined) =>
+  /\bsoulbond\b/i.test(frontText(info)) && /each of those creatures has "whenever this creature deals damage to an opponent, (?:you may )?draw a card\."/i.test(frontText(info));
+export const noncombatDrawOf = (info: CardInfo | undefined) => /whenever a source you control deals noncombat damage to an opponent, you draw that many cards/i.test(frontText(info));
+export const noncombatImpulseOf = (info: CardInfo | undefined) =>
+  /whenever a source you control deals noncombat damage to an opponent, you may exile that many cards from the top of your library\. you may play those cards this turn/i.test(frontText(info));
 
 // ── Wheels ────────────────────────────────────────────────────────────
 

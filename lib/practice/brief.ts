@@ -4,7 +4,7 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { burdenDrawOf, canPlayAsLand, cloneTypeOf, digAbilityOf, nonlandManaBonusOf, permanentFetchOf, tapTreasureOf, transmuteOf, goesWhenALandIsPlayed, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
+import { drawsOnDamageAura, soulbondDrawOf, noncombatDrawOf, noncombatImpulseOf, burdenDrawOf, canPlayAsLand, cloneTypeOf, digAbilityOf, nonlandManaBonusOf, permanentFetchOf, tapTreasureOf, transmuteOf, goesWhenALandIsPlayed, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
 import { availableMana, castable, cardId, comboStatus, lifeFor, loyaltyOf, uncastable } from "./game";
 import { comboHeadline, type DeckCombo } from "./combos";
 import {
@@ -34,7 +34,7 @@ import { manaSummary, manaTotal } from "./mana";
 import { makesTreasures, treasureSpellOf } from "./treasure";
 import { adNauseamOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, impulseOf, landsForManaOf, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import { damageRuleOf } from "./damage";
-import { cardTypesAmong, tutorOf } from "./spells";
+import { cardTypesAmong, lootOf, pumpSpellOf, tutorOf } from "./spells";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
 const EFFECT_TYPES: EffectType[] = ["damage", "life", "destroy", "exile", "bounce", "tap", "untap", "draw", "discard", "mill", "token", "counters", "pump", "search", "mana", "note"];
@@ -294,6 +294,15 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (hasTriggers(book, front))
       notes.push("its simple triggers (a card, life, tokens or counters when it enters or attacks, at your upkeep or end step, when lands or creatures enter, when creatures die, when the player draws or casts) happen by themselves: give it no effects for them");
     if (punishesIdleOf(book, front)) notes.push("the end-step damage for creatures that didn't attack happens by itself, to both players: attack with what you can");
+    // Spells the table carries out whole.
+    const pump = pumpSpellOf(info);
+    if (pump && !pump.modal) {
+      notes.push(
+        `the app carries it out: it goes on the creature its effects target, else on your creature whose mana counts its power, else your biggest attacker${pump.pitch ? `; with "x" left at 0 it's paid by exiling your dearest spare card of that colour from your hand, X that card's mana value` : ""}. Cast it before that creature's mana is used`
+      );
+    } else if (pump) notes.push('to use its pump mode, give it one effect of type "pump" whose target is your creature: the app does the rest');
+    if (lootOf(info)) notes.push("its draw, its discard and the cards it exiles for you to play happen by themselves (the app picks the discard): give it no effects");
+    if (drawsOnDamageAura(info) || soulbondDrawOf(info) || noncombatDrawOf(info) || noncombatImpulseOf(info)) notes.push("the cards it gives when your creature or your spell hurts the player come by themselves");
     if (notes.length) out.push(`- ${info.name}: ${notes.join("; ")}.`);
   }
   return out;
