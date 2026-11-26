@@ -187,7 +187,8 @@ export interface Effect {
 }
 
 export interface PlanAction {
-  kind: "land" | "cast" | "activate";
+  /** combo: go for one of the deck's combos (lib/practice/combos.ts); `card` is the combo's id. */
+  kind: "land" | "cast" | "activate" | "combo";
   card: string;
   /** X, for a spell with X in its cost. */
   x: number | null;

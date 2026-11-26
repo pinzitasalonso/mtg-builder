@@ -4,7 +4,8 @@
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
 import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, searchOnCast, stats, wheelSpellOf } from "./cards";
-import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, indestructible, lifeFor, spellCost } from "./game";
+import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, comboStatus, indestructible, lifeFor, spellCost } from "./game";
+import { comboOutcome, type DeckCombo } from "./combos";
 import { equipOf } from "./abilities";
 import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
 import { treasureSpellOf } from "./treasure";
@@ -168,7 +169,7 @@ const blank = (type: Effect["type"]): Effect => ({ ...drawEffect(0), type, playe
 /** What a tutor finds: the biggest card it can cast next turn (with one
     more land), or else the biggest. Lands only when it has none in hand and
     few out. */
-function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): Effect[] | null {
+function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, combos: DeckCombo[] = []): Effect[] | null {
   const t = tutorOf(infoOf(book, c));
   if (!t || g.sides[seat].life - t.lose < 10) return null;
   const side = g.sides[seat];
@@ -193,7 +194,20 @@ function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): Ef
       : isOracle(x) && !holdsOracle && side.library.some(isExiler)
         ? 50000
         : 0;
-  const score = (x: PlayCard) => combo(x) + (needLand && isLand(x) ? 10000 : 0) + (mv(x) <= reach ? 1000 : 0) + mv(x) * 10 + (isCreature(book, x) ? 1 : 0);
+  // A piece of one of the deck's combos that is still in the library: the
+  // fewer pieces that combo lacks, the more it's worth finding.
+  const lacking = new Map<string, number>();
+  for (const k of combos) {
+    if (comboOutcome(k.produces) === "other") continue;
+    const st = comboStatus(g, seat, k, book);
+    if (!st.missing.length || st.missing.some((m) => m.where !== "library")) continue;
+    for (const m of st.missing) lacking.set(m.name.toLowerCase(), Math.min(lacking.get(m.name.toLowerCase()) ?? 9, st.missing.length));
+  }
+  const piece = (x: PlayCard) => {
+    const n = lacking.get(x.name.toLowerCase()) ?? lacking.get(x.name.split(" // ")[0]!.toLowerCase());
+    return n ? 80000 - n * 5000 : 0;
+  };
+  const score = (x: PlayCard) => combo(x) + piece(x) + (needLand && isLand(x) ? 10000 : 0) + (mv(x) <= reach ? 1000 : 0) + mv(x) * 10 + (isCreature(book, x) ? 1 : 0);
   const pick = fits.reduce((a, b) => (score(b) > score(a) ? b : a));
   const effects: Effect[] = [{ ...blank("search"), name: pick.name, to: t.search.to[0]!.zone === "top" ? "top" : "hand" }];
   if (t.lose) effects.push({ ...blank("life"), player: "ai", amount: -t.lose });
@@ -246,13 +260,13 @@ function wipePlan(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): Pla
     with an empty library, a lethal storm or burn turn), checked by
     playing it out; null otherwise. A model game uses it too: a win the
     table can see isn't left to the model to find. */
-export function winningTurn(g: PracticeGame, book: CardBook, seat: Seat = "opp"): TurnPlan | null {
+export function winningTurn(g: PracticeGame, book: CardBook, seat: Seat = "opp", combos: DeckCombo[] = []): TurnPlan | null {
   if (g.winner || g.choice || g.combat || g.active !== seat) return null;
   const out: { wins?: boolean } = {};
-  const plan = fallbackPlan(g, book, seat, out);
+  const plan = fallbackPlan(g, book, seat, out, combos);
   if (!out.wins) return null;
   let after = g;
-  for (const a of plan.main) after = applyAction(after, seat, a, book).game;
+  for (const a of plan.main) after = applyAction(after, seat, a, book, { combos }).game;
   return after.winner === seat ? plan : null;
 }
 
@@ -268,7 +282,7 @@ function wheelWorth(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): b
 /** The turn without the model: a land (the one that unlocks the most), then
     the biggest permanents it can pay for, then spells that only draw, then
     safe attacks. */
-export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp", out: { wins?: boolean } = {}): TurnPlan {
+export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp", out: { wins?: boolean } = {}, combos: DeckCombo[] = []): TurnPlan {
   const side = g.sides[seat];
   const main: PlanAction[] = [];
   const lands = side.hand.filter(canPlayAsLand);
@@ -318,11 +332,45 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     };
     return true;
   };
+  // A combo it can go for now: its pieces in place (or castable this turn)
+  // and its mana there. A win, or milling the player out, comes before
+  // anything else; endless mana is taken and then spent as usual.
+  const combo = comboLine_();
+  if (combo && combo.ends) {
+    out.wins = combo.wins;
+    return { main: [...main, ...combo.actions], attack: [], after_combat: [], say: "" };
+  }
   // A way to win now comes before anything else.
   const win = winLine();
   if (win) {
     out.wins = true;
     return { main: [...main, ...win], attack: [], after_combat: [], say: "" };
+  }
+  function comboLine_(): { actions: PlanAction[]; ends: boolean; wins: boolean } | null {
+    for (const c of combos) {
+      const outcome = comboOutcome(c.produces);
+      if (outcome === "other") continue;
+      const status = comboStatus(sim, seat, c, book);
+      if (status.missing.length || status.blocked) continue;
+      // Cast the pieces that have to be out, on a copy of the table, then look again.
+      let t = sim;
+      const actions: PlanAction[] = [];
+      let ok = true;
+      for (const piece of status.toCast) {
+        const a = blankAction("cast", piece.iid);
+        const r = applyAction(t, seat, a, book);
+        if (!r.ok) {
+          ok = false;
+          break;
+        }
+        t = r.game;
+        actions.push(a);
+      }
+      if (!ok || !comboStatus(t, seat, c, book).ready) continue;
+      actions.push({ ...blankAction("cast", 0), kind: "combo", card: c.id });
+      return { actions, ends: outcome === "win" || outcome === "mill", wins: outcome === "win" };
+    }
+    return null;
   }
   function winLine(): PlanAction[] | null {
     const hand = sim.sides[seat].hand;
@@ -471,7 +519,7 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
   for (const { c, zone } of candidates) {
     if (!castable(sim, seat, c, book, zone)) continue;
     // A tutor needs something worth finding; a draw spell, the life to spare.
-    const found = tutorOf(infoOf(book, c)) ? tutorPick(sim, seat, c, book) : null;
+    const found = tutorOf(infoOf(book, c)) ? tutorPick(sim, seat, c, book, combos) : null;
     if (tutorOf(infoOf(book, c)) && !found) continue;
     const drawSpell = drawSpellOf(infoOf(book, c));
     if (!payIn(spellCost(sim, seat, c, book, zone))) continue;
@@ -484,6 +532,8 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
       sim.sides[seat] = { ...sim.sides[seat], life: sim.sides[seat].life - drawSpell.lose };
     } else main.push(blankAction("cast", c.iid));
   }
+  // A combo for endless mana, if it's there (its win, when the deck has one, is a combo of its own).
+  if (combo && !combo.ends) main.push(...combo.actions);
   // Then the Equipment that's on nothing, onto its best creature, while it
   // can pay. (An Equipment cast this turn waits for the next: it isn't on
   // the battlefield the planner looks at.)
@@ -543,9 +593,9 @@ const usableAbility = (text: string) => text.split("\n").some((line) => /^[^:"]{
     with an ability to use: all there is to do is play the land (or pass).
     The table plays that without asking the model, which would take its
     time to say the same. Early turns are mostly these. */
-export function simpleTurn(g: PracticeGame, book: CardBook, seat: Seat = "opp"): TurnPlan | null {
+export function simpleTurn(g: PracticeGame, book: CardBook, seat: Seat = "opp", combos: DeckCombo[] = []): TurnPlan | null {
   if (g.winner || g.choice || g.combat || g.active !== seat) return null;
-  const plan = fallbackPlan(g, book, seat);
+  const plan = fallbackPlan(g, book, seat, {}, combos);
   if (plan.attack.length || plan.after_combat.length || plan.main.some((a) => a.kind !== "land")) return null;
   // The table as it is once the land is down (a fetch land has fetched).
   let after = g;

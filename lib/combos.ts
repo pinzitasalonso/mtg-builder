@@ -21,6 +21,13 @@ export interface ComboLine {
   manaNeeded: string;
   /** Spellbook's step-by-step, newline separated. */
   steps: string;
+  /** Where each piece has to be for the combo to start, by its name: B
+      (battlefield), H (hand), G (graveyard), E (exile), C (command zone),
+      L (library). Missing in answers decoded before this was kept. */
+  zones?: Record<string, string[]>;
+  /** What else has to be true ("Isochron Scepter has imprinted Dramatic
+      Reversal"), in Spellbook's words. */
+  prerequisites?: string;
 }
 
 export interface ComboResult {
@@ -44,7 +51,9 @@ export interface ComboInput {
 
 interface RawCombo {
   id?: string | number;
-  uses?: { card?: { name?: string } }[];
+  uses?: { card?: { name?: string }; zoneLocations?: string[] }[];
+  easyPrerequisites?: string;
+  notablePrerequisites?: string;
   produces?: { feature?: { name?: string } }[];
   description?: string;
   manaNeeded?: string;
@@ -73,6 +82,12 @@ export function normalizeCombos(body: unknown): ComboResult {
         .filter((n): n is string => typeof n === "string" && n.length > 0),
       manaNeeded: typeof raw.manaNeeded === "string" ? raw.manaNeeded : "",
       steps: typeof raw.description === "string" ? raw.description : "",
+      zones: Object.fromEntries(
+        (raw.uses ?? [])
+          .filter((u) => typeof u.card?.name === "string" && Array.isArray(u.zoneLocations))
+          .map((u) => [u.card!.name!, u.zoneLocations!.filter((z): z is string => typeof z === "string" && /^[BHGECL]$/.test(z))])
+      ),
+      prerequisites: [raw.easyPrerequisites, raw.notablePrerequisites].filter((t): t is string => typeof t === "string" && t.trim().length > 0).join(" ").trim(),
     });
   }
   return { combos, hasTwoCardCombo };

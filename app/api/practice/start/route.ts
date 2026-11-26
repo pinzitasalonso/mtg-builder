@@ -9,6 +9,8 @@ import { rateLimit } from "@/lib/ratelimit";
 import { scanVersionURL } from "@/lib/scan-url";
 import { deckFromDb, deckFromEdhrec, deckFromMtgtop8, type PracticeDeck } from "@/lib/practice/decks";
 import { cleanOpponent } from "@/lib/practice/opponents";
+import { findCombos } from "@/lib/combos";
+import { deckCombos } from "@/lib/practice/combos";
 
 /** A picture for a deck: its commander's art. */
 function coverOf(deck: PracticeDeck): string | null {
@@ -57,6 +59,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Couldn't load that opponent's deck. Try another." }, { status: 502 });
   }
 
+  // The opponent's combos, from Commander Spellbook: how a combo deck
+  // wins. The model is told them, and the built-in planner (the basic
+  // opponent, and any turn the model misses) goes for them too. No answer
+  // from Spellbook, no combos: the match starts all the same.
+  const oppCommanders = new Set((opp.commander ?? "").split("+").map((n) => n.trim().toLowerCase()).filter(Boolean));
+  const combos = deckCombos((await findCombos(opp.cards.map((c) => ({ name: c.name, quantity: c.quantity, isCommander: oppCommanders.has(c.name.toLowerCase()) })))).combos);
+
   const book = { ...you.book, ...opp.book };
   const commanderGame = !!(you.commander || opp.commander);
   await prisma.practiceGame.update({
@@ -67,7 +76,7 @@ export async function POST(req: Request) {
       // The opponent as picked, for "play it again": its tile's words and
       // picture, or the loaded deck's where the tile had none.
       opponent: JSON.stringify({ ...o, label: o.label || opp.label, detail: o.detail || opp.detail, image: o.image ?? coverOf(opp) }),
-      setup: JSON.stringify({ book, oppDeck: opp.cards.map((c) => ({ name: c.name, quantity: c.quantity })), oppCommander: opp.commander }),
+      setup: JSON.stringify({ book, oppDeck: opp.cards.map((c) => ({ name: c.name, quantity: c.quantity })), oppCommander: opp.commander, combos }),
     },
   });
   void recordEvent("practice_game");
@@ -77,6 +86,7 @@ export async function POST(req: Request) {
     commanderGame,
     aiTurns: PRACTICE_AI_TURNS,
     book,
+    combos,
     you: { label: you.label, cards: you.cards, commander: you.commander },
     opp: { label: opp.label, detail: opp.detail, cards: opp.cards, commander: opp.commander },
   });

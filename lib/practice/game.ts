@@ -101,6 +101,7 @@ import {
   winsWithTreasures,
 } from "./treasure";
 import { colorsOfCost, manaSources, manaTotal, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
+import { comboHeadline, comboOutcome, type DeckCombo } from "./combos";
 import { type PendingTax, other, type CardBook, type Choice, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
@@ -1222,6 +1223,146 @@ export interface CastStage {
   stage?: "pay" | "resolve" | "counter";
   /** "counter": what countered it, for the log. */
   by?: string;
+  /** The deck's combos, for a plan's "combo" action. */
+  combos?: DeckCombo[];
+}
+
+// ── Combos (lib/practice/combos.ts) ────────────────────────────────────
+
+/** Where a combo stands for a seat right now. */
+export interface ComboStatus {
+  /** Every piece is in place and its mana can be paid: it can go off. */
+  ready: boolean;
+  /** Pieces that must be on the battlefield and are still in hand or the
+      command zone: cast them first. */
+  toCast: PlayCard[];
+  /** Pieces out of reach, and where each one is. */
+  missing: { name: string; where: Zone | "nowhere" }[];
+  /** With every piece in place, what still stops it. */
+  blocked: string | null;
+}
+
+const COMBO_ZONE: Record<string, Zone> = { B: "battlefield", H: "hand", G: "graveyard", E: "exile", C: "command", L: "library" };
+const ZONE_ORDER: Zone[] = ["battlefield", "hand", "command", "graveyard", "exile", "library"];
+/** Do the combo's steps tap this card, or use an ability of its own? */
+function usesByTapping(steps: string, name: string): boolean {
+  const short = name.split(" // ")[0]!.split(",")[0]!.toLowerCase();
+  const text = steps.toLowerCase();
+  return ["tap " + short, "tapping " + short, "activate " + short, "activating " + short].some((t) => text.includes(t));
+}
+const sameCard = (card: PlayCard, name: string) => {
+  const want = name.toLowerCase();
+  return card.name.toLowerCase() === want || card.name.split(" // ")[0]!.toLowerCase() === want;
+};
+
+/** A piece of a combo, where the seat has it (the zone that suits the combo
+    best), and whether that is where the combo wants it. */
+function comboPiece(g: PracticeGame, seat: Seat, piece: DeckCombo["pieces"][number]) {
+  const wanted = new Set(piece.zones.map((z) => COMBO_ZONE[z]).filter(Boolean) as Zone[]);
+  // What the table doesn't model stands in: a card to be imprinted or
+  // exiled ("E") counts from the hand, a commander piece from its zone.
+  if (wanted.has("exile")) wanted.add("hand");
+  const side = g.sides[seat];
+  const found = ZONE_ORDER.flatMap((zone) => side[zone].filter((c) => sameCard(c, piece.name)).map((card) => ({ zone, card })));
+  if (found.some((f) => f.card.commander) && wanted.has("hand")) wanted.add("command");
+  const placed = found.find((f) => wanted.has(f.zone));
+  return { wanted, placed, anywhere: found[0] };
+}
+
+export function comboStatus(g: PracticeGame, seat: Seat, combo: DeckCombo, book: CardBook): ComboStatus {
+  const out: ComboStatus = { ready: false, toCast: [], missing: [], blocked: null };
+  for (const piece of combo.pieces) {
+    const { wanted, placed, anywhere } = comboPiece(g, seat, piece);
+    if (placed) {
+      // A creature that has to tap can't the turn it arrives (unless it has haste).
+      const c = placed.card;
+      if (placed.zone === "battlefield" && isCreature(book, c) && isSick(book, c, g.turn) && usesByTapping(combo.steps, c.name)) {
+        out.blocked ??= `${c.name} arrived this turn: it can't be used yet.`;
+      }
+      continue;
+    }
+    if (wanted.has("battlefield") && anywhere && (anywhere.zone === "hand" || anywhere.zone === "command")) out.toCast.push(anywhere.card);
+    else out.missing.push({ name: piece.name, where: anywhere?.zone ?? "nowhere" });
+  }
+  if (out.missing.length || out.toCast.length) return out;
+  if (!out.blocked && totalOf(parseCost(combo.manaNeeded)) > 0 && !aiPay(g, seat, parseCost(combo.manaNeeded), availableMana(g, seat, book), book)) {
+    out.blocked = `It needs ${combo.manaNeeded} and the mana isn't there.`;
+  }
+  out.ready = !out.blocked;
+  return out;
+}
+
+/** Go for a combo. "pay" checks it (every piece in place, the mana paid),
+    casts the pieces it uses from the hand, and says what's coming: the
+    table then stops for the player's answer. "resolve" looks again: with a
+    piece gone it's broken; otherwise what it makes is carried out: a win
+    ends the game, a mill empties the player's library, endless mana fills
+    the pool for the rest of the phase, and anything else is said in the
+    log. With no stage, both at once. */
+export function applyCombo(g0: PracticeGame, seat: Seat, combo: DeckCombo, book: CardBook, opts: { stage?: "pay" | "resolve" } = {}): Step {
+  if (g0.winner) return { game: g0, ok: false };
+  const g = structuredClone(g0);
+  const names = combo.pieces.map((p) => p.name).join(" + ");
+  const isSpell = (c: PlayCard) => resolvesToGraveyard(infoOf(book, c)?.typeLine ?? c.typeLine);
+  if (opts.stage !== "resolve") {
+    const status = comboStatus(g, seat, combo, book);
+    if (!status.ready) {
+      const why = status.missing.length
+        ? `${status.missing.map((m) => m.name).join(" and ")} ${status.missing.length === 1 ? "isn't" : "aren't"} in place`
+        : status.toCast.length
+          ? `${status.toCast.map((c) => c.name).join(" and ")} must be cast first`
+          : (status.blocked ?? "it isn't ready");
+      say(g, seat, `(${who(seat)} tried to go for ${names}, but ${why.replace(/\.$/, "")}.)`);
+      return { game: g, ok: false };
+    }
+    const cost = parseCost(combo.manaNeeded);
+    if (totalOf(cost) > 0) {
+      const sources = availableMana(g, seat, book);
+      const paid = aiPay(g, seat, cost, sources, book);
+      if (!paid) return { game: g, ok: false };
+      spend(g, seat, paid, sources, book);
+      loseLife(g, seat, paid.life, book);
+    }
+    // Its pieces in hand are cast as part of it: a spell goes to the
+    // graveyard, a permanent onto the battlefield.
+    for (const piece of combo.pieces) {
+      const at = comboPiece(g, seat, piece).placed;
+      if (at && (at.zone === "hand" || at.zone === "command") && !piece.zones.includes("E")) moveTo(g, at.card.iid, isSpell(at.card) ? "graveyard" : "battlefield");
+    }
+    say(g, seat, `${seat === "you" ? "You go" : "The opponent goes"} for a combo: ${names}.`);
+    say(g, seat, `It makes: ${combo.produces.slice(0, 4).join(", ") || "a loop"}.`);
+    if (opts.stage === "pay") return { game: g, ok: true };
+  }
+  // Is every piece still there? (You may have answered.)
+  for (const piece of combo.pieces) {
+    const found = ZONE_ORDER.flatMap((zone) => g.sides[seat][zone].filter((c) => sameCard(c, piece.name)).map((card) => ({ zone, card })));
+    const live = found.some((f) => (isSpell(f.card) ? f.zone === "graveyard" || f.zone === "hand" || f.zone === "exile" : f.zone === "battlefield" || (piece.zones.includes("G") && f.zone === "graveyard") || (piece.zones.includes("E") && (f.zone === "exile" || f.zone === "hand"))));
+    if (!live) {
+      say(g, seat, `The combo is broken: ${piece.name} is gone.`);
+      return { game: g, ok: true };
+    }
+  }
+  const outcome = comboOutcome(combo.produces);
+  const headline = comboHeadline(combo);
+  if (outcome === "win") {
+    say(g, seat, `${names}: ${headline.toLowerCase()}. ${seat === "you" ? "You win." : "The opponent wins."}`);
+    g.winner = seat;
+  } else if (outcome === "mill") {
+    const foe = other(seat);
+    g.sides[foe] = { ...g.sides[foe], graveyard: [...g.sides[foe].graveyard, ...g.sides[foe].library], library: [] };
+    say(g, seat, `${names}: ${foe === "you" ? "your" : "the opponent's"} whole library goes to the graveyard.`);
+  } else if (outcome === "mana") {
+    // Endless mana, as much as a turn can use, until the phase ends. A
+    // unit of every colour pays for anything.
+    const colourless = !combo.produces.some((p) => /colored mana|mana nonland permanents|infinite mana$/i.test(p));
+    if (!g.pool) g.pool = { you: [], opp: [] };
+    g.pool[seat] = [...g.pool[seat], ...Array<string>(40).fill(colourless ? "C" : "WUBRG")];
+    say(g, seat, `${names}: ${headline.toLowerCase()}. ${who(seat)} ${seat === "you" ? "have" : "has"} all the ${colourless ? "colourless " : ""}mana ${seat === "you" ? "you" : "it"} can use this phase.`);
+  } else {
+    say(g, seat, `${names}: ${combo.produces.slice(0, 3).join(", ").toLowerCase() || "a loop"}. (The table doesn't carry this one out: resolve it by hand.)`);
+  }
+  checkState(g, book);
+  return { game: g, ok: true };
 }
 
 export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, book: CardBook, opts: CastStage = {}): Step {
@@ -1233,6 +1374,11 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     say(g, seat, why);
     return { game: g, ok: false };
   };
+  if (action.kind === "combo") {
+    const combo = opts.combos?.find((c) => c.id === action.card);
+    if (!combo) return fail(`(The opponent tried a combo its deck doesn't have.)`);
+    return applyCombo(g0, seat, combo, book, { stage: opts.stage === "counter" ? undefined : opts.stage });
+  }
   if (!at || at.seat !== seat) return fail(`(The opponent tried to use a card it doesn't have.)`);
   const card = at.card;
   const info = infoOf(book, card);

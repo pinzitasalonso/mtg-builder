@@ -16,6 +16,7 @@ import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, wheelAbilityOf, type Search } from "@/lib/practice/cards";
 import { equipOf, tapTribeOf, untapLandsOf } from "@/lib/practice/abilities";
+import { comboHeadline, type DeckCombo } from "@/lib/practice/combos";
 import { canPayNextTax, declineTax, payTax, playerDraws, concede,
   addCounters,
   adjustLife,
@@ -85,6 +86,8 @@ interface Setup {
   book: CardBook;
   you: { label: string; cards: DeckCard[]; commander: string | null };
   opp: { label: string; detail: string; cards: DeckCard[]; commander: string | null };
+  /** The opponent deck's combos (absent in a game kept from before they were). */
+  combos?: DeckCombo[];
 }
 // "respond": the opponent has cast a spell and waits for your answer.
 // "ninjutsu": your attack's blocks are in, and you could ninjutsu a ninja in.
@@ -135,7 +138,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const [pile, setPile] = useState<{ seat: Seat; zone: "graveyard" | "exile" | "library" | "hand" } | null>(null);
   // The opponent's spell waiting for your answer, and how to give it.
   // What waits for your answer: the opponent's spell, or its end step.
-  const [pending, setPending] = useState<{ kind: "spell"; action: PlanAction; card: PlayCard; target?: string } | { kind: "end" } | null>(null);
+  const [pending, setPending] = useState<{ kind: "spell"; action: PlanAction; card: PlayCard; target?: string } | { kind: "end" } | { kind: "combo"; combo: DeckCombo } | null>(null);
   // The opponent's spell, shown big while it's cast (as in Arena), and what it targets.
   const [spotlight, setSpotlight] = useState<{ card: PlayCard; target?: string; targetIid?: number } | null>(null);
   const answerRef = useRef<((a: Answer) => void) | null>(null);
@@ -486,6 +489,29 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     return pause(BEAT, g);
   }
 
+  /** The opponent goes for a combo: paid for and announced, then it always
+      stops for you. A combo usually ends the game, so you get the moment
+      whatever you hold: cast an instant, or take a piece off the table by
+      hand if a card of yours would. Then it's carried out, if its pieces
+      are still there. */
+  async function aiCombo(g0: PracticeGame, a: PlanAction): Promise<PracticeGame> {
+    if (!setup) return g0;
+    const combos = setup.combos ?? [];
+    const combo = combos.find((c) => c.id === a.card);
+    const paid = applyAction(g0, "opp", a, setup.book, { stage: "pay", combos });
+    setGame(paid.game);
+    if (!paid.ok || !combo) return pause(BEAT, paid.game);
+    setPending({ kind: "combo", combo });
+    setMode("respond");
+    const answer = await new Promise<Answer>((resolve) => (answerRef.current = resolve));
+    answerRef.current = null;
+    setPending(null);
+    setMode("ai");
+    const g = applyAction(answer.g, "opp", a, setup.book, { stage: "resolve", combos }).game;
+    setGame(g);
+    return pause(BEAT, await waitChoice(g));
+  }
+
   /** The opponent's end step: if you could cast something, it stops for
       you to (card draw, removal you'd rather cast now). */
   async function endStepStop(g: PracticeGame): Promise<PracticeGame> {
@@ -546,7 +572,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     storeSaved(deckId, { setup, game: g0, as: "ai", option: lastOpponent.current });
     if (setup.bot) {
       // The basic bot: the built-in planner, here in the browser.
-      plan = fallbackPlan(g, setup.book);
+      plan = fallbackPlan(g, setup.book, "opp", {}, setup.combos ?? []);
       g = await pause(BEAT, g);
     } else
     try {
@@ -561,7 +587,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       plan = data.plan as TurnPlan;
       if (data.note) setAiNote(data.note);
     } catch (e) {
-      plan = fallbackPlan(g, setup.book);
+      plan = fallbackPlan(g, setup.book, "opp", {}, setup.combos ?? []);
       const why = e instanceof DOMException && e.name === "TimeoutError" ? "no answer in time" : e instanceof Error && e.message.startsWith("server") ? e.message : "offline";
       setAiNote(`The opponent played on instinct this turn (${why}).`);
     }
@@ -571,6 +597,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (plan.say) setSay(plan.say);
     for (const a of plan.main) {
       if (a.kind === "cast") g = await aiCast(g, a, "ai");
+      else if (a.kind === "combo") g = await aiCombo(g, a);
       else {
         g = applyAction(g, "opp", a, setup.book).game;
         setGame(g);
@@ -625,6 +652,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const actions = [...aiGraveyardCasts(g, setup.book), ...actions0];
     for (const a of actions) {
       if (a.kind === "cast") g = await aiCast(g, a, "ai");
+      else if (a.kind === "combo") g = await aiCombo(g, a);
       else {
         g = applyAction(g, "opp", a, setup.book).game;
         setGame(g);
@@ -1144,6 +1172,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           : mode === "respond" && pending
             ? pending.kind === "end"
               ? "The opponent's end step. Cast an instant now, or go on to your turn."
+              : pending.kind === "combo"
+                ? `The opponent goes for a combo: ${pending.combo.pieces.map((p) => p.name).join(" + ")} (${comboHeadline(pending.combo).toLowerCase()}). Answer it now, or let it happen.`
               : `The opponent casts ${pending.card.name}${pending.target ? ` on ${pending.target}` : ""}. Answer with an instant, or let it resolve.`
             : mode === "ai"
             ? "The opponent is playing…"
@@ -1171,8 +1201,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               Counter with {c.name}
             </button>
           ))}
-      <button type="button" className={pending.kind === "end" ? "pt-btn pt-btn-gold" : "pt-btn"} onClick={letResolve}>
-        {pending.kind === "end" ? "Go to my turn" : "Let it resolve"}
+      <button type="button" className={pending.kind === "spell" ? "pt-btn" : "pt-btn pt-btn-gold"} onClick={letResolve}>
+        {pending.kind === "end" ? "Go to my turn" : pending.kind === "combo" ? "Let it happen" : "Let it resolve"}
       </button>
       <button
         type="button"
@@ -1254,7 +1284,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           )}
           {/* The end-step stop has no card to show: its buttons stay up here.
               An answer to a spell sits with the spell, under the big card. */}
-          {mode === "respond" && pending?.kind === "end" && answerButtons}
+          {mode === "respond" && (pending?.kind === "end" || pending?.kind === "combo") && answerButtons}
           {mode === "over" && (
             <>
               <button type="button" className="pt-btn pt-btn-gold" onClick={() => void openReview()}>
