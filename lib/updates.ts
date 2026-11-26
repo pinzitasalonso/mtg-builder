@@ -51,7 +51,7 @@ export const UPDATES: Update[] = [
       { area: "Collection", text: "A Wishlist for the cards you want, next to your collection." },
       { area: "Decks", text: "Assemble deck: tick off the physical cards as you build, and see which of your other decks hold the ones you're missing." },
       { area: "Decks", text: "Free accounts can keep as many decks as they like." },
-      { area: "Spellpool Pro", text: "Pro is available on the web, with a new pricing page." },
+      { area: "Spellpool Pro", text: "A new pricing page: what Pro costs, and what it adds." },
       { area: "The site", text: "A round of fixes for speed and safety: quicker collection loads, sturdier imports and sign-in." },
     ],
   },
