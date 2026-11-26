@@ -39,23 +39,26 @@ import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan }
 
 const EFFECT_TYPES: EffectType[] = ["damage", "life", "destroy", "exile", "bounce", "tap", "untap", "draw", "discard", "mill", "token", "counters", "pump", "search", "mana", "note"];
 
-// Nullable fields as anyOf: the form structured outputs documents.
-const nullable = (type: string) => ({ anyOf: [{ type }, { type: "null" }] });
-const nullableEnum = (values: string[]) => ({ anyOf: [{ type: "string", enum: values }, { type: "null" }] });
+// Every field is required and has one type. A field that isn't used holds
+// its empty value: "" for text, 0 for a number, false, "none" for a choice.
+// (They used to be "this type or null". Structured outputs allow 16 such
+// fields a request, and this schema, with its two lists of actions, had 28:
+// the API refused every turn with a 400, and the built-in planner played
+// them all. PLAN_UNION_LIMIT's test keeps the count in check.)
 const EFFECT_SCHEMA = {
   type: "object",
   properties: {
     type: { type: "string", enum: EFFECT_TYPES },
-    target: nullable("string"),
-    player: nullableEnum(["ai", "player"]),
-    amount: nullable("integer"),
-    name: nullable("string"),
-    power: nullable("integer"),
-    toughness: nullable("integer"),
+    target: { type: "string" },
+    player: { type: "string", enum: ["ai", "player", "none"] },
+    amount: { type: "integer" },
+    name: { type: "string" },
+    power: { type: "integer" },
+    toughness: { type: "integer" },
     keywords: { type: "array", items: { type: "string" } },
-    to: nullableEnum(["battlefield", "hand", "top"]),
-    tapped: nullable("boolean"),
-    text: nullable("string"),
+    to: { type: "string", enum: ["battlefield", "hand", "top", "none"] },
+    tapped: { type: "boolean" },
+    text: { type: "string" },
   },
   required: ["type", "target", "player", "amount", "name", "power", "toughness", "keywords", "to", "tapped", "text"],
   additionalProperties: false,
@@ -65,17 +68,40 @@ const ACTION_SCHEMA = {
   properties: {
     kind: { type: "string", enum: ["land", "cast", "activate", "combo"] },
     card: { type: "string" },
-    x: nullable("integer"),
-    tap_card: nullable("boolean"),
-    sacrifice_card: nullable("boolean"),
-    mana: nullable("string"),
-    life: nullable("integer"),
+    x: { type: "integer" },
+    tap_card: { type: "boolean" },
+    sacrifice_card: { type: "boolean" },
+    mana: { type: "string" },
+    life: { type: "integer" },
     effects: { type: "array", items: EFFECT_SCHEMA },
   },
   required: ["kind", "card", "x", "tap_card", "sacrifice_card", "mana", "life", "effects"],
   additionalProperties: false,
 };
 /** The plan's shape, enforced by the API's structured outputs. */
+/** Structured outputs' limits on one request's schemas: fields that are
+    "this type or that" (anyOf, a list of types), and fields not listed as
+    required. Counted as the API counts them, each time one appears. */
+export const PLAN_UNION_LIMIT = 16;
+export const PLAN_OPTIONAL_LIMIT = 24;
+export function schemaCounts(schema: unknown): { unions: number; optional: number } {
+  let unions = 0;
+  let optional = 0;
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) return node.forEach(walk);
+    const n = node as Record<string, unknown>;
+    if (Array.isArray(n.anyOf) || Array.isArray(n.type)) unions++;
+    if (n.properties && typeof n.properties === "object") {
+      const required = new Set(Array.isArray(n.required) ? (n.required as string[]) : []);
+      optional += Object.keys(n.properties as object).filter((k) => !required.has(k)).length;
+    }
+    Object.values(n).forEach(walk);
+  };
+  walk(schema);
+  return { unions, optional };
+}
+
 export const PLAN_SCHEMA = {
   type: "object",
   properties: {
@@ -116,7 +142,7 @@ COMBOS
 - When your deck has combos, they are listed after your decklist, each with an id, its pieces, where each piece has to be, its mana and its steps. Each turn the brief says where every one stands: READY, what to cast first, or which piece is missing and where it is.
 - A combo deck wins with its combos. Assembling one comes before attacking: find the missing piece with a tutor or card draw, keep the mana for it, and don't spend a piece on anything else.
 - Endless mana is a win when you have a way to spend it over and over: an ability whose whole cost is mana and that draws, digs or deals damage (Kinnan, Thrasios). The app ends the game there.
-- To go for a combo that is READY: {"kind":"combo","card":"<combo id>"}, every other field null and effects []. The app pays its mana, casts the pieces it uses from your hand, and carries out what it makes: a combo that wins ends the game; endless mana fills your pool for the rest of the phase, so put what you spend it on right after. The player gets a moment to answer first, as for any spell.
+- To go for a combo that is READY: {"kind":"combo","card":"<combo id>"}, every other field empty and effects []. The app pays its mana, casts the pieces it uses from your hand, and carries out what it makes: a combo that wins ends the game; endless mana fills your pool for the rest of the phase, so put what you spend it on right after. The player gets a moment to answer first, as for any spell.
 - A piece that has to be on the battlefield is cast first, with an ordinary cast action earlier in the same turn. The brief tells you which.
 - Hold the combo pieces that do nothing alone (Thassa's Oracle, Demonic Consultation, Underworld Breach, Brain Freeze) and your rituals until the turn you can finish. Everything else is for using now: mana rocks, draw engines (Necropotence, Rhystic Study, Mystic Remora), tutors for the piece you lack. A combo deck that passes its early turns has lost its edge.
 - Each turn the brief shows THE APP'S LINE: what the app would play this turn. Play it, or something better. If your plan casts nothing, the app plays its line for you.
@@ -126,16 +152,16 @@ COMBOS
 
 ACTIONS
 - {"kind":"land","card":"<id>"}: play a land from your hand. A modal card with a land on its back (marked in your hand) can be cast as its front, or played as your land this way.
-- {"kind":"cast","card":"<id>","x":<n or null>,"effects":[...]}: cast a card from your hand or command zone. A permanent enters the battlefield; an instant or sorcery resolves and goes to your graveyard. "effects" is what the spell does, or what the permanent's enters-the-battlefield ability does, right now.
-- {"kind":"activate","card":"<id>","tap_card":<bool>,"sacrifice_card":<bool>,"mana":"{2}{G}" or null,"life":<n or null>,"effects":[...]}: an activated ability of a permanent you control, with its costs.
-Every field is always present; set the ones an action doesn't use to null (effects to []).
+- {"kind":"cast","card":"<id>","x":<n, or 0>,"effects":[...]}: cast a card from your hand or command zone. A permanent enters the battlefield; an instant or sorcery resolves and goes to your graveyard. "effects" is what the spell does, or what the permanent's enters-the-battlefield ability does, right now.
+- {"kind":"activate","card":"<id>","tap_card":<bool>,"sacrifice_card":<bool>,"mana":"{2}{G}" or "","life":<n, or 0>,"effects":[...]}: an activated ability of a permanent you control, with its costs.
+Every field is always present. One an action doesn't use holds its empty value: "" for text, 0 for a number, false for yes/no (effects: []).
 
-EFFECTS (every field present: unused ones null, keywords [] when unused)
+EFFECTS (every field present. Unused ones hold their empty value: "" for text, 0 for a number, false, "none" for player and to, [] for keywords)
 - damage: target is a card id, "player" or "ai"; amount.
 - life: player is "ai" or "player"; amount (negative to lose life).
 - destroy, exile, bounce (return to its owner's hand), tap, untap: target is a card id on the battlefield.
 - draw, discard, mill: player and amount. Your own discards pick themselves; the player chooses theirs.
-- token: name, power, toughness, amount (how many), keywords, tapped, and player (whose; null means yours).
+- token: name, power, toughness, amount (how many), keywords, tapped, and player (whose; "none" means yours).
 - counters: target and amount (+1/+1 counters; negative for -1/-1).
 - pump: target, power and toughness, until end of turn.
 - search: name (an exact card name from your deck still in your library), to ("battlefield", "hand", or "top" for a tutor that puts it on top of your library, like Vampiric Tutor), tapped.
@@ -391,7 +417,8 @@ export function sinceLastTurn(g: PracticeGame): string[] {
 }
 
 const int = (v: unknown, lo: number, hi: number) => (typeof v === "number" && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v))) : null);
-const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : null);
+// "" is the wire's "not used", as null is in a plan.
+const text = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.slice(0, max) : null);
 const bool = (v: unknown) => (typeof v === "boolean" ? v : null);
 
 function cleanEffect(raw: unknown): Effect | null {
@@ -402,13 +429,16 @@ function cleanEffect(raw: unknown): Effect | null {
     type: e.type as EffectType,
     target: text(e.target, 20),
     player: e.player === "ai" || e.player === "player" ? e.player : null,
-    amount: int(e.amount, -99, 99),
+    // 0 is the wire's "not used": the effect's own default applies.
+    amount: int(e.amount, -99, 99) || null,
     name: text(e.name, 80),
-    power: int(e.power, -20, 99),
-    toughness: int(e.toughness, -20, 99),
+    // A token's size and a pump's change are numbers the effect uses (0
+    // is a real one); any other effect leaves them out.
+    power: e.type === "token" || e.type === "pump" ? int(e.power, -20, 99) : null,
+    toughness: e.type === "token" || e.type === "pump" ? int(e.toughness, -20, 99) : null,
     keywords: Array.isArray(e.keywords) ? e.keywords.filter((k): k is string => typeof k === "string").slice(0, 6).map((k) => k.slice(0, 30)) : [],
     to: e.to === "battlefield" || e.to === "hand" || e.to === "top" ? e.to : null,
-    tapped: bool(e.tapped),
+    tapped: bool(e.tapped) || null,
     text: text(e.text, 200),
   };
 }
@@ -423,11 +453,11 @@ function cleanAction(raw: unknown): PlanAction | null {
   return {
     kind: a.kind,
     card,
-    x: int(a.x, 0, 30),
-    tap_card: bool(a.tap_card),
-    sacrifice_card: bool(a.sacrifice_card),
+    x: int(a.x, 0, 30) || null,
+    tap_card: bool(a.tap_card) || null,
+    sacrifice_card: bool(a.sacrifice_card) || null,
     mana: text(a.mana, 40),
-    life: int(a.life, 0, 20),
+    life: int(a.life, 0, 20) || null,
     effects: (Array.isArray(a.effects) ? a.effects : []).map(cleanEffect).filter((e): e is Effect => !!e).slice(0, 12),
   };
 }

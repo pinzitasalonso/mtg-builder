@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { normalizeCombos } from "../combos";
 import { fallbackPlan, simpleTurn, winningTurn } from "./ai";
-import { cleanPlan, comboBrief, systemPrompt } from "./brief";
+import { cleanPlan, comboBrief, PLAN_OPTIONAL_LIMIT, PLAN_SCHEMA, PLAN_UNION_LIMIT, schemaCounts, systemPrompt } from "./brief";
+import { ANALYSIS_SCHEMA } from "../deck-analysis";
+import { REPLACE_SCHEMA } from "../assemble-replace";
 import { asCombos, comboOutcome, deckCombos, type DeckCombo } from "./combos";
 import { applyAction, applyCombo, cardId, comboStatus, moveAnyCard, newGame, type DeckCard } from "./game";
 import type { CardBook, CardInfo, PlanAction, PracticeGame } from "./types";
@@ -196,5 +198,37 @@ describe("what the model is told", () => {
   it("a plan may name a combo by its id", () => {
     const plan = cleanPlan({ main: [comboAction("100-200"), { ...comboAction("c12"), kind: "cast" }, comboAction("bad id!")], attack: [], after_combat: [], say: "" });
     expect(plan!.main.map((a) => `${a.kind}:${a.card}`)).toEqual(["combo:100-200", "cast:c12"]);
+  });
+});
+
+describe("the plan the model writes", () => {
+  it("every schema sent to the API stays inside structured outputs' limits", () => {
+    // 16 fields that are "this type or null" a request, 24 that aren't
+    // required. The plan's schema once had 28 of the first, and the API
+    // refused every one of the smart opponent's turns.
+    for (const schema of [PLAN_SCHEMA, ANALYSIS_SCHEMA, REPLACE_SCHEMA]) {
+      const n = schemaCounts(schema);
+      expect(n.unions).toBeLessThanOrEqual(PLAN_UNION_LIMIT);
+      expect(n.optional).toBeLessThanOrEqual(PLAN_OPTIONAL_LIMIT);
+    }
+    expect(schemaCounts(PLAN_SCHEMA)).toEqual({ unions: 0, optional: 0 });
+    // The counter counts each place a field appears.
+    expect(schemaCounts({ type: "object", properties: { a: { anyOf: [{ type: "string" }, { type: "null" }] }, b: { type: ["integer", "null"] }, c: { type: "string" } }, required: ["a"] })).toEqual({ unions: 2, optional: 2 });
+  });
+
+  it("an unused field's empty value reads as not used", () => {
+    const wire = {
+      main: [
+        { kind: "cast", card: "c12", x: 0, tap_card: false, sacrifice_card: false, mana: "", life: 0, effects: [{ type: "search", target: "", player: "none", amount: 0, name: "Thassa's Oracle", power: 0, toughness: 0, keywords: [], to: "hand", tapped: false, text: "" }] },
+        { kind: "activate", card: "c13", x: 0, tap_card: true, sacrifice_card: false, mana: "{2}", life: 2, effects: [{ type: "token", target: "", player: "none", amount: 2, name: "Goblin", power: 0, toughness: 1, keywords: ["Haste"], to: "none", tapped: true, text: "" }] },
+      ],
+      attack: ["c14"],
+      after_combat: [],
+      say: "",
+    };
+    const plan = cleanPlan(wire)!;
+    expect(plan.main[0]).toEqual({ kind: "cast", card: "c12", x: null, tap_card: null, sacrifice_card: null, mana: null, life: null, effects: [{ type: "search", target: null, player: null, amount: null, name: "Thassa's Oracle", power: null, toughness: null, keywords: [], to: "hand", tapped: null, text: null }] });
+    // A token's 0 power is a real 0.
+    expect(plan.main[1]).toMatchObject({ tap_card: true, mana: "{2}", life: 2, effects: [{ type: "token", amount: 2, power: 0, toughness: 1, tapped: true }] });
   });
 });
