@@ -84,14 +84,40 @@ export function lordsOf(book: CardBook, card: PlayCard): Lord[] {
   return out;
 }
 
-/** "Enchanted creature gets +2/+2 and has flying." An Equipment's
-    "Equipped creature gets +2/+0." reads the same way. */
-export function auraBonusOf(book: CardBook, card: PlayCard): { power: number; toughness: number; keywords: string[] } | null {
+/** What an Aura or an Equipment gives the creature it's on: "Enchanted
+    creature gets +2/+2 and has flying", "Equipped creature gets +1/-1",
+    "…gets +10/+10 and loses flying", "…gets +1/+1 for each land you
+    control" (`count` says how many of a thing its controller has: without
+    it, a "for each" bonus is nothing). An ability in quotes it grants is
+    left to you; its keywords are read up to there. */
+export function auraBonusOf(
+  book: CardBook,
+  card: PlayCard,
+  count?: (what: string) => number | null
+): { power: number; toughness: number; keywords: string[] } | null {
   const text = textOf(book, card);
-  const gets = /(?:enchanted|equipped) creature gets ([+-]\d+)\/([+-]\d+)(?: and has ([a-z ,]+?))?(?:\.|$)/im.exec(text);
-  const hasOnly = /(?:enchanted|equipped) creature has ([a-z ,]+?)\./im.exec(text);
-  if (!gets && !hasOnly) return null;
-  return { power: gets ? Number(gets[1]) : 0, toughness: gets ? Number(gets[2]) : 0, keywords: kwList(gets?.[3] ?? hasOnly?.[1]) };
+  let power = 0;
+  let toughness = 0;
+  const keywords: string[] = [];
+  let any = false;
+  for (const m of text.matchAll(/\b(?:enchanted|equipped) (?:creature|permanent) gets ([+-]\d+)\/([+-]\d+)([^.\n]*)/gi)) {
+    const tail = m[3] ?? "";
+    // "…until end of turn" is an effect of the moment, not what it gives while attached.
+    if (/until end of turn/i.test(tail)) continue;
+    const each = /^ for each ([^.,"]+)/i.exec(tail);
+    const times = each ? (count ? count(each[1]!.trim().toLowerCase()) : null) : 1;
+    if (times === null) continue;
+    power += Number(m[1]) * times;
+    toughness += Number(m[2]) * times;
+    any = true;
+    const has = /\band has ([^."]+)/i.exec(tail);
+    if (has) keywords.push(...kwList(has[1]!.replace(/\s+(?:and|as long as|for as long as)\s*$/i, "")));
+  }
+  for (const m of text.matchAll(/\b(?:enchanted|equipped) (?:creature|permanent) has ([^."\n]+)/gi)) {
+    keywords.push(...kwList(m[1]!.replace(/\s+(?:and|as long as)\s*$/i, "")));
+    any = true;
+  }
+  return any ? { power, toughness, keywords: [...new Set(keywords)] } : null;
 }
 
 /** What an Aura may be put on, read from its "Enchant …" line: "Enchant
