@@ -60,6 +60,9 @@ export interface PlayCard {
   /** In hand for this turn only ("You may play them this turn", Jeska's
       Will): exiled at the end of the turn if it's still there. */
   fleeting?: boolean;
+  /** A card that entered as a copy of another (Copy Enchantment, Clone):
+      what it is itself, to go back to when it leaves the battlefield. */
+  cloneOf?: { name: string; typeLine: string | null; imageUri: string };
   /** Put on top of its owner's library by their own tutor this turn
       (Mystical Tutor): the opponent's Necropotence takes it at the end step. */
   sought?: boolean;
@@ -236,6 +239,13 @@ export function moveCard(
     delete card.loyalty;
     delete card.imprint;
     delete card.age;
+    // A copy is itself again.
+    if (card.cloneOf) {
+      card.name = card.cloneOf.name;
+      card.typeLine = card.cloneOf.typeLine;
+      card.imageUri = card.cloneOf.imageUri;
+      delete card.cloneOf;
+    }
   }
   let next = { ...state, [from]: state[from].filter((c) => c.iid !== iid) } as PlaytestState;
   // What was attached to it stays in play, attached to nothing.

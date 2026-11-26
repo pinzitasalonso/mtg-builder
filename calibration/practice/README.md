@@ -50,3 +50,19 @@ The table plays the planner's line when the model's turn casts nothing, and
 plays any win the planner can check, so the planner is the floor under
 every match. What the model does above that floor is in the saved matches
 (the admin page).
+
+## The spells the table can't carry out
+
+The same command prints, for each list, the instants and sorceries the
+table knows nothing of (`coverage.bench.ts`, `lib/practice/coverage.ts`):
+
+```
+Rograkh + Silas Renn (second list): 45 instants and sorceries, 13 the table can't carry out
+  Rain of Filth {B} — Until end of turn, lands you control gain "Sacrifice this land: Add {B}."
+  ...
+```
+
+The model has to describe those in effects, and often can't; the built-in
+planner never casts them. Lim-Dûl's Vault was on this list until a match
+showed it doing nothing: the list is where to look for the next one.
+

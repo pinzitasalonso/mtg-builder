@@ -12,7 +12,7 @@ import OpponentPicker from "@/components/deck/OpponentPicker";
 import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom, AttachGroup, TableTitle, LibraryOrderBar, orderLibrary, type LibraryOrder } from "@/components/deck/playtest-parts";
 import { bottomCard, byKind, draw, kindBreak, KIND_GAP, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
-import { aiMulligan, arrivalsPlan, chooseBlocks, fallbackPlan, winningTurn } from "@/lib/practice/ai";
+import { aiMulligan, arrivalsPlan, chooseBlocks, fallbackPlan, spareManaPlan, winningTurn } from "@/lib/practice/ai";
 import { tutorOf, tutorSearch } from "@/lib/practice/spells";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, wheelAbilityOf, type Search } from "@/lib/practice/cards";
@@ -649,13 +649,17 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       // (Still idle after the planner's land, a fetch land that found
       // mana: it plans again with that mana.)
       const idle = !instinct && !(g.spells?.opp ?? 0);
-      // Otherwise a smart opponent takes a win the table can check, or
-      // plays what its turn brought it after the plan was made (a tutor's
-      // find, Jeska's Will's cards): the model couldn't name those.
+      // Otherwise a smart opponent takes a win the table can check, plays
+      // what its turn brought it after the plan was made (a tutor's find,
+      // Jeska's Will's cards: the model couldn't name those), or spends
+      // the mana it left on the permanents the planner would cast.
       const more =
         instinct || idle
           ? fallbackPlan(g, setup.book, "opp", {}, setup.combos ?? [])
-          : (winningTurn(g, setup.book, "opp", setup.combos ?? []) ?? arrivalsPlan(g, setup.book, held, "opp", setup.combos ?? []));
+          : (winningTurn(g, setup.book, "opp", setup.combos ?? []) ??
+            arrivalsPlan(g, setup.book, held, "opp", setup.combos ?? []) ??
+            // And what its leftover mana pays for: mana unspent is lost.
+            spareManaPlan(g, setup.book, "opp", setup.combos ?? []));
       if (!more?.main.some((a) => a.kind !== "land" || !g.landPlayed)) break;
       const before = stamp(g);
       const next = await playActions(g, more.main);

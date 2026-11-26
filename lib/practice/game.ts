@@ -27,6 +27,8 @@ import {
   faceText,
   fetchOf,
   goesWhenALandIsPlayed,
+  cloneTypeOf,
+  transmuteOf,
   has,
   hasAltCost,
   hitTriggersOf,
@@ -86,7 +88,7 @@ import {
 } from "./abilities";
 import { triggersOf, type Outcome } from "./triggers";
 import { scaleDamage } from "./damage";
-import { drawSpellOf, tutorOf } from "./spells";
+import { drawSpellOf, tutorOf, tutorSearch } from "./spells";
 import { adNauseamOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, impulseOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import {
   extraTreasureOf,
@@ -309,15 +311,38 @@ function drawCards(g: PracticeGame, seat: Seat, n: number, book?: CardBook, opts
   }
 }
 
+/** A seat that wins from an empty library: Thassa's Oracle in hand or out,
+    Laboratory Maniac or Jace out. */
+const emptyLibraryWins = (g: PracticeGame, seat: Seat, book: CardBook) =>
+  [...g.sides[seat].hand, ...g.sides[seat].battlefield].some((c) => oracleWinOf(book, c)) || g.sides[seat].battlefield.some((c) => emptyDrawWinsOf(book, c));
+
+/** What the opponent's clone would enter as (Copy Enchantment, Clone): its
+    own draw engine first, then the biggest thing of that kind on either
+    side. Its own legends are left alone (the copy would be a second one). */
+function aiCloneTarget(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook): PlayCard | null {
+  const kind = cloneTypeOf(book, card);
+  if (!kind) return null;
+  const fits = (["you", "opp"] as Seat[]).flatMap((s) =>
+    g.sides[s].battlefield
+      .filter((c) => c.iid !== card.iid && !c.token && !isLand(c) && (kind === "permanent" || isType(book, c, kind) || (kind === "creature" && isCreature(book, c))))
+      .filter((c) => !(s === seat && /\bLegendary\b/.test(infoOf(book, c)?.typeLine ?? c.typeLine ?? "")))
+      .map((c) => ({ c, s }))
+  );
+  if (!fits.length) return null;
+  const score = ({ c, s }: { c: PlayCard; s: Seat }) =>
+    (s === seat && (lifeForCardsOf(book, c) || triggersOf(book, c).tax) ? 1000 : 0) + (infoOf(book, c)?.manaValue ?? 0) * 10 + (isCreature(book, c) ? Math.max(0, stats(book, c).power) : 0);
+  return fits.reduce((a, b) => (score(b) > score(a) ? b : a)).c;
+}
+
 /** Demonic Consultation or Tainted Pact, for the AI. With a way to win
     from an empty library (Thassa's Oracle in hand or out, Laboratory
     Maniac or Jace out) it names a card that isn't there and exiles the
     whole library. Otherwise it's a tutor: Consultation names the best card
     it could cast next turn (exiling the top six first, and what's above
     it); the Pact keeps the first card that isn't a land. */
-function libraryExile(g: PracticeGame, seat: Seat, source: string, kind: "consultation" | "pact", book: CardBook) {
+function libraryExile(g: PracticeGame, seat: Seat, source: string, kind: "consultation" | "pact", book: CardBook, want = "") {
   const side = g.sides[seat];
-  const wins = [...side.hand, ...side.battlefield].some((c) => oracleWinOf(book, c)) || side.battlefield.some((c) => emptyDrawWinsOf(book, c));
+  const wins = emptyLibraryWins(g, seat, book);
   const lib = side.library;
   const exile = (cards: PlayCard[]) => {
     const gone = new Set(cards.map((c) => c.iid));
@@ -330,7 +355,28 @@ function libraryExile(g: PracticeGame, seat: Seat, source: string, kind: "consul
   }
   let found: PlayCard | undefined;
   let gone: PlayCard[];
-  if (kind === "consultation") {
+  const named = want.trim().toLowerCase();
+  const wanted = named ? lib.findIndex((c) => c.name.toLowerCase() === named || c.name.toLowerCase().split(" // ")[0] === named) : -1;
+  if (named && kind === "consultation") {
+    // The card it names: the top six go first, and with them the card if
+    // it's among them. Then everything above it.
+    found = wanted >= 6 ? lib[wanted] : undefined;
+    gone = found ? lib.slice(0, wanted) : lib;
+  } else if (named) {
+    // The Pact, kept going until that card: two cards of one name on the
+    // way stop it there.
+    const seen = new Set<string>();
+    let stop = -1;
+    for (let i = 0; i < (wanted < 0 ? lib.length : wanted); i++) {
+      if (seen.has(lib[i]!.name)) {
+        stop = i;
+        break;
+      }
+      seen.add(lib[i]!.name);
+    }
+    found = stop < 0 && wanted >= 0 ? lib[wanted] : undefined;
+    gone = stop >= 0 ? lib.slice(0, stop + 1) : found ? lib.slice(0, wanted) : lib;
+  } else if (kind === "consultation") {
     const reach = manaTotal(availableMana(g, seat, book)) + side.battlefield.filter((c) => c.tapped).length + 1;
     const mv = (c: PlayCard) => infoOf(book, c)?.manaValue ?? 0;
     const named = lib.slice(6).filter((c) => !isLand(c)).sort((a, b) => Number(mv(b) <= reach) - Number(mv(a) <= reach) || mv(b) - mv(a))[0];
@@ -781,13 +827,16 @@ function spend(g: PracticeGame, seat: Seat, paid: Payment, sources: Source[], bo
       say(g, seat, `${src.name} deals ${dealt} damage to ${seat === "you" ? "you" : "the opponent"}.`);
       loseLife(g, seat, dealt, book);
     }
-    // Vivi, Selvala: all of it at once; what this payment leaves floats.
-    if (src?.float) {
-      const left = src.amount - (paid.used[t] ?? 0);
+    // A source makes all its mana at once: what this payment doesn't use
+    // floats, for the turn's next spell. (Mana Vault paid a {1} and its
+    // other two were gone: the three-mana spell after it couldn't be cast.)
+    const left = src && !src.exile ? src.amount - (paid.used[t] ?? 0) : 0;
+    if (src && left > 0) {
       if (!g.pool) g.pool = { you: [], opp: [] };
-      if (left > 0) g.pool[seat] = [...g.pool[seat], ...Array.from({ length: left }, () => src.colors.join(""))];
-      say(g, seat, `${faceName(findCard(g, t)?.card ?? ({ name: src.name } as PlayCard))} adds ${src.amount} mana${left > 0 ? ` (${left} left floating)` : ""}.`);
+      g.pool[seat] = [...g.pool[seat], ...Array.from({ length: left }, () => src.colors.join(""))];
     }
+    // Vivi, Selvala: said, since the amount is theirs to work out.
+    if (src?.float) say(g, seat, `${faceName(findCard(g, t)?.card ?? ({ name: src.name } as PlayCard))} adds ${src.amount} mana${left > 0 ? ` (${left} left floating)` : ""}.`);
   }
 }
 
@@ -1309,6 +1358,15 @@ export function uncastable(g: PracticeGame, seat: Seat, card: PlayCard, book: Ca
   // "As an additional cost to cast this spell, sacrifice a creature."
   const sac = sacrificeCostOf(info);
   if (sac && !g.sides[seat].battlefield.some((c) => sacrificable(book, c, sac))) return `${card.name} needs ${/^[aeiou]/.test(sac) ? "an" : "a"} ${sac} to sacrifice.`;
+  // Demonic Consultation is the win with Thassa's Oracle. Without it it's a
+  // tutor that costs the library above the card: only for a card the plan
+  // names. (Cast with no name, it exiled 40 cards for the dearest spell
+  // left. Tainted Pact with no name stops at its first spell.)
+  if (seat === "opp" && libraryExilerOf(info) === "consultation" && !emptyLibraryWins(g, seat, book) && !effects.some((e) => e.type === "search" && (e.name ?? "").trim())) {
+    return `${card.name} is for the win with Thassa's Oracle; as a tutor it needs a search effect naming the card`;
+  }
+  // A clone with nothing to copy is a blank card.
+  if (seat === "opp" && cloneTypeOf(book, card) && !aiCloneTarget(g, seat, card, book)) return `${card.name} has no ${cloneTypeOf(book, card)} to copy`;
   return null;
 }
 
@@ -1654,6 +1712,26 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   // activate
   // A fetch land already cracked itself when it was played.
   if (at.zone === "graveyard" && fetchOf(info)) return { game: g0, ok: true };
+  // Transmute, from the hand: paid, the card discarded, and a card of the
+  // same mana value found. A sorcery's timing.
+  const tm = at.zone === "hand" ? transmuteOf(info) : null;
+  if (tm) {
+    if (g.active !== seat || g.combat) return fail(`(${card.name} is transmuted in the opponent's own main phase.)`);
+    const want = (action.effects.find((e) => e.type === "search")?.name ?? "").trim().toLowerCase();
+    const found = g.sides[seat].library.find((c) => (c.name.toLowerCase() === want || c.name.toLowerCase().split(" // ")[0] === want) && (infoOf(book, c)?.manaValue ?? 0) === tm.manaValue);
+    if (!found) return fail(`(${card.name} transmutes for a card with mana value ${tm.manaValue}: name one with a search effect.)`);
+    const sources = availableMana(g, seat, book, [card.iid]);
+    const paid = aiPay(g, seat, parseCost(tm.cost), sources, book, { keep: opts.keep });
+    if (!paid) return fail(`The opponent can't pay to transmute ${card.name}.`);
+    spend(g, seat, paid, sources, book);
+    loseLife(g, seat, paid.life, book);
+    moveTo(g, card.iid, "graveyard");
+    moveTo(g, found.iid, "hand");
+    g.sides[seat] = { ...g.sides[seat], library: shuffled(g.sides[seat].library) };
+    say(g, seat, `${who(seat)} ${verb(seat, "transmute")} ${card.name}: it finds ${found.name}.`, card);
+    checkState(g, book);
+    return { game: g, ok: true };
+  }
   if (at.zone !== "battlefield") return fail(`(The opponent tried to use ${card.name}, which isn't in play.)`);
   // Inalla's "tap five Wizards", Beledros's "pay 10 life: untap your
   // lands": the table carries them out, whatever effects the plan gave.
@@ -2802,14 +2880,15 @@ export function playerUseSearch(g0: PracticeGame, iid: number, ability: SearchAb
 }
 
 /** A paid-for cast takes effect: a permanent enters, a spell resolves. */
-function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAction, book: CardBook) {
+function resolveCast(g: PracticeGame, seat: Seat, card0: PlayCard, action: PlanAction, book: CardBook) {
+  let card = card0;
   // A wheel is the table's to carry out, whatever effects the plan gave it.
   const w = wheelSpellOf(book, card);
   const ts = w ? null : treasureSpellOf(book, card);
   const exiler = libraryExilerOf(infoOf(book, card));
   if (exiler) {
     moveTo(g, card.iid, "graveyard");
-    libraryExile(g, seat, card.name, exiler, book);
+    libraryExile(g, seat, card.name, exiler, book, action.effects.find((e) => e.type === "search" && (e.name ?? "").trim())?.name ?? "");
   } else if (w) {
     wheel(g, seat, w, card.name, book, card.iid);
     moveTo(g, card.iid, "graveyard");
@@ -2859,8 +2938,35 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
     });
     // Gamble's discard is the table's too, at random (below): the plan's
     // own "discard a card" made it two cards lost for one.
-    const randomDiscard = !!tutorOf(infoOf(book, card))?.discardRandom;
-    const effects = action.effects.filter((e) => !(made && e.type === "mana") && !(randomDiscard && e.type === "discard" && e.player !== (seat === "opp" ? "player" : "ai")));
+    const tutor = tutorOf(infoOf(book, card));
+    const randomDiscard = !!tutor?.discardRandom;
+    let effects = action.effects.filter((e) => !(made && e.type === "mana") && !(randomDiscard && e.type === "discard" && e.player !== (seat === "opp" ? "player" : "ai")));
+    if (tutor) {
+      // A tutor's find goes where the card says (the top, for Mystical
+      // Tutor), whatever the plan said; and it finds one card.
+      const to = tutorSearch(tutor, g.sides[seat].graveyard).to[0]!.zone === "top" ? "top" : "hand";
+      let found = false;
+      effects = effects.flatMap((e) => {
+        if (e.type !== "search") return tutor.dig ? [] : [e];
+        if (found) return [];
+        found = true;
+        if (!tutor.dig) return [{ ...e, to }];
+        // Lim-Dûl's Vault: five cards at a time, a life for each five passed.
+        const want = (e.name ?? "").trim().toLowerCase();
+        const at = g.sides[seat].library.findIndex((c) => c.name.toLowerCase() === want || c.name.toLowerCase().split(" // ")[0] === want);
+        if (at < 0) return [{ ...e, to }];
+        const price = Math.floor(at / tutor.dig);
+        if (g.sides[seat].life - price < 5) {
+          say(g, seat, `${card.name}: ${who(seat)} ${verb(seat, "stop")} looking: it would cost too much life.`);
+          return [];
+        }
+        if (price) {
+          say(g, seat, `${card.name}: ${who(seat)} ${verb(seat, "pay")} ${price} life to look further.`);
+          loseLife(g, seat, price, book);
+        }
+        return [{ ...e, to }];
+      });
+    }
     for (let i = 0; i <= copies && !g.winner; i++) {
       if (made?.length) applyEffects(g, seat, [{ type: "mana", target: null, player: null, amount: null, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: made.map((u) => `{${u}}`).join("") }], book, i ? `${card.name} (copy)` : card.name, card);
       applyEffects(g, seat, effects, book, i ? `${card.name} (copy)` : card.name, card);
@@ -2899,6 +3005,15 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
     moveTo(g, card.iid, "graveyard");
   } else {
     moveTo(g, card.iid, "battlefield");
+    // A clone enters as a copy of the best thing there is to copy: from
+    // here on it is that card, until it leaves.
+    const twin = aiCloneTarget(g, seat, card, book);
+    if (twin) {
+      const self = { name: card.name, typeLine: card.typeLine, imageUri: card.imageUri };
+      update(g, card.iid, (c) => ({ ...c, cloneOf: self, name: twin.name, typeLine: twin.typeLine, imageUri: twin.imageUri, flipped: twin.flipped }));
+      say(g, seat, `${self.name} enters as a copy of ${twin.name}.`);
+      card = findCard(g, card.iid)!.card;
+    }
     // An Aura goes on what it targets, or where it helps most.
     if (isType(book, card, "aura")) aiAttach(g, seat, card, action, book);
     // Kefka's discard is the table's to carry out, not the plan's.
