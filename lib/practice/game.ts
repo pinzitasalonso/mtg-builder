@@ -804,7 +804,7 @@ function lifeFloor(g: PracticeGame, seat: Seat, book: CardBook): number {
 
 /** What the AI pays for a cost now, with life where a card lets it, and
     never below its floor. */
-function aiPay(g: PracticeGame, seat: Seat, cost: Cost, sources: Source[], book: CardBook, opts: { x?: number; life?: number } = {}) {
+function aiPay(g: PracticeGame, seat: Seat, cost: Cost, sources: Source[], book: CardBook, opts: { x?: number; life?: number; keep?: string[] } = {}) {
   const paid = payCost(cost, sources, { ...opts, lifeFor: lifeFor(g, seat, book) });
   if (!paid) return null;
   // The life its lands cost (Ancient Tomb) counts too.
@@ -1068,12 +1068,27 @@ function endStep(g: PracticeGame, book: CardBook) {
     // turn while it has 8 life left: it has no draw step.
     const safe = Math.max(15, lifeFloor(g, seat, book) + 4);
     const spare = side.life > safe ? Math.min(20, side.life - safe) : side.life > Math.max(8, lifeFloor(g, seat, book)) ? 2 : 0;
-    const n = Math.max(0, Math.min(spare, side.library.length));
+    // The card its own tutor put on top this turn is always taken, while a
+    // life can be spared: it has no draw step to get it by.
+    const sought = side.library[0]?.sought && side.life > 1 ? 1 : 0;
+    const n = Math.max(0, Math.min(Math.max(spare, sought), side.library.length));
     if (!n) continue;
     loseLife(g, seat, n, book);
     if (kind === "draw") drawCards(g, seat, n, book);
     else g.sides[seat] = { ...g.sides[seat], library: g.sides[seat].library.slice(n), hand: [...g.sides[seat].hand, ...g.sides[seat].library.slice(0, n)] };
     say(g, seat, `${faceName(c)}: the opponent pays ${n} life for ${n} card${n === 1 ? "" : "s"}.`);
+  }
+  // A card a tutor put on top was "sought" for this turn only.
+  for (const z of ["library", "hand"] as const) {
+    if (!g.sides[seat][z].some((c) => c.sought)) continue;
+    g.sides[seat] = {
+      ...g.sides[seat],
+      [z]: g.sides[seat][z].map((c) => {
+        const plain = { ...c };
+        delete plain.sought;
+        return plain;
+      }),
+    };
   }
   // "At the beginning of the end step, sacrifice this" (Underworld Breach).
   for (const s of ["you", "opp"] as Seat[]) {
@@ -1343,6 +1358,27 @@ export interface CastStage {
   by?: string;
   /** The deck's combos, for a plan's "combo" action. */
   combos?: DeckCombo[];
+  /** The coloured mana the rest of the plan will ask for (`manaAhead`): a
+      generic cost is paid with what those spells don't need. */
+  keep?: string[];
+}
+
+/** The coloured mana a plan's later actions will ask for: its casts'
+    coloured pips, and its abilities' costs. (Mana Vault was paid for with
+    the only red land, and the Jeska's Will and Gamble planned after it
+    couldn't be cast.) */
+export function manaAhead(g: PracticeGame, rest: PlanAction[], book: CardBook): string[] {
+  const out: string[] = [];
+  const add = (cost: string | null | undefined) => {
+    for (const pip of parseCost(cost).pips) if (pip.length === 1 && /^[WUBRGC]$/.test(pip[0]!)) out.push(pip[0]!);
+  };
+  for (const a of rest) {
+    if (a.kind === "cast") {
+      const c = findCard(g, parseCardId(a.card) ?? -1)?.card;
+      if (c) add(infoOf(book, c)?.manaCost);
+    } else if (a.kind === "activate") add(a.mana);
+  }
+  return out;
 }
 
 // ── Combos (lib/practice/combos.ts) ────────────────────────────────────
@@ -1572,7 +1608,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     if (no) return fail(`(${no})`);
     const cost = spellCost(g, seat, card, book, at.zone);
     const sources = availableMana(g, seat, book, [card.iid], { commander: card.commander });
-    const paid = aiPay(g, seat, cost, sources, book, { x: action.x ?? 0 });
+    const paid = aiPay(g, seat, cost, sources, book, { x: action.x ?? 0, keep: opts.keep });
     if (!paid) return fail(`The opponent can't pay for ${card.name} yet.`);
     spend(g, seat, paid, sources, book);
     // Its sacrifice, as it's cast (Culling the Weak, Diabolic Intent). A
@@ -1682,13 +1718,16 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     checkState(g, book);
     return { game: g, ok: true };
   }
+  // Necropotence's cards are the table's to take, at the end step. A plan's
+  // own activation paid life for a note, and the note named the card on top.
+  if (seat === "opp" && lifeForCardsOf(book, card)) return fail(`(${faceName(card)}'s cards are taken at the end step, by the table.)`);
   if (action.tap_card) {
     if (card.tapped) return fail(`(${card.name} is already tapped.)`);
     if (isCreature(book, card) && isSick(book, card, g.turn)) return fail(`(${card.name} can't tap the turn it arrived.)`);
   }
   const cost = parseCost(action.mana);
   const sources = availableMana(g, seat, book, action.tap_card ? [card.iid] : []);
-  const paid = aiPay(g, seat, cost, sources, book, { life: action.life ?? 0 });
+  const paid = aiPay(g, seat, cost, sources, book, { life: action.life ?? 0, keep: opts.keep });
   if (!paid) return fail(`The opponent can't pay for ${card.name}'s ability.`);
   spend(g, seat, paid, sources, book);
   if (action.tap_card) update(g, card.iid, (c) => ({ ...c, tapped: true }));
@@ -2802,7 +2841,10 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
       ritesInGraveyards: [...g.sides.you.graveyard, ...g.sides.opp.graveyard].filter((c) => c.name === card.name).length,
       foeHand: g.sides[other(seat)].hand.length,
     });
-    const effects = made ? action.effects.filter((e) => e.type !== "mana") : action.effects;
+    // Gamble's discard is the table's too, at random (below): the plan's
+    // own "discard a card" made it two cards lost for one.
+    const randomDiscard = !!tutorOf(infoOf(book, card))?.discardRandom;
+    const effects = action.effects.filter((e) => !(made && e.type === "mana") && !(randomDiscard && e.type === "discard" && e.player !== (seat === "opp" ? "player" : "ai")));
     for (let i = 0; i <= copies && !g.winner; i++) {
       if (made?.length) applyEffects(g, seat, [{ type: "mana", target: null, player: null, amount: null, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: made.map((u) => `{${u}}`).join("") }], book, i ? `${card.name} (copy)` : card.name, card);
       applyEffects(g, seat, effects, book, i ? `${card.name} (copy)` : card.name, card);
@@ -3027,7 +3069,7 @@ function applyEffects(g: PracticeGame, caster: Seat, effects: Effect[], book: Ca
         if (e.to === "top") {
           // Shuffled, then on top (Vampiric Tutor): the next card drawn.
           const rest = shuffled(g.sides[s].library.filter((c) => c.iid !== found.iid));
-          g.sides[s] = { ...g.sides[s], library: [found, ...rest] };
+          g.sides[s] = { ...g.sides[s], library: [{ ...found, sought: true }, ...rest] };
           say(g, caster, `${source} finds a card and puts it on top of ${s === "you" ? "your" : "its"} library.`);
           break;
         }

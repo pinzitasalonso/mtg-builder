@@ -9,7 +9,7 @@
 
 import { aiMulligan, fallbackPlan } from "./ai";
 import type { DeckCombo } from "./combos";
-import { aiEndStep, aiGraveyardCasts, applyAction, availableMana, castable, declareAttackers, endTurn, newGame, parseCardId, resolveCombat, setBlocks, type DeckCard } from "./game";
+import { aiEndStep, aiGraveyardCasts, applyAction, availableMana, castable, declareAttackers, endTurn, manaAhead, newGame, parseCardId, resolveCombat, setBlocks, type DeckCard } from "./game";
 import { manaSummary } from "./mana";
 import type { CardBook, PracticeGame } from "./types";
 
@@ -65,10 +65,11 @@ export function planTurn(g0: PracticeGame, book: CardBook, combos: DeckCombo[]):
     if (round && !plan.main.length) break;
     attack = plan.attack;
     const before = stamp(g);
-    for (const a of plan.main) {
+    for (const [i, a] of plan.main.entries()) {
       // A combo is announced, then (with no answer) carried out.
       if (a.kind === "combo") g = applyAction(applyAction(g, "opp", a, book, { stage: "pay", combos }).game, "opp", a, book, { stage: "resolve", combos }).game;
-      else g = applyAction(g, "opp", a, book, { combos }).game;
+      // Paid for as the table pays: knowing what the rest of the plan needs.
+      else g = applyAction(g, "opp", a, book, { combos, keep: manaAhead(g, plan.main.slice(i + 1), book) }).game;
       if (g.winner) return g;
     }
     if (stamp(g) === before) break;

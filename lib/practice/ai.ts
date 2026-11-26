@@ -490,6 +490,35 @@ export function winningTurn(g: PracticeGame, book: CardBook, seat: Seat = "opp",
   return after.winner === seat || !after.sides[other(seat)].library.length ? plan : null;
 }
 
+/** What a smart opponent's turn brought it after its plan was made: a
+    tutor's find, a draw spell's cards, Jeska's Will's three. The model
+    couldn't name a card it didn't hold, so its plan stops there (it found
+    Necropotence, made {B}{B}{B} with Cabal Ritual, and passed with both).
+    This is the built-in planner's turn from here, cut down to those new
+    cards and the mana that pays for them: the cards the model chose to hold
+    stay held. `held` is the hand as the model saw it. Null: nothing new
+    to play. */
+export function arrivalsPlan(g: PracticeGame, book: CardBook, held: Set<number>, seat: Seat = "opp", combos: DeckCombo[] = []): TurnPlan | null {
+  if (g.winner || g.choice || g.combat || g.active !== seat) return null;
+  const fresh = g.sides[seat].hand.filter((c) => !held.has(c.iid));
+  if (!fresh.length) return null;
+  const isFresh = (a: PlanAction) => fresh.some((c) => cardId(c.iid) === a.card);
+  // Mana for them: an ability, a ritual, a rock that pays for itself.
+  const makesMana = (a: PlanAction) => {
+    if (a.kind === "activate") return true;
+    if (a.kind !== "cast") return false;
+    const c = g.sides[seat].hand.find((x) => cardId(x.iid) === a.card);
+    const info = c ? infoOf(book, c) : undefined;
+    if (!c || !info) return false;
+    return !!ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 }) || (manaOutput(info, c.typeLine)?.amount ?? 0) >= (info.manaValue ?? 0);
+  };
+  const plan = fallbackPlan(g, book, seat, {}, combos);
+  const last = plan.main.findLastIndex((a) => (a.kind === "cast" || a.kind === "land" || a.kind === "combo") && (a.kind === "combo" || isFresh(a)));
+  if (last < 0) return null;
+  const main = plan.main.slice(0, last + 1).filter((a) => a.kind === "combo" || isFresh(a) || makesMana(a));
+  return main.some((a) => a.kind === "combo" || isFresh(a)) ? { ...plan, main } : null;
+}
+
 /** A wheel is worth casting when it gives this seat more cards than it
     throws away: the hand (less the wheel) is two cards or fewer. */
 function wheelWorth(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): boolean {

@@ -135,7 +135,7 @@ export interface Payment {
   pain: number;
 }
 
-export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?: number; lifeFor?: string[] } = {}): Payment | null {
+export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?: number; lifeFor?: string[]; keep?: string[] } = {}): Payment | null {
   const lifeFor = opts.lifeFor ?? [];
   const eligible = lifeFor.length ? cost.pips.filter((p) => p.some((c) => lifeFor.includes(c))).length : 0;
   for (let n = 0; n <= eligible; n++) {
@@ -147,10 +147,26 @@ export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?
 
 /** One try: `byLife` of the pips `lifeFor` covers are paid with life first;
     any of them mana can't pay is paid with life too. */
-function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: number }, lifeFor: string[], byLife: number): Payment | null {
+function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: number; keep?: string[] }, lifeFor: string[], byLife: number): Payment | null {
   const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors, sacrifice: !!s.sacrifice || !!s.exile, pain: s.pain ?? 0 })));
   const used = new Set<number>();
   const take = (i: number) => used.add(i);
+  // The colours wanted after this payment (`keep`: the rest of the turn's
+  // plan). A unit that makes one of them costs more to use, and more the
+  // fewer units are left that make it: the only red source isn't tapped for
+  // a generic cost when a red spell comes next.
+  const need: Record<string, number> = {};
+  for (const c of opts.keep ?? []) need[c] = (need[c] ?? 0) + 1;
+  const wanted = Object.keys(need);
+  const kept = (colors: string[]) => {
+    let cost = 0;
+    for (const c of wanted) {
+      if (!colors.includes(c)) continue;
+      const supply = units.filter((v, j) => !used.has(j) && v.colors.includes(c)).length;
+      cost += 20 * Math.min(2, need[c]! / Math.max(1, supply));
+    }
+    return cost;
+  };
   const pick = (ok: (colors: string[]) => boolean) => {
     // Floating mana first (it's gone at the end of the phase), then a unit
     // of a source already tapped for this payment, then the one that can
@@ -160,7 +176,7 @@ function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: numbe
     units.forEach((u, i) => {
       if (used.has(i) || !ok(u.colors)) return;
       const tappedAlready = u.iid < 0 || [...used].some((j) => units[j]!.iid === u.iid);
-      const score = (u.iid < 0 ? -100 : 0) + (tappedAlready ? 0 : 100) + (u.sacrifice ? 50 : 0) + (u.pain && !tappedAlready ? 30 : 0) + u.colors.length;
+      const score = (u.iid < 0 ? -100 : 0) + (tappedAlready ? 0 : 100) + (u.sacrifice ? 50 : 0) + (u.pain && !tappedAlready ? 30 : 0) + u.colors.length + (wanted.length ? kept(u.colors) : 0);
       if (score < bestScore) {
         best = i;
         bestScore = score;

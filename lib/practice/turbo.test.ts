@@ -3,14 +3,14 @@
 // cards turned into mana, rituals, Ad Nauseam, and the planner going for
 // its combo.
 
-import { describe, expect, it } from "vitest";
-import { aiMulligan, fallbackPlan, guardPlan, winningTurn } from "./ai";
+import { describe, expect, it, vi } from "vitest";
+import { aiMulligan, arrivalsPlan, fallbackPlan, guardPlan, winningTurn } from "./ai";
 import { comboBrief, lineBrief } from "./brief";
 import { handManaOf, manaOutput, manaSinkOf, sacManaOf, searchAbility } from "./cards";
 import { comboNeeds, type DeckCombo } from "./combos";
 import { report, selfplay } from "./selfplay";
-import { applyAction, availableMana, cardId, comboStatus, endTurn, newGame, playerSpellResolves, startTurn, uncastable, type DeckCard } from "./game";
-import { manaTotal } from "./mana";
+import { applyAction, availableMana, cardId, comboStatus, endTurn, manaAhead, newGame, playerSpellResolves, shownLog, startTurn, uncastable, type DeckCard } from "./game";
+import { manaSources, manaTotal, parseCost, payCost } from "./mana";
 import { cardTypesAmong, drawSpellOf, tutorOf, tutorSearch } from "./spells";
 import { readTriggers } from "./triggers";
 import type { CardBook, CardInfo, PlanAction, PracticeGame } from "./types";
@@ -552,5 +552,92 @@ describe("the benchmark's self-play", () => {
     expect(r.games).toBe(2);
     expect(r.wonBy[6]).toBeLessThanOrEqual(2);
     expect(r.idle).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// Two matches against Rograkh + Silas Renn, read from their traces
+// (lib/practice/trace.ts): what the table got wrong around a good plan.
+describe("what two real matches showed", () => {
+  const search = (name: string, to: "hand" | "top" = "hand") => ({ type: "search" as const, target: null, player: null, amount: null, name, power: null, toughness: null, keywords: [], to, tapped: null, text: null });
+  /** A plan played the way the table plays it: each action paid for knowing what comes after. */
+  const play = (g0: PracticeGame, actions: PlanAction[]) => actions.reduce((g, a, i) => applyAction(g, "opp", a, BOOK, { keep: manaAhead(g, actions.slice(i + 1), BOOK) }).game, g0);
+
+  // Turn 4: Mana Vault, then Jeska's Will, then Gamble. The rock was paid
+  // for with the only red land, and the two red spells couldn't be cast.
+  it("pays a generic cost with the land the rest of the plan doesn't need", () => {
+    const g0 = table({ opp: { field: ["Badlands", "Watery Grave", "Rograkh, Son of Rohgahh"], hand: ["Sol Ring", "Jeska's Will", "Gamble"], top: ["Tainted Pact"] }, you: { hand: ["Bear", "Bear", "Bear"] } });
+    const plan = [act("cast", at(g0, "opp", "Sol Ring")!.iid), act("cast", at(g0, "opp", "Jeska's Will")!.iid), act("cast", at(g0, "opp", "Gamble")!.iid, { effects: [search("Tainted Pact")] })];
+    expect(manaAhead(g0, plan.slice(1), BOOK)).toEqual(["R", "R"]);
+    // As it was: the first land listed paid for the rock, and that was the red one.
+    const blind = plan.reduce((g, a) => applyAction(g, "opp", a, BOOK).game, g0);
+    expect(said(blind)).toMatch(/can't pay for Jeska's Will/);
+    const g = play(g0, plan);
+    expect(said(g)).not.toMatch(/can't pay/);
+    expect(said(g)).toMatch(/The opponent casts Jeska's Will/);
+    expect(said(g)).toMatch(/Gamble finds Tainted Pact/);
+    // The payment itself: of two lands, the one that isn't red.
+    const sources = manaSources(g0.sides.opp, BOOK, g0.turn);
+    const paid = payCost(parseCost("{1}"), sources, { keep: ["R", "R"] })!;
+    expect(paid.tap.map((iid) => g0.sides.opp.battlefield.find((c) => c.iid === iid)!.name)).toEqual(["Watery Grave"]);
+    // With nothing wanted after, nothing changes.
+    expect(payCost(parseCost("{1}"), sources)!.tap.map((iid) => g0.sides.opp.battlefield.find((c) => c.iid === iid)!.name)).toEqual(["Badlands"]);
+  });
+
+  // "The opponent discards Force of Negation. Gamble: The opponent discards
+  // Culling the Weak at random." The plan listed Gamble's discard, and the
+  // table did Gamble's discard too.
+  it("Gamble throws one card away, whatever the plan lists", () => {
+    const g0 = table({ opp: { field: ["Badlands"], hand: ["Gamble", "Bear", "Bear", "Bear"], top: ["Necropotence"] } });
+    const discard = { ...search(""), type: "discard" as const, player: "ai" as const, amount: 1, name: null, to: null };
+    const g = cast(g0, "Gamble", { effects: [search("Necropotence"), discard] }).game;
+    // Three Bears and the Necropotence found, less one.
+    expect(g.sides.opp.hand).toHaveLength(3);
+    expect(said(g).match(/discards/g)).toHaveLength(1);
+  });
+
+  // Turn 5: Gamble found Necropotence, Cabal Ritual made {B}{B}{B}, and the
+  // turn ended with both: the model can't name a card it doesn't hold yet.
+  it("plays what the turn brought, with the mana that's left, and leaves the held cards held", () => {
+    const g0 = table({ opp: { field: ["Badlands", "Watery Grave", "Volcanic Island"], hand: ["Gamble", "Cabal Ritual", "Rhystic Study", "Bear"], top: ["Necropotence"] } });
+    const held = new Set(g0.sides.opp.hand.map((c) => c.iid));
+    // Nothing new yet: nothing for the table to add.
+    expect(arrivalsPlan(g0, BOOK, held)).toBeNull();
+    const plan = [act("cast", at(g0, "opp", "Gamble")!.iid, { effects: [search("Necropotence")] }), act("cast", at(g0, "opp", "Cabal Ritual")!.iid)];
+    // Gamble's discard is at random: here it's the Bear (the third of four).
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.6);
+    const g = play(g0, plan);
+    random.mockRestore();
+    expect(g.sides.opp.hand.map((c) => c.name).sort()).toEqual(["Necropotence", "Rhystic Study"]);
+    expect(g.pool?.opp).toEqual(["B", "B", "B"]);
+    const more = arrivalsPlan(g, BOOK, held)!;
+    // Necropotence, which arrived. Not Rhystic Study, which the model held.
+    expect(names(g, more)).toEqual(["cast:Necropotence"]);
+    const after = play(g, more.main);
+    expect(at(after, "opp", "Necropotence", "battlefield")).toBeDefined();
+    expect(at(after, "opp", "Rhystic Study")).toBeDefined();
+  });
+
+  // Turn 9: Mystical Tutor put Tainted Pact on top. Necropotence skips the
+  // draw, the table took no cards at 7 life, and the plan's own activation
+  // was a note that told the player what was on top.
+  it("Necropotence takes the card its tutor put on top, and isn't activated by the plan", () => {
+    const g0 = table({ opp: { field: ["Necropotence", "Underground Sea"], hand: ["Mystical Tutor"], top: ["Swamp", "Tainted Pact"] }, life: 7 });
+    const tutored = cast(g0, "Mystical Tutor", { effects: [search("Tainted Pact", "top")] }).game;
+    expect(tutored.sides.opp.library[0]).toMatchObject({ name: "Tainted Pact", sought: true });
+    // The plan's activation: refused, out of the player's sight, and free.
+    const necro = at(tutored, "opp", "Necropotence", "battlefield")!;
+    const note = { ...search(""), type: "note" as const, name: null, to: null, text: "Exile top card (Tainted Pact) face down; put it into hand at next end step." };
+    const tried = applyAction(tutored, "opp", act("activate", necro.iid, { life: 1, effects: [note] }), BOOK);
+    expect(tried.ok).toBe(false);
+    expect(tried.game.sides.opp.life).toBe(7);
+    expect(shownLog(tried.game).map((l) => l.text).join("\n")).not.toMatch(/Tainted Pact/);
+    // The end step: one life, for that card.
+    const ended = endTurn(tried.game, BOOK);
+    expect(said(ended)).toMatch(/Necropotence: the opponent pays 1 life for 1 card/);
+    expect(at(ended, "opp", "Tainted Pact")).toBeDefined();
+    expect(at(ended, "opp", "Tainted Pact")!.sought).toBeUndefined();
+    expect(ended.sides.opp.life).toBe(6);
+    // With nothing sought, 7 life buys nothing, as before.
+    expect(said(endTurn(g0, BOOK))).not.toMatch(/pays \d+ life/);
   });
 });
