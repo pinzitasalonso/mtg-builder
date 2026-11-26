@@ -792,6 +792,23 @@ export const imprintsFromHand = (book: CardBook, card: PlayCard) => /\benters[^.
 /** "When you play another land, sacrifice this land" (City of Traitors). */
 export const goesWhenALandIsPlayed = (book: CardBook, card: PlayCard) => /\bwhen you play another land, sacrifice\b/i.test(own(book, card));
 
+/** Transmute {1}{U}{U} (Drift of Phantasms, Dizzy Spell, Muddle the
+    Mixture): from the hand, pay it and discard the card to find a card of
+    the same mana value. */
+export function transmuteOf(info: CardInfo | undefined): { cost: string; manaValue: number } | null {
+  const m = /^transmute ((?:\{[^}]+\})+)/im.exec(info?.oracleText ?? "");
+  return m && info ? { cost: m[1]!, manaValue: info.manaValue ?? 0 } : null;
+}
+
+/** "You may have this enchantment enter as a copy of any enchantment on
+    the battlefield" (Copy Enchantment, Clone, Phantasmal Image): the type
+    it copies. */
+export function cloneTypeOf(book: CardBook, card: PlayCard): string | null {
+  if (card.cloneOf) return null;
+  const m = /\byou may have (?:this \w+|[^.\n]{1,40}?) enter (?:the battlefield )?as a copy of any (artifact|creature|enchantment|planeswalker|permanent) on the battlefield\b/i.exec(own(book, card));
+  return m ? m[1]!.toLowerCase() : null;
+}
+
 /** "You have no maximum hand size" (Reliquary Tower, Thought Vessel). */
 export const noMaxHandSize = (book: CardBook, card: PlayCard) => /\b(you have|each player has|players have) no maximum hand size\b/i.test(own(book, card));
 

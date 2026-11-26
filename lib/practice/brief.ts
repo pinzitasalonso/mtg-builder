@@ -4,7 +4,7 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { canPlayAsLand, goesWhenALandIsPlayed, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
+import { canPlayAsLand, cloneTypeOf, transmuteOf, goesWhenALandIsPlayed, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
 import { availableMana, castable, cardId, comboStatus, lifeFor, loyaltyOf, uncastable } from "./game";
 import { comboHeadline, type DeckCombo } from "./combos";
 import {
@@ -149,6 +149,7 @@ COMBOS
 - Some combos ask for more than their pieces (cards in your graveyard). The brief says when that isn't there yet: don't start one that can't finish.
 - The turn you go off, make the mana first: free rocks, rituals, a creature sacrificed for mana. Your commander that costs {0} is there to be sacrificed.
 - Never use a combo action for a combo the brief doesn't call READY.
+- Mana you don't spend is lost. After your plan the app spends what is left on the creatures and other permanents of THE APP'S LINE (and a land you didn't play), keeping the mana of a counterspell or removal spell you hold. Plan your turn to use your mana.
 - You can't name a card you don't hold yet. What a tutor, a draw spell or Jeska's Will brings you this turn is cast by the app after your plan, with the mana that is left: plan the mana for it (cast the ritual in the same turn as the tutor), and don't spend it on something lesser.
 
 ACTIONS
@@ -215,8 +216,12 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (handSizeOf(book, front)) notes.push(`your maximum hand size is ${handSizeOf(book, front)} while it's out`);
     const cu = cumulativeUpkeepOf(book, front);
     if (cu !== null) notes.push(`the app pays its cumulative upkeep at your upkeep while it's {2} or less and leaves you mana for the turn, then sacrifices it`);
+    const tm = transmuteOf(info);
+    if (tm) notes.push(`transmute: from your hand, in your main phase, activate it with "mana":"${tm.cost}" and one search effect naming a card with mana value ${tm.manaValue}. The app discards it and puts that card in your hand`);
+    if (cloneTypeOf(book, front)) notes.push(`the app has it enter as a copy of the best ${cloneTypeOf(book, front)} on the battlefield (your draw engine first): give it no effects. With none to copy it can't be cast`);
     if (goesWhenALandIsPlayed(book, front)) notes.push("when you play another land it's sacrificed: the app taps it for its mana first, which floats for that turn. Spend that mana the same turn");
     const tu = tutorOf(info);
+    if (tu?.dig) notes.push(`a tutor: give it one search effect naming the card you want and no note. The app puts it on top of your library, for 1 life for every ${tu.dig} cards it has to pass. Cast it the turn before you need the card`);
     if (tu?.discardRandom) notes.push("the app discards a card at random after the search: give it its search effect and no discard");
     if (tu?.delirium) notes.push("it finds any card when your graveyard has four card types (the brief says how many); otherwise only what its first line says");
     if (tu && /exile it face down/i.test(info.oracleText ?? "")) notes.push("a tutor: the card goes to your hand (bargain isn't used)");
@@ -225,7 +230,11 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (sm) notes.push(`to use it, activate it with no effects: the app ${sm.tap ? "taps it, " : ""}sacrifices your cheapest creature and adds ${sm.units.map((u) => `{${u}}`).join("")}`);
     if (hasStorm(info)) notes.push("storm: the app copies it for each spell cast before it this turn. Give its effects once, and cast it last");
     if (oracleWinOf(book, front)) notes.push("a win: the app wins the game when it enters with your devotion to blue at least your library's size; empty the library first with Demonic Consultation or Tainted Pact");
-    if (libraryExilerOf(info)) notes.push("with Thassa's Oracle in your hand or Laboratory Maniac out, the app exiles your whole library with it; otherwise it finds your best card. Give it no effects");
+    const exiler = libraryExilerOf(info);
+    if (exiler)
+      notes.push(
+        `with Thassa's Oracle in your hand or Laboratory Maniac out, the app exiles your whole library with it: give it no effects. Without one it is only a tutor that exiles every card above the one you name (give it a search effect with that card's name)${exiler === "consultation" ? ", and the app refuses it with no name" : "; with no name it keeps the first card that isn't a land"}. Keep it for the win`
+      );
     if (emptyDrawWinsOf(book, front)) notes.push("while it's out, drawing from an empty library wins you the game: the app does it");
     if (damageRuleOf(book, front)) notes.push("it changes the damage you deal; the app applies it to every hit, so give damage effects their printed amounts");
     if (treasureSpellOf(book, front)) notes.push("the app pays its extra cost (it picks the card), draws and makes the Treasures: give it no effects");

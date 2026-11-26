@@ -32,6 +32,9 @@ export interface Tutor {
   /** "…put that card into your hand, discard a card at random, then
       shuffle" (Gamble). */
   discardRandom?: boolean;
+  /** Lim-Dûl's Vault: it looks at five cards at a time, and passing a five
+      costs 1 life. The find goes on top. */
+  dig?: number;
   /** "Delirium — If there are four or more card types among cards in
       your graveyard, instead search your library for any card…" (Demonic
       Counsel): the search then. */
@@ -52,8 +55,17 @@ export function cardTypesAmong(typeLines: (string | null | undefined)[]): number
 export function tutorSearch(t: Tutor, graveyard: { typeLine: string | null }[]): Search {
   return t.delirium && cardTypesAmong(graveyard.map((c) => c.typeLine)) >= 4 ? t.delirium : t.search;
 }
+const VAULT =
+  /^look at the top five cards of your library\. as many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library\. then shuffle and put the last cards you looked at this way on top in any order\.?$/i;
+
 export function tutorOf(info: CardInfo | undefined): Tutor | null {
   if (!isSpell(info)) return null;
+  // Lim-Dûl's Vault is played as a tutor to the top that costs life: its
+  // text has no "search", so the table did nothing with it, and a plan's
+  // note told the player which card it was after.
+  if (VAULT.test((info?.oracleText ?? "").split("\n//\n")[0]!.replace(/\s*\n\s*/g, " ").trim())) {
+    return { search: { count: 1, what: "a card", to: [{ zone: "top" }], test: () => true }, lose: 0, dig: 5 };
+  }
   // A sacrifice as it's cast (Diabolic Intent) is a cost the table takes.
   // Bargain (Beseech the Mirror) is a choice the table doesn't make: the
   // card comes to the hand.

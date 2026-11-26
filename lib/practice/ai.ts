@@ -3,10 +3,10 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, ninjutsuOf, ownTurnOf, sacManaOf, searchOnCast, stats, wheelSpellOf } from "./cards";
+import { BASIC_COLOR, canPlayAsLand, counterOf, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, ninjutsuOf, ownTurnOf, removalOf, sacManaOf, searchOnCast, stats, transmuteOf, wheelSpellOf, type Search } from "./cards";
 import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, comboStatus, indestructible, lifeFor, spellCost, uncastable } from "./game";
 import { comboOutcome, type DeckCombo } from "./combos";
-import { equipOf } from "./abilities";
+import { equipOf, punishesIdleOf } from "./abilities";
 import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
 import { treasureSpellOf } from "./treasure";
 import { drawSpellOf, tutorOf, tutorSearch, wipeOf, type Tutor } from "./spells";
@@ -83,6 +83,21 @@ export function chooseBlocks(g: PracticeGame, book: CardBook): Record<number, nu
       taken.add(winner.iid);
     }
   }
+  // Blocks that cost nothing: the blocker lives, and the damage doesn't
+  // land. The biggest hitters first, behind the sturdiest it has. (A 0/5
+  // wall watched attackers go past it turn after turn.)
+  for (const a of attackers) {
+    if (blocks[a.iid]) continue;
+    const need = has(book, a, "Menace") ? 2 : 1;
+    const walls = free
+      .filter((b) => !taken.has(b.iid) && canBlock(book, b, a) && !exchange(book, a, b).dies)
+      .sort((x, y) => stats(book, y).toughness - stats(book, x).toughness)
+      .slice(0, need);
+    if (walls.length === need) {
+      blocks[a.iid] = walls.map((c) => c.iid);
+      walls.forEach((c) => taken.add(c.iid));
+    }
+  }
   // Survive: if what gets through is lethal, put bodies in front of the
   // biggest hitters until it isn't.
   const life = g.sides[def].life;
@@ -116,13 +131,23 @@ export function chooseBlocks(g: PracticeGame, book: CardBook): Record<number, nu
 
 /** Attackers that won't just die to a block: no untapped defender kills them
     and lives. Everything goes in when it's lethal. */
+/** The other side punishes creatures that don't attack (Kratos, God of
+    War): then attacking is worth it for its own sake. */
+export const idlePunished = (g: PracticeGame, seat: Seat, book: CardBook) => g.sides[other(seat)].battlefield.some((c) => punishesIdleOf(book, c));
+
 export function safeAttackers(g: PracticeGame, seat: Seat, book: CardBook): PlayCard[] {
   const def = other(seat);
-  const able = g.sides[seat].battlefield.filter((c) => canAttack(g, seat, c, book) && stats(book, c).power > 0);
+  const punished = idlePunished(g, seat, book);
+  const able = g.sides[seat].battlefield.filter((c) => canAttack(g, seat, c, book) && (stats(book, c).power > 0 || punished));
   const blockers = g.sides[def].battlefield.filter((c) => isCreature(book, c) && !c.tapped);
   const total = able.reduce((n, c) => n + stats(book, c).power * (has(book, c, "Double strike") ? 2 : 1), 0);
   if (total >= g.sides[def].life + blockers.reduce((n, b) => n + Math.max(0, stats(book, b).power), 0) && able.length > blockers.length) return able;
-  return able.filter((a) => !blockers.some((b) => canBlock(book, b, a) && exchange(book, a, b).kills && !exchange(book, a, b).dies));
+  // (Menace takes two blockers: one creature across the table can't stop it.)
+  return able.filter((a) => {
+    const can = blockers.filter((b) => canBlock(book, b, a));
+    if (has(book, a, "Menace") && can.length < 2) return true;
+    return !can.some((b) => exchange(book, a, b).kills && !exchange(book, a, b).dies);
+  });
 }
 
 const drawEffect = (amount: number): Effect => ({
@@ -178,6 +203,8 @@ function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, com
   // that costs none is cast at any life: after Ad Nauseam, at 8, it used
   // to hold Demonic Tutor for turns.
   if (!t || (t.lose > 0 && g.sides[seat].life - t.lose < 10)) return null;
+  // Lim-Dûl's Vault pays a life for every five cards it passes: not below 20.
+  if (t.dig && g.sides[seat].life < 20) return null;
   const side = g.sides[seat];
   // Next turn's mana: what it has (tapped or not) and a land drop.
   const reach = manaTotal(availableMana(g, seat, book)) + side.battlefield.filter((x) => x.tapped).length + 1;
@@ -284,11 +311,13 @@ function wipePlan(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): Pla
     Fortune). A plan that declares a combo, or empties its library, is
     left as it is. */
 export function guardPlan(g: PracticeGame, plan0: TurnPlan, book: CardBook, seat: Seat = "opp"): TurnPlan {
-  // An attacker with no power stays home, where it can block: Rograkh (0/1)
-  // "swung" every turn for nothing. Unless the attack is the point: a
-  // trigger on attacking, or a Ninja to bring in behind it.
+  // An attacker with no power stays home, where it can block. Unless the
+  // attack is the point: the other side punishes creatures that don't
+  // attack (Kratos: that was why Rograkh swung every turn), a trigger on
+  // attacking, or a Ninja to bring in behind it.
   const side = g.sides[seat];
   const attackIsThePoint = (c: PlayCard) =>
+    idlePunished(g, seat, book) ||
     /\battacks?\b/i.test(infoOf(book, c)?.oracleText ?? "") ||
     side.battlefield.some((x) => x.iid !== c.iid && /\bwhenever [^.]*\bcreatures? you control attacks?\b/i.test(infoOf(book, x)?.oracleText ?? "")) ||
     [...side.hand, ...side.command].some((x) => !!ninjutsuOf(book, x));
@@ -300,9 +329,12 @@ export function guardPlan(g: PracticeGame, plan0: TurnPlan, book: CardBook, seat
   const own = [...g.sides[seat].hand, ...g.sides[seat].command];
   const cardOf = (a: PlanAction) => own.find((c) => cardId(c.iid) === a.card);
   const all = [...plan.main, ...plan.after_combat];
+  // Going off: a combo, or Demonic Consultation / Tainted Pact with the
+  // card that wins from an empty library. (Either of them alone is a tutor.)
+  const winsEmpty = [...side.hand, ...side.battlefield].some((c) => oracleWinOf(book, c)) || side.battlefield.some((c) => emptyDrawWinsOf(book, c));
   const goes = all.some((a) => {
     const c = a.kind === "cast" ? cardOf(a) : undefined;
-    return a.kind === "combo" || (!!c && !!libraryExilerOf(infoOf(book, c)));
+    return a.kind === "combo" || (!!c && !!libraryExilerOf(infoOf(book, c)) && winsEmpty);
   });
   if (goes) return plan;
   const wasted = (a: PlanAction) => {
@@ -532,6 +564,45 @@ export function arrivalsPlan(g: PracticeGame, book: CardBook, held: Set<number>,
   return main.some((a) => a.kind === "combo" || isFresh(a)) ? { ...plan, main } : null;
 }
 
+/** What a smart opponent's leftover mana pays for, after its plan: the
+    creatures and other permanents of the built-in planner's turn. The model
+    leaves mana on the table (nine mana, one spell, and a two-mana creature
+    still in hand), and nothing at this table is cast later at instant speed
+    but a counterspell or a removal spell: so their mana is kept back, and
+    the rest is spent. Null: nothing to add. */
+export function spareManaPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp", combos: DeckCombo[] = []): TurnPlan | null {
+  if (g.winner || g.choice || g.combat || g.active !== seat) return null;
+  const side = g.sides[seat];
+  // The dearest answer it holds that costs mana: that much stays untapped.
+  const answers = side.hand.filter((c) => !!counterOf(infoOf(book, c)) || !!removalOf(infoOf(book, c)));
+  const reserve = answers.reduce((n, c) => Math.max(n, totalOf(spellCost(g, seat, c, book, "hand"))), 0);
+  const plan = fallbackPlan(g, book, seat, {}, combos);
+  let sim = g;
+  const main: PlanAction[] = [];
+  for (const a of plan.main) {
+    // A land drop it didn't make is made.
+    if (a.kind === "land" && !sim.landPlayed) {
+      const r = applyAction(sim, seat, a, book, { combos });
+      if (r.ok) {
+        sim = r.game;
+        main.push(a);
+      }
+      continue;
+    }
+    if (a.kind !== "cast") continue;
+    const c = [...side.hand, ...side.command].find((x) => cardId(x.iid) === a.card);
+    // Permanents only, and not a commander: recasting one is the model's call.
+    if (!c || c.commander || isLand(c) || /\b(Instant|Sorcery)\b/.test((infoOf(book, c)?.typeLine ?? c.typeLine ?? "").split(" // ")[0]!)) continue;
+    // A creature that arrives can't attack this turn: into Kratos, it costs life.
+    if (isCreature(book, c) && idlePunished(g, seat, book)) continue;
+    const r = applyAction(sim, seat, a, book, { combos });
+    if (!r.ok || manaTotal(availableMana(r.game, seat, book)) < reserve) continue;
+    sim = r.game;
+    main.push(a);
+  }
+  return main.length ? { ...plan, main } : null;
+}
+
 /** A wheel is worth casting when it gives this seat more cards than it
     throws away: the hand (less the wheel) is two cards or fewer. */
 function wheelWorth(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): boolean {
@@ -620,6 +691,14 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
       hand: sim.sides[seat].hand.filter((x) => !exiled.has(x.iid)),
       battlefield: sim.sides[seat].battlefield.map((x) => (tapped.has(x.iid) ? { ...x, tapped: true } : x)),
     };
+    // What a source made and this payment didn't use floats, as at the table.
+    for (const t of paid.tap) {
+      const src = sources.find((x) => x.iid === t);
+      const left = src && t >= 0 && !src.exile ? src.amount - (paid.used[t] ?? 0) : 0;
+      if (!src || left <= 0) continue;
+      if (!sim.pool) sim.pool = { you: [], opp: [] };
+      sim.pool[seat] = [...sim.pool[seat], ...Array.from({ length: left }, () => src.colors.join(""))];
+    }
     return true;
   };
   // A combo it can finish this turn: the pieces it holds are cast, a tutor
@@ -838,7 +917,22 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     }
     return null;
   };
+  // Transmute (Drift of Phantasms, Dizzy Spell, Muddle the Mixture): for a
+  // piece its combo lacks, the card is worth more as that piece.
+  const transmuted = new Set<number>();
+  for (const c of [...sim.sides[seat].hand]) {
+    const tm = transmuteOf(infoOf(book, c));
+    if (!tm) continue;
+    const search: Search = { count: 1, what: `a card with mana value ${tm.manaValue}`, to: [{ zone: "hand" }], test: (_type, info) => (info?.manaValue ?? 0) === tm.manaValue };
+    const found = tutorPick(sim, seat, c, book, combos, { tutor: { search, lose: 0 }, onlyPieces: true });
+    if (!found || !payIn(parseCost(tm.cost))) continue;
+    main.push({ ...blankAction("activate", c.iid), mana: tm.cost, effects: found });
+    sim = structuredClone(sim);
+    sim.sides[seat] = { ...sim.sides[seat], hand: sim.sides[seat].hand.filter((x) => x.iid !== c.iid) };
+    transmuted.add(c.iid);
+  }
   for (const { c, zone } of candidates) {
+    if (transmuted.has(c.iid)) continue;
     if (!castable(sim, seat, c, book, zone)) {
       // Worth a ritual: a draw engine, or (in a combo deck) a tutor that
       // finds the piece it lacks. The win comes next turn: it needn't all

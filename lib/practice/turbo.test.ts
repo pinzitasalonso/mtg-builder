@@ -4,12 +4,13 @@
 // its combo.
 
 import { describe, expect, it, vi } from "vitest";
-import { aiMulligan, arrivalsPlan, fallbackPlan, guardPlan, winningTurn } from "./ai";
+import { aiMulligan, arrivalsPlan, chooseBlocks, fallbackPlan, guardPlan, safeAttackers, spareManaPlan, winningTurn } from "./ai";
 import { comboBrief, lineBrief } from "./brief";
+import { scaleDamage } from "./damage";
 import { entersTapped, handManaOf, manaOutput, manaSinkOf, ownTurnOf, sacManaOf, searchAbility } from "./cards";
 import { comboNeeds, type DeckCombo } from "./combos";
 import { report, selfplay } from "./selfplay";
-import { applyAction, availableMana, cardId, comboStatus, endTurn, manaAhead, newGame, playerSpellResolves, shownLog, startTurn, uncastable, type DeckCard } from "./game";
+import { applyAction, availableMana, cardId, comboStatus, declareAttackers, endTurn, manaAhead, newGame, playerSpellResolves, shownLog, startTurn, uncastable, type DeckCard } from "./game";
 import { manaSources, manaTotal, parseCost, payCost } from "./mana";
 import { cardTypesAmong, drawSpellOf, tutorOf, tutorSearch } from "./spells";
 import { readTriggers } from "./triggers";
@@ -32,6 +33,14 @@ const BOOK: CardBook = Object.fromEntries(
     info("Starting Town", { typeLine: "Land — Town", producedMana: ["B", "C", "G", "R", "U", "W"], oracleText: "This land enters tapped unless it's your first, second, or third turn of the game.\n{T}: Add {C}.\n{T}, Pay 1 life: Add one mana of any color." }),
     info("Hexing Squelcher", { typeLine: "Creature — Goblin Sorcerer", manaCost: "{1}{R}", manaValue: 2, power: 2, toughness: 2, oracleText: "This spell can't be countered.\nWard—Pay 2 life.\nSpells you control can't be countered.\nOther creatures you control have \"Ward—Pay 2 life.\"" }),
     info("Copy Enchantment", { typeLine: "Enchantment", manaCost: "{2}{U}", manaValue: 3, oracleText: "You may have this enchantment enter as a copy of any enchantment on the battlefield." }),
+    // A fourth match's.
+    info("Lim-Dûl's Vault", { typeLine: "Instant", manaCost: "{U}{B}", manaValue: 2, oracleText: "Look at the top five cards of your library. As many times as you choose, you may pay 1 life, put those cards on the bottom of your library in any order, then look at the top five cards of your library. Then shuffle and put the last cards you looked at this way on top in any order." }),
+    info("Fiendish Duo", { typeLine: "Creature — Devil", manaCost: "{4}{R}{R}", manaValue: 6, power: 5, toughness: 5, oracleText: "First strike (This creature deals combat damage before creatures without first strike.)\nIf a source would deal damage to an opponent, it deals double that damage to that player instead." }),
+    // A fifth match's (Vivi).
+    info("Mana Vault", { typeLine: "Artifact", manaCost: "{1}", manaValue: 1, producedMana: ["C"], oracleText: "This artifact doesn't untap during your untap step.\nAt the beginning of your upkeep, you may pay {4}. If you do, untap this artifact.\nAt the beginning of your draw step, if this artifact is tapped, it deals 1 damage to you.\n{T}: Add {C}{C}{C}." }),
+    info("Drift of Phantasms", { typeLine: "Creature — Spirit", manaCost: "{3}", manaValue: 3, power: 0, toughness: 5, keywords: ["Flying", "Defender", "Transmute"], oracleText: "Flying, defender\nTransmute {1}{U}{U} ({1}{U}{U}, Discard this card: Search your library for a card with the same mana value as this card, reveal it, put it into your hand, then shuffle. Transmute only as a sorcery.)" }),
+    info("Dizzy Spell", { typeLine: "Instant", manaCost: "{U}", manaValue: 1, keywords: ["Transmute"], oracleText: "Target creature gets -3/-0 until end of turn.\nTransmute {1}{U}{U} ({1}{U}{U}, Discard this card: Search your library for a card with the same mana value as this card, reveal it, put it into your hand, then shuffle. Transmute only as a sorcery.)" }),
+    info("War God", { typeLine: "Legendary Creature — God", manaCost: "{1}{R}{R}", manaValue: 3, power: 2, toughness: 4, oracleText: "At the beginning of each player's end step, War God deals damage to that player equal to the number of creatures that player controls that didn't attack this turn." }),
     info("Goblin Piker", { typeLine: "Creature — Goblin Warrior", manaCost: "{1}{R}", manaValue: 2, power: 0, toughness: 3, oracleText: "Whenever this creature attacks, it gets +2/+0 until end of turn." }),
   ].map((c) => [c.name.toLowerCase(), c])
 );
@@ -720,5 +729,173 @@ describe("mana sense", () => {
     const plan = { say: "", main: [], attack: [id("Rograkh, Son of Rohgahh"), id("Goblin Piker"), id("Bear")], after_combat: [] };
     // Rograkh is 0/1. The Piker is 0/3 with a trigger on attacking. The Bear is 2/2.
     expect(guardPlan(g, plan, BOOK).attack).toEqual([id("Goblin Piker"), id("Bear")]);
+  });
+});
+
+// A fourth match: it held Demonic Consultation from its first turn, cast
+// Lim-Dûl's Vault for Thassa's Oracle on its second, and the table did
+// nothing with the Vault. It lost on turn 16.
+describe("the lines of a competitive deck", () => {
+  const search = (name: string, to: "hand" | "top" = "hand") => ({ type: "search" as const, target: null, player: null, amount: null, name, power: null, toughness: null, keywords: [], to, tapped: null, text: null });
+
+  it("Lim-Dûl's Vault is a tutor to the top, a life for every five cards it passes", () => {
+    expect(tutorOf(of("Lim-Dûl's Vault"))).toMatchObject({ dig: 5, lose: 0 });
+    // The Oracle is the thirteenth card down: two fives are passed.
+    const g0 = table({ opp: { field: ["Underground Sea", "Underground Sea"], hand: ["Lim-Dûl's Vault", "Demonic Consultation"], top: [...Array(12).fill("Bear"), "Thassa's Oracle"] } });
+    // The plan said "hand", and added a note that named the card: the card says the top, and says no more.
+    const note = { ...search(""), type: "note" as const, name: null, to: null, text: "Look until Thassa's Oracle is found; put it on top." };
+    const g = cast(g0, "Lim-Dûl's Vault", { effects: [search("Thassa's Oracle", "hand"), note] }).game;
+    expect(g.sides.opp.library[0]).toMatchObject({ name: "Thassa's Oracle", sought: true });
+    expect(g.sides.opp.life).toBe(38);
+    expect(said(g)).toMatch(/Lim-Dûl's Vault: The opponent pays 2 life to look further/);
+    expect(said(g)).not.toMatch(/Resolve:/);
+    expect(shownLog(g).map((l) => l.text).join("\n")).not.toMatch(/Thassa's Oracle/);
+    // The planner casts it for the half it's missing…
+    const plan = fallbackPlan(g0, BOOK, "opp", {}, [ORACLE]);
+    expect(names(g0, plan)).toContain("cast:Lim-Dûl's Vault");
+    expect(plan.main.find((a) => a.effects.some((e) => e.type === "search"))!.effects[0]).toMatchObject({ name: "Thassa's Oracle", to: "top" });
+    // …draws it, and has the win it was built for: a land later, three mana.
+    const next = startTurn(g, BOOK);
+    expect(at(next, "opp", "Thassa's Oracle")).toBeDefined();
+    const third = { ...next, sides: { ...next.sides, opp: { ...next.sides.opp, battlefield: [...next.sides.opp.battlefield.map((c) => ({ ...c, tapped: false })), { ...next.sides.opp.library.find((c) => c.name === "Swamp")!, enteredTurn: 0 }] } } };
+    expect(winningTurn(third, BOOK, "opp", [ORACLE])).not.toBeNull();
+    // Not at a life total the digging could end.
+    expect(names(g0, fallbackPlan({ ...g0, sides: { ...g0.sides, opp: { ...g0.sides.opp, life: 12 } } }, BOOK, "opp", {}, [ORACLE]))).not.toContain("cast:Lim-Dûl's Vault");
+  });
+
+  // "Demonic Consultation: The opponent exiles 40 cards and puts Commandeer into its hand."
+  it("Demonic Consultation without the Oracle is cast only for a card it names", () => {
+    const g0 = table({ opp: { field: ["Underground Sea"], hand: ["Demonic Consultation"], top: [...Array(8).fill("Bear"), "Necropotence"] } });
+    const blind = cast(g0, "Demonic Consultation");
+    expect(blind.ok).toBe(false);
+    expect(blind.game.sides.opp.exile).toHaveLength(0);
+    expect(blind.game.log.at(-1)).toMatchObject({ hidden: true });
+    const named = cast(g0, "Demonic Consultation", { effects: [search("Necropotence")] });
+    expect(named.ok).toBe(true);
+    expect(at(named.game, "opp", "Necropotence")).toBeDefined();
+    expect(named.game.sides.opp.exile).toHaveLength(8);
+    // With the Oracle in hand it is the win, and needs no name.
+    const win = table({ opp: { field: ["Underground Sea"], hand: ["Demonic Consultation", "Thassa's Oracle"] } });
+    expect(cast(win, "Demonic Consultation").ok).toBe(true);
+    // A plan with a lone Consultation isn't "going off": its wasted casts are still taken out.
+    const lone = table({ opp: { field: ["Underground Sea", "Volcanic Island", "Badlands"], hand: ["Demonic Consultation", "Underworld Breach"] } });
+    const plan = { say: "", attack: [], after_combat: [], main: [act("cast", at(lone, "opp", "Demonic Consultation")!.iid, { effects: [search("Necropotence")] }), act("cast", at(lone, "opp", "Underworld Breach")!.iid)] };
+    expect(names(lone, guardPlan(lone, plan, BOOK))).toEqual(["cast:Demonic Consultation"]);
+  });
+
+  // Copy Enchantment sat in its hand all game: "the app's line: cast Copy Enchantment", with nothing to copy.
+  it("a clone is cast only with something to copy, and enters as it", () => {
+    const empty = table({ opp: { field: ["Underground Sea", "Underground Sea", "Underground Sea"], hand: ["Copy Enchantment"] } });
+    expect(uncastable(empty, "opp", at(empty, "opp", "Copy Enchantment")!, BOOK)).toMatch(/no enchantment to copy/);
+    expect(names(empty, fallbackPlan(empty, BOOK))).not.toContain("cast:Copy Enchantment");
+    const g0 = table({ opp: { field: ["Underground Sea", "Underground Sea", "Underground Sea", "Mystic Remora"], hand: ["Copy Enchantment"] } });
+    const g = cast(g0, "Copy Enchantment").game;
+    expect(said(g)).toMatch(/Copy Enchantment enters as a copy of Mystic Remora/);
+    const copies = g.sides.opp.battlefield.filter((c) => c.name === "Mystic Remora");
+    expect(copies).toHaveLength(2);
+    const clone = copies.find((c) => c.cloneOf)!;
+    expect(clone.cloneOf).toMatchObject({ name: "Copy Enchantment" });
+    // It's itself again when it leaves.
+    const gone = endTurn({ ...g, sides: { ...g.sides, opp: { ...g.sides.opp, hand: [], battlefield: g.sides.opp.battlefield.filter((c) => !c.name.includes("Sea")) } } }, BOOK);
+    expect(gone).toBeDefined();
+  });
+
+  // Kike took the life off by hand: the Duo doubles what its controller's opponent takes.
+  it("Fiendish Duo doubles the damage its controller's opponents take, from any source", () => {
+    const g = table({ you: { field: ["Fiendish Duo", "Bear"] }, opp: { field: ["Bear"] } });
+    const bear = at(g, "you", "Bear", "battlefield")!;
+    const theirs = at(g, "opp", "Bear", "battlefield")!;
+    // Your Bear hits the opponent: doubled. Their own source hurting them: doubled too.
+    expect(scaleDamage(g, BOOK, "you", bear, "opp", 2, true)).toBe(4);
+    expect(scaleDamage(g, BOOK, "opp", theirs, "opp", 3)).toBe(6);
+    // Damage to you, or to a creature: as printed.
+    expect(scaleDamage(g, BOOK, "opp", theirs, "you", 2, true)).toBe(2);
+    expect(scaleDamage(g, BOOK, "you", bear, "opp", 2, true, true)).toBe(2);
+  });
+
+  // Turn 15: nine mana, one spell, and a two-mana creature left in hand.
+  it("leftover mana is spent on the permanents it holds, keeping an answer's mana", () => {
+    const start = (lands: number, hand: string[]) => table({ opp: { field: Array(lands).fill("Command Tower"), hand, command: ["Rograkh, Son of Rohgahh"] } });
+    const four = start(4, ["Bear", "Counterspell"]);
+    // The Bear ({1}{G}), with {U}{U} kept for the Counterspell. Not the commander: that's the model's call.
+    expect(names(four, spareManaPlan(four, BOOK)!)).toEqual(["cast:Bear"]);
+    // Three lands: the Bear would leave one, and the Counterspell needs two.
+    expect(spareManaPlan(start(3, ["Bear", "Counterspell"]), BOOK)).toBeNull();
+    // No answer in hand: nothing is kept back.
+    const two = start(2, ["Bear"]);
+    expect(names(two, spareManaPlan(two, BOOK)!)).toEqual(["cast:Bear"]);
+    // An instant or a sorcery isn't a thing to spend leftover mana on.
+    expect(spareManaPlan(start(4, ["Dark Ritual", "Brainstorm"]), BOOK)).toBeNull();
+  });
+});
+
+// A fifth match, a Vivi list: stuck on one land, then slow, then dead to
+// attackers it never blocked.
+describe("what a Vivi match showed", () => {
+  const search = (name: string) => ({ type: "search" as const, target: null, player: null, amount: null, name, power: null, toughness: null, keywords: [], to: "hand" as const, tapped: null, text: null });
+
+  // "The opponent can't pay for Drift of Phantasms yet": six mana, a three-mana
+  // commander, and Mana Vault's other two mana gone with the {1} it paid.
+  it("what a rock makes and a payment doesn't use floats for the next spell", () => {
+    const g0 = table({ opp: { field: ["Underground Sea", "Badlands", "Volcanic Island", "Mana Vault"], hand: ["Rhystic Study", "Drift of Phantasms"] } });
+    const first = cast(g0, "Rhystic Study");
+    expect(first.ok).toBe(true);
+    const second = cast(first.game, "Drift of Phantasms");
+    expect(second.ok).toBe(true);
+    expect(at(second.game, "opp", "Drift of Phantasms", "battlefield")).toBeDefined();
+    // And the planner counts on it: both, from the same six mana.
+    expect(names(g0, fallbackPlan(g0, BOOK)).sort()).toEqual(["cast:Drift of Phantasms", "cast:Rhystic Study"]);
+  });
+
+  // "(The opponent tried to use Drift of Phantasms, which isn't in play.)"
+  it("Transmute: from the hand, for a card of the same mana value", () => {
+    const g0 = table({ opp: { field: ["Underground Sea", "Underground Sea", "Underground Sea"], hand: ["Drift of Phantasms", "Dizzy Spell", "Thassa's Oracle"], top: ["Necropotence", "Demonic Consultation"] } });
+    const drift = at(g0, "opp", "Drift of Phantasms")!;
+    const done = applyAction(g0, "opp", act("activate", drift.iid, { mana: "{1}{U}{U}", effects: [search("Necropotence")] }), BOOK);
+    expect(done.ok).toBe(true);
+    expect(at(done.game, "opp", "Necropotence")).toBeDefined();
+    expect(at(done.game, "opp", "Drift of Phantasms", "graveyard")).toBeDefined();
+    expect(said(done.game)).toMatch(/The opponent transmutes Drift of Phantasms: it finds Necropotence/);
+    // Only the same mana value: the Oracle's half costs one, the Drift three.
+    expect(applyAction(g0, "opp", act("activate", drift.iid, { mana: "{1}{U}{U}", effects: [search("Demonic Consultation")] }), BOOK).ok).toBe(false);
+    // The planner transmutes for the piece its combo lacks: Dizzy Spell (1) for Demonic Consultation (1).
+    const plan = fallbackPlan(g0, BOOK, "opp", {}, [ORACLE]);
+    const tm = plan.main.find((a) => a.kind === "activate")!;
+    expect(g0.sides.opp.hand.find((c) => cardId(c.iid) === tm.card)!.name).toBe("Dizzy Spell");
+    expect(tm.effects[0]).toMatchObject({ type: "search", name: "Demonic Consultation" });
+    const after = applyAction(g0, "opp", tm, BOOK);
+    expect(after.ok).toBe(true);
+    expect(at(after.game, "opp", "Demonic Consultation")).toBeDefined();
+  });
+
+  // A 0/5 flier, untapped, and "No blocks" until it was dead.
+  it("blocks when its blocker lives through it", () => {
+    const g0 = table({ active: "you", you: { field: ["Bear", "Fiendish Duo"] }, opp: { field: ["Drift of Phantasms"] } });
+    const attack = (...names2: string[]) => declareAttackers(g0, "you", names2.map((n) => at(g0, "you", n, "battlefield")!.iid), BOOK);
+    const drift = at(g0, "opp", "Drift of Phantasms", "battlefield")!.iid;
+    // The Bear (2/2) bounces off it.
+    const one = attack("Bear");
+    expect(chooseBlocks(one, BOOK)).toEqual({ [at(g0, "you", "Bear", "battlefield")!.iid]: [drift] });
+    // Both attack: the Duo (5/5) would kill it, so it stands in front of the Bear.
+    const both = attack("Bear", "Fiendish Duo");
+    expect(chooseBlocks(both, BOOK)).toEqual({ [at(g0, "you", "Bear", "battlefield")!.iid]: [drift] });
+    // The Duo alone, at 40 life: no block is worth the wall.
+    expect(chooseBlocks(attack("Fiendish Duo"), BOOK)).toEqual({});
+  });
+
+  // Kratos punishes creatures that don't attack. The last change kept a
+  // 0-power attacker home whatever was across the table.
+  it("attacks with everything when not attacking is punished", () => {
+    const calm = table({ opp: { field: ["Rograkh, Son of Rohgahh", "Underground Sea", "Underground Sea"], hand: ["Bear"] } });
+    const war = table({ you: { field: ["War God"] }, opp: { field: ["Rograkh, Son of Rohgahh", "Command Tower", "Command Tower"], hand: ["Bear"] } });
+    const id = (g: PracticeGame) => cardId(at(g, "opp", "Rograkh, Son of Rohgahh", "battlefield")!.iid);
+    const plan = (g: PracticeGame) => ({ say: "", main: [], attack: [id(g)], after_combat: [] });
+    expect(guardPlan(calm, plan(calm), BOOK).attack).toEqual([]);
+    expect(guardPlan(war, plan(war), BOOK).attack).toEqual([id(war)]);
+    expect(safeAttackers(calm, "opp", BOOK)).toEqual([]);
+    // Rograkh has menace: one blocker can't stop it, so it goes.
+    expect(safeAttackers(war, "opp", BOOK).map((c) => c.name)).toEqual(["Rograkh, Son of Rohgahh"]);
+    // And leftover mana isn't spent on a creature that would sit there for the War God to count.
+    expect(spareManaPlan(war, BOOK)).toBeNull();
   });
 });

@@ -10,6 +10,7 @@
 //   creature's.
 // - Ojer Axonil: a red source's noncombat damage to an opponent is at
 //   least Ojer's power.
+// - Fiendish Duo: double, any source, to its controller's opponents.
 // The controller orders them as suits them: Ojer first, then +2, then the
 // multipliers.
 
@@ -31,6 +32,8 @@ export interface DamageRule {
   /** Ojer Axonil: at least this much, and only to a player. */
   atLeast?: number;
   playersOnly?: boolean;
+  /** Fiendish Duo: "an opponent" is its controller's, whoever the source is. */
+  foesOfController?: boolean;
 }
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -53,6 +56,8 @@ export function damageRuleOf(book: CardBook, card: PlayCard): DamageRule | null 
       };
     }
     if (/^if a source would deal damage to a permanent or player, it deals double that damage to that permanent or player instead$/i.test(s)) return { who: "any", to: "any", times: 2 };
+    // Fiendish Duo: any source, to its controller's opponents (the players).
+    if (/^if a source would deal damage to an opponent, it deals double that damage to that player instead$/i.test(s)) return { who: "any", to: "any", times: 2, playersOnly: true, foesOfController: true };
     if (/^if a red source you control would deal damage to an opponent or a permanent an opponent controls, it deals that much damage plus 2 instead$/i.test(s)) return { who: "you", to: "opponents", plus: 2, red: true };
     m = new RegExp(`^if a red source you control would deal an amount of noncombat damage less than (?:${esc(name)}|${esc(short)})'s power to an opponent, that source deals damage equal to (?:${esc(name)}|${esc(short)})'s power instead$`, "i").exec(s);
     if (m) return { who: "you", to: "opponents", red: true, noncombat: true, playersOnly: true, atLeast: Math.max(0, stats(book, card).power) };
@@ -79,7 +84,8 @@ export function scaleDamage(g: PracticeGame, book: CardBook, from: Seat, src: Pl
     (!r.red || isRed(book, src)) &&
     (!r.creature || (!!src && isCreature(book, src))) &&
     (!r.noncombat || !combat) &&
-    (!r.playersOnly || !permanent);
+    (!r.playersOnly || !permanent) &&
+    (!r.foesOfController || to !== s);
   let n = amount;
   for (const x of rules) if (x.r.atLeast !== undefined && applies(x)) n = Math.max(n, x.r.atLeast);
   for (const x of rules) if (x.r.plus && applies(x)) n += x.r.plus;
