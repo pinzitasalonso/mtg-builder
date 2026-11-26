@@ -63,6 +63,51 @@ export function ritualOf(info: CardInfo | undefined): string[] | null {
 export const extraTurnOf = (info: CardInfo | undefined) =>
   /\b(Instant|Sorcery)\b/.test((info?.typeLine ?? "").split(" // ")[0]!) && sentences(info?.oracleText ?? "").some((s) => /^(?:target player takes|take) an extra turn after this one$/i.test(s));
 
+/** An extra turn that ends the game for its caster: "At the beginning of
+    that turn's end step, you lose the game" (Final Fortune, Last Chance,
+    Warrior's Oath). */
+export const extraTurnLosesOf = (info: CardInfo | undefined) => extraTurnOf(info) && sentences(info?.oracleText ?? "").some((s) => /^at the beginning of that turn's end step, you lose the game$/i.test(s));
+
+/** Ad Nauseam: "Reveal the top card of your library and put that card into
+    your hand. You lose life equal to its mana value. You may repeat this
+    process any number of times." */
+export const adNauseamOf = (info: CardInfo | undefined) =>
+  /^reveal the top card of your library and put that card into your hand\. you lose life equal to its mana value\. you may repeat this process any number of times\.?$/i.test(ownText(info?.oracleText ?? "").trim());
+
+/** A spell that asks for a sacrifice as it's cast: "As an additional cost
+    to cast this spell, sacrifice a creature" (Culling the Weak, Diabolic
+    Intent, Infernal Plunge). What it wants, in the card's words. */
+export function sacrificeCostOf(info: CardInfo | undefined): string | null {
+  for (const s of sentences(info?.oracleText ?? "")) {
+    const m = /^as an additional cost to cast this spell, sacrifice an? ([a-z]+(?: or [a-z]+)?)$/i.exec(s);
+    if (m) return m[1]!.toLowerCase();
+  }
+  return null;
+}
+
+/** The mana a ritual adds as it resolves, for the table as it stands:
+    Dark Ritual's three, Culling the Weak's four (its sacrifice is its
+    cost), Rite of Flame's two and one more for each in a graveyard, Cabal
+    Ritual's three or (with seven cards in the graveyard) five, and Jeska's
+    Will's {R} for each card in the other player's hand. Null for a spell
+    that isn't a ritual. */
+export function ritualMana(info: CardInfo | undefined, at: { graveyard: number; ritesInGraveyards: number; foeHand: number }): string[] | null {
+  if (!/\b(Instant|Sorcery)\b/.test((info?.typeLine ?? "").split(" // ")[0]!)) return null;
+  const units = (run: string) => [...run.matchAll(/\{([WUBRGC])\}/gi)].map((x) => x[1]!.toUpperCase());
+  const lines = sentences(info?.oracleText ?? "").filter((s) => !/^splice onto arcane\b/i.test(s) && !/^as an additional cost to cast this spell, sacrifice an? [a-z ]+$/i.test(s));
+  let m: RegExpExecArray | null;
+  if (lines.length === 1 && (m = /^add ((?:\{[WUBRGC]\})+)$/i.exec(lines[0]!))) return units(m[1]!);
+  if (lines.length === 1 && (m = /^add ((?:\{[WUBRGC]\})+), then add (\{[WUBRGC]\}) for each card named [^.]+ in each graveyard$/i.exec(lines[0]!))) return [...units(m[1]!), ...Array<string>(at.ritesInGraveyards).fill(units(m[2]!)[0]!)];
+  if (lines.length === 2 && (m = /^add ((?:\{[WUBRGC]\})+)$/i.exec(lines[0]!))) {
+    const more = /^threshold — add ((?:\{[WUBRGC]\})+) instead if (?:there are )?seven or more cards (?:are )?in your graveyard$/i.exec(lines[1]!);
+    if (more) return units(at.graveyard >= 7 ? more[1]! : m[1]!);
+  }
+  // Jeska's Will: the mana mode (the other one, and both with a commander, are its caster's to play).
+  const mode = lines.find((s) => /^• add (\{[WUBRGC]\}) for each card in target opponent's hand$/i.test(s));
+  if (mode && lines.some((s) => /^choose one\b/i.test(s))) return Array<string>(at.foeHand).fill(units(mode)[0]!);
+  return null;
+}
+
 /** Storm: "When you cast this spell, copy it for each spell cast before
     it this turn" (Grapeshot, Brain Freeze). */
 export const hasStorm = (info: CardInfo | undefined) => /^storm\b/im.test((info?.oracleText ?? "").split("\n//\n")[0]!);

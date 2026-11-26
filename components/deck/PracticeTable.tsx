@@ -12,7 +12,7 @@ import OpponentPicker from "@/components/deck/OpponentPicker";
 import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom, AttachGroup, TableTitle, LibraryOrderBar, orderLibrary, type LibraryOrder } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
-import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
+import { aiMulligan, chooseBlocks, fallbackPlan, winningTurn } from "@/lib/practice/ai";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, wheelAbilityOf, type Search } from "@/lib/practice/cards";
 import { equipOf, tapTribeOf, untapLandsOf } from "@/lib/practice/abilities";
@@ -569,6 +569,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     setAiNote("");
     let g = g0;
     let plan: TurnPlan;
+    // The built-in planner's turn (the basic opponent, or a turn the model missed).
+    let instinct = !!setup.bot;
     // Kept as the turn starts: picked up again, the opponent plays it over.
     storeSaved(deckId, { setup, game: g0, as: "ai", option: lastOpponent.current });
     if (setup.bot) {
@@ -586,8 +588,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.plan) throw new Error(`server ${res.status}`);
       plan = data.plan as TurnPlan;
+      if (data.source === "fallback" || data.source === "bot") instinct = true;
       if (data.note) setAiNote(data.note);
     } catch (e) {
+      instinct = true;
       plan = fallbackPlan(g, setup.book, "opp", {}, setup.combos ?? []);
       const why = e instanceof DOMException && e.name === "TimeoutError" ? "no answer in time" : e instanceof Error && e.message.startsWith("server") ? e.message : "offline";
       setAiNote(`The opponent played on instinct this turn (${why}).`);
@@ -606,7 +610,29 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       }
       if (!alive.current || g.winner) return;
     }
-    const attackers = plan.attack.map(parseCardId).filter((n): n is number => n !== null);
+    // What the turn brought (a tutor's find, Ad Nauseam's cards) may let it
+    // do more: the built-in planner plans again with the new hand, and a
+    // smart opponent takes a win the table can check.
+    let attack = plan.attack;
+    const stamp = (x: PracticeGame) => `${x.sides.opp.hand.map((c) => c.iid).join()}|${x.sides.opp.battlefield.map((c) => `${c.iid}${c.tapped ? "t" : ""}`).join()}|${x.sides.you.library.length}`;
+    for (let round = 0; round < 3; round++) {
+      const more = instinct ? fallbackPlan(g, setup.book, "opp", {}, setup.combos ?? []) : winningTurn(g, setup.book, "opp", setup.combos ?? []);
+      if (!more?.main.length) break;
+      const before = stamp(g);
+      for (const a of more.main) {
+        if (a.kind === "cast") g = await aiCast(g, a, "ai");
+        else if (a.kind === "combo") g = await aiCombo(g, a);
+        else {
+          g = applyAction(g, "opp", a, setup.book).game;
+          setGame(g);
+          g = await pause(BEAT, await waitChoice(g));
+        }
+        if (!alive.current || g.winner) return;
+      }
+      if (instinct) attack = more.attack;
+      if (stamp(g) === before) break;
+    }
+    const attackers = attack.map(parseCardId).filter((n): n is number => n !== null);
     if (attackers.length) {
       let declared = declareAttackers(g, "opp", attackers, setup.book);
       if (declared.combat) {

@@ -3,14 +3,15 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, has, infoOf, isCreature, isLand, manaOutput, searchOnCast, stats, wheelSpellOf } from "./cards";
+import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, sacManaOf, searchOnCast, stats, wheelSpellOf } from "./cards";
 import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, comboStatus, indestructible, lifeFor, spellCost } from "./game";
 import { comboOutcome, type DeckCombo } from "./combos";
 import { equipOf } from "./abilities";
 import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
 import { treasureSpellOf } from "./treasure";
 import { drawSpellOf, tutorOf, wipeOf } from "./spells";
-import { burnOf, devotion, emptyDrawWinsOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualOf } from "./wincons";
+import { adNauseamOf, burnOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, ritualOf, sacrificeCostOf } from "./wincons";
+import { triggersOf } from "./triggers";
 import { scaleDamage } from "./damage";
 import { castTriggerOf } from "./cards";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
@@ -256,6 +257,164 @@ function wipePlan(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): Pla
   return { ...blankAction("cast", c.iid), x: w.amount === null ? n : null, effects };
 }
 
+/** A card the planner keeps in hand for its combo: a piece the combo wants
+    in the hand or the graveyard (Thassa's Oracle, Brain Freeze), or one
+    that only lasts the turn it's cast (Underworld Breach). Cast alone, it's
+    wasted. */
+function heldForCombo(book: CardBook, c: PlayCard, combos: DeckCombo[]): boolean {
+  if (triggersOf(book, c).endSacrifice) return true;
+  const name = c.name.toLowerCase();
+  const front = c.name.split(" // ")[0]!.toLowerCase();
+  return combos.some((k) => {
+    const o = comboOutcome(k.produces);
+    return (o === "win" || o === "mill") && k.pieces.some((p) => (p.name.toLowerCase() === name || p.name.toLowerCase() === front) && !p.zones.includes("B"));
+  });
+}
+
+/** One of the deck's combos, finished this turn, as the actions that do
+    it; null when none can be. Tried on a copy of the table with the real
+    moves, the nearest combo first: the pieces it holds are cast, a tutor
+    in hand finds the piece still in the library, and when the mana is
+    short it's made: free rocks, rituals (a creature sacrificed for the
+    ones that ask), a creature fed to Phyrexian Tower. Nothing is cast
+    unless the whole line gets there. */
+function goOff(g: PracticeGame, book: CardBook, seat: Seat, combos: DeckCombo[], land: PlanAction | null): { actions: PlanAction[]; attack: string[]; wins: boolean } | null {
+  const lines = combos.filter((c) => comboOutcome(c.produces) !== "other");
+  if (!lines.length || g.choice) return null;
+  // The table once the land is down (a fetch land has fetched).
+  let start = g;
+  if (land) {
+    const r = applyAction(g, seat, land, book, { combos });
+    if (!r.ok || r.game.choice) return null;
+    start = r.game;
+  }
+  const far = (c: DeckCombo) => {
+    const st = comboStatus(start, seat, c, book);
+    return st.missing.length * 10 + st.toCast.length + (st.needs ? 50 : 0);
+  };
+  for (const c of [...lines].sort((a, b) => far(a) - far(b))) {
+    const line = comboLine(start, book, seat, c, combos);
+    if (!line) continue;
+    const outcome = comboOutcome(c.produces);
+    // A win, or the player's library gone: the turn is this and nothing else.
+    if (outcome !== "mana") return { actions: line.actions, attack: [], wins: true };
+    // Endless mana: the rest of the turn is planned with it in the pool.
+    const out: { wins?: boolean } = {};
+    const rest = fallbackPlan(line.after, book, seat, out, combos.filter((x) => x.id !== c.id));
+    return { actions: [...line.actions, ...rest.main], attack: rest.attack, wins: !!out.wins };
+  }
+  return null;
+}
+
+function comboLine(g0: PracticeGame, book: CardBook, seat: Seat, combo: DeckCombo, combos: DeckCombo[]): { actions: PlanAction[]; after: PracticeGame } | null {
+  let t = g0;
+  const actions: PlanAction[] = [];
+  const step = (a: PlanAction) => {
+    const r = applyAction(t, seat, a, book, { combos });
+    if (!r.ok || r.game.choice || r.game.winner === other(seat)) return false;
+    t = r.game;
+    actions.push(a);
+    return true;
+  };
+  const costOf = (c: PlayCard, zone: "hand" | "command") => totalOf(spellCost(t, seat, c, book, zone));
+  const zoneOf = (c: PlayCard) => (t.sides[seat].command.some((x) => x.iid === c.iid) ? ("command" as const) : ("hand" as const));
+  const isPiece = (c: PlayCard) => combo.pieces.some((p) => p.name.toLowerCase() === c.name.toLowerCase() || p.name.toLowerCase() === c.name.split(" // ")[0]!.toLowerCase());
+  /** A tutor in hand that puts this card in the hand, as its cast. (Not
+      Gamble: its random discard could throw the piece away.) */
+  const tutorFor = (name: string): PlanAction | null => {
+    const want = t.sides[seat].library.find((x) => x.name.toLowerCase() === name.toLowerCase() || x.name.split(" // ")[0]!.toLowerCase() === name.toLowerCase());
+    if (!want) return null;
+    for (const c of t.sides[seat].hand) {
+      const tu = isPiece(c) ? null : tutorOf(infoOf(book, c));
+      if (!tu || tu.discardRandom || tu.search.to[0]!.zone !== "hand" || !tu.search.test(want.typeLine, infoOf(book, want))) continue;
+      if (t.sides[seat].life - tu.lose < 5) continue;
+      const effects: Effect[] = [{ ...blank("search"), name: want.name, to: "hand" }];
+      if (tu.lose) effects.push({ ...blank("life"), player: "ai", amount: -tu.lose });
+      return { ...blankAction("cast", c.iid), effects };
+    }
+    return null;
+  };
+  /** One more source of mana, played: true when something was. */
+  const makeMana = (): boolean => {
+    const side = t.sides[seat];
+    const spare = side.hand.filter((c) => !isLand(c) && !isPiece(c));
+    // A rock that costs less than it gives (Lotus Petal, a Mox, Sol Ring, Mana Vault).
+    for (const c of spare) {
+      const made = manaOutput(infoOf(book, c), c.typeLine);
+      if (!made || isCreature(book, c) || made.amount <= costOf(c, "hand")) continue;
+      const before = manaTotal(availableMana(t, seat, book));
+      const saved = { t, n: actions.length };
+      if (step(blankAction("cast", c.iid))) {
+        if (manaTotal(availableMana(t, seat, book)) > before) return true;
+        // It gave nothing (a Mox with no way to turn it on): take it back.
+        t = saved.t;
+        actions.length = saved.n;
+      }
+    }
+    const fodder = side.battlefield.some((c) => isCreature(book, c));
+    const wantsFodder = spare.some((c) => sacrificeCostOf(infoOf(book, c)) === "creature" && ritualNow(c)) || side.battlefield.some((c) => !c.tapped && sacManaOf(infoOf(book, c)));
+    // A creature that costs nothing (Rograkh), to be sacrificed for mana.
+    if (wantsFodder && !fodder) {
+      const free = [...side.command, ...side.hand].find((c) => isCreature(book, c) && !isPiece(c) && costOf(c, zoneOf(c)) === 0);
+      if (free && step(blankAction("cast", free.iid))) return true;
+    }
+    // A ritual that gives more than it costs.
+    const rituals = spare
+      .map((c) => ({ c, net: (ritualNow(c)?.length ?? 0) - costOf(c, "hand") }))
+      .filter((r) => r.net > 0)
+      .sort((a, b) => b.net - a.net);
+    for (const r of rituals) if (step(blankAction("cast", r.c.iid))) return true;
+    // A creature fed to Phyrexian Tower.
+    for (const c of side.battlefield) {
+      if (c.tapped || !sacManaOf(infoOf(book, c)) || !t.sides[seat].battlefield.some((x) => isCreature(book, x) && !isPiece(x))) continue;
+      if (step(blankAction("activate", c.iid))) return true;
+    }
+    return false;
+  };
+  const ritualNow = (c: PlayCard) =>
+    ritualMana(infoOf(book, c), {
+      graveyard: t.sides[seat].graveyard.length,
+      ritesInGraveyards: [...t.sides.you.graveyard, ...t.sides.opp.graveyard].filter((x) => x.name === c.name).length,
+      foeHand: t.sides[other(seat)].hand.length,
+    });
+  for (let n = 0; n < 24; n++) {
+    const st = comboStatus(t, seat, combo, book);
+    if (st.ready) {
+      const go: PlanAction = { ...blankAction("cast", 0), kind: "combo", card: combo.id };
+      const r = applyAction(t, seat, go, book, { combos });
+      if (!r.ok) return null;
+      return { actions: [...actions, go], after: r.game };
+    }
+    // What a turn can't mend: a piece that's gone, a graveyard too thin.
+    if (st.needs || st.missing.some((m) => m.where !== "library")) return null;
+    const finds = st.missing.map((m) => tutorFor(m.name));
+    if (finds.some((f) => !f) && st.missing.length > t.sides[seat].hand.filter((c) => tutorOf(infoOf(book, c))).length) return null;
+    const find = finds.find((f): f is PlanAction => !!f);
+    if (st.missing.length && !find) return null;
+    // The mana the rest of the line asks for: the tutors, the pieces to
+    // cast, the combo's own. Short of it, the rituals and rocks come first:
+    // what they add pays for the tutor, and the lands keep their colours
+    // for the pieces.
+    const handCard = (a: PlanAction) => t.sides[seat].hand.find((c) => cardId(c.iid) === a.card);
+    const ahead =
+      totalOf(parseCost(combo.manaNeeded)) +
+      st.toCast.reduce((n, c) => n + costOf(c, zoneOf(c)), 0) +
+      finds.reduce((n, f) => n + (f && handCard(f) ? costOf(handCard(f)!, "hand") : 0), 0) +
+      // A piece still in the library that has to be cast once found.
+      st.missing.reduce((n, m) => n + (combo.pieces.find((p) => p.name === m.name)?.zones.includes("B") ? (book[m.name.toLowerCase()]?.manaValue ?? 0) : 0), 0);
+    if (ahead > manaTotal(availableMana(t, seat, book)) && makeMana()) continue;
+    // A tutor for a piece still in the library.
+    if (find && step(find)) continue;
+    // A piece that has to be out (or in the graveyard), cheapest first.
+    const piece = [...st.toCast].sort((a, b) => costOf(a, zoneOf(a)) - costOf(b, zoneOf(b))).find((c) => step(blankAction("cast", c.iid)));
+    if (piece) continue;
+    // Short of mana: make some.
+    if (makeMana()) continue;
+    return null;
+  }
+  return null;
+}
+
 /** The planner's turn when it wins the game outright (Thassa's Oracle
     with an empty library, a lethal storm or burn turn), checked by
     playing it out; null otherwise. A model game uses it too: a win the
@@ -267,7 +426,8 @@ export function winningTurn(g: PracticeGame, book: CardBook, seat: Seat = "opp",
   if (!out.wins) return null;
   let after = g;
   for (const a of plan.main) after = applyAction(after, seat, a, book, { combos }).game;
-  return after.winner === seat ? plan : null;
+  // Won, or the player's library is gone (they lose as they draw).
+  return after.winner === seat || !after.sides[other(seat)].library.length ? plan : null;
 }
 
 /** A wheel is worth casting when it gives this seat more cards than it
@@ -325,52 +485,47 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     // Floating mana used (a ritual's) is gone.
     const usedPool = new Set(paid.tap.filter((t) => t < 0).map((t) => -t - 1));
     if (usedPool.size && sim.pool) sim.pool[seat] = sim.pool[seat].filter((_, i) => !usedPool.has(i));
+    // A Spirit Guide exiled for its mana is gone from the hand.
+    const exiled = new Set(paid.tap.filter((t) => sources.find((x) => x.iid === t)?.exile));
     sim.sides[seat] = {
       ...sim.sides[seat],
       life: sim.sides[seat].life - life,
+      hand: sim.sides[seat].hand.filter((x) => !exiled.has(x.iid)),
       battlefield: sim.sides[seat].battlefield.map((x) => (tapped.has(x.iid) ? { ...x, tapped: true } : x)),
     };
     return true;
   };
-  // A combo it can go for now: its pieces in place (or castable this turn)
-  // and its mana there. A win, or milling the player out, comes before
-  // anything else; endless mana is taken and then spent as usual.
-  const combo = comboLine_();
-  if (combo && combo.ends) {
+  // A combo it can finish this turn: the pieces it holds are cast, a tutor
+  // finds the one it lacks, rituals and sacrifices make the mana. A win,
+  // or milling the player out, comes before anything else; endless mana is
+  // taken and then spent.
+  const combo = goOff(g, book, seat, combos, main[0] ?? null);
+  if (combo) {
     out.wins = combo.wins;
-    return { main: [...main, ...combo.actions], attack: [], after_combat: [], say: "" };
+    return { main: [...main, ...combo.actions], attack: combo.attack, after_combat: [], say: "" };
   }
-  // A way to win now comes before anything else.
+  // A way to win now comes before anything else. It is played out on a
+  // copy of the real table first: the planner's own count of its mana can
+  // be off (City of Traitors goes when the land is played), and a
+  // Consultation with no Oracle after it loses the game.
+  const beforeWin = sim;
   const win = winLine();
   if (win) {
-    out.wins = true;
-    return { main: [...main, ...win], attack: [], after_combat: [], say: "" };
-  }
-  function comboLine_(): { actions: PlanAction[]; ends: boolean; wins: boolean } | null {
-    for (const c of combos) {
-      const outcome = comboOutcome(c.produces);
-      if (outcome === "other") continue;
-      const status = comboStatus(sim, seat, c, book);
-      if (status.missing.length || status.blocked) continue;
-      // Cast the pieces that have to be out, on a copy of the table, then look again.
-      let t = sim;
-      const actions: PlanAction[] = [];
-      let ok = true;
-      for (const piece of status.toCast) {
-        const a = blankAction("cast", piece.iid);
-        const r = applyAction(t, seat, a, book);
-        if (!r.ok) {
-          ok = false;
-          break;
-        }
-        t = r.game;
-        actions.push(a);
+    let t = g;
+    let ok = true;
+    for (const a of [...main, ...win]) {
+      const r = applyAction(t, seat, a, book, { combos });
+      if (!r.ok) {
+        ok = false;
+        break;
       }
-      if (!ok || !comboStatus(t, seat, c, book).ready) continue;
-      actions.push({ ...blankAction("cast", 0), kind: "combo", card: c.id });
-      return { actions, ends: outcome === "win" || outcome === "mill", wins: outcome === "win" };
+      t = r.game;
     }
-    return null;
+    if (ok && t.winner === seat) {
+      out.wins = true;
+      return { main: [...main, ...win], attack: [], after_combat: [], say: "" };
+    }
+    sim = beforeWin;
   }
   function winLine(): PlanAction[] | null {
     const hand = sim.sides[seat].hand;
@@ -490,6 +645,8 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     if (kill && card && payIn(spellCost(sim, "opp", card, book, "hand"))) main.push(kill);
   }
   const cast = new Set(main.map((a) => a.card));
+  // The combos that end the game: what the deck is built to do.
+  const ending = combos.filter((c) => comboOutcome(c.produces) === "win" || comboOutcome(c.produces) === "mill");
   const candidates = [
     ...sim.sides[seat].hand.filter((c) => !cast.has(cardId(c.iid))).map((c) => ({ c, zone: "hand" as const })),
     ...sim.sides[seat].command.map((c) => ({ c, zone: "command" as const })),
@@ -501,11 +658,17 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
           drawOnly(book, c, sim.sides[seat].life) > 0 ||
           !!tutorOf(infoOf(book, c)) ||
           extraTurnOf(infoOf(book, c)) ||
+          // Ad Nauseam, with the life to turn into cards.
+          (adNauseamOf(infoOf(book, c)) && sim.sides[seat].life >= 20) ||
           wheelWorth(sim, seat, c, book) ||
           !!treasureSpellOf(book, c))
     )
     // Thassa's Oracle is kept for the win; Consultation and Pact too.
     .filter(({ c }) => !oracleWinOf(book, c) && !libraryExilerOf(infoOf(book, c)))
+    // So is a piece of a combo that isn't worth anything alone (a spell,
+    // a card that only lasts the turn), a card that costs the game (Final
+    // Fortune), and a Spirit Guide, which is mana.
+    .filter(({ c }) => !heldForCombo(book, c, combos) && !extraTurnLosesOf(infoOf(book, c)) && !handManaOf(infoOf(book, c)))
     // A 0/0 creature needs a choice the planner doesn't make: X counters
     // (Walking Ballista) or a creature to copy (Phyrexian Metamorph). Cast
     // as it is, it dies at once.
@@ -513,8 +676,9 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     // Permanents first, biggest first; then tutors; then the draw spells.
     .sort((a, b) => rank(a.c) - rank(b.c) || value(book, b.c) - value(book, a.c));
   function rank(c: PlayCard) {
-    // Another turn first: everything after it is worth twice.
-    return extraTurnOf(infoOf(book, c)) ? -1 : tutorOf(infoOf(book, c)) ? 1 : drawOnly(book, c) ? 2 : 0;
+    // Another turn first: everything after it is worth twice. A combo
+    // deck's tutors come before its permanents: the piece is the plan.
+    return extraTurnOf(infoOf(book, c)) || adNauseamOf(infoOf(book, c)) ? -1 : tutorOf(infoOf(book, c)) ? (ending.length ? -0.5 : 1) : drawOnly(book, c) ? 2 : 0;
   }
   for (const { c, zone } of candidates) {
     if (!castable(sim, seat, c, book, zone)) continue;
@@ -532,8 +696,6 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
       sim.sides[seat] = { ...sim.sides[seat], life: sim.sides[seat].life - drawSpell.lose };
     } else main.push(blankAction("cast", c.iid));
   }
-  // A combo for endless mana, if it's there (its win, when the deck has one, is a combo of its own).
-  if (combo && !combo.ends) main.push(...combo.actions);
   // Then the Equipment that's on nothing, onto its best creature, while it
   // can pay. (An Equipment cast this turn waits for the next: it isn't on
   // the battlefield the planner looks at.)

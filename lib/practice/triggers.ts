@@ -45,6 +45,9 @@ export interface Triggers {
   upkeep?: Outcome;
   /** "At the beginning of your end step, …" */
   endStep?: Outcome;
+  /** "At the beginning of the end step, sacrifice this" (Underworld
+      Breach, Sneak Attack's creature aside): it goes at the end of the turn. */
+  endSacrifice?: true;
   /** "Whenever a land you control enters, …" */
   landfall?: Outcome;
   /** "Whenever another creature you control [with power 4 or greater] enters, …" */
@@ -150,6 +153,7 @@ export function readTriggers(text: string, name: string): Triggers {
     else if ((m = new RegExp(`^whenever ${self} attacks, (.+)$`).exec(body))) set("attacks", outcomeOf(m[1]!, self));
     else if ((m = /^at the beginning of your upkeep, (.+)$/.exec(body))) set("upkeep", outcomeOf(m[1]!, self));
     else if ((m = /^at the beginning of your end step, (.+)$/.exec(body))) set("endStep", outcomeOf(m[1]!, self));
+    else if (new RegExp(`^at the beginning of (?:the|your|each) end step, sacrifice ${self}\\.?$`).test(body)) t.endSacrifice = true;
     else if ((m = /^whenever a land (?:you control enters|enters(?: the battlefield)? under your control), (.+)$/.exec(body))) set("landfall", outcomeOf(m[1]!, self));
     else if ((m = /^whenever (another|a) (nontoken )?creature (you control )?(?:with (?:power (\d+) or greater|([a-z]+(?: [a-z]+)?)) )?enters(?: the battlefield)?( under your control)?, (.+)$/.exec(body))) {
       const out = outcomeOf(m[7]!, self);

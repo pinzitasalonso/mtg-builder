@@ -54,6 +54,8 @@ export interface Source {
   float?: boolean;
   /** The life using it costs (Ancient Tomb: 2). */
   pain?: number;
+  /** A card in hand, exiled for its mana (Simian Spirit Guide). */
+  exile?: boolean;
 }
 
 /** A card's colours, from its mana cost. */
@@ -146,7 +148,7 @@ export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?
 /** One try: `byLife` of the pips `lifeFor` covers are paid with life first;
     any of them mana can't pay is paid with life too. */
 function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: number }, lifeFor: string[], byLife: number): Payment | null {
-  const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors, sacrifice: !!s.sacrifice, pain: s.pain ?? 0 })));
+  const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors, sacrifice: !!s.sacrifice || !!s.exile, pain: s.pain ?? 0 })));
   const used = new Set<number>();
   const take = (i: number) => used.add(i);
   const pick = (ok: (colors: string[]) => boolean) => {

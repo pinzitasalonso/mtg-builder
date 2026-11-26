@@ -45,6 +45,37 @@ export function comboHeadline(c: Pick<DeckCombo, "produces">): string {
   return c.produces.find((p) => WINS.test(p)) ?? c.produces.find((p) => MILLS.test(p)) ?? c.produces.find((p) => MANA.test(p)) ?? c.produces[0] ?? "a combo";
 }
 
+const COUNT: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12 };
+const count = (w: string | undefined) => (w ? (COUNT[w.toLowerCase()] ?? (Number(w) || 0)) : 0);
+
+/** What a combo asks for besides its pieces, where the table can count it:
+    cards in the graveyard ("You have at least six other cards in your
+    graveyard, plus an additional four cards if Brain Freeze is in your
+    graveyard"), or in the hand and graveyard together. Anything else
+    Spellbook lists is left to the pilot. */
+export interface ComboNeeds {
+  graveyard: number;
+  /** More graveyard cards when this piece is in the graveyard. */
+  plus: { name: string; count: number }[];
+  handOrGraveyard: number;
+}
+export function comboNeeds(prerequisites: string): ComboNeeds {
+  const out: ComboNeeds = { graveyard: 0, plus: [], handOrGraveyard: 0 };
+  for (const line of prerequisites.split(/\n|(?<=\.)\s+/)) {
+    const both = /\bat least (\w+) (?:other |additional |more )?cards? (?:between |in )(?:your )?hand and(?:\/or)? (?:your )?graveyard/i.exec(line);
+    if (both) {
+      out.handOrGraveyard = Math.max(out.handOrGraveyard, count(both[1]));
+      continue;
+    }
+    const gy = /\bat least (\w+) (?:other |additional |more )?cards? in your graveyard/i.exec(line);
+    if (!gy) continue;
+    out.graveyard = Math.max(out.graveyard, count(gy[1]));
+    const plus = /\bplus an additional (\w+) cards? if (.+?) is in your graveyard/i.exec(line);
+    if (plus) out.plus.push({ name: plus[2]!.trim(), count: count(plus[1]) });
+  }
+  return out;
+}
+
 const RANK: Record<ComboOutcome, number> = { win: 0, mill: 1, mana: 2, other: 3 };
 /** A deck can have dozens: this many are kept, the ones that win first. */
 export const MAX_COMBOS = 24;
