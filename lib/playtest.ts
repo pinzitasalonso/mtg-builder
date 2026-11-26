@@ -57,6 +57,9 @@ export interface PlayCard {
   imprint?: string[];
   /** Age counters, for a cumulative upkeep (Mystic Remora). */
   age?: number;
+  /** Burden counters (The One Ring): cards drawn each time it's tapped,
+      and life lost each upkeep. */
+  burden?: number;
   /** In hand for this turn only ("You may play them this turn", Jeska's
       Will): exiled at the end of the turn if it's still there. */
   fleeting?: boolean;
@@ -239,6 +242,7 @@ export function moveCard(
     delete card.loyalty;
     delete card.imprint;
     delete card.age;
+    delete card.burden;
     // A copy is itself again.
     if (card.cloneOf) {
       card.name = card.cloneOf.name;

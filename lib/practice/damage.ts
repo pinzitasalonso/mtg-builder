@@ -73,6 +73,8 @@ const isRed = (book: CardBook, src: PlayCard | null) => !!src && !src.token && c
     battlefield. */
 export function scaleDamage(g: PracticeGame, book: CardBook, from: Seat, src: PlayCard | null, to: Seat, amount: number, combat = false, permanent = false): number {
   if (amount <= 0) return amount;
+  // Protection from everything (The One Ring, the turn it's cast): no damage to that player.
+  if (!permanent && g.shield?.[to]) return 0;
   const rules = (["you", "opp"] as Seat[]).flatMap((s) => g.sides[s].battlefield.flatMap((c) => {
     const r = damageRuleOf(book, c);
     return r ? [{ r, s }] : [];

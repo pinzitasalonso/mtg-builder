@@ -3,14 +3,14 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { BASIC_COLOR, canPlayAsLand, counterOf, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, ninjutsuOf, ownTurnOf, removalOf, sacManaOf, searchOnCast, stats, transmuteOf, wheelSpellOf, type Search } from "./cards";
-import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, comboStatus, indestructible, lifeFor, spellCost, uncastable } from "./game";
+import { BASIC_COLOR, burdenDrawOf, canPlayAsLand, counterOf, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, ninjutsuOf, ownTurnOf, removalOf, sacManaOf, searchOnCast, stats, transmuteOf, wheelSpellOf, type Search } from "./cards";
+import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, colourNeeds, comboStatus, indestructible, lifeFor, spellCost, uncastable } from "./game";
 import { comboOutcome, type DeckCombo } from "./combos";
 import { equipOf, punishesIdleOf } from "./abilities";
 import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
 import { treasureSpellOf } from "./treasure";
 import { drawSpellOf, tutorOf, tutorSearch, wipeOf, type Tutor } from "./spells";
-import { adNauseamOf, burnOf, devotion, impulseOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, ritualOf, sacrificeCostOf } from "./wincons";
+import { adNauseamOf, burnOf, devotion, impulseOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, landsForManaOf, libraryExilerOf, oracleWinOf, ritualMana, ritualOf, sacrificeCostOf } from "./wincons";
 import { triggersOf } from "./triggers";
 import { lifeForCardsOf, searchAbility, type SearchAbility } from "./cards";
 import { scaleDamage } from "./damage";
@@ -254,8 +254,22 @@ function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, com
     if (tu && !tu.discardRandom && tu.search.to[0]!.zone === "hand" && lackingCards.some((y) => tutorSearch(tu, side.graveyard).test(y.typeLine, infoOf(book, y)))) return 60000;
     return adNauseamOf(info) || lifeForCardsOf(book, x) ? 40000 : 0;
   };
-  const score = (x: PlayCard) => combo(x) + piece(x) + bridge(x) + (needLand && isLand(x) ? 10000 : 0) + (mv(x) <= reach ? 1000 : 0) + mv(x) * 10 + (isCreature(book, x) ? 1 : 0);
+  // With the whole win in hand, what it lacks is mana: the tutor finds the
+  // quickest fix, a cheap rock that makes its colours before a ritual. (It
+  // went for a second combo's pieces, or cast the tutor for nothing.)
+  const whole = holdsOracle && (holdsExiler || maniacOut);
+  const fix = (x: PlayCard) => {
+    if (!whole || isLand(x) || isCreature(book, x)) return 0;
+    const info = infoOf(book, x);
+    const made = manaOutput(info, x.typeLine);
+    if (made && (info?.manaValue ?? 9) <= 2) return 200000 + (made.colors.includes("U") ? 2000 : 0) + (made.colors.includes("B") ? 1000 : 0) - (info?.manaValue ?? 0) * 300;
+    const ritual = ritualMana(info, { graveyard: side.graveyard.length, ritesInGraveyards: 0, foeHand: g.sides[other(seat)].hand.length });
+    return ritual && ritual.length > (info?.manaValue ?? 0) ? 150000 + ritual.length : 0;
+  };
+  const score = (x: PlayCard) => fix(x) + combo(x) + piece(x) + bridge(x) + (needLand && isLand(x) ? 10000 : 0) + (mv(x) <= reach ? 1000 : 0) + mv(x) * 10 + (isCreature(book, x) ? 1 : 0);
   const pick = fits.reduce((a, b) => (score(b) > score(a) ? b : a));
+  // Nothing that helps the win it holds: the tutor waits.
+  if (whole && !fix(pick)) return null;
   // Wishclaw Talisman goes to the player once used: only for a combo piece.
   if (opts.onlyPieces && !piece(pick) && combo(pick) < 100000) return null;
   const effects: Effect[] = [{ ...blank("search"), name: pick.name, to: search.to[0]!.zone === "top" ? "top" : "hand" }];
@@ -341,7 +355,9 @@ export function guardPlan(g: PracticeGame, plan0: TurnPlan, book: CardBook, seat
     if (a.kind !== "cast") return false;
     const c = cardOf(a);
     if (!c) return false;
-    return oracleWinOf(book, c) ? devotion(g, seat, "U", book) + 2 < g.sides[seat].library.length : !!triggersOf(book, c).endSacrifice || extraTurnLosesOf(infoOf(book, c));
+    return oracleWinOf(book, c)
+      ? devotion(g, seat, "U", book) + 2 < g.sides[seat].library.length
+      : !!triggersOf(book, c).endSacrifice || extraTurnLosesOf(infoOf(book, c)) || !!landsForManaOf(infoOf(book, c));
   };
   if (!all.some(wasted)) return plan;
   return { ...plan, main: plan.main.filter((a) => !wasted(a)), after_combat: plan.after_combat.filter((a) => !wasted(a)) };
@@ -473,6 +489,11 @@ function comboLine(g0: PracticeGame, book: CardBook, seat: Seat, combo: DeckComb
     for (const c of side.battlefield) {
       if (c.tapped || !sacManaOf(infoOf(book, c)) || !t.sides[seat].battlefield.some((x) => isCreature(book, x) && !isPiece(x))) continue;
       if (step(blankAction("activate", c.iid))) return true;
+    }
+    // Last, Rain of Filth: every land for one more mana. All in, so only
+    // here, where the line is thrown away unless it wins.
+    for (const c of spare) {
+      if (landsForManaOf(infoOf(book, c)) && side.battlefield.some(isLand) && step(blankAction("cast", c.iid))) return true;
     }
     return false;
   };
@@ -642,15 +663,12 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
   const main: PlanAction[] = [];
   const lands = side.hand.filter(canPlayAsLand);
   if (!g.landPlayed && lands.length) {
-    // Prefer a land of a colour the hand (or the commander) is missing,
-    // then one that enters untapped.
-    const have = new Set(side.battlefield.flatMap((c) => landColors(book, c)));
-    const missing = new Set(
-      [...side.hand.filter((c) => !isLand(c)), ...side.command].flatMap((c) => parseCost(infoOf(book, c)?.manaCost ?? null).pips.flat()).filter((c) => !have.has(c))
-    );
+    // Prefer the land that makes what the hand (or the commander) is
+    // shortest of, then one that enters untapped.
+    const short = colourNeeds(g, seat, book);
     // A modal card with a land back is a spell first: a real land goes before it.
     const score = (l: PlayCard) =>
-      landColors(book, l).filter((c) => missing.has(c)).length * 10 + (entersTapped(infoOf(book, l), ownTurnOf(g.turn)) ? 0 : 5) + landColors(book, l).length - (isLand(l) ? 0 : 8);
+      landColors(book, l).reduce((n, c) => n + (short[c] ?? 0), 0) * 10 + (entersTapped(infoOf(book, l), ownTurnOf(g.turn)) ? 0 : 5) + landColors(book, l).length - (isLand(l) ? 0 : 8);
     const pickLand = lands.reduce((a, b) => (score(b) > score(a) ? b : a));
     // (Holding a land back to keep City of Traitors was tried, and measured
     // slower over 200 games a list: the land goes down, and the table taps
@@ -966,6 +984,16 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     main.push(abilityTutor(c, ab, found));
     sim = structuredClone(sim);
     sim.sides[seat] = { ...sim.sides[seat], battlefield: sim.sides[seat].battlefield.map((x) => (x.iid === c.iid ? { ...x, tapped: true } : x)) };
+  }
+  // The One Ring: a card for each burden counter, every turn it can spare
+  // the life (the counters cost one each at its upkeep).
+  for (const c of sim.sides[seat].battlefield) {
+    if (c.tapped || !burdenDrawOf(book, c)) continue;
+    const burden = (c.burden ?? 0) + 1;
+    if (sim.sides[seat].life - burden < 12) continue;
+    main.push({ ...blankAction("activate", c.iid), tap_card: true });
+    sim = structuredClone(sim);
+    sim.sides[seat] = { ...sim.sides[seat], battlefield: sim.sides[seat].battlefield.map((x) => (x.iid === c.iid ? { ...x, tapped: true, burden } : x)) };
   }
   // Then the Equipment that's on nothing, onto its best creature, while it
   // can pay. (An Equipment cast this turn waits for the next: it isn't on

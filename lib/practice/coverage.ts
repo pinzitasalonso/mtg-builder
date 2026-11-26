@@ -8,7 +8,7 @@ import { drawSpellOf, tutorOf, wipeOf } from "./spells";
 import { treasureSpellOf } from "./treasure";
 import type { PlayCard } from "../playtest";
 import type { CardBook, CardInfo } from "./types";
-import { adNauseamOf, burnOf, extraTurnOf, impulseOf, libraryExilerOf, ritualMana } from "./wincons";
+import { adNauseamOf, burnOf, extraTurnOf, impulseOf, landsForManaOf, libraryExilerOf, ritualMana } from "./wincons";
 
 /** What the table knows a spell as, or null when it knows nothing of it. */
 export function spellKnown(info: CardInfo, book: CardBook): string | null {
@@ -16,6 +16,7 @@ export function spellKnown(info: CardInfo, book: CardBook): string | null {
   if (tutorOf(info)) return "tutor";
   if (drawSpellOf(info)) return "draw";
   if (ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 })) return "ritual";
+  if (landsForManaOf(info)) return "lands for mana";
   if (impulseOf(info)) return "impulse";
   if (libraryExilerOf(info)) return "library exiler";
   if (adNauseamOf(info)) return "ad nauseam";
