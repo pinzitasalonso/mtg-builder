@@ -52,6 +52,7 @@ const SECTIONS = [
   { id: "growth", label: "Growth" },
   { id: "journey", label: "Journey" },
   { id: "ai", label: "AI" },
+  { id: "practice", label: "Practice" },
   { id: "accounts", label: "Accounts" },
   { id: "events", label: "Events" },
 ];
@@ -229,6 +230,9 @@ function Dashboard({ events, acc, onAccountsChanged }: { events: Events; acc: Ac
         </div>
       </Section>
 
+      {/* ── PRACTICE ── */}
+      <PracticeMatches />
+
       {/* ── ACCOUNTS ── */}
       <Section id="accounts" title="Accounts" note="Everyone who signed up. Click a row for their decks.">
         <AccountsTable rows={acc.accounts} onChanged={onAccountsChanged} />
@@ -258,6 +262,104 @@ function Dashboard({ events, acc, onAccountsChanged }: { events: Events; acc: Ac
         </div>
       </Section>
     </>
+  );
+}
+
+/* ───────────────────────── practice matches ───────────────────────── */
+
+interface PracticeMatch {
+  id: string;
+  at: string;
+  email: string;
+  opponent: string;
+  bot: boolean;
+  result: string | null;
+  endTurn: number | null;
+  aiTurns: number;
+  traced: number;
+  turns: number;
+  idle: number;
+  known: number;
+  bySource: Record<string, number>;
+}
+interface PracticeData {
+  matches: PracticeMatch[];
+  summary: { matches: number; medianEndTurn: number | null; idle: number; known: number };
+}
+
+/** The latest practice matches, with what their kept turns say: how long
+    each took and how many of the opponent's turns cast nothing. "Read"
+    opens a match's turns as text (lib/practice/trace.ts). */
+function PracticeMatches() {
+  const [data, setData] = useState<PracticeData | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    fetch("/api/analytics/practice", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: PracticeData) => setData(d))
+      .catch(() => setFailed(true));
+  }, []);
+  const s = data?.summary;
+  const th: React.CSSProperties = { textAlign: "left", padding: "9px 12px", fontSize: 11, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--w-3)", borderBottom: "1px solid var(--w-line)", whiteSpace: "nowrap" };
+  const td: React.CSSProperties = { padding: "9px 12px", fontSize: 13, color: "var(--w-2)", borderBottom: "1px solid var(--w-line)", whiteSpace: "nowrap" };
+  const note = !s
+    ? "The opponent's turns in real matches, kept 45 days."
+    : s.matches
+      ? `Smart-opponent matches with their turns kept: ${s.matches}. Half end by turn ${s.medianEndTurn ?? "?"}. The opponent cast nothing on ${s.idle} of ${s.known} turns.`
+      : "No finished smart-opponent match has its turns kept yet. They're kept from now on, for 45 days.";
+  return (
+    <Section id="practice" title="Practice matches" note={note}>
+      <Card style={{ padding: 0, overflow: "hidden" }}>
+        {failed ? (
+          <p style={{ padding: 16, margin: 0, color: "var(--w-3)", fontSize: 13.5 }}>Couldn&apos;t load the matches.</p>
+        ) : !data ? (
+          <p style={{ padding: 16, margin: 0, color: "var(--w-3)", fontSize: 13.5 }}>Loading…</p>
+        ) : !data.matches.length ? (
+          <p style={{ padding: 16, margin: 0, color: "var(--w-3)", fontSize: 13.5 }}>No practice matches yet.</p>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr>
+                  {["When", "Player", "Opponent", "Result", "Its turns", "Cast nothing", "Planned by", ""].map((h) => (
+                    <th key={h} style={th}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.matches.map((m) => (
+                  <tr key={m.id}>
+                    <td style={td}>{ago(m.at)}</td>
+                    <td style={{ ...td, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>{m.email}</td>
+                    <td style={{ ...td, color: "var(--w-1)", maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis" }} title={m.opponent}>
+                      {m.opponent.split(" — ")[0]}
+                      {m.bot ? " · basic" : ""}
+                    </td>
+                    <td style={td}>{m.result ? `${m.result === "won" ? "Player won" : "Opponent won"}, turn ${m.endTurn ?? "?"}` : "Not finished"}</td>
+                    <td style={{ ...td, fontVariantNumeric: "tabular-nums" }}>{m.turns || "—"}</td>
+                    <td style={{ ...td, fontVariantNumeric: "tabular-nums", color: m.known && m.idle / m.known > 0.3 ? "#ffb9a8" : "var(--w-2)" }}>{m.known ? `${m.idle} of ${m.known}` : "—"}</td>
+                    <td style={td}>
+                      {Object.entries(m.bySource)
+                        .map(([k, v]) => `${k} ${v}`)
+                        .join(" · ") || "—"}
+                    </td>
+                    <td style={{ ...td, textAlign: "right" }}>
+                      {m.traced ? (
+                        <a href={`/api/analytics/practice/${m.id}`} target="_blank" rel="noreferrer" style={{ color: "var(--gold)", fontWeight: 700, textDecoration: "none" }}>
+                          Read
+                        </a>
+                      ) : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </Section>
   );
 }
 

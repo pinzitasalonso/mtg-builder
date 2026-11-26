@@ -211,10 +211,14 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   useEffect(() => {
     if (!winner || !gameId || reported.current === gameId) return;
     reported.current = gameId;
-    fetch(`/api/practice/${gameId}/result`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ result: winner === "you" ? "won" : "lost", turn: overTurn }) })
+    // The last of the log goes with the result: how the match ended.
+    const log = (game?.log ?? []).slice(-70).map((l) => l.text);
+    fetch(`/api/practice/${gameId}/result`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ result: winner === "you" ? "won" : "lost", turn: overTurn, log }) })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => alive.current && d?.record && setRecord(d.record))
       .catch(() => {});
+    // The game as it is when it ends: it doesn't change after.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner, gameId, overTurn]);
 
   // A game picked up at the start of the opponent's turn: it takes that turn.
