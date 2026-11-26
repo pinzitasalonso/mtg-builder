@@ -952,6 +952,14 @@ export function hitTriggersOf(book: CardBook, card: PlayCard): HitTrigger[] {
   return out;
 }
 
+/** Underworld Breach: "Each nonland card in your graveyard has escape. The
+    escape cost is equal to the card's mana cost plus exile three other
+    cards from your graveyard." How many other cards a cast exiles, or 0. */
+export function graveyardEscapeOf(info: CardInfo | undefined): number {
+  const m = /each nonland card in your graveyard has escape\. the escape cost is equal to the card's mana cost plus exile (two|three|four|five|\d+) other cards from your graveyard/i.exec(frontText(info));
+  return m ? (NUMBER_WORDS[m[1]!.toLowerCase()] ?? Number(m[1])) : 0;
+}
+
 /** What a hit on an opponent brings, beyond combat-damage triggers:
     - an Aura on the creature: "Whenever enchanted creature deals damage to
       an opponent, you may draw a card" (Curiosity, Ophidian Eye), or the

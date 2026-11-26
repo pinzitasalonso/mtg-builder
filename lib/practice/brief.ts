@@ -5,7 +5,7 @@
 
 import type { PlayCard } from "../playtest";
 import { drawsOnDamageAura, soulbondDrawOf, noncombatDrawOf, noncombatImpulseOf, burdenDrawOf, canPlayAsLand, cloneTypeOf, digAbilityOf, nonlandManaBonusOf, permanentFetchOf, tapTreasureOf, transmuteOf, goesWhenALandIsPlayed, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
-import { availableMana, castable, cardId, comboStatus, lifeFor, loyaltyOf, uncastable } from "./game";
+import { availableMana, castable, cardId, comboStatus, escapable, escapeCost, lifeFor, loyaltyOf, uncastable } from "./game";
 import { comboHeadline, type DeckCombo } from "./combos";
 import {
   affinityOf,
@@ -417,6 +417,10 @@ export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[], 
     const can = castable(g, "opp", c, book, "command");
     return `- ${cardId(c.iid)} ${c.name} ${info?.manaCost ?? ""}${g.tax.opp ? ` +{${2 * g.tax.opp}} tax` : ""} — ${can ? "you can pay for it now" : "can't pay for it yet"}`;
   });
+  // Underworld Breach out: what the graveyard holds that can be cast again.
+  const escapes = me.graveyard
+    .filter((c) => escapable(g, "opp", c, book))
+    .map((c) => `- ${cardId(c.iid)} ${c.name} ${infoOf(book, c)?.manaCost ?? ""} (${(infoOf(book, c)?.typeLine ?? "").split(" — ")[0]})${castable(g, "opp", c, book, "graveyard") ? "" : " — can't pay for it yet"}`);
   const field = (cards: PlayCard[], text: boolean) => (cards.length ? cards.map((c) => describe(g, book, c, { text })).join("\n") : "(nothing)");
   const grave = (cards: PlayCard[]) => (cards.length ? cards.slice(-8).map((c) => c.name).join(", ") : "empty");
   return [
@@ -431,6 +435,9 @@ export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[], 
     `YOUR BATTLEFIELD:\n${field(me.battlefield, false)}`,
     `THE PLAYER'S BATTLEFIELD:\n${field(them.battlefield, true)}`,
     `GRAVEYARDS: yours (${me.graveyard.length} cards, ${cardTypesAmong(me.graveyard.map((c) => c.typeLine))} card types): ${grave(me.graveyard)}. The player's: ${grave(them.graveyard)}.`,
+    escapes.length
+      ? `YOU CAN CAST FROM YOUR GRAVEYARD (escape, while Underworld Breach is out: a cast action with the card's id; you pay its mana cost and the app exiles ${escapeCost(g, "opp", book)} other cards of your graveyard, lands first; a spell cast this way goes back to the graveyard):\n${escapes.join("\n")}`
+      : "",
     combos.length ? `YOUR COMBOS THIS TURN:\n${comboBrief(g, book, combos)}` : "",
     line ? `THE APP'S LINE: ${lineBrief(g, line)} Play it, or something better.` : "",
     `Plan your turn.`,
