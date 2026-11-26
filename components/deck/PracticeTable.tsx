@@ -5,12 +5,12 @@ import { isLimitMessage } from "@/lib/limits";
 import { refreshPlan } from "@/lib/plan-client";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bot, Flag, Loader2, Plus, Sparkles, Swords, Undo2, X } from "lucide-react";
+import { Bot, Dices, Flag, Loader2, Plus, Sparkles, Swords, Undo2, X } from "lucide-react";
 import type { OpponentOption } from "@/app/api/practice/opponents/route";
 import { PrimerMarkdown } from "@/components/deck/DeckPrimer";
 import OpponentPicker from "@/components/deck/OpponentPicker";
 import { CardArt } from "@/components/mtg";
-import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom, AttachGroup } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom, AttachGroup, ModeSwitch } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
@@ -969,8 +969,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     <header className="pt-top">
       <div className="pt-title">
         <span className="id-display" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 22, color: "#fff" }}>
-          <Bot size={21} strokeWidth={2} /> Practice match
+          <Dices size={21} strokeWidth={2} /> Playtest
         </span>
+        {/* Solo or a match: the same switch, in the same place, on both
+            tables. (Solo used to be a button in the far corner here.) */}
+        <ModeSwitch mode="match" onSolo={onSolo} />
         {setup && <span className="pt-sub">against {setup.opp.label}</span>}
       </div>
       <div className="pt-top-right">
@@ -997,9 +1000,6 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
             </span>
           </>
         )}
-        <button type="button" className="pt-btn pt-wide-only" onClick={onSolo}>
-          Solo
-        </button>
         <button type="button" className="pt-btn" onClick={onClose} aria-label="Close playtest">
           <X size={14} strokeWidth={2.5} /> <span className="pt-btn-label">Close</span>
         </button>
@@ -1195,6 +1195,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
 
       <div className="pt-tools">
         <div className="pt-tools-row">
+          <ModeSwitch narrow mode="match" onSolo={onSolo} />
           {mode === "mulligan" && (
             <>
               <button type="button" className="pt-btn pt-btn-gold" onClick={keep} disabled={you.toBottom > 0}>

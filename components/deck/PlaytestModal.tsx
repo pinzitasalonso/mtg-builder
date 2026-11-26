@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart3, Bot, Dices, RotateCw, Undo2, X } from "lucide-react";
 import { hasKnownBack } from "@/components/useCardFlip";
-import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, type MenuState, type Zoom, AttachGroup } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, type MenuState, type Zoom, AttachGroup, ModeSwitch } from "@/components/deck/playtest-parts";
 import PracticeTable from "@/components/deck/PracticeTable";
 import { PoolEntry } from "@/lib/pool-client";
 import { hypergeometric, hypergeometricAtLeast } from "@/lib/probability";
@@ -261,6 +261,8 @@ function SoloTable({
       <header className="pt-top">
         <div className="pt-title">
           <span className="id-display" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 22, color: "#fff" }}><Dices size={21} strokeWidth={2} /> Playtest</span>
+          {/* Solo or a match: the same switch, in the same place, on both tables. */}
+          {onVsAi && <ModeSwitch mode="solo" onMatch={onVsAi} />}
           <span className="pt-sub">
             from {sourceLabel} · {deckSize} cards · {landCount} lands
           </span>
@@ -282,14 +284,10 @@ function SoloTable({
         {/* One row that scrolls sideways on a phone; on a wider screen it's
             invisible and the buttons sit in .pt-tools as before. */}
         <div className="pt-tools-row">
+        {onVsAi && <ModeSwitch narrow mode="solo" onMatch={onVsAi} />}
         <button type="button" className="pt-btn pt-btn-gold" onClick={() => act(newGame)}>
           New game
         </button>
-        {onVsAi && (
-          <button type="button" className="pt-btn pt-btn-ai" onClick={onVsAi}>
-            <Bot size={14} strokeWidth={2.25} /> Match
-          </button>
-        )}
         <button type="button" className="pt-btn" onClick={undo} disabled={history.length === 0} title="Undo (⌘Z / Ctrl+Z)" aria-label="Undo">
           <Undo2 size={14} strokeWidth={2.25} /> <span className="pt-btn-label">Undo</span>
         </button>

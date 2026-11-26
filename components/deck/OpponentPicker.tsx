@@ -1,5 +1,6 @@
 "use client";
 
+import { ModeSwitch } from "@/components/deck/playtest-parts";
 import Link from "next/link";
 import { LimitNotice } from "@/components/Upgrade";
 import { isLimitMessage } from "@/lib/limits";
@@ -65,8 +66,6 @@ export default function OpponentPicker({
   const [picked, setPicked] = useState<OpponentOption | null>(null);
   const [levels, setLevels] = useState<LevelsState | null>(null);
   const [level, setLevel] = useState<string | null>(null);
-  // Who pilots it: the AI (a model plans each turn), or the basic bot.
-  const [pilot, setPilot] = useState<"ai" | "bot">("ai");
   const alive = useRef(true);
   useEffect(() => () => void (alive.current = false), []);
 
@@ -138,7 +137,10 @@ export default function OpponentPicker({
   const free = data?.free ?? null;
   const spent = !!free && free.left <= 0;
   // With today's game spent, the basic bot is what's left: it's free.
-  const bot = pilot === "bot" || spent;
+  // A match is against the smart opponent (a model plans each turn). The
+  // basic one (the built-in planner: free, instant) is the fallback once
+  // today's free matches are used; it used to be a second choice here.
+  const bot = spent;
   const blocked = starting || (picked?.kind === "edhrec" && (!levels || levels.busy || !!levels.error));
   const play = () => {
     if (!picked || blocked) return;
@@ -150,6 +152,11 @@ export default function OpponentPicker({
     <div className="pk">
       <div className="pk-scroll">
         <div className="pk-inner">
+          {/* On a phone the header has no room for the title and its
+              switch: Solo or Match leads the page here instead. */}
+          <div className="pk-mode">
+            <ModeSwitch narrow mode="match" onSolo={onSolo} />
+          </div>
           <div className="pk-head">
             <h2 className="id-display pk-title">Pick an opponent</h2>
             {free && (
@@ -171,7 +178,7 @@ export default function OpponentPicker({
           </p>
           {spent && (
             <p className="pt-pick-note pk-spent">
-              A free account plays {free?.perDay === 1 ? "one match" : `${free?.perDay ?? 2} matches`} a day against the smart opponent. {free?.perDay === 1 ? "It’s" : "They’re"} back tomorrow. The basic opponent is free, as often as you like.{" "}
+              A free account plays {free?.perDay === 1 ? "one match" : `${free?.perDay ?? 2} matches`} a day against the smart opponent. {free?.perDay === 1 ? "It’s" : "They’re"} back tomorrow. Until then you play the basic opponent, free, as often as you like.{" "}
               <Link href="/pricing" onClick={rememberUpgradeFrom} className="go-pro-link">
                 Go Pro for unlimited matches
               </Link>
@@ -259,9 +266,6 @@ export default function OpponentPicker({
             </>
           )}
 
-          <button type="button" className="pt-btn pk-solo" onClick={onSolo}>
-            Play alone instead
-          </button>
         </div>
       </div>
 
@@ -299,21 +303,10 @@ export default function OpponentPicker({
               )}
             </div>
             <div className="pk-bar-go">
-              {/* Who pilots it. The basic bot makes no AI call: it's free and its turns are instant. */}
-              {!spent && (
-                <div className="pk-pilot" role="radiogroup" aria-label="Who plays the opponent">
-                  <button type="button" role="radio" aria-checked={pilot === "ai"} onClick={() => setPilot("ai")} title="Thinks through each of its turns: what to cast, what to hold back, when to attack">
-                    Smart
-                  </button>
-                  <button type="button" role="radio" aria-checked={pilot === "bot"} onClick={() => setPilot("bot")} title="Plays its lands and creatures and attacks. It doesn’t plan ahead. Free, and its turns are instant.">
-                    Basic
-                  </button>
-                </div>
-              )}
               <button type="button" className="pt-btn pt-btn-gold pk-play" disabled={blocked} onClick={play}>
-                {starting ? <Loader2 size={16} className="spin" /> : <Swords size={16} />} {starting ? "Shuffling up…" : bot ? "Play the bot" : "Play"}
+                {starting ? <Loader2 size={16} className="spin" /> : <Swords size={16} />} {starting ? "Shuffling up…" : bot ? "Play the basic opponent" : "Play"}
               </button>
-              <span className="pk-bar-free">{bot ? "Free: the bot doesn’t plan ahead" : free ? (free.perDay === 1 ? "Uses today’s free match" : "Uses one of today’s free matches") : "A model plans its turns"}</span>
+              <span className="pk-bar-free">{bot ? "Free: it plays its cards and attacks, without planning ahead" : free ? (free.perDay === 1 ? "Uses today’s free match" : "Uses one of today’s free matches") : "It plans each of its turns"}</span>
             </div>
           </div>
         </div>
