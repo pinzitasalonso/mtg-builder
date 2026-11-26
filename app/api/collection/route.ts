@@ -7,6 +7,7 @@ import { encodePrinting } from "@/lib/printing";
 import { cachedUsdPrices, scryfallIdFromImage, usdPricesByIds, warmUsdPrices } from "@/lib/scryfall";
 import { isUnrecognised } from "@/lib/collection-enrich";
 import { ensureIndexing } from "@/lib/collection-indexer";
+import { collectionSummary } from "@/lib/collection-summary";
 
 export const runtime = "nodejs";
 
@@ -14,8 +15,6 @@ const MAX_ENTRIES = 20000;
 // Prices not yet known are fetched before answering only when that's a
 // request or two; more are fetched in the background, and the answer says so.
 const PRICE_NOW_MAX = 150;
-// Cards the summary shows.
-const SAMPLE = 7;
 // Rows per transaction when an import adds to what's there.
 const UPDATE_CHUNK = 500;
 
@@ -42,20 +41,10 @@ export async function GET(req: Request) {
   const query = new URL(req.url).searchParams;
 
   if (query.get("summary")) {
-    const where = { userId: user.id };
-    const [unique, sum, pending] = await Promise.all([
-      prisma.collectionCard.count({ where }),
-      prisma.collectionCard.aggregate({ where, _sum: { quantity: true } }),
-      prisma.collectionCard.count({ where: { ...where, enriched: false } }),
-    ]);
-    // A few cards to show, from a different place in the collection each time.
-    const withArt = { ...where, imageUri: { not: null } };
-    const pictured = unique ? await prisma.collectionCard.count({ where: withArt }) : 0;
-    const sample = pictured
-      ? await prisma.collectionCard.findMany({ where: withArt, select: { name: true, imageUri: true }, orderBy: { id: "asc" }, skip: Math.floor(Math.random() * Math.max(1, pictured - SAMPLE + 1)), take: SAMPLE })
-      : [];
+    const summary = await collectionSummary(user.id);
+    const pending = summary.pending;
     const indexing = await ensureIndexing(user.id, pending);
-    return NextResponse.json({ unique, total: sum._sum.quantity ?? 0, pending, sample, indexing });
+    return NextResponse.json({ ...summary, indexing });
   }
 
   const rows = await prisma.collectionCard.findMany({

@@ -1,24 +1,14 @@
-import { deckFace } from "@/lib/deck-face";
 import { NextResponse } from "next/server";
 import { DECK_TEXT_MAX, jsonBody } from "@/lib/api";
 import { jsonWithEtag } from "@/lib/http-cache";
 import prisma from "@/lib/prisma";
 import { currentUser } from "@/lib/auth";
 import { newPublicId } from "@/lib/deck-id";
+import { backfillPublicIds, tileDecks } from "@/lib/deck-list";
 import { SIGN_IN_FOR_DECKS_MSG } from "@/lib/limits";
 import { recordEvent } from "@/lib/analytics";
-import { scanSummary } from "@/lib/deck-analysis";
 import { sweepEmptyPublicDecks } from "@/lib/public-sweep";
 import { pickPublicBrews } from "@/lib/public-brews";
-
-// One-time: assign an unguessable publicId to any deck created before this
-// column existed, so every deck has a stable URL. No-op once all are filled.
-async function backfillPublicIds() {
-  const stale = await prisma.deck.findMany({ where: { publicId: null }, select: { id: true } });
-  for (const d of stale) {
-    await prisma.deck.update({ where: { id: d.id }, data: { publicId: newPublicId() } });
-  }
-}
 
 // Public decks (userId null) are listed for everyone; signed-in users see
 // their own private decks by default. ?public=1 forces the public gallery
@@ -39,51 +29,7 @@ export async function GET(req: Request) {
     // of it (it no longer grows: new decks need an account).
     take: listingPublic ? 1000 : 100,
   });
-  // Aggregate each deck's color identity (WUBRG order) and its real deck size.
-  // The card count must reflect only cards promoted to the decklist (board
-  // "deck"), not pool candidates — and summed by quantity, matching the deck
-  // page — so the home progress bar shows actual progress toward the format.
-  const cards = await prisma.poolCard.findMany({
-    where: { deckId: { in: decks.map((d) => d.id) } },
-    select: { deckId: true, colorIdentity: true, board: true, quantity: true, name: true, imageUri: true, typeLine: true, manaCost: true },
-  });
-  // The tile's art is the stored scan of the deck's face (lib/deck-face.ts):
-  // its commander, or with none the card its list is most about. The tile
-  // cuts its art crop from that scan on cards.scryfall.io instead of asking
-  // Scryfall's API by name, which allows two lookups a second (a home page
-  // of decks went over).
-  const cardsByDeck = new Map<number, typeof cards>();
-  for (const c of cards) {
-    const list = cardsByDeck.get(c.deckId);
-    if (list) list.push(c);
-    else cardsByDeck.set(c.deckId, [c]);
-  }
-  const coverByDeck = new Map<number, string>();
-  for (const d of decks) {
-    const face = deckFace(d.commander, cardsByDeck.get(d.id) ?? []);
-    if (face?.imageUri) coverByDeck.set(d.id, face.imageUri);
-  }
-  const colorsByDeck = new Map<number, Set<string>>();
-  const deckCountByDeck = new Map<number, number>();
-  for (const c of cards) {
-    if (c.board === "deck") {
-      deckCountByDeck.set(c.deckId, (deckCountByDeck.get(c.deckId) ?? 0) + c.quantity);
-    }
-    if (!c.colorIdentity) continue;
-    const set = colorsByDeck.get(c.deckId) ?? new Set<string>();
-    for (const ch of c.colorIdentity) if ("WUBRG".includes(ch)) set.add(ch);
-    colorsByDeck.set(c.deckId, set);
-  }
-  // The last scan travels as its summary (Score and bracket, for the deck's
-  // tile), not as the stored JSON: the full scan is several KB a deck, and
-  // both clients read it from /scan on the deck's own page.
-  const listed = decks.map(({ analysis, ...d }) => ({
-    ...d,
-    _count: { cards: deckCountByDeck.get(d.id) ?? 0 },
-    colors: ["W", "U", "B", "R", "G"].filter((ch) => colorsByDeck.get(d.id)?.has(ch)),
-    scan: scanSummary(analysis),
-    cover: coverByDeck.get(d.id) ?? null,
-  }));
+  const listed = await tileDecks(decks);
   if (!listingPublic) return jsonWithEtag(req, listed);
   // The public pool: only its finished brews, best first (lib/public-brews.ts).
   const brews = pickPublicBrews(
