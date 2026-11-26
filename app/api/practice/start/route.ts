@@ -11,6 +11,7 @@ import { deckFromDb, deckFromEdhrec, deckFromMtgtop8, type PracticeDeck } from "
 import { cleanOpponent } from "@/lib/practice/opponents";
 import { findCombos } from "@/lib/combos";
 import { deckCombos } from "@/lib/practice/combos";
+import { TRACE_DAYS } from "@/lib/practice/trace";
 
 /** A picture for a deck: its commander's art. */
 function coverOf(deck: PracticeDeck): string | null {
@@ -80,6 +81,8 @@ export async function POST(req: Request) {
     },
   });
   void recordEvent("practice_game");
+  // Old matches' turns are let go (lib/practice/trace.ts).
+  void prisma.practiceTurn.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - TRACE_DAYS * 86_400_000) } } }).catch(() => {});
   return NextResponse.json({
     id,
     bot,

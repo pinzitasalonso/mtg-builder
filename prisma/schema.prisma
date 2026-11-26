@@ -392,9 +392,33 @@ model PracticeGame {
   endTurn   Int?
   // The AI's review of the finished game (markdown), written once on request.
   review    String?
+  // The opponent's turns as the server planned them (lib/practice/trace.ts).
+  trace     PracticeTurn[]
 
   @@index([userId, createdAt])
   @@index([userId, deck])
+}
+
+// One of the opponent's turns in a practice match: what it held, what the
+// built-in planner would have played, what the model planned, and what had
+// happened on the table since its turn before. Kept 45 days, to see how the
+// opponent really plays in people's matches (the admin page reads them).
+// The last row of a finished match ("end") is the table's closing log.
+model PracticeTurn {
+  id        Int          @id @default(autoincrement())
+  gameId    String
+  game      PracticeGame @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  createdAt DateTime     @default(now())
+  // The game's turn number.
+  turn      Int
+  // Who planned it: "ai" (the model), "win" and "simple" (the table, without
+  // asking), "fallback" (the planner, the model missed), or "end".
+  source    String
+  // JSON: a TurnTrace.
+  data      String
+
+  @@index([gameId, id])
+  @@index([createdAt])
 }
 
 // Stripe billing (web), mirrored from verified webhooks (app/api/stripe/webhook,

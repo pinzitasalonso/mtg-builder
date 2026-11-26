@@ -6,7 +6,8 @@ import { recordEvent } from "@/lib/analytics";
 import { currentUser } from "@/lib/auth";
 import { PRACTICE_AI_TURNS } from "@/lib/limits";
 import { fallbackPlan, simpleTurn, winningTurn, guardPlan } from "@/lib/practice/ai";
-import { cleanPlan, PLAN_SCHEMA, sinceLastTurn, systemPrompt, turnBrief, type DeckLine } from "@/lib/practice/brief";
+import { cleanPlan, lineBrief, PLAN_SCHEMA, sinceLastTurn, systemPrompt, turnBrief, type DeckLine } from "@/lib/practice/brief";
+import { turnTrace, type TurnTrace } from "@/lib/practice/trace";
 import type { CardBook, TurnPlan } from "@/lib/practice/types";
 import { asGame } from "@/lib/practice/wire";
 import { asCombos } from "@/lib/practice/combos";
@@ -43,11 +44,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const setup = JSON.parse(row.setup) as Setup;
   const combos = asCombos(setup.combos);
 
+  // The turn is kept as it was planned (lib/practice/trace.ts): what the
+  // opponent held, the planner's line, the model's plan. A match can then
+  // be read back from the admin page. Not waited for, and never in the way.
+  const keep = (source: string, extra: Partial<TurnTrace> = {}) => {
+    try {
+      const data: TurnTrace = { ...turnTrace(game, setup.book), ...extra };
+      void prisma.practiceTurn.create({ data: { gameId: id, turn: game.turn, source, data: JSON.stringify(data) } }).catch(() => {});
+    } catch {
+      /* a trace is never worth a failed turn */
+    }
+  };
+  const said = (plan: TurnPlan) => lineBrief(game, plan);
+
   // Counted, so admin shows how often the model is reached. The note says
   // why in a few words, so a player can tell us (and the log has the rest).
-  const fallback = (note: string) => {
+  const fallback = (note: string, extra: Partial<TurnTrace> = {}) => {
     void recordEvent("practice_fallback_turn");
-    return NextResponse.json({ plan: fallbackPlan(game, setup.book, "opp", {}, combos), source: "fallback", note });
+    const plan = fallbackPlan(game, setup.book, "opp", {}, combos);
+    keep("fallback", { line: said(plan), note, ...extra });
+    return NextResponse.json({ plan, source: "fallback", note });
   };
   const instinct = (why: string) => fallback(`The opponent played on instinct this turn (${why}).`);
 
@@ -63,9 +79,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // check: a combo sitting on the battlefield is exactly a turn with
   // nothing to cast.
   const win = winningTurn(game, setup.book, "opp", combos);
-  if (win) return NextResponse.json({ plan: win, source: "win" });
+  if (win) {
+    keep("win", { line: said(win) });
+    return NextResponse.json({ plan: win, source: "win" });
+  }
   const simple = simpleTurn(game, setup.book, "opp", combos);
-  if (simple) return NextResponse.json({ plan: simple, source: "simple" });
+  if (simple) {
+    keep("simple", { line: said(simple) });
+    return NextResponse.json({ plan: simple, source: "simple" });
+  }
 
   // One more AI turn, if the game has any left.
   const spent = await prisma.practiceGame.updateMany({ where: { id, userId: user.id, turns: { lt: PRACTICE_AI_TURNS } }, data: { turns: { increment: 1 } } });
@@ -75,7 +97,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { rules, deck } = systemPrompt(setup.oppDeck, setup.book, setup.oppCommander, combos);
   // What the built-in planner would play: the model is shown it, and the
   // table plays it when the model's turn casts nothing.
-  const brief = turnBrief(game, setup.book, sinceLastTurn(game), combos, fallbackPlan(game, setup.book, "opp", {}, combos));
+  const line = fallbackPlan(game, setup.book, "opp", {}, combos);
+  const brief = turnBrief(game, setup.book, sinceLastTurn(game), combos, line);
   try {
     const anthropic = new Anthropic();
     const res = await anthropic.messages.create(
@@ -113,9 +136,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const plan: TurnPlan | null = read ? guardPlan(game, read, setup.book) : null;
     if (!plan) {
       console.error(`[practice] unreadable plan: ${text.slice(0, 300)}`);
-      return instinct("its plan didn't fit the game");
+      return fallback("The opponent played on instinct this turn (its plan didn't fit the game).", { raw: text.slice(0, 3000) });
     }
     void recordEvent("practice_ai_turn");
+    // What the model planned, next to what the planner would have: its
+    // actions as it wrote them too, for the ones the table then refuses.
+    keep("ai", { line: said(line), plan: said(plan), say: plan.say.slice(0, 300), raw: JSON.stringify([...plan.main, ...plan.after_combat]).slice(0, 4000) });
     return NextResponse.json({ plan, source: "ai" });
   } catch (e) {
     console.error("[practice] turn failed", e instanceof Error ? e.message : e);

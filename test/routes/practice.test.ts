@@ -5,6 +5,8 @@ import { POST as result } from "@/app/api/practice/[id]/result/route";
 import { POST as review } from "@/app/api/practice/[id]/review/route";
 import { POST as turn } from "@/app/api/practice/[id]/turn/route";
 import { POST as start } from "@/app/api/practice/start/route";
+import { GET as adminMatches } from "@/app/api/analytics/practice/route";
+import { GET as adminMatch } from "@/app/api/analytics/practice/[id]/route";
 import { FREE_PRACTICE_PER_DAY } from "@/lib/limits";
 
 // MTGTop8, EDHREC and Scryfall are down in tests (fetch fails): the picker
@@ -176,5 +178,69 @@ describe("/api/practice/<id>/turn and /review", () => {
     expect(await kept.text()).toBe("## What decided it\nKept.");
     await signIn(await makeUser());
     expect((await ask(table({ winner: "you" }))).status).toBe(404);
+  });
+});
+
+describe("a match's turns are kept", () => {
+  const side = (o: Record<string, unknown> = {}) => ({ library: [], hand: [], battlefield: [], graveyard: [], exile: [], command: [], life: 40, turn: 1, oppLife: 40, mulligans: 0, toBottom: 0, ...o });
+  const line = (text: string, seat: string | null = "opp") => ({ seat, text });
+  const table = (o: Record<string, unknown> = {}) => ({ turn: 4, active: "opp", first: "you", winner: null, commanderGame: false, landPlayed: false, cmdDamage: { you: 0, opp: 0 }, tax: { you: 0, opp: 0 }, combat: null, log: [], sides: { you: side(), opp: side() }, ...o });
+  const island = (iid: number) => ({ iid, name: "Island", imageUri: "", typeLine: "Basic Land — Island" });
+
+  it("each turn the server plans, and the table's closing log, read back by the admin only", async () => {
+    const user = await makeUser({ tier: "pro" });
+    await signIn(user);
+    const mine = await makeDeck(user.id, "Mine", "Kefka, Court Mage");
+    const id = (await (await start(jsonRequest("/api/practice/start", { deck: mine.publicId, opponent: { kind: "deck", deck: mine.publicId, label: "Mirror match", detail: "" } }))).json()).id as string;
+
+    // Its turn 2: a land in hand, nothing else. Then turn 4, after a turn where it only played that land.
+    await turn(jsonRequest("/x", { game: table({ turn: 2, log: [line("Turn 2 — the opponent's turn.")], sides: { you: side(), opp: side({ hand: [island(100_001)], life: 38 }) } }) }), params({ id }));
+    const log = [line("Turn 2 — the opponent's turn."), line("The opponent plays Island."), line("Turn 3 — your turn.", "you"), line("You cast Bear.", "you"), line("Turn 4 — the opponent's turn.")];
+    await turn(jsonRequest("/x", { game: table({ turn: 4, log, sides: { you: side(), opp: side({ hand: [island(100_002)], battlefield: [{ ...island(100_001), tapped: false }] }) } }) }), params({ id }));
+    await result(jsonRequest("/x", { result: "won", turn: 9, log: ["Turn 9 — your turn.", "You attack.", "The opponent is out of life. You win!", 7, null] }), params({ id }));
+    // A second report changes nothing, and adds no second ending.
+    await result(jsonRequest("/x", { result: "lost", turn: 11, log: ["again"] }), params({ id }));
+
+    // Rows are written without being waited for.
+    await new Promise((r) => setTimeout(r, 50));
+    const rows = await prisma.practiceTurn.findMany({ where: { gameId: id }, orderBy: { id: "asc" } });
+    expect(rows.map((r) => [r.turn, r.source])).toEqual([[2, "simple"], [4, "simple"], [9, "end"]]);
+    const second = JSON.parse(rows[1]!.data);
+    expect(second).toMatchObject({ life: { opp: 40, you: 40 }, hand: ["Island*"], field: ["Island"], line: expect.stringMatching(/^play c100002 Island\.$/) });
+    expect(second.since).toEqual(["Turn 2 — the opponent's turn.", "The opponent plays Island.", "Turn 3 — your turn.", "You cast Bear."]);
+    expect(JSON.parse(rows[2]!.data).since).toEqual(["Turn 9 — your turn.", "You attack.", "The opponent is out of life. You win!"]);
+
+    // Not the player's to read: the admin's.
+    expect((await adminMatches()).status).toBe(403);
+    expect((await adminMatch(jsonRequest("/x"), params({ id }))).status).toBe(403);
+    const admin = await makeUser({ email: "boss@example.com" });
+    process.env.ANALYTICS_ADMIN_EMAIL = "boss@example.com";
+    await signIn(admin);
+    const list = await (await adminMatches()).json();
+    const m = list.matches.find((x: { id: string }) => x.id === id);
+    // Two turns planned; the first is known to have cast nothing (a land only).
+    expect(m).toMatchObject({ opponent: expect.stringContaining("Mine"), bot: false, result: "won", endTurn: 9, traced: 3, turns: 2, known: 1, idle: 1, bySource: { simple: 2 } });
+    expect(list.summary).toMatchObject({ matches: 1, medianEndTurn: 9, idle: 1, known: 1 });
+    const text = await (await adminMatch(jsonRequest("/x"), params({ id }))).text();
+    expect(text).toMatch(/^Practice match against Mine/);
+    expect(text).toMatch(/Result: the player won on turn 9\./);
+    expect(text).toMatch(/=== Turn 4 · planned by: simple · life 40 \(player 40\)/);
+    expect(text).toMatch(/hand: Island\*/);
+    expect(text).toMatch(/the app's line: play c100002 Island\./);
+    expect(text).toMatch(/=== How it ended \(won\) ===\n   Turn 9 — your turn\./);
+    expect((await adminMatch(jsonRequest("/x"), params({ id: "nope" }))).status).toBe(404);
+    delete process.env.ANALYTICS_ADMIN_EMAIL;
+  });
+
+  it("go with the match when its account is deleted", async () => {
+    const user = await makeUser({ tier: "pro" });
+    await signIn(user);
+    const mine = await makeDeck(user.id, "Mine", "Kefka, Court Mage");
+    const id = (await (await start(jsonRequest("/api/practice/start", { deck: mine.publicId, opponent: { kind: "deck", deck: mine.publicId, label: "", detail: "" } }))).json()).id as string;
+    await turn(jsonRequest("/x", { game: table({ sides: { you: side(), opp: side({ hand: [island(100_001)] }) } }) }), params({ id }));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(await prisma.practiceTurn.count({ where: { gameId: id } })).toBe(1);
+    await prisma.user.delete({ where: { id: user.id } });
+    expect(await prisma.practiceTurn.count({ where: { gameId: id } })).toBe(0);
   });
 });

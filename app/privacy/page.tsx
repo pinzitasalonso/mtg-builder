@@ -38,6 +38,10 @@ export default function PrivacyPage() {
         visitors on the web can build public decks, which aren&apos;t tied to an identity.
       </p>
       <p style={P}>
+        <b>Practice matches.</b>{" "}How each practice match went: its result, and for 45 days the plays of the match, so we can
+        see how the opponent plays and make it better.
+      </p>
+      <p style={P}>
         <b>Usage counters.</b>{" "}Anonymous daily event counts (e.g. how many decks were created). They
         contain no identifiers and can&apos;t be traced back to you.
       </p>
