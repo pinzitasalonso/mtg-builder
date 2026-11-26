@@ -65,7 +65,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     keep("fallback", { line: said(plan), note, ...extra });
     return NextResponse.json({ plan, source: "fallback", note });
   };
-  const instinct = (why: string) => fallback(`The opponent played on instinct this turn (${why}).`);
+  const instinct = (why: string, extra: Partial<TurnTrace> = {}) => fallback(`The opponent played on instinct this turn (${why}).`, extra);
 
   // The basic bot is the built-in planner: no model, no count. (The table
   // plans those turns itself; this answers a client that asks anyway.)
@@ -128,7 +128,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
     if (res.stop_reason !== "end_turn") {
       console.error(`[practice] turn stopped: ${res.stop_reason}`);
-      return instinct(res.stop_reason === "max_tokens" ? "its plan ran too long" : res.stop_reason === "refusal" ? "it couldn't plan this turn" : `its planning stopped: ${res.stop_reason}`);
+      return instinct(res.stop_reason === "max_tokens" ? "its plan ran too long" : res.stop_reason === "refusal" ? "it couldn't plan this turn" : `its planning stopped: ${res.stop_reason}`, { error: `stop_reason ${res.stop_reason}; ${u.output_tokens} output tokens` });
     }
     const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
     // A combo piece cast on a turn that doesn't go off is taken out.
@@ -144,9 +144,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     keep("ai", { line: said(line), plan: said(plan), say: plan.say.slice(0, 300), raw: JSON.stringify([...plan.main, ...plan.after_combat]).slice(0, 4000) });
     return NextResponse.json({ plan, source: "ai" });
   } catch (e) {
-    console.error("[practice] turn failed", e instanceof Error ? e.message : e);
-    if (e instanceof Anthropic.APIConnectionTimeoutError) return instinct("it took too long to think");
-    if (e instanceof Anthropic.APIError && e.status) return instinct(`planner error ${e.status}`);
-    return instinct("its planner couldn't be reached");
+    // What the API said goes in the match's kept turns (the admin page),
+    // not on the player's table: a refused request names its own cause.
+    const error = (e instanceof Error ? e.message : String(e)).slice(0, 600);
+    console.error("[practice] turn failed", error);
+    if (e instanceof Anthropic.APIConnectionTimeoutError) return instinct("it took too long to think", { error });
+    if (e instanceof Anthropic.APIError && e.status) return instinct(`planner error ${e.status}`, { error });
+    return instinct("its planner couldn't be reached", { error });
   }
 }

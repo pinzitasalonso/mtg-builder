@@ -31,8 +31,10 @@ export interface TurnTrace {
   plan?: string;
   say?: string;
   raw?: string;
-  /** Why the planner played instead of the model. */
+  /** Why the planner played instead of the model, as the player was told,
+      and what the API said (never shown to the player). */
   note?: string;
+  error?: string;
   /** "end": how the match ended. */
   result?: string;
 }
@@ -144,6 +146,7 @@ export function traceText(head: { label: string; bot: boolean; result: string | 
       ...(d.plan !== undefined ? [`the model's plan: ${d.plan || "nothing"}${d.say ? ` — "${d.say}"` : ""}`] : []),
       ...(d.raw ? [`its actions: ${d.raw}`] : []),
       ...(d.note ? [`note: ${d.note}`] : []),
+      ...(d.error ? [`the API said: ${d.error}`] : []),
       "since its turn before:",
       ...d.since.map((t) => `   ${t}`),
       ""
