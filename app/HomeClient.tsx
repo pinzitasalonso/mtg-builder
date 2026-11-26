@@ -693,6 +693,7 @@ export default function HomeClient({ start }: { start?: HomeStart }) {
           <Link href="/terms" style={{ color: "var(--t2)", textDecoration: "none" }}>Terms</Link>
           <Link href="/refund" style={{ color: "var(--t2)", textDecoration: "none" }}>Refunds</Link>
           <Link href="/pricing" style={{ color: "var(--t2)", textDecoration: "none" }}>Pricing</Link>
+          <Link href="/updates" style={{ color: "var(--t2)", textDecoration: "none" }}>What&apos;s new</Link>
           <a href="mailto:pinzitasalonso@gmail.com" style={{ color: "var(--t2)", textDecoration: "none" }}>Contact</a>
         </div>
         <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--t3)", maxWidth: 720 }}>

@@ -4794,6 +4794,90 @@ button.st-tile { cursor: pointer; }
 .deck-score-pill span { padding: 0 9px; font-weight: 600; background: #f4f0e6; }
 .deck-score-pill span:first-child:not(:last-child) { font-weight: 800; }
 
+/* What's new (app/updates): the public log, a week to a section. Each
+   week is its date, a title, and its lines beside the part of the app
+   they're about; on a phone the part sits above its lines. */
+.up {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 20px 80px;
+  font-family: var(--font-ui);
+}
+.up-head h1 {
+  font-size: clamp(34px, 6vw, 52px);
+  margin: 26px 0 6px;
+  color: var(--t1);
+}
+.up-head p {
+  margin: 0 0 8px;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--t3);
+}
+.up-week {
+  margin-top: 40px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.up-date {
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+.up-title {
+  margin: 0 0 20px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.2;
+  color: var(--t1);
+  text-wrap: balance;
+}
+.up-items {
+  margin: 0;
+  display: grid;
+  gap: 16px;
+}
+.up-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 4px 20px;
+  align-items: baseline;
+}
+.up-row dt {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--t1);
+}
+.up-row dd {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.up-row dd p {
+  margin: 0;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--t2);
+}
+.up-foot {
+  margin: 48px 0 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--t3);
+}
+.up-foot a {
+  color: var(--gold);
+}
+@media (max-width: 560px) {
+  .up-row {
+    grid-template-columns: 1fr;
+  }
+  .up-items {
+    gap: 18px;
+  }
+}
+
 /* Home, a free account that hasn't tried everything: what the free plan
    gives a day (components/FirstSteps.tsx). One panel, its three steps
    divided by a hairline: side by side on a wide page, stacked on a phone. */

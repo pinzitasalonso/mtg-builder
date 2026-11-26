@@ -105,6 +105,7 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
         <Link href="/privacy" style={{ color: "var(--t2)", textDecoration: "none" }}>Privacy</Link>
         <Link href="/terms" style={{ color: "var(--t2)", textDecoration: "none" }}>Terms</Link>
         <Link href="/refund" style={{ color: "var(--t2)", textDecoration: "none" }}>Refunds</Link>
+        <Link href="/updates" style={{ color: "var(--t2)", textDecoration: "none" }}>What&apos;s new</Link>
         <a href="mailto:pinzitasalonso@gmail.com" style={{ color: "var(--t2)", textDecoration: "none" }}>Contact</a>
       </footer>
     </div>
