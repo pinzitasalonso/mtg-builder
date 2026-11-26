@@ -43,6 +43,14 @@ ADD="Kinnan, Bonder Prodigy" SLUG=kinnan npm run practice:bench
 UBR" for a pair). It takes that archetype's best recent finish, and reaches
 MTGTop8, Scryfall and Commander Spellbook once.
 
+`LIST=1 npm run practice:bench` prints MTGTop8's cEDH archetypes with their
+share of the field, to pick the next one. `decks/` holds the top of that
+list: fourteen lists, from Kinnan to a Ral storm deck.
+
+A list whose numbers stay low is one whose plan the table can't play yet.
+Read its `.out/` log for what it holds and doesn't use, then the coverage
+list below for the spells the table doesn't know.
+
 ## What it doesn't measure
 
 The smart opponent's turns come from the model, which this doesn't call.

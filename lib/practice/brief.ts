@@ -4,7 +4,7 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { burdenDrawOf, canPlayAsLand, cloneTypeOf, transmuteOf, goesWhenALandIsPlayed, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
+import { burdenDrawOf, canPlayAsLand, cloneTypeOf, digAbilityOf, nonlandManaBonusOf, permanentFetchOf, tapTreasureOf, transmuteOf, goesWhenALandIsPlayed, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
 import { availableMana, castable, cardId, comboStatus, lifeFor, loyaltyOf, uncastable } from "./game";
 import { comboHeadline, type DeckCombo } from "./combos";
 import {
@@ -217,6 +217,17 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     const cu = cumulativeUpkeepOf(book, front);
     if (cu !== null) notes.push(`the app pays its cumulative upkeep at your upkeep while it's {2} or less and leaves you mana for the turn, then sacrifices it`);
     if (landsForManaOf(info)) notes.push(`the app taps every land you control for its mana, then sacrifices them all for {${landsForManaOf(info)}} each: give it no effects, and cast it only on the turn you win`);
+    const pf = permanentFetchOf(book, front);
+    if (pf)
+      notes.push(
+        pf.treasures
+          ? `with ${pf.treasures} Treasures, activate it (no mana) with a search effect naming the card: the app sacrifices them and puts the card onto the battlefield. With no name it takes a combo piece first`
+          : `to use its ${pf.cost} ability, activate it with "mana":"${pf.cost}" and a search effect naming a legendary permanent that costs less than its power (it counts the colours among your other legends): the app puts it onto the battlefield`
+      );
+    if (tapTreasureOf(book, front)) notes.push(`the app makes a Treasure each time one of your ${tapTreasureOf(book, front)} creatures becomes tapped (it attacks, or is tapped for mana)`);
+    if (nonlandManaBonusOf(info)) notes.push("while it's out, each of your nonland permanents that taps for mana makes one more: your mana shown counts it");
+    const dig = digAbilityOf(book, front);
+    if (dig) notes.push(`to use its ${dig.cost} ability, activate it with "mana":"${dig.cost}" and no effects, as many times as you can pay: the app ${dig.kind === "creature" ? `looks at the top ${dig.look} cards and puts the best creature that isn't a Human onto the battlefield` : "puts the top card onto the battlefield if it's a land, and draws it if not"}. Spend your leftover mana on it every turn`);
     if (burdenDrawOf(book, front)) notes.push("to use it, activate it with tap_card true and no effects: the app adds a burden counter and draws you a card for each one, and takes a life for each counter at your upkeep. Use it every turn you can spare the life. Cast, it also stops all damage to you until your next turn");
     const tm = transmuteOf(info);
     if (tm) notes.push(`transmute: from your hand, in your main phase, activate it with "mana":"${tm.cost}" and one search effect naming a card with mana value ${tm.manaValue}. The app discards it and puts that card in your hand`);

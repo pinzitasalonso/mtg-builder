@@ -1,0 +1,2264 @@
+{
+ "name": "Dargo, the Shipwrecker + Tymna the Weaver",
+ "source": {
+  "kind": "mtgtop8",
+  "detail": "Atticus Chanse [larp] won Art's Birthday Bash (07/11/26) · MTGTop8",
+  "fetchedAt": "2026-11-26"
+ },
+ "commander": "Dargo, the Shipwrecker + Tymna the Weaver",
+ "cards": [
+  {
+   "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani"
+  },
+  {
+   "name": "Altar of the Wretched // Wretched Bonemass",
+   "quantity": 1,
+   "typeLine": "Artifact // Creature — Skeleton Horror"
+  },
+  {
+   "name": "Birgi, God of Storytelling // Harnfel, Horn of Bounty",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — God // Legendary Artifact"
+  },
+  {
+   "name": "Deadpool, Trading Card",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Mutant Mercenary Hero"
+  },
+  {
+   "name": "Esper Sentinel",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Human Soldier"
+  },
+  {
+   "name": "Evereth, Viceroy of Plunder",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Vampire Soldier"
+  },
+  {
+   "name": "Goblin Engineer",
+   "quantity": 1,
+   "typeLine": "Creature — Goblin Artificer"
+  },
+  {
+   "name": "Goblin Welder",
+   "quantity": 1,
+   "typeLine": "Creature — Goblin Artificer"
+  },
+  {
+   "name": "Grand Abolisher",
+   "quantity": 1,
+   "typeLine": "Creature — Human Cleric"
+  },
+  {
+   "name": "Greedy Freebooter",
+   "quantity": 1,
+   "typeLine": "Creature — Human Pirate"
+  },
+  {
+   "name": "Hope of Ghirapur",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact Creature — Thopter"
+  },
+  {
+   "name": "Impulsive Pilferer",
+   "quantity": 1,
+   "typeLine": "Creature — Goblin Pirate"
+  },
+  {
+   "name": "Lotho, Corrupt Shirriff",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Halfling Rogue"
+  },
+  {
+   "name": "Magda, Brazen Outlaw",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Dwarf Berserker"
+  },
+  {
+   "name": "Mardu Devotee",
+   "quantity": 1,
+   "typeLine": "Creature — Human Scout"
+  },
+  {
+   "name": "Marionette Apprentice",
+   "quantity": 1,
+   "typeLine": "Creature — Human Artificer"
+  },
+  {
+   "name": "Memnite",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Construct"
+  },
+  {
+   "name": "Opposition Agent",
+   "quantity": 1,
+   "typeLine": "Creature — Human Rogue"
+  },
+  {
+   "name": "Professional Face-Breaker",
+   "quantity": 1,
+   "typeLine": "Creature — Human Warrior"
+  },
+  {
+   "name": "Ragavan, Nimble Pilferer",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Monkey Pirate"
+  },
+  {
+   "name": "Ranger-Captain of Eos",
+   "quantity": 1,
+   "typeLine": "Creature — Human Soldier Ranger"
+  },
+  {
+   "name": "Ruthless Technomancer",
+   "quantity": 1,
+   "typeLine": "Creature — Human Wizard"
+  },
+  {
+   "name": "Simian Spirit Guide",
+   "quantity": 1,
+   "typeLine": "Creature — Ape Spirit"
+  },
+  {
+   "name": "Tataru Taru",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Dwarf Advisor"
+  },
+  {
+   "name": "The Queen of Dale",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Noble"
+  },
+  {
+   "name": "The Vision and Scarlet Witch",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact Creature — Mutant Hero"
+  },
+  {
+   "name": "Voice of Victory",
+   "quantity": 1,
+   "typeLine": "Creature — Human Bard"
+  },
+  {
+   "name": "Warren Soultrader",
+   "quantity": 1,
+   "typeLine": "Creature — Zombie Goblin Wizard"
+  },
+  {
+   "name": "Yawgmoth, Thran Physician",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Cleric"
+  },
+  {
+   "name": "Altar of Dementia",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Arcane Signet",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Bolas's Citadel",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact"
+  },
+  {
+   "name": "Chrome Mox",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Lion's Eye Diamond",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Lotus Petal",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mana Vault",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mox Amber",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact"
+  },
+  {
+   "name": "Mox Diamond",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mox Opal",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact"
+  },
+  {
+   "name": "Prized Statue",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Relic of Legends",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Sol Ring",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Vexing Bauble",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Wishclaw Talisman",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Ad Nauseam",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Burnt Offering",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Cabal Ritual",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Culling the Weak",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Dark Ritual",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Demonic Consultation",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Enlightened Tutor",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Final Fortune",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Pyroblast",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Rain of Filth",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Redirect Lightning",
+   "quantity": 1,
+   "typeLine": "Instant — Lesson"
+  },
+  {
+   "name": "Sacrifice",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Silence",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Tainted Pact",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Vampiric Tutor",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Beseech the Mirror",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Demonic Tutor",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Diabolic Intent",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Gamble",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Imperial Seal",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Infernal Plunge",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Jeska's Will",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Lively Dirge",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Rite of Flame",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Scheming Symmetry",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Sevinne's Reclamation",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Goblin Bombardment",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Necropotence",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Static Prison",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Underworld Breach",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Ancient Tomb",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Arid Mesa",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Badlands",
+   "quantity": 1,
+   "typeLine": "Land — Swamp Mountain"
+  },
+  {
+   "name": "Blood Crypt",
+   "quantity": 1,
+   "typeLine": "Land — Swamp Mountain"
+  },
+  {
+   "name": "Bloodstained Mire",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Cavern of Souls",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "City of Brass",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "City of Traitors",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Command Tower",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Emergence Zone",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Gemstone Caverns",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Godless Shrine",
+   "quantity": 1,
+   "typeLine": "Land — Plains Swamp"
+  },
+  {
+   "name": "Great Furnace",
+   "quantity": 1,
+   "typeLine": "Artifact Land"
+  },
+  {
+   "name": "Mana Confluence",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Marsh Flats",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Phyrexian Tower",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Plateau",
+   "quantity": 1,
+   "typeLine": "Land — Mountain Plains"
+  },
+  {
+   "name": "Polluted Delta",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Sacred Foundry",
+   "quantity": 1,
+   "typeLine": "Land — Mountain Plains"
+  },
+  {
+   "name": "Scalding Tarn",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Scrubland",
+   "quantity": 1,
+   "typeLine": "Land — Plains Swamp"
+  },
+  {
+   "name": "Starting Town",
+   "quantity": 1,
+   "typeLine": "Land — Town"
+  },
+  {
+   "name": "Verdant Catacombs",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Windswept Heath",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Dargo, the Shipwrecker",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Giant Pirate"
+  },
+  {
+   "name": "Tymna the Weaver",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Cleric"
+  }
+ ],
+ "book": {
+  "ajani, nacatl pariah // ajani, nacatl avenger": {
+   "name": "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Cat Warrior // Legendary Planeswalker — Ajani",
+   "manaCost": "{1}{W}",
+   "manaValue": 2,
+   "oracleText": "When Ajani enters, create a 2/1 white Cat Warrior creature token.\nWhenever one or more other Cats you control die, you may exile Ajani, then return him to the battlefield transformed under his owner's control.\n//\n+2: Put a +1/+1 counter on each Cat you control.\n0: Create a 2/1 white Cat Warrior creature token. When you do, if you control a red permanent other than Ajani, he deals damage equal to the number of creatures you control to any target.\n−4: Each opponent chooses an artifact, a creature, an enchantment, and a planeswalker from among the nonland permanents they control, then sacrifices the rest.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [
+    "Transform"
+   ],
+   "producedMana": []
+  },
+  "altar of the wretched // wretched bonemass": {
+   "name": "Altar of the Wretched // Wretched Bonemass",
+   "imageUri": "",
+   "typeLine": "Artifact // Creature — Skeleton Horror",
+   "manaCost": "{2}{B}",
+   "manaValue": 3,
+   "oracleText": "When this artifact enters, you may sacrifice a nontoken creature. If you do, draw X cards, then mill X cards, where X is that creature's power.\nCraft with one or more creatures {2}{B}{B}\n{2}{B}: Return this card from your graveyard to your hand.\n//\nWretched Bonemass's power and toughness are each equal to the total power of the exiled cards used to craft it.\nThis creature has flying as long as an exiled card used to craft it has flying. The same is true for first strike, double strike, deathtouch, haste, hexproof, indestructible, lifelink, menace, protection, reach, trample, and vigilance.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Craft",
+    "Transform",
+    "Mill"
+   ],
+   "producedMana": [],
+   "back": {
+    "power": 0,
+    "toughness": 0
+   }
+  },
+  "birgi, god of storytelling // harnfel, horn of bounty": {
+   "name": "Birgi, God of Storytelling // Harnfel, Horn of Bounty",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — God // Legendary Artifact",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Whenever you cast a spell, add {R}. Until end of turn, you don't lose this mana as steps and phases end.\nCreatures you control can boast twice during each of your turns rather than once.\n//\nDiscard a card: Exile the top two cards of your library. You may play those cards this turn.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "deadpool, trading card": {
+   "name": "Deadpool, Trading Card",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Mutant Mercenary Hero",
+   "manaCost": "{2}{B}{R}",
+   "manaValue": 4,
+   "oracleText": "As Deadpool enters, you may exchange his text box and another creature's.\nAt the beginning of your upkeep, you lose 3 life.\n{3}, Sacrifice this creature: Each other player draws a card.",
+   "power": 5,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": []
+  },
+  "esper sentinel": {
+   "name": "Esper Sentinel",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Human Soldier",
+   "manaCost": "{W}",
+   "manaValue": 1,
+   "oracleText": "Whenever an opponent casts their first noncreature spell each turn, draw a card unless that player pays {X}, where X is this creature's power.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "evereth, viceroy of plunder": {
+   "name": "Evereth, Viceroy of Plunder",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Vampire Soldier",
+   "manaCost": "{2}{B}",
+   "manaValue": 3,
+   "oracleText": "Flying\nSacrifice another creature or artifact: Put a +1/+1 counter on Evereth. If the sacrificed permanent was a Treasure, Evereth gains lifelink until end of turn. Activate only as a sorcery.\nWhen Evereth dies, you may pay {1}{B/R}. When you do, Evereth deals damage equal to its power to each opponent.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": []
+  },
+  "goblin engineer": {
+   "name": "Goblin Engineer",
+   "imageUri": "",
+   "typeLine": "Creature — Goblin Artificer",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "When this creature enters, you may search your library for an artifact card, put it into your graveyard, then shuffle.\n{R}, {T}, Sacrifice an artifact: Return target artifact card with mana value 3 or less from your graveyard to the battlefield.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "goblin welder": {
+   "name": "Goblin Welder",
+   "imageUri": "",
+   "typeLine": "Creature — Goblin Artificer",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "{T}: Choose target artifact a player controls and target artifact card in that player's graveyard. If both targets are still legal as this ability resolves, that player simultaneously sacrifices the artifact and returns the artifact card to the battlefield.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "grand abolisher": {
+   "name": "Grand Abolisher",
+   "imageUri": "",
+   "typeLine": "Creature — Human Cleric",
+   "manaCost": "{W}{W}",
+   "manaValue": 2,
+   "oracleText": "During your turn, your opponents can't cast spells or activate abilities of artifacts, creatures, or enchantments.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "greedy freebooter": {
+   "name": "Greedy Freebooter",
+   "imageUri": "",
+   "typeLine": "Creature — Human Pirate",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "When this creature dies, scry 1 and create a Treasure token. (To scry 1, look at the top card of your library. You may put that card on the bottom. A Treasure token is an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Treasure",
+    "Scry"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "hope of ghirapur": {
+   "name": "Hope of Ghirapur",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact Creature — Thopter",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "Flying\nSacrifice Hope of Ghirapur: Until your next turn, target player who was dealt combat damage by Hope of Ghirapur this turn can't cast noncreature spells.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": []
+  },
+  "impulsive pilferer": {
+   "name": "Impulsive Pilferer",
+   "imageUri": "",
+   "typeLine": "Creature — Goblin Pirate",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "When this creature dies, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nEncore {3}{R} ({3}{R}, Exile this card from your graveyard: For each opponent, create a token copy that attacks that opponent this turn if able. They gain haste. Sacrifice them at the beginning of the next end step. Activate only as a sorcery.)",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Treasure",
+    "Encore"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "lotho, corrupt shirriff": {
+   "name": "Lotho, Corrupt Shirriff",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Halfling Rogue",
+   "manaCost": "{W}{B}",
+   "manaValue": 2,
+   "oracleText": "Whenever a player casts their second spell each turn, you lose 1 life and create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "magda, brazen outlaw": {
+   "name": "Magda, Brazen Outlaw",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Dwarf Berserker",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Other Dwarves you control get +1/+0.\nWhenever a Dwarf you control becomes tapped, create a Treasure token.\nSacrifice five Treasures: Search your library for an artifact or Dragon card, put that card onto the battlefield, then shuffle.",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": []
+  },
+  "mardu devotee": {
+   "name": "Mardu Devotee",
+   "imageUri": "",
+   "typeLine": "Creature — Human Scout",
+   "manaCost": "{W}",
+   "manaValue": 1,
+   "oracleText": "When this creature enters, scry 2. (Look at the top two cards of your library, then put any number of them on the bottom and the rest on top in any order.)\n{1}: Add {R}, {W}, or {B}. Activate only once each turn.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [
+    "Scry"
+   ],
+   "producedMana": [
+    "B",
+    "R",
+    "W"
+   ]
+  },
+  "marionette apprentice": {
+   "name": "Marionette Apprentice",
+   "imageUri": "",
+   "typeLine": "Creature — Human Artificer",
+   "manaCost": "{1}{B}",
+   "manaValue": 2,
+   "oracleText": "Fabricate 1 (When this creature enters, put a +1/+1 counter on it or create a 1/1 colorless Servo artifact creature token.)\nWhenever another creature or artifact you control is put into a graveyard from the battlefield, each opponent loses 1 life.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [
+    "Fabricate"
+   ],
+   "producedMana": []
+  },
+  "memnite": {
+   "name": "Memnite",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Construct",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "opposition agent": {
+   "name": "Opposition Agent",
+   "imageUri": "",
+   "typeLine": "Creature — Human Rogue",
+   "manaCost": "{2}{B}",
+   "manaValue": 3,
+   "oracleText": "Flash\nYou control your opponents while they're searching their libraries.\nWhile an opponent is searching their library, they exile each card they find. You may play those cards for as long as they remain exiled, and you may spend mana as though it were mana of any color to cast them.",
+   "power": 3,
+   "toughness": 2,
+   "keywords": [
+    "Flash"
+   ],
+   "producedMana": []
+  },
+  "professional face-breaker": {
+   "name": "Professional Face-Breaker",
+   "imageUri": "",
+   "typeLine": "Creature — Human Warrior",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Menace\nWhenever one or more creatures you control deal combat damage to a player, create a Treasure token.\nSacrifice a Treasure: Exile the top card of your library. You may play that card this turn.",
+   "power": 2,
+   "toughness": 3,
+   "keywords": [
+    "Treasure",
+    "Menace"
+   ],
+   "producedMana": []
+  },
+  "ragavan, nimble pilferer": {
+   "name": "Ragavan, Nimble Pilferer",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Monkey Pirate",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Whenever Ragavan deals combat damage to a player, create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card.\nDash {1}{R} (You may cast this spell for its dash cost. If you do, it gains haste, and it's returned from the battlefield to its owner's hand at the beginning of the next end step.)",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [
+    "Treasure",
+    "Dash"
+   ],
+   "producedMana": []
+  },
+  "ranger-captain of eos": {
+   "name": "Ranger-Captain of Eos",
+   "imageUri": "",
+   "typeLine": "Creature — Human Soldier Ranger",
+   "manaCost": "{1}{W}{W}",
+   "manaValue": 3,
+   "oracleText": "When this creature enters, you may search your library for a creature card with mana value 1 or less, reveal it, put it into your hand, then shuffle.\nSacrifice this creature: Your opponents can't cast noncreature spells this turn.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": []
+  },
+  "ruthless technomancer": {
+   "name": "Ruthless Technomancer",
+   "imageUri": "",
+   "typeLine": "Creature — Human Wizard",
+   "manaCost": "{3}{B}",
+   "manaValue": 4,
+   "oracleText": "When this creature enters, you may sacrifice another creature you control. If you do, create a number of Treasure tokens equal to that creature's power.\n{2}{B}, Sacrifice X artifacts: Return target creature card with power X or less from your graveyard to the battlefield. X can't be 0.",
+   "power": 2,
+   "toughness": 4,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": []
+  },
+  "simian spirit guide": {
+   "name": "Simian Spirit Guide",
+   "imageUri": "",
+   "typeLine": "Creature — Ape Spirit",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Exile this card from your hand: Add {R}.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "tataru taru": {
+   "name": "Tataru Taru",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Dwarf Advisor",
+   "manaCost": "{1}{W}",
+   "manaValue": 2,
+   "oracleText": "When Tataru Taru enters, you draw a card and target opponent may draw a card.\nScions' Secretary — Whenever an opponent draws a card, if it isn't that player's turn, create a tapped Treasure token. This ability triggers only once each turn.",
+   "power": 0,
+   "toughness": 3,
+   "keywords": [
+    "Scions' Secretary",
+    "Treasure"
+   ],
+   "producedMana": []
+  },
+  "the queen of dale": {
+   "name": "The Queen of Dale",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Noble",
+   "manaCost": "{1}{W}",
+   "manaValue": 2,
+   "oracleText": "Whenever an opponent casts their first noncreature spell each turn, you recruit. (Draw a card, then discard a card. If you discarded a nonland card, create a 1/1 white Human Soldier creature token.)",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [
+    "Recruit"
+   ],
+   "producedMana": []
+  },
+  "the vision and scarlet witch": {
+   "name": "The Vision and Scarlet Witch",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact Creature — Mutant Hero",
+   "manaCost": "{2}{R}{R}",
+   "manaValue": 4,
+   "oracleText": "Flying\nWhenever you cast a spell, add {R} and put a +1/+1 counter on The Vision and Scarlet Witch.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "voice of victory": {
+   "name": "Voice of Victory",
+   "imageUri": "",
+   "typeLine": "Creature — Human Bard",
+   "manaCost": "{1}{W}",
+   "manaValue": 2,
+   "oracleText": "Mobilize 2 (Whenever this creature attacks, create two tapped and attacking 1/1 red Warrior creature tokens. Sacrifice them at the beginning of the next end step.)\nYour opponents can't cast spells during your turn.",
+   "power": 1,
+   "toughness": 3,
+   "keywords": [
+    "Mobilize"
+   ],
+   "producedMana": []
+  },
+  "warren soultrader": {
+   "name": "Warren Soultrader",
+   "imageUri": "",
+   "typeLine": "Creature — Zombie Goblin Wizard",
+   "manaCost": "{2}{B}",
+   "manaValue": 3,
+   "oracleText": "Pay 1 life, Sacrifice another creature: Create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "yawgmoth, thran physician": {
+   "name": "Yawgmoth, Thran Physician",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Cleric",
+   "manaCost": "{2}{B}{B}",
+   "manaValue": 4,
+   "oracleText": "Protection from Humans\nPay 1 life, Sacrifice another creature: Put a -1/-1 counter on up to one target creature and draw a card.\n{B}{B}, Discard a card: Proliferate. (Choose any number of permanents and/or players, then give each another counter of each kind already there.)",
+   "power": 2,
+   "toughness": 4,
+   "keywords": [
+    "Protection",
+    "Proliferate"
+   ],
+   "producedMana": []
+  },
+  "altar of dementia": {
+   "name": "Altar of Dementia",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "Sacrifice a creature: Target player mills cards equal to the sacrificed creature's power.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Mill"
+   ],
+   "producedMana": []
+  },
+  "arcane signet": {
+   "name": "Arcane Signet",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "bolas's citadel": {
+   "name": "Bolas's Citadel",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact",
+   "manaCost": "{3}{B}{B}{B}",
+   "manaValue": 6,
+   "oracleText": "You may look at the top card of your library any time.\nYou may play lands and cast spells from the top of your library. If you cast a spell this way, pay life equal to its mana value rather than pay its mana cost.\n{T}, Sacrifice ten nonland permanents: Each opponent loses 10 life.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "chrome mox": {
+   "name": "Chrome Mox",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Imprint — When this artifact enters, you may exile a nonartifact, nonland card from your hand.\n{T}: Add one mana of any of the exiled card's colors.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Imprint"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "lion's eye diamond": {
+   "name": "Lion's Eye Diamond",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Discard your hand, Sacrifice this artifact: Add three mana of any one color. Activate only as an instant.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "lotus petal": {
+   "name": "Lotus Petal",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "{T}, Sacrifice this artifact: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mana vault": {
+   "name": "Mana Vault",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "This artifact doesn't untap during your untap step.\nAt the beginning of your upkeep, you may pay {4}. If you do, untap this artifact.\nAt the beginning of your draw step, if this artifact is tapped, it deals 1 damage to you.\n{T}: Add {C}{C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "mox amber": {
+   "name": "Mox Amber",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "{T}: Add one mana of any color among legendary creatures and planeswalkers you control.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mox diamond": {
+   "name": "Mox Diamond",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "If this artifact would enter, you may discard a land card instead. If you do, put this artifact onto the battlefield. If you don't, put it into its owner's graveyard.\n{T}: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mox opal": {
+   "name": "Mox Opal",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Metalcraft — {T}: Add one mana of any color. Activate only if you control three or more artifacts.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Metalcraft"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "prized statue": {
+   "name": "Prized Statue",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "When this artifact enters or is put into a graveyard from the battlefield, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "relic of legends": {
+   "name": "Relic of Legends",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{3}",
+   "manaValue": 3,
+   "oracleText": "{T}: Add one mana of any color.\nTap an untapped legendary creature you control: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "sol ring": {
+   "name": "Sol Ring",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "{T}: Add {C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "vexing bauble": {
+   "name": "Vexing Bauble",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "Whenever a player casts a spell, if no mana was spent to cast it, counter that spell.\n{1}, {T}, Sacrifice this artifact: Draw a card.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "wishclaw talisman": {
+   "name": "Wishclaw Talisman",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}{B}",
+   "manaValue": 2,
+   "oracleText": "This artifact enters with three wish counters on it.\n{1}, {T}, Remove a wish counter from this artifact: Search your library for a card, put it into your hand, then shuffle. An opponent gains control of this artifact. Activate only during your turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "ad nauseam": {
+   "name": "Ad Nauseam",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{3}{B}{B}",
+   "manaValue": 5,
+   "oracleText": "Reveal the top card of your library and put that card into your hand. You lose life equal to its mana value. You may repeat this process any number of times.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "burnt offering": {
+   "name": "Burnt Offering",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "As an additional cost to cast this spell, sacrifice a creature.\nAdd X mana in any combination of {B} and/or {R}, where X is the sacrificed creature's mana value.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "R"
+   ]
+  },
+  "cabal ritual": {
+   "name": "Cabal Ritual",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{B}",
+   "manaValue": 2,
+   "oracleText": "Add {B}{B}{B}.\nThreshold — Add {B}{B}{B}{B}{B} instead if there are seven or more cards in your graveyard.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Threshold"
+   ],
+   "producedMana": [
+    "B"
+   ]
+  },
+  "culling the weak": {
+   "name": "Culling the Weak",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "As an additional cost to cast this spell, sacrifice a creature.\nAdd {B}{B}{B}{B}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B"
+   ]
+  },
+  "dark ritual": {
+   "name": "Dark Ritual",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "Add {B}{B}{B}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B"
+   ]
+  },
+  "demonic consultation": {
+   "name": "Demonic Consultation",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "Choose a card name. Exile the top six cards of your library, then reveal cards from the top of your library until you reveal a card with the chosen name. Put that card into your hand and exile all other cards revealed this way.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "enlightened tutor": {
+   "name": "Enlightened Tutor",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{W}",
+   "manaValue": 1,
+   "oracleText": "Search your library for an artifact or enchantment card, reveal it, then shuffle and put that card on top.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "final fortune": {
+   "name": "Final Fortune",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{R}{R}",
+   "manaValue": 2,
+   "oracleText": "Take an extra turn after this one. At the beginning of that turn's end step, you lose the game.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "pyroblast": {
+   "name": "Pyroblast",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Choose one —\n• Counter target spell if it's blue.\n• Destroy target permanent if it's blue.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "rain of filth": {
+   "name": "Rain of Filth",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "Until end of turn, lands you control gain \"Sacrifice this land: Add {B}.\"",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B"
+   ]
+  },
+  "redirect lightning": {
+   "name": "Redirect Lightning",
+   "imageUri": "",
+   "typeLine": "Instant — Lesson",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "As an additional cost to cast this spell, pay 5 life or pay {2}.\nChange the target of target spell or ability with a single target.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "sacrifice": {
+   "name": "Sacrifice",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "As an additional cost to cast this spell, sacrifice a creature.\nAdd an amount of {B} equal to the sacrificed creature's mana value.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B"
+   ]
+  },
+  "silence": {
+   "name": "Silence",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{W}",
+   "manaValue": 1,
+   "oracleText": "Your opponents can't cast spells this turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "tainted pact": {
+   "name": "Tainted Pact",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{B}",
+   "manaValue": 2,
+   "oracleText": "Exile the top card of your library. You may put that card into your hand unless it has the same name as another card exiled this way. Repeat this process until you put a card into your hand or you exile two cards with the same name, whichever comes first.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "vampiric tutor": {
+   "name": "Vampiric Tutor",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "Search your library for a card, then shuffle and put that card on top. You lose 2 life.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "beseech the mirror": {
+   "name": "Beseech the Mirror",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{B}{B}{B}",
+   "manaValue": 4,
+   "oracleText": "Bargain (You may sacrifice an artifact, enchantment, or token as you cast this spell.)\nSearch your library for a card, exile it face down, then shuffle. If this spell was bargained, you may cast the exiled card without paying its mana cost if that spell's mana value is 4 or less. Put the exiled card into your hand if it wasn't cast this way.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Bargain"
+   ],
+   "producedMana": []
+  },
+  "demonic tutor": {
+   "name": "Demonic Tutor",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{B}",
+   "manaValue": 2,
+   "oracleText": "Search your library for a card, put that card into your hand, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "diabolic intent": {
+   "name": "Diabolic Intent",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{B}",
+   "manaValue": 2,
+   "oracleText": "As an additional cost to cast this spell, sacrifice a creature.\nSearch your library for a card, put that card into your hand, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "gamble": {
+   "name": "Gamble",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Search your library for a card, put that card into your hand, discard a card at random, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "imperial seal": {
+   "name": "Imperial Seal",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "Search your library for a card, then shuffle and put that card on top. You lose 2 life.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "infernal plunge": {
+   "name": "Infernal Plunge",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "As an additional cost to cast this spell, sacrifice a creature.\nAdd {R}{R}{R}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "jeska's will": {
+   "name": "Jeska's Will",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Choose one. If you control a commander as you cast this spell, you may choose both instead.\n• Add {R} for each card in target opponent's hand.\n• Exile the top three cards of your library. You may play them this turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "lively dirge": {
+   "name": "Lively Dirge",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{B}",
+   "manaValue": 2,
+   "oracleText": "Spree (Choose one or more additional costs.)\n+ {1} — Search your library for a card, put it into your graveyard, then shuffle.\n+ {2} — Return up to two creature cards with total mana value 4 or less from your graveyard to the battlefield.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Spree"
+   ],
+   "producedMana": []
+  },
+  "rite of flame": {
+   "name": "Rite of Flame",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Add {R}{R}, then add {R} for each card named Rite of Flame in each graveyard.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "scheming symmetry": {
+   "name": "Scheming Symmetry",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "Choose two target players. Each of them searches their library for a card, then shuffles and puts that card on top.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "sevinne's reclamation": {
+   "name": "Sevinne's Reclamation",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{2}{W}",
+   "manaValue": 3,
+   "oracleText": "Return target permanent card with mana value 3 or less from your graveyard to the battlefield. If this spell was cast from a graveyard, you may copy this spell and may choose a new target for the copy.\nFlashback {4}{W} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Flashback"
+   ],
+   "producedMana": []
+  },
+  "goblin bombardment": {
+   "name": "Goblin Bombardment",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Sacrifice a creature: This enchantment deals 1 damage to any target.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "necropotence": {
+   "name": "Necropotence",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{B}{B}{B}",
+   "manaValue": 3,
+   "oracleText": "Skip your draw step.\nWhenever you discard a card, exile that card from your graveyard.\nPay 1 life: Exile the top card of your library face down. Put that card into your hand at the beginning of your next end step.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "static prison": {
+   "name": "Static Prison",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{W}",
+   "manaValue": 1,
+   "oracleText": "When this enchantment enters, exile target nonland permanent an opponent controls until this enchantment leaves the battlefield. You get {E}{E} (two energy counters).\nAt the beginning of your first main phase, sacrifice this enchantment unless you pay {E}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "underworld breach": {
+   "name": "Underworld Breach",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exile three other cards from your graveyard. (You may cast cards from your graveyard for their escape cost.)\nAt the beginning of the end step, sacrifice this enchantment.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "ancient tomb": {
+   "name": "Ancient Tomb",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}{C}. This land deals 2 damage to you.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "arid mesa": {
+   "name": "Arid Mesa",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Mountain or Plains card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "badlands": {
+   "name": "Badlands",
+   "imageUri": "",
+   "typeLine": "Land — Swamp Mountain",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {B} or {R}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "R"
+   ]
+  },
+  "blood crypt": {
+   "name": "Blood Crypt",
+   "imageUri": "",
+   "typeLine": "Land — Swamp Mountain",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {B} or {R}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "R"
+   ]
+  },
+  "bloodstained mire": {
+   "name": "Bloodstained Mire",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Swamp or Mountain card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "cavern of souls": {
+   "name": "Cavern of Souls",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "As this land enters, choose a creature type.\n{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast a creature spell of the chosen type, and that spell can't be countered.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "city of brass": {
+   "name": "City of Brass",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "Whenever this land becomes tapped, it deals 1 damage to you.\n{T}: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "city of traitors": {
+   "name": "City of Traitors",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "When you play another land, sacrifice this land.\n{T}: Add {C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "command tower": {
+   "name": "Command Tower",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "emergence zone": {
+   "name": "Emergence Zone",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{1}, {T}, Sacrifice this land: You may cast spells this turn as though they had flash.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "gemstone caverns": {
+   "name": "Gemstone Caverns",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "If this card is in your opening hand and you're not the starting player, you may begin the game with Gemstone Caverns on the battlefield with a luck counter on it. If you do, exile a card from your hand.\n{T}: Add {C}. If Gemstone Caverns has a luck counter on it, instead add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "godless shrine": {
+   "name": "Godless Shrine",
+   "imageUri": "",
+   "typeLine": "Land — Plains Swamp",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {W} or {B}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "W"
+   ]
+  },
+  "great furnace": {
+   "name": "Great Furnace",
+   "imageUri": "",
+   "typeLine": "Artifact Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {R}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "mana confluence": {
+   "name": "Mana Confluence",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "marsh flats": {
+   "name": "Marsh Flats",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Plains or Swamp card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "phyrexian tower": {
+   "name": "Phyrexian Tower",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{T}, Sacrifice a creature: Add {B}{B}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C"
+   ]
+  },
+  "plateau": {
+   "name": "Plateau",
+   "imageUri": "",
+   "typeLine": "Land — Mountain Plains",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {R} or {W}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R",
+    "W"
+   ]
+  },
+  "polluted delta": {
+   "name": "Polluted Delta",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for an Island or Swamp card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "sacred foundry": {
+   "name": "Sacred Foundry",
+   "imageUri": "",
+   "typeLine": "Land — Mountain Plains",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {R} or {W}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R",
+    "W"
+   ]
+  },
+  "scalding tarn": {
+   "name": "Scalding Tarn",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for an Island or Mountain card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "scrubland": {
+   "name": "Scrubland",
+   "imageUri": "",
+   "typeLine": "Land — Plains Swamp",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {W} or {B}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "W"
+   ]
+  },
+  "starting town": {
+   "name": "Starting Town",
+   "imageUri": "",
+   "typeLine": "Land — Town",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "This land enters tapped unless it's your first, second, or third turn of the game.\n{T}: Add {C}.\n{T}, Pay 1 life: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "verdant catacombs": {
+   "name": "Verdant Catacombs",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Swamp or Forest card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "windswept heath": {
+   "name": "Windswept Heath",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Forest or Plains card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "dargo, the shipwrecker": {
+   "name": "Dargo, the Shipwrecker",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Giant Pirate",
+   "manaCost": "{6}{R}",
+   "manaValue": 7,
+   "oracleText": "As an additional cost to cast this spell, you may sacrifice any number of artifacts and/or creatures. This spell costs {2} less to cast for each permanent sacrificed this way and {2} less to cast for each other artifact or creature you've sacrificed this turn.\nTrample\nPartner (You can have two commanders if both have partner.)",
+   "power": 7,
+   "toughness": 5,
+   "keywords": [
+    "Partner",
+    "Trample"
+   ],
+   "producedMana": []
+  },
+  "tymna the weaver": {
+   "name": "Tymna the Weaver",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Cleric",
+   "manaCost": "{1}{W}{B}",
+   "manaValue": 3,
+   "oracleText": "Lifelink\nAt the beginning of each of your postcombat main phases, you may pay X life, where X is the number of opponents that were dealt combat damage this turn. If you do, draw X cards.\nPartner (You can have two commanders if both have partner.)",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Lifelink",
+    "Partner"
+   ],
+   "producedMana": []
+  }
+ },
+ "combos": [
+  {
+   "id": "3327-4549-5147",
+   "pieces": [
+    {
+     "name": "Dargo, the Shipwrecker",
+     "zones": [
+      "C"
+     ]
+    },
+    {
+     "name": "Relic of Legends",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Goblin Bombardment",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite creature LTB",
+    "Infinite creature ETB",
+    "Infinite creature sacrifice triggers",
+    "Infinite death triggers",
+    "Infinite damage",
+    "Infinite storm count",
+    "Infinite commander casts"
+   ],
+   "manaNeeded": "{R}",
+   "steps": "Cast Dargo from the command zone by paying {R}.\nActivate Relic of Legends' second ability by tapping Dargo, adding {R}.\nActivate Goblin Bombardment by sacrificing Dargo.\nChoose to return Dargo to the command zone from your graveyard.\nResolve the Goblin Bombardment ability, dealing 1 damage to any target.\nRepeat.",
+   "prerequisites": "You have sacrificed at least three artifacts and/or creatures this turn, plus an additional artifact or creature for each time you've cast Dargo from the command zone this game"
+  },
+  {
+   "id": "392-3327-5147",
+   "pieces": [
+    {
+     "name": "Dargo, the Shipwrecker",
+     "zones": [
+      "C"
+     ]
+    },
+    {
+     "name": "Birgi, God of Storytelling // Harnfel, Horn of Bounty",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Goblin Bombardment",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite commander casts",
+    "Infinite damage",
+    "Infinite death triggers",
+    "Infinite creature ETB",
+    "Infinite creature LTB",
+    "Infinite creature sacrifice triggers",
+    "Infinite storm count"
+   ],
+   "manaNeeded": "{R}",
+   "steps": "Cast Dargo by paying {R}.\nBirgi triggers, adding {R}.\nActivate Goblin Bombardment by sacrificing Dargo.\nChoose to put Dargo into the command zone from your graveyard.\nResolve the Goblin Bombardment ability, dealing 1 damage to any target.\nRepeat.",
+   "prerequisites": "You are able to cast Dargo for {R}."
+  },
+  {
+   "id": "392-3327-6495",
+   "pieces": [
+    {
+     "name": "Dargo, the Shipwrecker",
+     "zones": [
+      "C"
+     ]
+    },
+    {
+     "name": "Birgi, God of Storytelling // Harnfel, Horn of Bounty",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Evereth, Viceroy of Plunder",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite +1/+1 counters on a creature",
+    "Infinite commander casts",
+    "Infinite creature ETB",
+    "Infinite creature LTB",
+    "Infinite creature sacrifice triggers",
+    "Infinite death triggers",
+    "Infinite storm count",
+    "Infinite damage"
+   ],
+   "manaNeeded": "{R}",
+   "steps": "Cast Dargo from the command zone by paying {R}.\nBirgi triggers, adding {R}.\nActivate Evereth by sacrificing Dargo.\nChoose to return Dargo to the command zone from your graveyard.\nResolve the Evereth ability\nRepeat.",
+   "prerequisites": "You have sacrificed at least three artifacts and/or creatures this turn, plus an additional artifact or creature for each time you've cast Dargo from the command zone this game."
+  },
+  {
+   "id": "3327-4549-6495",
+   "pieces": [
+    {
+     "name": "Dargo, the Shipwrecker",
+     "zones": [
+      "C"
+     ]
+    },
+    {
+     "name": "Relic of Legends",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Evereth, Viceroy of Plunder",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite +1/+1 counters on a creature",
+    "Infinite commander casts",
+    "Infinite creature ETB",
+    "Infinite creature LTB",
+    "Infinite creature sacrifice triggers",
+    "Infinite death triggers",
+    "Infinite storm count",
+    "Infinite damage"
+   ],
+   "manaNeeded": "{R}",
+   "steps": "Cast Dargo from the command zone by paying {R}.\nActivate Relic of Legends' second ability by tapping Dargo, adding {R}.\nActivate Evereth by sacrificing Dargo.\nChoose to return Dargo to the command zone from your graveyard.\nResolve the Evereth ability\nRepeat.",
+   "prerequisites": "You have sacrificed at least three artifacts and/or creatures this turn, plus an additional artifact or creature for each time you've cast Dargo from the command zone this game"
+  },
+  {
+   "id": "392-3327-5256",
+   "pieces": [
+    {
+     "name": "Dargo, the Shipwrecker",
+     "zones": [
+      "C"
+     ]
+    },
+    {
+     "name": "Birgi, God of Storytelling // Harnfel, Horn of Bounty",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Altar of Dementia",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite commander casts",
+    "Infinite death triggers",
+    "Infinite creature ETB",
+    "Infinite creature LTB",
+    "Infinite mill",
+    "Infinite creature sacrifice triggers",
+    "Infinite self-mill",
+    "Infinite storm count"
+   ],
+   "manaNeeded": "{R}",
+   "steps": "Cast Dargo from the command zone by paying {R}.\nBirgi triggers, adding {R}.\nActivate Altar of Dementia by sacrificing Dargo.\nChoose to return Dargo to the command zone from your graveyard.\nResolve the Altar of Dementia ability, causing target player to mill cards equal to Dargo's power.\nRepeat.",
+   "prerequisites": "You have sacrificed at least three artifacts and/or creatures this turn, plus an additional artifact or creature for each time you've cast Dargo from the command zone this game."
+  },
+  {
+   "id": "3327-4549-5256",
+   "pieces": [
+    {
+     "name": "Dargo, the Shipwrecker",
+     "zones": [
+      "C"
+     ]
+    },
+    {
+     "name": "Relic of Legends",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Altar of Dementia",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite creature LTB",
+    "Infinite creature ETB",
+    "Infinite creature sacrifice triggers",
+    "Infinite death triggers",
+    "Infinite mill",
+    "Infinite self-mill",
+    "Infinite storm count",
+    "Infinite commander casts"
+   ],
+   "manaNeeded": "{R}",
+   "steps": "Cast Dargo from the command zone by paying {R}.\nActivate Relic of Legends' second ability by tapping Dargo, adding {R}.\nActivate Altar of Dementia by sacrificing Dargo.\nChoose to return Dargo to the command zone from your graveyard.\nResolve the Altar of Dementia ability, causing target player to mill cards equal to Dargo's power.\nRepeat.",
+   "prerequisites": "You have sacrificed at least three artifacts and/or creatures this turn, plus an additional artifact or creature for each time you've cast Dargo from the command zone this game"
+  },
+  {
+   "id": "1368-1414-3327-5256",
+   "pieces": [
+    {
+     "name": "Dargo, the Shipwrecker",
+     "zones": [
+      "C"
+     ]
+    },
+    {
+     "name": "Underworld Breach",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Lotus Petal",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Altar of Dementia",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite self-mill",
+    "Near-infinite commander casts",
+    "Near-infinite death triggers",
+    "Near-infinite creature ETB",
+    "Near-infinite creature LTB",
+    "Near-infinite mill",
+    "Near-infinite creature sacrifice triggers",
+    "Near-infinite storm count"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Lotus Petal by tapping and sacrificing it, adding {R}.\nCast Dargo from the command zone by paying {R}.\nActivate Altar of Dementia by sacrificing Dargo.\nChoose to return Dargo to the command zone from your graveyard.\nResolve the Altar of Dementia ability, causing you to mill cards equal to Dargo's power.\nCast Lotus Petal from your graveyard by paying {0} and exiling three other cards from your graveyard.\nRepeat.\nOnce you have milled your library, you may target other players using Altar of Dementia's ability.",
+   "prerequisites": "You have sacrificed at least three artifacts and/or creatures this turn, plus an additional artifact or creature for each time you've cast Dargo from the command zone this game."
+  },
+  {
+   "id": "3327-3719-6523",
+   "pieces": [
+    {
+     "name": "Dargo, the Shipwrecker",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Ruthless Technomancer",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Deadpool, Trading Card",
+     "zones": [
+      "H"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact LTB",
+    "Infinite artifact sacrifice triggers",
+    "Infinite artifact tokens",
+    "Infinite creature LTB",
+    "Infinite creature ETB",
+    "Infinite Treasure tokens",
+    "Infinite colored mana",
+    "Infinite creature sacrifice triggers",
+    "Infinite death triggers",
+    "Infinite storm count",
+    "Infinite commander casts"
+   ],
+   "manaNeeded": "{3}{B}{B/R}",
+   "steps": "Cast Ruthless Technomancer by paying {3}{B}.\nWhen Ruthless Technomancer enters the battlefield, it triggers, causing you to sacrifice Dargo and create seven Treasure artifact tokens.\nChoose to return Dargo to the command zone from your graveyard.\nActivate seven Treasure tokens by tapping and sacrificing them, adding {4}{B}{B/R}{R}\nCast Deadpool by paying {2}{B}{R}, choosing to swap it and Ruthless Technomancer's text boxes as it enters the battlefield.\nWhen Deadpool enters the battlefield, it triggers, causing you to sacrifice Ruthless Technomancer and create two Treasure artifact tokens.\nCast Dargo from the command zone by paying {R}.\nActivate Deadpool by paying {2}{B} and sacrificing two Treasures, returning the nontoken Ruthless Technomancer from your graveyard to the battlefield.\nWhen the nontoken Ruthless Technomancer enters the battlefield, it triggers, causing you to sacrifice Dar",
+   "prerequisites": "Dargo is one of your commanders.\nYou have sacrificed a number of artifacts and/or creatures this turn equal to the number of times you've cast Dargo from the command zone this game."
+  }
+ ]
+}

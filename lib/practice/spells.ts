@@ -35,6 +35,12 @@ export interface Tutor {
   /** Lim-Dûl's Vault: it looks at five cards at a time, and passing a five
       costs 1 life. The find goes on top. */
   dig?: number;
+  /** "…with mana value X or less" (Green Sun's Zenith, Chord of Calling,
+      Finale of Devastation): the X paid as it's cast is the limit. */
+  x?: boolean;
+  /** "At the beginning of your next upkeep, pay {2}{G}{G}. If you don't,
+      you lose the game" (Summoner's Pact): that cost. */
+  upkeep?: string;
   /** "Delirium — If there are four or more card types among cards in
       your graveyard, instead search your library for any card…" (Demonic
       Counsel): the search then. */
@@ -69,7 +75,25 @@ export function tutorOf(info: CardInfo | undefined): Tutor | null {
   // A sacrifice as it's cast (Diabolic Intent) is a cost the table takes.
   // Bargain (Beseech the Mirror) is a choice the table doesn't make: the
   // card comes to the hand.
-  const [first, ...rest] = sentences(info).filter((x) => !/^as an additional cost to cast this spell, sacrifice an? [a-z ]+$/i.test(x) && !/^bargain$/i.test(x));
+  const [first, ...rest] = sentences(info).filter((x) => !/^as an additional cost to cast this spell, sacrifice an? [a-z ]+$/i.test(x) && !/^(?:bargain|convoke)$/i.test(x));
+  // A creature straight onto the battlefield, as big as the X paid: Green
+  // Sun's Zenith, Nature's Rhythm, Chord of Calling, Finale of Devastation.
+  const big = first ? /^search your library(?: and\/or graveyard)? for an? (green )?creature card with mana value x or less(?:, put it onto the battlefield, then shuffle| and put it onto the battlefield)$/i.exec(first) : null;
+  if (big) {
+    const extra = [/^shuffle .+ into its owner's library$/i, /^if you search your library this way, shuffle$/i, /^if x is 10 or more, creatures you control get \+x\/\+x and gain haste until end of turn$/i, /^harmonize\b/i];
+    if (rest.some((r) => !extra.some((e) => e.test(r)))) return null;
+    const green = !!big[1];
+    return {
+      search: {
+        count: 1,
+        what: `${green ? "green " : ""}creature card`,
+        to: [{ zone: "battlefield" }],
+        test: (typeLine, i) => /\bCreature\b/.test((i?.typeLine ?? typeLine ?? "").split(" // ")[0]!) && (!green || /\{[^}]*G[^}]*\}/.test(i?.manaCost ?? "")),
+      },
+      lose: 0,
+      x: true,
+    };
+  }
   // The whole sentence, and only to the hand or the top: Entomb's "into
   // your graveyard" isn't this. Gamble's random discard is.
   const m = first ? /^search your library for [^,.]*?\bcard(?:, reveal (?:it|that card))?, (?:put (?:it|that card|the card) into your hand(, discard a card at random)?, then shuffle|then shuffle and put (?:it|that card|the card) on top|exile it face down, then shuffle)$/i.exec(first) : null;
@@ -77,7 +101,15 @@ export function tutorOf(info: CardInfo | undefined): Tutor | null {
   const faceDown = /exile it face down/i.test(first!);
   let lose = 0;
   let delirium: Search | undefined;
-  for (const s of rest) {
+  let upkeep: string | undefined;
+  for (const [n, s] of rest.entries()) {
+    // Summoner's Pact: paid for at the next upkeep, or the game is lost.
+    const pact = /^at the beginning of your next upkeep, pay ((?:\{[^}]+\})+)$/i.exec(s);
+    if (pact && /^if you don't, you lose the game$/i.test(rest[n + 1] ?? "")) {
+      upkeep = pact[1]!;
+      continue;
+    }
+    if (upkeep && /^if you don't, you lose the game$/i.test(s)) continue;
     const life = /^you lose (\d+) life$/i.exec(s);
     if (life) {
       lose += Number(life[1]);
@@ -96,7 +128,7 @@ export function tutorOf(info: CardInfo | undefined): Tutor | null {
   if (faceDown && !rest.some((s) => /^put the exiled card into your hand/i.test(s))) return null;
   const search = searchOnCast(info);
   if (!search || search.count !== 1 || search.to[0]!.zone === "battlefield") return null;
-  return { search, lose, ...(m[1] ? { discardRandom: true } : {}), ...(delirium ? { delirium } : {}) };
+  return { search, lose, ...(m[1] ? { discardRandom: true } : {}), ...(delirium ? { delirium } : {}), ...(upkeep ? { upkeep } : {}) };
 }
 
 /** A board wipe: "Destroy all creatures" (Wrath of God, Damnation, Day of

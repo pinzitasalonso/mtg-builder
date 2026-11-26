@@ -5,7 +5,7 @@
 // A source that hurts (Ancient Tomb) is used after the ones that don't.
 
 import type { PlayCard, PlaytestState } from "../playtest";
-import { infoOf, isCreature, isSick, manaOutput } from "./cards";
+import { creatureManaGrantOf, infoOf, isCreature, isSick, manaOutput, nonlandManaBonusOf, stats } from "./cards";
 import { doublesTreasures } from "./treasure";
 import type { CardBook, CardInfo } from "./types";
 
@@ -56,6 +56,8 @@ export interface Source {
   pain?: number;
   /** A card in hand, exiled for its mana (Simian Spirit Guide). */
   exile?: boolean;
+  /** A creature's power: tapped for mana, it doesn't attack. */
+  attacker?: number;
 }
 
 /** A card's colours, from its mana cost. */
@@ -112,6 +114,28 @@ export function manaSources(side: PlaytestState, book: CardBook, turn: number, e
     taken.add(helper.iid);
     out.push({ iid: drum.iid, name: drum.name, colors: ["W", "U", "B", "R", "G"], amount: 1, also: [helper.iid] });
   }
+  // Cryptolith Rite: every creature taps for mana (the larger of that and its own).
+  const grant = side.battlefield.map((c) => (c.token ? null : creatureManaGrantOf(infoOf(book, c)))).filter((x) => !!x).sort((a, b) => b.amount - a.amount)[0];
+  if (grant) {
+    for (const c of side.battlefield) {
+      if (c.tapped || exclude.includes(c.iid) || taken.has(c.iid) || !isCreature(book, c) || isSick(book, c, turn)) continue;
+      const own = out.find((s) => s.iid === c.iid);
+      if (!own) out.push({ iid: c.iid, name: c.name, colors: grant.colors, amount: grant.amount });
+      else if (own.amount < grant.amount && !own.sacrifice && !own.also) Object.assign(own, { colors: grant.colors, amount: grant.amount });
+    }
+  }
+  // A creature tapped for mana doesn't attack: lands and rocks pay first.
+  for (const src of out) {
+    const c = side.battlefield.find((x) => x.iid === src.iid);
+    if (c && isCreature(book, c)) src.attacker = Math.max(0, stats(book, c).power) || undefined;
+  }
+  // Kinnan: a nonland permanent tapped for mana makes one more of what it made.
+  if (side.battlefield.some((c) => !c.token && nonlandManaBonusOf(infoOf(book, c)))) {
+    for (const src of out) {
+      const c = side.battlefield.find((x) => x.iid === src.iid);
+      if (c && !/\bLand\b/.test(typeOf(c))) src.amount += 1;
+    }
+  }
   return out;
 }
 
@@ -148,7 +172,7 @@ export function payCost(cost: Cost, sources: Source[], opts: { x?: number; life?
 /** One try: `byLife` of the pips `lifeFor` covers are paid with life first;
     any of them mana can't pay is paid with life too. */
 function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: number; keep?: string[] }, lifeFor: string[], byLife: number): Payment | null {
-  const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors, sacrifice: !!s.sacrifice || !!s.exile, pain: s.pain ?? 0 })));
+  const units = sources.flatMap((s) => Array.from({ length: s.amount }, () => ({ iid: s.iid, colors: s.colors, sacrifice: !!s.sacrifice || !!s.exile, pain: s.pain ?? 0, attacker: s.attacker ?? 0 })));
   const used = new Set<number>();
   const take = (i: number) => used.add(i);
   // The colours wanted after this payment (`keep`: the rest of the turn's
@@ -176,7 +200,15 @@ function payWith(cost: Cost, sources: Source[], opts: { x?: number; life?: numbe
     units.forEach((u, i) => {
       if (used.has(i) || !ok(u.colors)) return;
       const tappedAlready = u.iid < 0 || [...used].some((j) => units[j]!.iid === u.iid);
-      const score = (u.iid < 0 ? -100 : 0) + (tappedAlready ? 0 : 100) + (u.sacrifice ? 50 : 0) + (u.pain && !tappedAlready ? 30 : 0) + u.colors.length + (wanted.length ? kept(u.colors) : 0);
+      const score =
+        (u.iid < 0 ? -100 : 0) +
+        (tappedAlready ? 0 : 100) +
+        (u.sacrifice ? 50 : 0) +
+        (u.pain && !tappedAlready ? 30 : 0) +
+        // An attacker last among what's free to tap, the biggest last of all.
+        (u.attacker && !tappedAlready ? 8 + 2 * Math.min(u.attacker, 8) : 0) +
+        u.colors.length +
+        (wanted.length ? kept(u.colors) : 0);
       if (score < bestScore) {
         best = i;
         bestScore = score;

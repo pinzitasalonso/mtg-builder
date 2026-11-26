@@ -30,6 +30,10 @@ import {
   cloneTypeOf,
   transmuteOf,
   burdenDrawOf,
+  digAbilityOf,
+  growsWithLegendColoursOf,
+  permanentFetchOf,
+  tapTreasureOf,
   shieldOnCastOf,
   has,
   hasAltCost,
@@ -106,7 +110,7 @@ import {
   winsWithTreasures,
 } from "./treasure";
 import { colorsOfCost, manaSources, manaTotal, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
-import { comboHeadline, comboNeeds, comboOutcome, type DeckCombo } from "./combos";
+import { castsWithoutEnd, comboHeadline, comboNeeds, comboOutcome, type DeckCombo } from "./combos";
 import { type PendingTax, other, type CardBook, type Choice, type Combat, type Effect, type LogLine, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
@@ -820,8 +824,14 @@ function spend(g: PracticeGame, seat: Seat, paid: Payment, sources: Source[], bo
       moveTo(g, t, "graveyard");
       say(g, seat, `${who(seat)} sacrifice${seat === "you" ? "" : "s"} ${name} for mana.`);
     } else if (src?.once) g.once = [...(g.once ?? []), t];
-    else update(g, t, (c) => ({ ...c, tapped: true }));
-    for (const a of src?.also ?? []) update(g, a, (c) => ({ ...c, tapped: true }));
+    else {
+      update(g, t, (c) => ({ ...c, tapped: true }));
+      becameTapped(g, seat, t, book);
+    }
+    for (const a of src?.also ?? []) {
+      update(g, a, (c) => ({ ...c, tapped: true }));
+      becameTapped(g, seat, a, book);
+    }
     // Ancient Tomb: the mana hurts.
     if (src?.pain) {
       const painter = findCard(g, t)?.card ?? null;
@@ -960,6 +970,24 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   // Protection "until your next turn" ends here.
   if (g.shield?.[seat]) g.shield = { ...g.shield, [seat]: false };
   say(g, seat, `Turn ${g.turn} — ${seat === "you" ? "your turn" : "the opponent's turn"}.`);
+  // A Pact from the turn before: paid now, or the game is lost.
+  for (const pact of (g.pacts ?? []).filter((x) => x.seat === seat)) {
+    if (g.winner) break;
+    if (seat === "you") {
+      say(g, "you", `${pact.name}: pay ${pact.cost} now, or you lose the game.`);
+      continue;
+    }
+    const sources = availableMana(g, seat, book);
+    const paid = aiPay(g, seat, parseCost(pact.cost), sources, book);
+    if (paid) {
+      spend(g, seat, paid, sources, book);
+      say(g, seat, `The opponent pays ${pact.cost} for ${pact.name}.`);
+    } else {
+      say(g, seat, `The opponent can't pay ${pact.cost} for ${pact.name}: it loses the game.`);
+      g.winner = "you";
+    }
+  }
+  if (g.pacts?.some((x) => x.seat === seat)) g.pacts = g.pacts.filter((x) => x.seat !== seat);
   // The One Ring: a life for each burden counter, at its controller's upkeep.
   for (const c of g.sides[seat].battlefield) {
     if (!c.burden || !burdenDrawOf(book, c) || g.winner) continue;
@@ -1645,8 +1673,20 @@ export function applyCombo(g0: PracticeGame, seat: Seat, combo: DeckCombo, book:
     // With a way to spend it over and over (Kinnan's ability, Thrasios's),
     // endless mana is the game: the whole library, one activation at a time.
     const sink = comboSink(g, seat, book);
+    // Or a permanent that hurts you each time a spell is cast (Vivi,
+    // Crystal), when the loop is one that casts without end. Its commander
+    // counts from the command zone: endless mana casts it.
+    const pinger = castsWithoutEnd(combo.produces)
+      ? [...g.sides[seat].battlefield, ...g.sides[seat].command].find((c) => {
+          const t = castTriggerOf(book, c);
+          return !!t && (t.damage > 0 || t.drain > 0 || !!t.damagePerColor);
+        })
+      : undefined;
     if (sink && seat === "opp") {
       say(g, seat, `With endless mana, ${faceName(sink)}'s ability takes the opponent through its whole library. The opponent wins.`);
+      g.winner = seat;
+    } else if (pinger && seat === "opp") {
+      say(g, seat, `Every spell of the loop is a hit from ${faceName(pinger)}. The opponent wins.`);
       g.winner = seat;
     }
   } else {
@@ -1846,6 +1886,81 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     checkState(g, book);
     return { game: g, ok: true };
   }
+  // Magda's and Sisay's abilities: a card from the library onto the battlefield.
+  const fetch = permanentFetchOf(book, card);
+  if (fetch) {
+    const side = g.sides[seat];
+    const tokens = side.battlefield.filter((c) => c.token?.kind === "artifact" && /^treasure$/i.test(c.name));
+    if (tokens.length < fetch.treasures) return fail(`(${faceName(card)} needs ${fetch.treasures} Treasures.)`);
+    // Sisay's power: hers, and one for each colour among her other legends.
+    const legendColours = growsWithLegendColoursOf(book, card)
+      ? new Set(side.battlefield.filter((c) => c.iid !== card.iid && !c.token && /\bLegendary\b/.test(infoOf(book, c)?.typeLine ?? c.typeLine ?? "")).flatMap((c) => colorsOfCost(infoOf(book, c)))).size
+      : 0;
+    const limit = fetch.underPower ? stats(book, card).power + legendColours : Infinity;
+    const fits = side.library.filter((c) => fetch.test(c.typeLine, infoOf(book, c)) && (infoOf(book, c)?.manaValue ?? 0) < limit);
+    if (!fits.length) return fail(`(${faceName(card)} has nothing to find.)`);
+    if (fetch.cost) {
+      const sources = availableMana(g, seat, book);
+      const paid = aiPay(g, seat, parseCost(fetch.cost), sources, book, { keep: opts.keep });
+      if (!paid) return fail(`The opponent can't pay for ${faceName(card)}'s ability.`);
+      spend(g, seat, paid, sources, book);
+      loseLife(g, seat, paid.life, book);
+    }
+    for (const t of tokens.slice(0, fetch.treasures)) moveTo(g, t.iid, "graveyard");
+    // The card the plan names, if it's one the ability can find. Else a
+    // piece of a combo, a draw engine, the most mana, the dearest.
+    const named = (action.effects.find((e) => e.type === "search")?.name ?? "").trim().toLowerCase();
+    const pieces = new Set((opts.combos ?? []).flatMap((k) => k.pieces.map((x) => x.name.toLowerCase())));
+    const worth = (c: PlayCard) =>
+      (pieces.has(c.name.toLowerCase()) ? 10000 : 0) +
+      (lifeForCardsOf(book, c) || burdenDrawOf(book, c) || triggersOf(book, c).tax ? 5000 : 0) +
+      (manaOutput(infoOf(book, c), c.typeLine)?.amount ?? 0) * 500 +
+      (infoOf(book, c)?.manaValue ?? 0);
+    const pick = fits.find((c) => c.name.toLowerCase() === named) ?? [...fits].sort((a, b) => worth(b) - worth(a))[0]!;
+    g.sides[seat] = { ...g.sides[seat], library: shuffled(g.sides[seat].library.filter((c) => c.iid !== pick.iid)), battlefield: [...g.sides[seat].battlefield, { ...pick, tapped: false, enteredTurn: g.turn }] };
+    say(g, seat, `${who(seat)} ${verb(seat, "activate")} ${faceName(card)}: ${pick.name} enters the battlefield.`, card);
+    if (isLand(pick)) landEntered(g, seat, book);
+    else entered(g, seat, pick, book, { cast: false });
+    checkState(g, book);
+    return { game: g, ok: true };
+  }
+  // Kinnan's and Thrasios's abilities: mana into cards, as often as it's paid.
+  const dig = digAbilityOf(book, card);
+  if (dig) {
+    const sources = availableMana(g, seat, book);
+    const paid = aiPay(g, seat, parseCost(dig.cost), sources, book, { keep: opts.keep });
+    if (!paid) return fail(`The opponent can't pay for ${faceName(card)}'s ability.`);
+    spend(g, seat, paid, sources, book);
+    loseLife(g, seat, paid.life, book);
+    const lib = g.sides[seat].library;
+    if (dig.kind === "creature") {
+      const seen = lib.slice(0, dig.look);
+      // A piece of one of its combos first, then the dearest.
+      const pieces = new Set((opts.combos ?? []).flatMap((k) => k.pieces.map((x) => x.name.toLowerCase())));
+      const worth = (c: PlayCard) => (pieces.has(c.name.toLowerCase()) ? 1000 : 0) + (infoOf(book, c)?.manaValue ?? 0);
+      const pick = seen.filter((c) => isCreature(book, c) && !/\bHuman\b/.test(infoOf(book, c)?.typeLine ?? c.typeLine ?? "")).sort((a, b) => worth(b) - worth(a))[0];
+      const rest = shuffled(seen.filter((c) => c.iid !== pick?.iid));
+      g.sides[seat] = { ...g.sides[seat], library: [...lib.slice(seen.length), ...rest] };
+      if (pick) {
+        g.sides[seat] = { ...g.sides[seat], battlefield: [...g.sides[seat].battlefield, { ...pick, tapped: false, enteredTurn: g.turn }] };
+        say(g, seat, `${who(seat)} ${verb(seat, "activate")} ${faceName(card)}: of ${seen.length} cards, ${pick.name} enters the battlefield.`, card);
+        entered(g, seat, pick, book, { cast: false });
+      } else say(g, seat, `${who(seat)} ${verb(seat, "activate")} ${faceName(card)}: no creature among ${seen.length} cards.`, card);
+    } else {
+      const top = lib[0];
+      if (!top) say(g, seat, `${who(seat)} ${verb(seat, "activate")} ${faceName(card)}: the library is empty.`, card);
+      else if (isLand(top)) {
+        g.sides[seat] = { ...g.sides[seat], library: lib.slice(1), battlefield: [...g.sides[seat].battlefield, { ...top, tapped: true, enteredTurn: g.turn }] };
+        say(g, seat, `${who(seat)} ${verb(seat, "activate")} ${faceName(card)}: ${top.name} enters the battlefield tapped.`, card);
+        landEntered(g, seat, book);
+      } else {
+        say(g, seat, `${who(seat)} ${verb(seat, "activate")} ${faceName(card)}: a card.`, card);
+        drawCards(g, seat, 1, book);
+      }
+    }
+    checkState(g, book);
+    return { game: g, ok: true };
+  }
   // The One Ring: tapped for a burden counter and a card for each one.
   if (burdenDrawOf(book, card)) {
     if (card.tapped) return fail(`(${card.name} is already tapped.)`);
@@ -2009,6 +2124,17 @@ function makeArtifacts(g: PracticeGame, seat: Seat, name: string, n: number, boo
 }
 
 /** A seat makes Treasures from a card, said in the log. */
+/** A creature of a seat's became tapped (it attacked, or was tapped for
+    mana): Magda makes a Treasure for each Dwarf. */
+function becameTapped(g: PracticeGame, seat: Seat, iid: number, book: CardBook) {
+  const c = g.sides[seat].battlefield.find((x) => x.iid === iid);
+  if (!c || !isCreature(book, c)) return;
+  for (const m of g.sides[seat].battlefield) {
+    const type = tapTreasureOf(book, m);
+    if (type && isType(book, c, type)) treasures(g, seat, 1, faceName(m), book, ` (${c.name} was tapped)`);
+  }
+}
+
 function treasures(g: PracticeGame, seat: Seat, n: number, source: string, book: CardBook, why = "") {
   const made = makeArtifacts(g, seat, "Treasure", n, book);
   if (made) say(g, seat, `${source}: ${seat === "you" ? "you make" : "the opponent makes"} ${made}${why}.`);
@@ -2118,8 +2244,10 @@ function castTriggers(g: PracticeGame, seat: Seat, spell: PlayCard, book: CardBo
       update(g, c.iid, (x) => ({ ...x, pump: { power: (x.pump?.power ?? 0) + t.pump, toughness: (x.pump?.toughness ?? 0) + t.pump } }));
       say(g, seat, `${name} gets +${t.pump}/+${t.pump} until end of turn.`);
     }
-    if (t.damage) {
-      const dealt = scaleDamage(g, book, seat, c, foe, t.damage);
+    // Crystal: as much as the spell has colours.
+    const hit = t.damage + (t.damagePerColor ? colorsOfCost(info).length : 0);
+    if (hit) {
+      const dealt = scaleDamage(g, book, seat, c, foe, hit);
       say(g, seat, `${name} deals ${dealt} damage to ${foe === "you" ? "you" : "the opponent"}.`);
       loseLife(g, foe, dealt, book);
     }
@@ -3025,12 +3153,23 @@ function resolveCast(g: PracticeGame, seat: Seat, card0: PlayCard, action: PlanA
     if (tutor) {
       // A tutor's find goes where the card says (the top, for Mystical
       // Tutor), whatever the plan said; and it finds one card.
-      const to = tutorSearch(tutor, g.sides[seat].graveyard).to[0]!.zone === "top" ? "top" : "hand";
+      const to = tutorSearch(tutor, g.sides[seat].graveyard).to[0]!.zone;
+      if (tutor.upkeep) g.pacts = [...(g.pacts ?? []), { seat, cost: tutor.upkeep, name: card.name }];
       let found = false;
       effects = effects.flatMap((e) => {
         if (e.type !== "search") return tutor.dig ? [] : [e];
         if (found) return [];
         found = true;
+        // "…with mana value X or less": no bigger than the X that was paid.
+        if (tutor.x) {
+          const named = (e.name ?? "").trim().toLowerCase();
+          const hit = g.sides[seat].library.find((c) => c.name.toLowerCase() === named || c.name.toLowerCase().split(" // ")[0] === named);
+          const search = tutorSearch(tutor, g.sides[seat].graveyard);
+          if (!hit || !search.test(hit.typeLine, infoOf(book, hit)) || (infoOf(book, hit)?.manaValue ?? 0) > (action.x ?? 0)) {
+            say(g, seat, `${card.name} finds nothing it can take (X is ${action.x ?? 0}).`);
+            return [];
+          }
+        }
         if (!tutor.dig) return [{ ...e, to }];
         // Lim-Dûl's Vault: five cards at a time, a life for each five passed.
         const want = (e.name ?? "").trim().toLowerCase();
@@ -3341,7 +3480,10 @@ export function declareAttackers(g0: PracticeGame, seat: Seat, iids: number[], b
     const card = g.sides[seat].battlefield.find((c) => c.iid === iid);
     if (!card || !canAttack(g, seat, card, book)) continue;
     attackers.push(iid);
-    if (!has(book, card, "Vigilance")) update(g, iid, (c) => ({ ...c, tapped: true }));
+    if (!has(book, card, "Vigilance")) {
+      update(g, iid, (c) => ({ ...c, tapped: true }));
+      becameTapped(g, seat, iid, book);
+    }
   }
   if (!attackers.length) return g0;
   const names = attackers.map((i) => findCard(g, i)!.card.name);
