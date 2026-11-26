@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart3, RotateCw, Swords, Undo2, X } from "lucide-react";
 import { hasKnownBack } from "@/components/useCardFlip";
-import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, type MenuState, type Zoom, AttachGroup, TableTitle } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, type MenuState, type Zoom, AttachGroup, TableTitle, LibraryOrderBar, orderLibrary, type LibraryOrder } from "@/components/deck/playtest-parts";
 import PracticeTable from "@/components/deck/PracticeTable";
 import { PoolEntry } from "@/lib/pool-client";
 import { hypergeometric, hypergeometricAtLeast } from "@/lib/probability";
@@ -101,6 +101,8 @@ function SoloTable({
   const [pile, setPile] = useState<Pile | null>(null);
   const [oddsOpen, setOddsOpen] = useState(false);
   const [scryOpen, setScryOpen] = useState(false);
+  // The library opens as it will be drawn; by name is one click away.
+  const [libraryOrder, setLibraryOrder] = useState<LibraryOrder>("draw");
   const [zoom, setZoom] = useState<Zoom | null>(null);
   // A phone held sideways: whether the hand is raised over the board.
   const [handUp, setHandUp] = useState(false);
@@ -250,7 +252,7 @@ function SoloTable({
     pile === "graveyard"
       ? [...state.graveyard].reverse()
       : pile === "library"
-        ? [...state.library].sort((a, b) => a.name.localeCompare(b.name))
+        ? orderLibrary(state.library, libraryOrder)
         : pile === "exile"
           ? state.exile
           : [];
@@ -435,12 +437,11 @@ function SoloTable({
       {pile && (
         <Panel title={`${ZONE_LABEL[pile]} · ${pileCards.length}`} onClose={() => setPile(null)}>
           {pile === "library" && (
-            <p className="pt-panel-note">
-              Shown in alphabetical order, as a search would. Click a card to move it, then shuffle when you&apos;re done.
-              <button type="button" className="pt-btn" style={{ marginLeft: 10 }} onClick={() => act((s) => shuffleLibrary(s))}>
+            <LibraryOrderBar order={libraryOrder} onOrder={setLibraryOrder}>
+              <button type="button" className="pt-btn" onClick={() => act((s) => shuffleLibrary(s))} disabled={state.library.length < 2}>
                 Shuffle
               </button>
-            </p>
+            </LibraryOrderBar>
           )}
           {pileCards.length === 0 ? (
             <div className="pt-empty">Nothing here.</div>

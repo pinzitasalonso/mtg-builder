@@ -10,7 +10,7 @@ import type { OpponentOption } from "@/app/api/practice/opponents/route";
 import { PrimerMarkdown } from "@/components/deck/DeckPrimer";
 import OpponentPicker from "@/components/deck/OpponentPicker";
 import { CardArt } from "@/components/mtg";
-import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom, AttachGroup, TableTitle } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom, AttachGroup, TableTitle, LibraryOrderBar, orderLibrary, type LibraryOrder } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan } from "@/lib/practice/ai";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
@@ -136,6 +136,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const [menu, setMenu] = useState<(MenuState & { seat: Seat }) | null>(null);
   const [zoom, setZoom] = useState<Zoom | null>(null);
   const [pile, setPile] = useState<{ seat: Seat; zone: "graveyard" | "exile" | "library" | "hand" } | null>(null);
+  const [libraryOrder, setLibraryOrder] = useState<LibraryOrder>("draw");
   // The opponent's spell waiting for your answer, and how to give it.
   // What waits for your answer: the opponent's spell, or its end step.
   const [pending, setPending] = useState<{ kind: "spell"; action: PlanAction; card: PlayCard; target?: string } | { kind: "end" } | { kind: "combo"; combo: DeckCombo } | null>(null);
@@ -1121,7 +1122,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   };
   const blockCount = Object.values(blocks).reduce((n, b) => n + b.length, 0);
   const zoomLive = zoom !== null && !!findCard(game, zoom.card.iid);
-  const pileCards = pile ? [...game.sides[pile.seat][pile.zone]].reverse() : [];
+  // A graveyard shows its newest card first. The library shows as it will
+  // be drawn, or by name.
+  const pileCards = !pile ? [] : pile.zone === "library" ? orderLibrary(game.sides[pile.seat].library, libraryOrder) : [...game.sides[pile.seat][pile.zone]].reverse();
 
   const tax = game.taxes?.[0] ?? null;
   const choicePrompt = game.choice
@@ -1581,11 +1584,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           title={`${pile.seat === "you" ? "Your" : "The opponent's"} ${pile.zone} · ${pileCards.length}`}
           onClose={() => setPile(null)}
         >
+          {pile.zone === "library" && <LibraryOrderBar order={libraryOrder} onOrder={setLibraryOrder} />}
           {pileCards.length === 0 ? (
             <div className="pt-empty">Nothing here.</div>
           ) : (
             <div className="pt-row">
-              {(pile.zone === "library" ? [...pileCards].sort((a, b) => a.name.localeCompare(b.name)) : pileCards).map((c) => (
+              {pileCards.map((c) => (
                 <PtCard key={c.iid} {...cardProps(pile.seat)(c, pile.zone)} />
               ))}
             </div>
