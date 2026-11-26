@@ -1501,6 +1501,49 @@ button {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.65);
 }
+/* The line above the library's cards: draw order or by name, and what the
+   one that's on means (playtest-parts.tsx LibraryOrderBar). */
+.pt-lib-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 0 14px;
+}
+.pt-lib-note {
+  flex: 1;
+  min-width: 12em;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+}
+.pt-seg {
+  display: inline-flex;
+  flex: none;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.pt-seg button {
+  padding: 5px 13px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pt-seg button[aria-checked="true"] {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: default;
+}
+.pt-seg button:not([aria-checked="true"]):hover {
+  color: #fff;
+}
 /* ── Practice games against the AI (components/deck/PracticeTable). ── */
 .spin {
   animation: spin 1s linear infinite;

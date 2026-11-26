@@ -393,6 +393,34 @@ export function Panel({ title, onClose, children }: { title: string; onClose: ()
   );
 }
 
+/** How the library panel lays the cards out. */
+export type LibraryOrder = "draw" | "name";
+
+/** Your library as it will be drawn (the first card is the top one), or by
+    name as a search would lay it out. */
+export function orderLibrary<T extends { name: string }>(library: T[], order: LibraryOrder): T[] {
+  return order === "name" ? [...library].sort((a, b) => a.name.localeCompare(b.name)) : library;
+}
+
+/** The line above the library's cards: the two orders, what the one on
+    means, and whatever the table adds (Shuffle). It opens in draw order. */
+export function LibraryOrderBar({ order, onOrder, children }: { order: LibraryOrder; onOrder: (o: LibraryOrder) => void; children?: React.ReactNode }) {
+  return (
+    <div className="pt-lib-bar">
+      <div className="pt-seg" role="radiogroup" aria-label="Order">
+        <button type="button" role="radio" aria-checked={order === "draw"} onClick={() => onOrder("draw")}>
+          Draw order
+        </button>
+        <button type="button" role="radio" aria-checked={order === "name"} onClick={() => onOrder("name")}>
+          A to Z
+        </button>
+      </div>
+      <span className="pt-lib-note">{order === "draw" ? "The first card is the next one you draw." : "By name, as a search would show it."}</span>
+      {children}
+    </div>
+  );
+}
+
 /* Scry X: the top X cards of your library, each kept on top or sent to
    the bottom (tap a card to switch), in an order you set with the arrows:
    the left one ends up on top. */
