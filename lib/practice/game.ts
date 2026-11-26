@@ -42,6 +42,8 @@ import {
   ninjutsuOf,
   noMaxHandSize,
   removalOf,
+  removalCanTarget,
+  colourGateOf,
   shockLife,
   stats,
   staysTapped,
@@ -1159,6 +1161,38 @@ export function uncastable(g: PracticeGame, seat: Seat, card: PlayCard, book: Ca
   return null;
 }
 
+/** A plan's removal spell aimed at something its text doesn't allow: a
+    Pyroblast (blue only) on a red creature, a Doom Blade on a black one.
+    The plan names its own targets, so the table checks them: a spell whose
+    every "destroy / exile / counter target" asks for one colour may only
+    hit that colour; a spell with one way to be cast is held to all of its
+    conditions (type, cost, size, a keyword). Null when the targets are
+    fine, or the card isn't one the table can read. */
+function mistargeted(g: PracticeGame, card: PlayCard, effects: PlanAction["effects"], book: CardBook): string | null {
+  const info = infoOf(book, card);
+  const aimed = effects.filter((e) => e.type === "destroy" || e.type === "exile" || e.type === "bounce" || e.type === "damage");
+  if (!info || !aimed.length) return null;
+  const targets = aimed.flatMap((e) => {
+    const iid = parseCardId(e.target);
+    const at = iid === null ? null : findCard(g, iid);
+    return at && at.zone === "battlefield" ? [at.card] : [];
+  });
+  if (!targets.length) return null;
+  const gate = colourGateOf(info);
+  const pipOf = (c: PlayCard) => (c.token ? "" : (infoOf(book, c)?.manaCost ?? "").split(" // ")[0]!);
+  const off = gate ? targets.find((c) => !new RegExp(`\\{[^}]*${gate}[^}]*\\}`).test(pipOf(c))) : undefined;
+  if (off) return `${card.name} can only hit a ${COLOUR_NAME[gate!]} card, and ${off.name} isn't one.`;
+  // One way to cast it (no "Choose one"): every condition of its target.
+  if (/•|\bchoose (?:one|two)\b/i.test(info.oracleText ?? "")) return null;
+  const r = removalOf(info, "instant") ?? removalOf(info, "sorcery");
+  if (!r) return null;
+  const attacking = new Set(g.combat?.attackers ?? []);
+  const bad = targets.find((c) => !removalCanTarget(book, r, c, attacking.has(c.iid)));
+  return bad ? `${card.name} can't target ${bad.name}.` : null;
+}
+
+const COLOUR_NAME: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
+
 /** Whether a card in the AI's hand (or command zone) can be cast now, and
     what it costs including commander tax. */
 export function castable(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, zone: Zone): boolean {
@@ -1216,7 +1250,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
       resolveCast(g, seat, card, action, book);
       return { game: g, ok: true };
     }
-    const no = uncastable(g, seat, card, book, action.effects);
+    const no = uncastable(g, seat, card, book, action.effects) ?? mistargeted(g, card, action.effects, book);
     if (no) return fail(`(${no})`);
     const cost = spellCost(g, seat, card, book, at.zone);
     const sources = availableMana(g, seat, book, [], { commander: card.commander });
@@ -2423,12 +2457,9 @@ export function aiRemovalAction(g: PracticeGame, book: CardBook, targets: number
   const ranked = creatures.filter(worth).sort((a, b) => stats(book, b).power - stats(book, a).power || (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0));
   for (const target of ranked) {
     const s = stats(book, target);
-    const tInfo = infoOf(book, target);
     const fit = affordable.find(({ r }) => {
-      if (r.attackingOnly && !attacking.has(target.iid)) return false;
-      if (r.notColor && new RegExp(`\\{[^}]*${r.notColor}[^}]*\\}`).test(tInfo?.manaCost ?? "")) return false;
-      if (r.notType && new RegExp(`\\b${r.notType}\\b`, "i").test(tInfo?.typeLine ?? target.typeLine ?? "")) return false;
-      if (r.minValue && (tInfo?.manaValue ?? 0) < r.minValue) return false;
+      // What the card may hit at all: colour ("if it's blue"), type, cost, size.
+      if (!removalCanTarget(book, r, target, attacking.has(target.iid))) return false;
       if (r.kind === "destroy" && indestructible(g, "you", target, book)) return false;
       if (r.kind === "damage" && (indestructible(g, "you", target, book) || r.amount < s.toughness - (target.damage ?? 0))) return false;
       return true;

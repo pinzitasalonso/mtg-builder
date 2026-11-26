@@ -402,34 +402,122 @@ export interface Removal {
   /** "nonblack": not this colour; "nonartifact": not this type. */
   notColor: string | null;
   notType: string | null;
+  /** "Target blue permanent", "…if it's blue" (Pyroblast): only this colour. */
+  onlyColor: string | null;
   /** "With mana value 4 or greater" (Despark). */
   minValue: number;
+  /** "With mana value 3 or less". */
+  maxValue: number | null;
+  /** "With power 4 or greater" / "with power 2 or less"; toughness the same way. */
+  power: { min: number; max: number | null };
+  toughness: { min: number; max: number | null };
+  /** "With flying": a keyword the target must have. */
+  needs: string | null;
   rider: string;
 }
+
+const COLOR_WORD = "white|blue|black|red|green";
+
 export function removalOf(info: CardInfo | undefined, speed: "instant" | "sorcery" = "instant"): Removal | null {
   // An instant, to answer on the player's turn; or a sorcery, for the AI's own.
   if (!info || !new RegExp(`\\b${speed === "instant" ? "Instant" : "Sorcery"}\\b`).test(frontType(info.typeLine))) return null;
   const text = frontText(info);
   // "Target creature", and the wider targets a creature fits: a permanent
   // (Beast Within), a nonland permanent (Anguished Unmaking), an artifact or
-  // creature (Putrefy), with or without "an opponent controls".
-  const kill = /\b(destroy|exile) target (attacking |tapped )?(?:non(\w+) )?(?:creature|permanent|artifact or creature|creature or artifact|creature or enchantment|creature or planeswalker|artifact, creature, or enchantment)\b(?! card)(?: an opponent controls| you don't control)?(?: with mana value (\d+) or greater)?/i.exec(text);
-  const burn = /\bdeals? (\d+) damage to (any target|target creature|target attacking creature|target creature or planeswalker)\b/i.exec(text);
-  const bounce = /\breturn target (attacking )?(?:creature|nonland permanent|permanent) to its owner's hand\b/i.exec(text);
+  // creature (Putrefy), with or without "an opponent controls". A colour
+  // before it ("target blue permanent") is a condition.
+  const what = `(?<attacking>attacking |tapped )?(?:(?<only>${COLOR_WORD}) )?(?:non(?<not>\\w+) )?`;
+  const kill = new RegExp(
+    `\\b(?<kind>destroy|exile) target ${what}(?:creature|permanent|artifact or creature|creature or artifact|creature or enchantment|creature or planeswalker|artifact, creature, or enchantment)\\b(?! card)(?: an opponent controls| you don't control)?`,
+    "i"
+  ).exec(text);
+  const burn = new RegExp(`\\bdeals? (?<amount>\\d+) damage to (?:any target|target ${what}creature(?: or planeswalker)?)\\b`, "i").exec(text);
+  const bounce = new RegExp(`\\breturn target ${what}(?:creature|nonland permanent|permanent) to its owner's hand\\b`, "i").exec(text);
   const m = kill ?? burn ?? bounce;
   if (!m) return null;
-  const not = kill?.[3]?.toLowerCase() ?? null;
+  const g = m.groups ?? {};
+  // The rest of its sentence says what else the target must be: "with mana
+  // value 4 or greater", "with flying", "if it's blue". A condition this
+  // doesn't know means the card isn't used as removal at all: it read
+  // Pyroblast as "destroy target permanent" and killed a red creature.
+  let rest = text.slice(m.index + m[0].length).split(/[.\n(]/)[0]!;
+  const out = {
+    onlyColor: g.only ? COLOR_PIP[g.only.toLowerCase()]! : null,
+    minValue: 0,
+    maxValue: null as number | null,
+    power: { min: 0, max: null as number | null },
+    toughness: { min: 0, max: null as number | null },
+    needs: null as string | null,
+  };
+  const take = (re: RegExp, on: (x: RegExpExecArray) => void): boolean => {
+    const x = re.exec(rest);
+    if (!x) return false;
+    on(x);
+    rest = rest.slice(x[0].length);
+    return true;
+  };
+  for (let i = 0; i < 6; i++) {
+    const took =
+      take(/^(?: an opponent controls| you don't control)/i, () => {}) ||
+      take(new RegExp(`^ if it's (${COLOR_WORD})\\b`, "i"), (x) => (out.onlyColor = COLOR_PIP[x[1]!.toLowerCase()]!)) ||
+      take(/^ with mana value (\d+) or (greater|less)/i, (x) => (x[2]!.toLowerCase() === "greater" ? (out.minValue = Number(x[1])) : (out.maxValue = Number(x[1])))) ||
+      take(/^ with (power|toughness) (\d+) or (greater|less)/i, (x) => {
+        const side = out[x[1]!.toLowerCase() as "power" | "toughness"];
+        if (x[3]!.toLowerCase() === "greater") side.min = Number(x[2]);
+        else side.max = Number(x[2]);
+      }) ||
+      take(/^ with (flying|reach|trample|haste|vigilance|deathtouch|lifelink|menace|first strike|double strike)\b/i, (x) => (out.needs = x[1]![0]!.toUpperCase() + x[1]!.slice(1).toLowerCase()));
+    if (!took) break;
+  }
+  // What may follow without changing what it can hit: the end of the
+  // sentence, a wider target ("or planeswalker"), another effect ("and you
+  // gain 3 life", ", then…").
+  if (!/^(?:\s*$|,| and | or )/i.test(rest)) return null;
+  const not = g.not?.toLowerCase() ?? null;
   const pip = not ? COLOR_PIP[not] : undefined;
   const after = text.slice(m.index + m[0].length).replace(/^[^.]*\.\s*/, "");
   return {
-    kind: kill ? (kill[1]!.toLowerCase() as "destroy" | "exile") : burn ? "damage" : "bounce",
-    amount: burn ? Number(burn[1]) : 0,
-    attackingOnly: /attacking/i.test((kill?.[2] ?? "") + (burn?.[2] ?? "") + (bounce?.[1] ?? "")),
+    kind: kill ? (g.kind!.toLowerCase() as "destroy" | "exile") : burn ? "damage" : "bounce",
+    amount: burn ? Number(g.amount) : 0,
+    attackingOnly: /attacking/i.test(g.attacking ?? ""),
     notColor: pip ?? null,
     notType: not && !pip ? not : null,
-    minValue: Number(kill?.[4]) || 0,
+    ...out,
     rider: /^its controller\b/i.test(after) ? after.split(/(?<=\.)\s/)[0]! : "",
   };
+}
+
+/** Whether a removal spell may target this permanent at all: its colour,
+    type, cost, size and keyword conditions. (Whether it's worth it, or the
+    damage is enough, is the caller's question.) */
+export function removalCanTarget(book: CardBook, r: Removal, target: PlayCard, attacking: boolean): boolean {
+  const info = infoOf(book, target);
+  const hasPip = (pip: string) => !target.token && new RegExp(`\\{[^}]*${pip}[^}]*\\}`).test((info?.manaCost ?? "").split(" // ")[0]!);
+  if (r.attackingOnly && !attacking) return false;
+  if (r.onlyColor && !hasPip(r.onlyColor)) return false;
+  if (r.notColor && hasPip(r.notColor)) return false;
+  if (r.notType && new RegExp(`\\b${r.notType}\\b`, "i").test(info?.typeLine ?? target.typeLine ?? "")) return false;
+  const mv = target.token ? 0 : (info?.manaValue ?? 0);
+  if (mv < r.minValue || (r.maxValue !== null && mv > r.maxValue)) return false;
+  if (r.power.min || r.power.max !== null || r.toughness.min || r.toughness.max !== null) {
+    if (!isCreature(book, target)) return false;
+    const s = stats(book, target);
+    if (s.power < r.power.min || (r.power.max !== null && s.power > r.power.max)) return false;
+    if (s.toughness < r.toughness.min || (r.toughness.max !== null && s.toughness > r.toughness.max)) return false;
+  }
+  if (r.needs && !has(book, target, r.needs)) return false;
+  return true;
+}
+
+/** The colour every "destroy / exile / counter target …" of a spell asks
+    for, when they all ask for the same one (Pyroblast, Red Elemental
+    Blast: blue; Hydroblast: red). Null when any of them has no such
+    condition. For checking a plan that names its own targets. */
+export function colourGateOf(info: CardInfo | undefined): string | null {
+  const clauses = [...frontText(info).matchAll(/\b(?:destroy|exile|counter) target [^.\n]*/gi)].map((m) => m[0]);
+  if (!clauses.length) return null;
+  const gates = clauses.map((c) => new RegExp(`\\btarget (${COLOR_WORD}) |\\bif it's (${COLOR_WORD})\\b`, "i").exec(c)).map((m) => (m ? (m[1] ?? m[2])!.toLowerCase() : null));
+  return gates[0] && gates.every((x) => x === gates[0]) ? COLOR_PIP[gates[0]]! : null;
 }
 
 /** Blue, by its mana cost (hybrid and phyrexian count). */
