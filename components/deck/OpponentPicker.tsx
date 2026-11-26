@@ -1,6 +1,6 @@
 "use client";
 
-import { ModeSwitch } from "@/components/deck/playtest-parts";
+import { PlayWays } from "@/components/deck/playtest-parts";
 import Link from "next/link";
 import { LimitNotice } from "@/components/Upgrade";
 import { isLimitMessage } from "@/lib/limits";
@@ -152,11 +152,9 @@ export default function OpponentPicker({
     <div className="pk">
       <div className="pk-scroll">
         <div className="pk-inner">
-          {/* On a phone the header has no room for the title and its
-              switch: Solo or Match leads the page here instead. */}
-          <div className="pk-mode">
-            <ModeSwitch narrow mode="match" onSolo={onSolo} />
-          </div>
+          {/* Solo or a match, first thing on the page: seen before an
+              opponent is picked. */}
+          <PlayWays mode="match" onSolo={onSolo} />
           <div className="pk-head">
             <h2 className="id-display pk-title">Pick an opponent</h2>
             {free && (
@@ -166,7 +164,7 @@ export default function OpponentPicker({
             )}
           </div>
           <p className="pt-pick-note">
-            Your opponent pilots a real deck against yours. You play your side by hand; it plays lands, casts what it can pay for, attacks and blocks.
+            You play your side by hand. Your opponent plays lands, casts what it can pay for, attacks and blocks.
             {record && record.won + record.lost > 0 && (
               <>
                 {" "}
