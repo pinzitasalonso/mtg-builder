@@ -1055,6 +1055,17 @@ button {
   gap: 10px;
   min-width: 0;
 }
+.pt-title-icon {
+  flex: none;
+  align-self: center;
+  margin-right: -2px;
+  color: #fff;
+}
+.pt-title-name {
+  font-size: 22px;
+  line-height: 1.2;
+  color: #fff;
+}
 .pt-sub {
   font-size: 12.5px;
   color: rgba(255, 255, 255, 0.6);
@@ -1830,40 +1841,99 @@ button {
   gap: 8px;
   margin-top: 14px;
 }
-/* Solo or Match: the two ways to play, as one switch beside the title of
-   both tables (components/deck/playtest-parts.tsx ModeSwitch). */
-.pt-mode {
-  display: inline-flex;
-  flex: none;
-  align-self: center;
-  padding: 3px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.25);
+/* Solo or Match: the two ways to play, as two choices at the top of the
+   page where a match is set up (components/deck/playtest-parts.tsx
+   PlayWays). The one you're in carries the gold. */
+.pw {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 28px;
 }
-.pt-mode button {
-  padding: 5px 14px;
-  border: none;
-  border-radius: 999px;
-  background: none;
-  color: rgba(255, 255, 255, 0.7);
+.pw-way {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
   font-family: var(--font-ui);
-  font-size: 13px;
-  font-weight: 700;
+  text-align: left;
   cursor: pointer;
-  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
-.pt-mode button[aria-selected="true"] {
-  background: var(--gold);
-  color: #181228;
+.pw-way:not([aria-checked="true"]):hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.08);
+}
+.pw-way[aria-checked="true"] {
+  border-color: #fdf26f;
+  background: rgba(253, 242, 111, 0.07);
+  box-shadow: 0 0 0 1px #fdf26f;
   cursor: default;
 }
-.pt-mode button:not([aria-selected="true"]):hover { color: #fff; }
-/* The phone's copy: shown only where the title (and the switch beside it)
-   is hidden. */
-.pt-mode-narrow,
-.pk-mode { display: none; }
-.pk-mode { margin-bottom: 14px; }
+.pw-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+.pw-way[aria-checked="true"] .pw-icon {
+  background: #fdf26f;
+  color: #181228;
+}
+.pw-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.pw-name {
+  font-size: 17px;
+  line-height: 1.2;
+}
+.pw-what {
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.65);
+}
+.pw-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.45);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.pw-way:not([aria-checked="true"]):hover .pw-mark {
+  color: #fff;
+  transform: translateX(2px);
+}
+.pw-way[aria-checked="true"] .pw-mark {
+  background: #fdf26f;
+  color: #181228;
+}
+/* A phone held upright: one under the other, so each keeps its line of words. */
+@media (max-width: 560px) {
+  .pw {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .pw-way {
+    padding: 12px 14px;
+  }
+}
 /* The commander search. */
 .pk-search {
   display: flex;
@@ -3128,15 +3198,6 @@ button {
   .pt-tools-row .pt-narrow-only {
     display: inline-flex;
   }
-  .pt-tools-row .pt-mode-narrow {
-    display: inline-flex;
-  }
-  .pk-mode {
-    display: block;
-  }
-  .pk-mode .pt-mode-narrow {
-    display: inline-flex;
-  }
   .pt-life-value {
     min-width: 26px;
     font-size: 15px;
@@ -3324,8 +3385,7 @@ button {
     flex: none;
     padding: 6px 10px;
   }
-  .pt-table .pt-tools-row .pt-narrow-only,
-  .pt-table .pt-tools-row .pt-mode-narrow {
+  .pt-table .pt-tools-row .pt-narrow-only {
     display: inline-flex;
   }
   /* The buttons come first: the status has what's left, at least a few

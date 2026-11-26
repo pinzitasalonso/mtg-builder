@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { BarChart3, Bot, Dices, RotateCw, Undo2, X } from "lucide-react";
+import { BarChart3, RotateCw, Swords, Undo2, X } from "lucide-react";
 import { hasKnownBack } from "@/components/useCardFlip";
-import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, type MenuState, type Zoom, AttachGroup, ModeSwitch } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, type MenuState, type Zoom, AttachGroup, TableTitle } from "@/components/deck/playtest-parts";
 import PracticeTable from "@/components/deck/PracticeTable";
 import { PoolEntry } from "@/lib/pool-client";
 import { hypergeometric, hypergeometricAtLeast } from "@/lib/probability";
@@ -259,14 +259,11 @@ function SoloTable({
     <div className="pt-root pt-table" role="dialog" aria-label="Playtest">
       <RotateHint onClose={onClose} />
       <header className="pt-top">
-        <div className="pt-title">
-          <span className="id-display" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 22, color: "#fff" }}><Dices size={21} strokeWidth={2} /> Playtest</span>
-          {/* Solo or a match: the same switch, in the same place, on both tables. */}
-          {onVsAi && <ModeSwitch mode="solo" onMatch={onVsAi} />}
+        <TableTitle>
           <span className="pt-sub">
             from {sourceLabel} · {deckSize} cards · {landCount} lands
           </span>
-        </div>
+        </TableTitle>
         <div className="pt-top-right">
           <span className="pt-turn">Turn {state.turn}</span>
           <LifeCounter label="Opp" value={state.oppLife} onDelta={(d) => act((s) => adjustLife(s, "opp", d))} />
@@ -284,7 +281,6 @@ function SoloTable({
         {/* One row that scrolls sideways on a phone; on a wider screen it's
             invisible and the buttons sit in .pt-tools as before. */}
         <div className="pt-tools-row">
-        {onVsAi && <ModeSwitch narrow mode="solo" onMatch={onVsAi} />}
         <button type="button" className="pt-btn pt-btn-gold" onClick={() => act(newGame)}>
           New game
         </button>
@@ -309,6 +305,12 @@ function SoloTable({
         <button type="button" className="pt-btn" onClick={() => act((s) => shuffleLibrary(s))} disabled={state.library.length < 2}>
           Shuffle
         </button>
+        {/* The other way to play: a match against an opponent. */}
+        {onVsAi && (
+          <button type="button" className="pt-btn pt-btn-ai" onClick={onVsAi} title="A practice match against an opponent that pilots a real deck">
+            <Swords size={14} strokeWidth={2.25} /> Play a match
+          </button>
+        )}
         {/* On a phone the header has room for the life totals and Close only. */}
         <button type="button" className="pt-btn pt-narrow-only" onClick={() => setOddsOpen(true)}>
           <BarChart3 size={14} strokeWidth={2.25} /> Odds

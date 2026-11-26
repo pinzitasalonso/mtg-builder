@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Crown, Ellipsis, RefreshCw, Smartphone, X, ZoomIn } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, Crown, Dices, Ellipsis, Layers, RefreshCw, Smartphone, Swords, X, ZoomIn } from "lucide-react";
 import { CardArt } from "@/components/mtg";
 import { backImageOf, useVerifiedBack } from "@/components/useCardFlip";
 import type { PlayCard, Zone } from "@/lib/playtest";
@@ -180,30 +180,45 @@ export function PtCard({
   );
 }
 
-/** The two ways to play, side by side in the same place on both tables:
-    alone (try hands), or a match against an opponent. The one you're in is
-    lit; the other is one click away. */
-export function ModeSwitch({
-  mode,
-  onSolo,
-  onMatch,
-  narrow,
-}: {
-  mode: "solo" | "match";
-  onSolo?: () => void;
-  onMatch?: () => void;
-  /** The phone's copy: a phone hides the title this sits beside, so the
-      switch leads the row of buttons there instead. */
-  narrow?: boolean;
-}) {
+/** The title of both tables. The icon is centred on the line; the name and
+    whatever follows it (the deck, the opponent) share a baseline. */
+export function TableTitle({ children }: { children?: React.ReactNode }) {
   return (
-    <div className={narrow ? "pt-mode pt-mode-narrow" : "pt-mode"} role="tablist" aria-label="How to play">
-      <button type="button" role="tab" aria-selected={mode === "solo"} onClick={mode === "solo" ? undefined : onSolo} title="Play alone: draw hands, try lines">
-        Solo
-      </button>
-      <button type="button" role="tab" aria-selected={mode === "match"} onClick={mode === "match" ? undefined : onMatch} title="A practice match against an opponent that pilots a real deck">
-        Match
-      </button>
+    <div className="pt-title">
+      <Dices className="pt-title-icon" size={21} strokeWidth={2} aria-hidden />
+      <span className="id-display pt-title-name">Playtest</span>
+      {children}
+    </div>
+  );
+}
+
+/** The two ways to play, as two large choices at the top of the page where
+    a match is set up: alone (try hands), or a match against an opponent.
+    The one you're in is lit. It sits in the page, above "Pick an opponent",
+    so it's seen before anything is picked. (It was a small switch beside
+    the title: easy to miss, and it pushed the title off its line.) */
+export function PlayWays({ mode, onSolo, onMatch }: { mode: "solo" | "match"; onSolo?: () => void; onMatch?: () => void }) {
+  const ways = [
+    { id: "solo" as const, name: "Solo", what: "Just you. Draw hands, try your lines.", icon: <Layers size={20} strokeWidth={2} />, go: onSolo },
+    { id: "match" as const, name: "Match", what: "Against an opponent with a real deck.", icon: <Swords size={20} strokeWidth={2} />, go: onMatch },
+  ];
+  return (
+    <div className="pw" role="radiogroup" aria-label="How to play">
+      {ways.map((w) => (
+        <button key={w.id} type="button" role="radio" aria-checked={mode === w.id} className="pw-way" onClick={mode === w.id ? undefined : w.go}>
+          <span className="pw-icon" aria-hidden>
+            {w.icon}
+          </span>
+          <span className="pw-text">
+            <span className="id-display pw-name">{w.name}</span>
+            <span className="pw-what">{w.what}</span>
+          </span>
+          {/* The one you're in is ticked; the other one takes you there. */}
+          <span className="pw-mark" aria-hidden>
+            {mode === w.id ? <Check size={13} strokeWidth={3} /> : <ArrowRight size={17} strokeWidth={2.25} />}
+          </span>
+        </button>
+      ))}
     </div>
   );
 }
