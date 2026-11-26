@@ -81,6 +81,9 @@ export interface PracticeGame {
   attacked?: number[];
   once?: number[];
   mayCast?: number[];
+  /** A player with protection from everything until their next turn (The
+      One Ring, as it's cast): damage to them is prevented. */
+  shield?: Partial<Record<Seat, boolean>>;
   /** What the player may pay to stop the opponent's card (Rhystic Study,
       Smothering Tithe), waiting for their answer: pay, or don't. */
   taxes?: PendingTax[];

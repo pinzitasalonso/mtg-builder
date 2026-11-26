@@ -792,6 +792,15 @@ export const imprintsFromHand = (book: CardBook, card: PlayCard) => /\benters[^.
 /** "When you play another land, sacrifice this land" (City of Traitors). */
 export const goesWhenALandIsPlayed = (book: CardBook, card: PlayCard) => /\bwhen you play another land, sacrifice\b/i.test(own(book, card));
 
+/** The One Ring: "{T}: Put a burden counter on The One Ring, then draw a
+    card for each burden counter on The One Ring", with a life lost for
+    each counter at its controller's upkeep. */
+export const burdenDrawOf = (book: CardBook, card: PlayCard) => /\{T\}: put a burden counter on [^,]+, then draw a card for each burden counter on\b/i.test(own(book, card));
+
+/** "When The One Ring enters, if you cast it, you gain protection from
+    everything until your next turn." */
+export const shieldOnCastOf = (book: CardBook, card: PlayCard) => /\bwhen [^,]+ enters(?: the battlefield)?, if you cast it, you gain protection from everything until your next turn\b/i.test(own(book, card));
+
 /** Transmute {1}{U}{U} (Drift of Phantasms, Dizzy Spell, Muddle the
     Mixture): from the hand, pay it and discard the card to find a card of
     the same mana value. */

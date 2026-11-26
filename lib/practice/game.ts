@@ -29,6 +29,8 @@ import {
   goesWhenALandIsPlayed,
   cloneTypeOf,
   transmuteOf,
+  burdenDrawOf,
+  shieldOnCastOf,
   has,
   hasAltCost,
   hitTriggersOf,
@@ -89,7 +91,7 @@ import {
 import { triggersOf, type Outcome } from "./triggers";
 import { scaleDamage } from "./damage";
 import { drawSpellOf, tutorOf, tutorSearch } from "./spells";
-import { adNauseamOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, impulseOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
+import { adNauseamOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, impulseOf, extraTurnOf, hasStorm, landsForManaOf, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import {
   extraTreasureOf,
   oneOfEachOf,
@@ -869,6 +871,29 @@ const emptyPool = (g: PracticeGame, seat?: Seat) => {
   else g.pool = { you: [], opp: [] };
 };
 
+/** How short a seat is of each colour: what its hand and command zone ask
+    for, over what it can already make. A card it wins with or finds with
+    counts three times, a cheap one twice: Thassa's Oracle's {U}{U} is two
+    blue sources wanted, not "blue: yes". */
+export function colourNeeds(g: PracticeGame, seat: Seat, book: CardBook, without?: number): Record<string, number> {
+  const side = g.sides[seat];
+  const have: Record<string, number> = {};
+  for (const src of manaSources(side, book, g.turn)) for (const c of src.colors) have[c] = (have[c] ?? 0) + src.amount;
+  const need: Record<string, number> = {};
+  for (const c of [...side.hand.filter((x) => !isLand(x) && x.iid !== without), ...side.command]) {
+    const info = infoOf(book, c);
+    const weight = (handWorth(c, book) >= 4 ? 3 : 1) * ((info?.manaValue ?? 0) <= 3 ? 2 : 1);
+    const pips = parseCost(info?.manaCost ?? null).pips.flat().filter((x) => /^[WUBRG]$/.test(x));
+    // Two pips of one colour want two sources of it.
+    const most: Record<string, number> = {};
+    for (const x of pips) most[x] = (most[x] ?? 0) + 1;
+    for (const [x, n] of Object.entries(most)) need[x] = Math.max(need[x] ?? 0, 0) + weight * Math.max(0.25, n - (have[x] ?? 0));
+  }
+  const out: Record<string, number> = {};
+  for (const [x, n] of Object.entries(need)) out[x] = n / (1 + (have[x] ?? 0));
+  return out;
+}
+
 /** A land the AI plays: a shock land enters untapped for 2 life while
     that's affordable; a fetch land cracks at once for the land that best
     fits the hand. */
@@ -892,12 +917,13 @@ function aiLandEnters(g: PracticeGame, seat: Seat, land: PlayCard, book: CardBoo
     return fetch.types.some((w) => w === "land" || t.includes(w));
   });
   if (!fits.length) return;
-  const have = new Set(manaSources(side, book, g.turn).flatMap((x) => x.colors));
-  const need = new Set(side.hand.filter((c) => !isLand(c)).flatMap((c) => parseCost(infoOf(book, c)?.manaCost ?? null).pips.flat()));
-  for (const c of side.command) for (const pip of parseCost(infoOf(book, c)?.manaCost ?? null).pips.flat()) need.add(pip);
+  // The land that makes what the hand is shortest of. (It counted colours
+  // as had or not: with Diabolic Intent and Demonic Consultation in hand
+  // it fetched Volcanic Island.)
+  const short = colourNeeds(g, seat, book);
   const score = (c: PlayCard) => {
     const colors = manaOutput(infoOf(book, c), c.typeLine)?.colors ?? [];
-    return colors.filter((x) => need.has(x) && !have.has(x)).length * 10 + colors.length - (entersTapped(infoOf(book, c), ownTurnOf(g.turn)) ? 5 : 0);
+    return colors.reduce((n, x) => n + (short[x] ?? 0), 0) * 10 + colors.length - (entersTapped(infoOf(book, c), ownTurnOf(g.turn)) ? 5 : 0);
   };
   const pick = fits.reduce((a, b) => (score(b) > score(a) ? b : a));
   if (fetch.life) loseLife(g, seat, fetch.life, book);
@@ -931,7 +957,15 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   g.attacked = [];
   g.once = [];
   g.mayCast = [];
+  // Protection "until your next turn" ends here.
+  if (g.shield?.[seat]) g.shield = { ...g.shield, [seat]: false };
   say(g, seat, `Turn ${g.turn} — ${seat === "you" ? "your turn" : "the opponent's turn"}.`);
+  // The One Ring: a life for each burden counter, at its controller's upkeep.
+  for (const c of g.sides[seat].battlefield) {
+    if (!c.burden || !burdenDrawOf(book, c) || g.winner) continue;
+    say(g, seat, `${faceName(c)}: ${who(seat)} ${verb(seat, "lose")} ${c.burden} life (its burden).`);
+    loseLife(g, seat, c.burden, book);
+  }
   // "At the beginning of each upkeep, create a 1/1 … Pest" (Beledros
   // Witherbloom): every upkeep, for whoever controls it.
   for (const s of ["you", "opp"] as Seat[]) {
@@ -1812,6 +1846,16 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     checkState(g, book);
     return { game: g, ok: true };
   }
+  // The One Ring: tapped for a burden counter and a card for each one.
+  if (burdenDrawOf(book, card)) {
+    if (card.tapped) return fail(`(${card.name} is already tapped.)`);
+    const burden = (card.burden ?? 0) + 1;
+    update(g, card.iid, (c) => ({ ...c, tapped: true, burden }));
+    say(g, seat, `${who(seat)} ${verb(seat, "tap")} ${faceName(card)}: a burden counter (${burden}), and ${burden === 1 ? "a card" : `${burden} cards`}.`, card);
+    drawCards(g, seat, burden, book);
+    checkState(g, book);
+    return { game: g, ok: true };
+  }
   // Necropotence's cards are the table's to take, at the end step. A plan's
   // own activation paid life for a note, and the note named the card on top.
   if (seat === "opp" && lifeForCardsOf(book, card)) return fail(`(${faceName(card)}'s cards are taken at the end step, by the table.)`);
@@ -2148,19 +2192,26 @@ function aiDiscardPick(g: PracticeGame, seat: Seat, book: CardBook, combos: Deck
   // Nauseam, a card that only works on the right turn, a ritual. Of the
   // rest, the dearest to cast goes first.
   // A piece of one of its combos that wins.
-  const pieces = new Set(combos.filter((k) => comboOutcome(k.produces) !== "other").flatMap((k) => k.pieces.map((p) => p.name.toLowerCase())));
-  const keep = (c: PlayCard) => {
-    const info = infoOf(book, c);
-    if (oracleWinOf(book, c) || libraryExilerOf(info)) return 5;
-    if (pieces.has(c.name.toLowerCase()) || pieces.has(c.name.split(" // ")[0]!.toLowerCase())) return 4;
-    if (tutorOf(info) || adNauseamOf(info) || triggersOf(book, c).endSacrifice) return 4;
-    if (ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 }) || handManaOf(info)) return 2;
-    // A mana rock: the mana it'll need.
-    if (manaOutput(info, c.typeLine) && !isCreature(book, c)) return 2;
-    return 0;
-  };
+  const keep = (c: PlayCard) => handWorth(c, book, combos);
   const spells = side.hand.filter((c) => !isLand(c)).sort((a, b) => keep(a) - keep(b) || (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0));
   return spells[0] ?? side.hand[0]!;
+}
+
+/** How much a hand would hate to lose a card, 0 to 5: a way to win, a
+    tutor, Ad Nauseam, a card that only works on the right turn, a draw
+    engine, a ritual or a rock. An answer or a body is 0. */
+function handWorth(c: PlayCard, book: CardBook, combos: DeckCombo[] = []): number {
+  const pieces = new Set(combos.filter((k) => comboOutcome(k.produces) !== "other").flatMap((k) => k.pieces.map((p) => p.name.toLowerCase())));
+  const info = infoOf(book, c);
+  if (oracleWinOf(book, c) || libraryExilerOf(info)) return 5;
+  if (pieces.has(c.name.toLowerCase()) || pieces.has(c.name.split(" // ")[0]!.toLowerCase())) return 4;
+  if (tutorOf(info) || adNauseamOf(info) || triggersOf(book, c).endSacrifice) return 4;
+  // A draw engine, or Jeska's Will.
+  if (lifeForCardsOf(book, c) || triggersOf(book, c).tax || impulseOf(info)) return 3;
+  if (ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 }) || handManaOf(info) || landsForManaOf(info)) return 2;
+  // A mana rock: the mana it'll need.
+  if (manaOutput(info, c.typeLine) && !isCreature(book, c)) return 2;
+  return 0;
 }
 
 /** "Each player discards a card. Then you draw a card for each card type
@@ -2426,6 +2477,11 @@ function entered(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, op
   const at = findCard(g, card.iid);
   if (!at || at.zone !== "battlefield") return false;
   const now = at.card;
+  // The One Ring, cast: protection from everything until its controller's next turn.
+  if (opts.cast && shieldOnCastOf(book, now)) {
+    g.shield = { ...g.shield, [seat]: true };
+    say(g, seat, `${faceName(now)}: ${who(seat)} ${seat === "you" ? "have" : "has"} protection from everything until ${seat === "you" ? "your" : "its"} next turn. No damage gets through.`);
+  }
   // Thassa's Oracle: devotion to blue against the library.
   if (oracleWinOf(book, now) && !g.winner) {
     const x = devotion(g, seat, "U", book);
@@ -2457,8 +2513,18 @@ function entered(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, op
   if (imprintsFromHand(book, now)) {
     const fits = imprintable(g, seat, book);
     if (seat === "opp") {
-      // The card it would cast last: the most expensive one with a colour.
-      const pick = fits.filter((c) => colorsOfCost(infoOf(book, c)).length).sort((a, b) => (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0))[0];
+      // The card it can best spare: an answer or a body before a ritual,
+      // never a way to win or a tutor (it took "the most expensive", and
+      // exiled Thassa's Oracle and Ad Nauseam). Of those, one whose colour
+      // the hand is shortest of; then the dearest.
+      // (What the rest of the hand is short of: a card isn't exiled to make the colour only it asked for.)
+      const give = (c: PlayCard) => {
+        const short = colourNeeds(g, seat, book, c.iid);
+        return Math.max(0, ...colorsOfCost(infoOf(book, c)).map((x) => short[x] ?? 0));
+      };
+      const pick = fits
+        .filter((c) => colorsOfCost(infoOf(book, c)).length && handWorth(c, book) < 4)
+        .sort((a, b) => handWorth(a, book) - handWorth(b, book) || give(b) - give(a) || (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0))[0];
       if (pick) imprint(g, "opp", now, pick, book);
     } else if (fits.length && !g.choice) g.choice = { kind: "imprint", source: now.name, by: "you", card: now.iid, decline: "Exile nothing" };
   }
@@ -2938,6 +3004,21 @@ function resolveCast(g: PracticeGame, seat: Seat, card0: PlayCard, action: PlanA
     });
     // Gamble's discard is the table's too, at random (below): the plan's
     // own "discard a card" made it two cards lost for one.
+    // Rain of Filth: every land is tapped for what it makes, then
+    // sacrificed for one more. The opponent's lands all go: it's cast on
+    // the turn it wins.
+    const rain = seat === "opp" ? landsForManaOf(infoOf(book, card)) : null;
+    if (rain) {
+      const lands = g.sides[seat].battlefield.filter(isLand);
+      if (!g.pool) g.pool = { you: [], opp: [] };
+      for (const l of lands) {
+        const out = l.tapped ? null : manaOutput(infoOf(book, l), l.typeLine, !!l.flipped);
+        if (out?.amount) g.pool[seat] = [...g.pool[seat], ...Array.from({ length: out.amount }, () => out.colors.join("") || "C")];
+        moveTo(g, l.iid, "graveyard");
+        g.pool[seat] = [...g.pool[seat], rain];
+      }
+      say(g, seat, `${card.name}: ${who(seat)} ${verb(seat, "sacrifice")} ${lands.length === 1 ? "its land" : `its ${lands.length} lands`} for {${rain}} each.`);
+    }
     const tutor = tutorOf(infoOf(book, card));
     const randomDiscard = !!tutor?.discardRandom;
     let effects = action.effects.filter((e) => !(made && e.type === "mana") && !(randomDiscard && e.type === "discard" && e.player !== (seat === "opp" ? "player" : "ai")));

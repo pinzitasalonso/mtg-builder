@@ -4,7 +4,7 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { canPlayAsLand, cloneTypeOf, transmuteOf, goesWhenALandIsPlayed, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
+import { burdenDrawOf, canPlayAsLand, cloneTypeOf, transmuteOf, goesWhenALandIsPlayed, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
 import { availableMana, castable, cardId, comboStatus, lifeFor, loyaltyOf, uncastable } from "./game";
 import { comboHeadline, type DeckCombo } from "./combos";
 import {
@@ -32,7 +32,7 @@ import {
 import { hasTriggers, triggersOf } from "./triggers";
 import { manaSummary, manaTotal } from "./mana";
 import { makesTreasures, treasureSpellOf } from "./treasure";
-import { adNauseamOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, impulseOf, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
+import { adNauseamOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, impulseOf, landsForManaOf, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import { damageRuleOf } from "./damage";
 import { cardTypesAmong, tutorOf } from "./spells";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
@@ -216,6 +216,8 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (handSizeOf(book, front)) notes.push(`your maximum hand size is ${handSizeOf(book, front)} while it's out`);
     const cu = cumulativeUpkeepOf(book, front);
     if (cu !== null) notes.push(`the app pays its cumulative upkeep at your upkeep while it's {2} or less and leaves you mana for the turn, then sacrifices it`);
+    if (landsForManaOf(info)) notes.push(`the app taps every land you control for its mana, then sacrifices them all for {${landsForManaOf(info)}} each: give it no effects, and cast it only on the turn you win`);
+    if (burdenDrawOf(book, front)) notes.push("to use it, activate it with tap_card true and no effects: the app adds a burden counter and draws you a card for each one, and takes a life for each counter at your upkeep. Use it every turn you can spare the life. Cast, it also stops all damage to you until your next turn");
     const tm = transmuteOf(info);
     if (tm) notes.push(`transmute: from your hand, in your main phase, activate it with "mana":"${tm.cost}" and one search effect naming a card with mana value ${tm.manaValue}. The app discards it and puts that card in your hand`);
     if (cloneTypeOf(book, front)) notes.push(`the app has it enter as a copy of the best ${cloneTypeOf(book, front)} on the battlefield (your draw engine first): give it no effects. With none to copy it can't be cast`);

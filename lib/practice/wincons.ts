@@ -45,6 +45,14 @@ export function libraryExilerOf(info: CardInfo | undefined): "consultation" | "p
   return null;
 }
 
+/** Rain of Filth: "Until end of turn, lands you control gain 'Sacrifice
+    this land: Add {B}.'" The colour each land gives as it's sacrificed. All
+    in: a card for the turn the game is won. */
+export function landsForManaOf(info: CardInfo | undefined): string | null {
+  const m = /^until end of turn, lands you control gain "sacrifice this land: add \{([WUBRGC])\}\."$/i.exec((info?.oracleText ?? "").split("\n//\n")[0]!.trim());
+  return m ? m[1]!.toUpperCase() : null;
+}
+
 /** A ritual: its whole text is "Add {R}{R}{R}." (a splice line allowed):
     the mana it adds, one letter a unit. */
 export function ritualOf(info: CardInfo | undefined): string[] | null {

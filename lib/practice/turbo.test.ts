@@ -10,12 +10,12 @@ import { scaleDamage } from "./damage";
 import { entersTapped, handManaOf, manaOutput, manaSinkOf, ownTurnOf, sacManaOf, searchAbility } from "./cards";
 import { comboNeeds, type DeckCombo } from "./combos";
 import { report, selfplay } from "./selfplay";
-import { applyAction, availableMana, cardId, comboStatus, declareAttackers, endTurn, manaAhead, newGame, playerSpellResolves, shownLog, startTurn, uncastable, type DeckCard } from "./game";
+import { applyAction, availableMana, cardId, colourNeeds, comboStatus, declareAttackers, endTurn, manaAhead, newGame, playerSpellResolves, shownLog, startTurn, uncastable, type DeckCard } from "./game";
 import { manaSources, manaTotal, parseCost, payCost } from "./mana";
 import { cardTypesAmong, drawSpellOf, tutorOf, tutorSearch } from "./spells";
 import { readTriggers } from "./triggers";
 import type { CardBook, CardInfo, PlanAction, PracticeGame } from "./types";
-import { adNauseamOf, extraTurnLosesOf, impulseOf, ritualMana, sacrificeCostOf } from "./wincons";
+import { adNauseamOf, extraTurnLosesOf, impulseOf, landsForManaOf, ritualMana, sacrificeCostOf } from "./wincons";
 import CARDS from "./fixtures/turbo.json";
 import COMBOS from "./fixtures/turbo-combos.json";
 
@@ -41,6 +41,11 @@ const BOOK: CardBook = Object.fromEntries(
     info("Drift of Phantasms", { typeLine: "Creature — Spirit", manaCost: "{3}", manaValue: 3, power: 0, toughness: 5, keywords: ["Flying", "Defender", "Transmute"], oracleText: "Flying, defender\nTransmute {1}{U}{U} ({1}{U}{U}, Discard this card: Search your library for a card with the same mana value as this card, reveal it, put it into your hand, then shuffle. Transmute only as a sorcery.)" }),
     info("Dizzy Spell", { typeLine: "Instant", manaCost: "{U}", manaValue: 1, keywords: ["Transmute"], oracleText: "Target creature gets -3/-0 until end of turn.\nTransmute {1}{U}{U} ({1}{U}{U}, Discard this card: Search your library for a card with the same mana value as this card, reveal it, put it into your hand, then shuffle. Transmute only as a sorcery.)" }),
     info("War God", { typeLine: "Legendary Creature — God", manaCost: "{1}{R}{R}", manaValue: 3, power: 2, toughness: 4, oracleText: "At the beginning of each player's end step, War God deals damage to that player equal to the number of creatures that player controls that didn't attack this turn." }),
+    // The next round's.
+    info("Chrome Mox", { typeLine: "Artifact", manaCost: "{0}", manaValue: 0, producedMana: ["B", "G", "R", "U", "W"], oracleText: "Imprint — When this artifact enters, you may exile a nonartifact, nonland card from your hand.\n{T}: Add one mana of any of the exiled card's colors." }),
+    info("Polluted Delta", { typeLine: "Land", oracleText: "{T}, Pay 1 life, Sacrifice this land: Search your library for an Island or Swamp card, put it onto the battlefield, then shuffle." }),
+    info("The One Ring", { typeLine: "Legendary Artifact", manaCost: "{4}", manaValue: 4, keywords: ["Indestructible"], oracleText: "Indestructible\nWhen The One Ring enters, if you cast it, you gain protection from everything until your next turn.\nAt the beginning of your upkeep, you lose 1 life for each burden counter on The One Ring.\n{T}: Put a burden counter on The One Ring, then draw a card for each burden counter on The One Ring." }),
+    info("Rain of Filth", { typeLine: "Instant", manaCost: "{B}", manaValue: 1, producedMana: ["B"], oracleText: "Until end of turn, lands you control gain \"Sacrifice this land: Add {B}.\"" }),
     info("Goblin Piker", { typeLine: "Creature — Goblin Warrior", manaCost: "{1}{R}", manaValue: 2, power: 0, toughness: 3, oracleText: "Whenever this creature attacks, it gets +2/+0 until end of turn." }),
   ].map((c) => [c.name.toLowerCase(), c])
 );
@@ -897,5 +902,93 @@ describe("what a Vivi match showed", () => {
     expect(safeAttackers(war, "opp", BOOK).map((c) => c.name)).toEqual(["Rograkh, Son of Rohgahh"]);
     // And leftover mana isn't spent on a creature that would sit there for the War God to count.
     expect(spareManaPlan(war, BOOK)).toBeNull();
+  });
+});
+
+// The real list's benchmark games, read turn by turn: where the planner
+// threw its own win away, or sat on it.
+describe("what the benchmark's games showed", () => {
+  const search = (name: string) => ({ type: "search" as const, target: null, player: null, amount: null, name, power: null, toughness: null, keywords: [], to: "hand" as const, tapped: null, text: null });
+  const PACT: DeckCombo = { ...ORACLE, id: "1295-3093", pieces: [{ name: "Tainted Pact", zones: ["H"] }, { name: "Thassa's Oracle", zones: ["H"] }], manaNeeded: "{1}{U}{U}{B}" } as DeckCombo;
+
+  // Turn 1: "The opponent exiles Thassa's Oracle with Chrome Mox."
+  it("Chrome Mox exiles a card the hand can spare, never a way to win", () => {
+    const g0 = table({ opp: { hand: ["Chrome Mox", "Thassa's Oracle", "Ad Nauseam", "Counterspell", "Tainted Pact"] } });
+    const g = cast(g0, "Chrome Mox").game;
+    expect(g.sides.opp.exile.map((c) => c.name)).toEqual(["Counterspell"]);
+    expect(at(g, "opp", "Chrome Mox", "battlefield")!.imprint).toEqual(["U"]);
+    // With nothing to spare it exiles nothing, and makes no mana.
+    const only = table({ opp: { hand: ["Chrome Mox", "Thassa's Oracle", "Demonic Tutor"] } });
+    expect(cast(only, "Chrome Mox").game.sides.opp.exile).toHaveLength(0);
+  });
+
+  // With Diabolic Intent and Demonic Consultation in hand, Polluted Delta found Volcanic Island.
+  it("a land is chosen for the colour the hand is shortest of", () => {
+    const g0 = { ...table({ opp: { hand: ["Polluted Delta", "Diabolic Intent", "Demonic Consultation"], top: ["Volcanic Island", "Underground Sea"] } }), landPlayed: false };
+    expect(colourNeeds(g0, "opp", BOOK).B).toBeGreaterThan(colourNeeds(g0, "opp", BOOK).U ?? 0);
+    const g = applyAction(g0, "opp", act("land", at(g0, "opp", "Polluted Delta")!.iid), BOOK).game;
+    expect(said(g)).toMatch(/cracks Polluted Delta for Underground Sea/);
+    // Thassa's Oracle asks for two blue sources: one in play isn't "blue: done".
+    const one = table({ opp: { field: ["Volcanic Island"], hand: ["Thassa's Oracle"] } });
+    expect(colourNeeds(one, "opp", BOOK).U).toBeGreaterThan(0);
+    // And of two lands in hand, the planner plays the one that makes it.
+    const pick = { ...table({ opp: { field: ["Volcanic Island"], hand: ["Badlands", "Underground Sea", "Thassa's Oracle"] } }), landPlayed: false };
+    expect(names(pick, fallbackPlan(pick, BOOK))[0]).toBe("land:Underground Sea");
+  });
+
+  // Mystical Tutor cast with both halves already in hand, for a second combo's piece.
+  it("with the whole win in hand, a tutor finds mana or waits", () => {
+    const g0 = table({ opp: { field: ["Underground Sea", "Underground Sea"], hand: ["Thassa's Oracle", "Tainted Pact", "Demonic Tutor"], top: ["Underworld Breach", "Lotus Petal", "Brain Freeze"] } });
+    const plan = fallbackPlan(g0, BOOK, "opp", {}, [PACT, BREACH]);
+    const tutor = plan.main.find((a) => a.effects.some((e) => e.type === "search"))!;
+    expect(tutor.effects[0]).toMatchObject({ name: "Lotus Petal" });
+    // Nothing in the library that helps: the tutor stays in hand.
+    const bare = table({ opp: { field: ["Underground Sea", "Underground Sea"], hand: ["Thassa's Oracle", "Tainted Pact", "Demonic Tutor"], top: ["Underworld Breach", "Brain Freeze"] } });
+    expect(names(bare, fallbackPlan(bare, BOOK, "opp", {}, [PACT, BREACH]))).not.toContain("cast:Demonic Tutor");
+  });
+
+  it("The One Ring: a card for each burden counter, a life for each at upkeep, and no damage the turn it's cast", () => {
+    const g0 = table({ opp: { field: ["Command Tower", "Command Tower", "Command Tower", "Command Tower"], hand: ["The One Ring"] }, you: { field: ["Bear"] } });
+    const g1 = cast(g0, "The One Ring").game;
+    expect(said(g1)).toMatch(/The One Ring: The opponent has protection from everything until its next turn/);
+    const bear = at(g1, "you", "Bear", "battlefield")!;
+    expect(scaleDamage(g1, BOOK, "you", bear, "opp", 2, true)).toBe(0);
+    // The planner taps it: one card now.
+    const tap = fallbackPlan(g1, BOOK).main.find((a) => a.kind === "activate")!;
+    expect(g1.sides.opp.battlefield.find((c) => cardId(c.iid) === tap.card)!.name).toBe("The One Ring");
+    const hand = g1.sides.opp.hand.length;
+    const g2 = applyAction(g1, "opp", tap, BOOK).game;
+    expect(g2.sides.opp.hand).toHaveLength(hand + 1);
+    expect(at(g2, "opp", "The One Ring", "battlefield")).toMatchObject({ tapped: true, burden: 1 });
+    // Its next turn: the protection is over, the burden is paid, and it draws two.
+    const g3 = startTurn(g2, BOOK);
+    expect(scaleDamage(g3, BOOK, "you", bear, "opp", 2, true)).toBe(2);
+    expect(said(g3)).toMatch(/The One Ring: The opponent loses 1 life \(its burden\)/);
+    const before = g3.sides.opp.hand.length;
+    const g4 = applyAction(g3, "opp", act("activate", at(g3, "opp", "The One Ring", "battlefield")!.iid, { tap_card: true }), BOOK).game;
+    expect(g4.sides.opp.hand).toHaveLength(before + 2);
+    // Not when the burden would take it too low.
+    const low = { ...g3, sides: { ...g3.sides, opp: { ...g3.sides.opp, life: 12 } } };
+    expect(fallbackPlan(low, BOOK).main.some((a) => a.kind === "activate")).toBe(false);
+  });
+
+  it("Rain of Filth: every land for one more mana, on the turn it wins", () => {
+    expect(landsForManaOf(of("Rain of Filth"))).toBe("B");
+    // Three lands, and Thassa's Oracle with Tainted Pact: four mana to find. The Rain makes five.
+    const g0 = table({ opp: { field: ["Underground Sea", "Underground Sea", "Underground Sea"], hand: ["Thassa's Oracle", "Tainted Pact", "Rain of Filth"] } });
+    const win = winningTurn(g0, BOOK, "opp", [PACT]);
+    expect(win).not.toBeNull();
+    expect(names(g0, win!)).toEqual(["cast:Rain of Filth", "combo:1295-3093"]);
+    const rained = applyAction(g0, "opp", win!.main[0]!, BOOK).game;
+    expect(rained.sides.opp.battlefield.filter((c) => c.name === "Underground Sea")).toHaveLength(0);
+    expect(said(rained)).toMatch(/Rain of Filth: The opponent sacrifices its 3 lands for \{B\} each/);
+    // Without it, three lands don't get there.
+    const dry = table({ opp: { field: ["Underground Sea", "Underground Sea", "Underground Sea"], hand: ["Thassa's Oracle", "Tainted Pact"] } });
+    expect(winningTurn(dry, BOOK, "opp", [PACT])).toBeNull();
+    // The planner doesn't spend it on an ordinary turn, and a plan that does has it taken out.
+    const idle = table({ opp: { field: ["Underground Sea", "Underground Sea"], hand: ["Rain of Filth", "Bear"] } });
+    expect(names(idle, fallbackPlan(idle, BOOK))).not.toContain("cast:Rain of Filth");
+    const plan = { say: "", attack: [], after_combat: [], main: [act("cast", at(idle, "opp", "Rain of Filth")!.iid)] };
+    expect(guardPlan(idle, plan, BOOK).main).toEqual([]);
   });
 });
