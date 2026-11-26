@@ -118,6 +118,20 @@ export function handManaOf(info: CardInfo | undefined): string[] | null {
   return null;
 }
 
+/** A way to spend mana over and over that ends the game with endless
+    mana: an ability whose whole cost is mana and that draws, digs through
+    the library or hurts the other player ("{5}{G}{U}: Look at the top five
+    cards…", Kinnan; "{4}: Scry 1, then reveal the top card…", Thrasios).
+    Its cost, or null. */
+export function manaSinkOf(info: CardInfo | undefined, flipped = false): string | null {
+  for (const line of ownText(faceText(info, { flipped })).split("\n")) {
+    const m = /^((?:\{[^}]+\})+): (.+)$/.exec(line.trim());
+    if (!m || /\{(?:T|Q|X)\}/i.test(m[1]!)) continue;
+    if (/\b(?:draws? (?:a|one|two|three|\d+) cards?|look at the top|reveal the top|scry \d+|deals \d+ damage to (?:any target|target (?:player|opponent)|each opponent)|(?:each opponent|target (?:player|opponent)) loses \d+ life)\b/i.test(m[2]!)) return m[1]!;
+  }
+  return null;
+}
+
 /** An Equipment that gives its creature a mana ability: 'Equipped
     creature has "{T}: Add one mana of any color."' (Paradise Mantle). */
 export const equipManaOf = (info: CardInfo | undefined) => /equipped creature has "\{T\}: Add one mana of any color\."/i.test(info?.oracleText ?? "");

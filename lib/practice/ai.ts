@@ -10,7 +10,7 @@ import { equipOf } from "./abilities";
 import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
 import { treasureSpellOf } from "./treasure";
 import { drawSpellOf, tutorOf, tutorSearch, wipeOf, type Tutor } from "./spells";
-import { adNauseamOf, burnOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, ritualOf, sacrificeCostOf } from "./wincons";
+import { adNauseamOf, burnOf, devotion, impulseOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, ritualOf, sacrificeCostOf } from "./wincons";
 import { triggersOf } from "./triggers";
 import { lifeForCardsOf, searchAbility, type SearchAbility } from "./cards";
 import { scaleDamage } from "./damage";
@@ -163,7 +163,8 @@ function landColors(book: CardBook, land: PlayCard): string[] {
     judgement while the life is there (Night's Whisper, Opt, Read the Bones). */
 function drawOnly(book: CardBook, c: PlayCard, life = Infinity): number {
   const d = drawSpellOf(infoOf(book, c));
-  return d && life - d.lose >= 10 ? d.draw : 0;
+  // The life it keeps is only a matter for a spell that costs life.
+  return d && (!d.lose || life - d.lose >= 10) ? d.draw : 0;
 }
 
 const blank = (type: Effect["type"]): Effect => ({ ...drawEffect(0), type, player: null, amount: null });
@@ -173,7 +174,10 @@ const blank = (type: Effect["type"]): Effect => ({ ...drawEffect(0), type, playe
     few out. */
 function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, combos: DeckCombo[] = [], opts: { tutor?: Tutor; onlyPieces?: boolean } = {}): Effect[] | null {
   const t = opts.tutor ?? tutorOf(infoOf(book, c));
-  if (!t || g.sides[seat].life - t.lose < 10) return null;
+  // It keeps 10 life from a tutor that costs life (Vampiric Tutor). One
+  // that costs none is cast at any life: after Ad Nauseam, at 8, it used
+  // to hold Demonic Tutor for turns.
+  if (!t || (t.lose > 0 && g.sides[seat].life - t.lose < 10)) return null;
   const side = g.sides[seat];
   // Next turn's mana: what it has (tapped or not) and a land drop.
   const reach = manaTotal(availableMana(g, seat, book)) + side.battlefield.filter((x) => x.tapped).length + 1;
@@ -200,21 +204,33 @@ function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, com
         : 0;
   // A piece of one of the deck's combos that is still in the library: the
   // fewer pieces that combo lacks, the more it's worth finding.
+  // Only the combos nearest to done count: with Demonic Consultation in
+  // hand, Tainted Pact isn't a piece it lacks.
+  const open = combos
+    .filter((k) => comboOutcome(k.produces) !== "other")
+    .map((k) => comboStatus(g, seat, k, book))
+    .filter((st) => st.missing.length && st.missing.every((m) => m.where === "library"));
+  const nearest = Math.min(...open.map((st) => st.missing.length));
   const lacking = new Map<string, number>();
-  for (const k of combos) {
-    if (comboOutcome(k.produces) === "other") continue;
-    const st = comboStatus(g, seat, k, book);
-    if (!st.missing.length || st.missing.some((m) => m.where !== "library")) continue;
-    for (const m of st.missing) lacking.set(m.name.toLowerCase(), Math.min(lacking.get(m.name.toLowerCase()) ?? 9, st.missing.length));
-  }
+  for (const st of open) if (st.missing.length === nearest) for (const m of st.missing) lacking.set(m.name.toLowerCase(), st.missing.length);
   const piece = (x: PlayCard) => {
     const n = lacking.get(x.name.toLowerCase()) ?? lacking.get(x.name.split(" // ")[0]!.toLowerCase());
     return n ? 80000 - n * 5000 : 0;
   };
-  const score = (x: PlayCard) => combo(x) + piece(x) + (needLand && isLand(x) ? 10000 : 0) + (mv(x) <= reach ? 1000 : 0) + mv(x) * 10 + (isCreature(book, x) ? 1 : 0);
+  // When this tutor can't find the piece (Mystical Tutor and a creature):
+  // a tutor that can, and failing that a draw engine.
+  const lackingCards = side.library.filter((x) => piece(x) > 0);
+  const bridge = (x: PlayCard) => {
+    if (!lackingCards.length) return 0;
+    const info = infoOf(book, x);
+    const tu = tutorOf(info);
+    if (tu && !tu.discardRandom && tu.search.to[0]!.zone === "hand" && lackingCards.some((y) => tutorSearch(tu, side.graveyard).test(y.typeLine, infoOf(book, y)))) return 60000;
+    return adNauseamOf(info) || lifeForCardsOf(book, x) ? 40000 : 0;
+  };
+  const score = (x: PlayCard) => combo(x) + piece(x) + bridge(x) + (needLand && isLand(x) ? 10000 : 0) + (mv(x) <= reach ? 1000 : 0) + mv(x) * 10 + (isCreature(book, x) ? 1 : 0);
   const pick = fits.reduce((a, b) => (score(b) > score(a) ? b : a));
   // Wishclaw Talisman goes to the player once used: only for a combo piece.
-  if (opts.onlyPieces && !piece(pick)) return null;
+  if (opts.onlyPieces && !piece(pick) && combo(pick) < 100000) return null;
   const effects: Effect[] = [{ ...blank("search"), name: pick.name, to: search.to[0]!.zone === "top" ? "top" : "hand" }];
   if (t.lose) effects.push({ ...blank("life"), player: "ai", amount: -t.lose });
   return effects;
@@ -332,8 +348,9 @@ function goOff(g: PracticeGame, book: CardBook, seat: Seat, combos: DeckCombo[],
     const line = comboLine(start, book, seat, c, combos);
     if (!line) continue;
     const outcome = comboOutcome(c.produces);
-    // A win, or the player's library gone: the turn is this and nothing else.
-    if (outcome !== "mana") return { actions: line.actions, attack: [], wins: true };
+    // A win, or the player's library gone: the turn is this and nothing
+    // else. Endless mana with a way to spend it for ever is a win too.
+    if (outcome !== "mana" || line.after.winner === seat) return { actions: line.actions, attack: [], wins: true };
     // Endless mana: the rest of the turn is planned with it in the pool.
     const out: { wins?: boolean } = {};
     const rest = fallbackPlan(line.after, book, seat, out, combos.filter((x) => x.id !== c.id));
@@ -364,7 +381,7 @@ function comboLine(g0: PracticeGame, book: CardBook, seat: Seat, combo: DeckComb
       const tu = isPiece(c) ? null : tutorOf(infoOf(book, c));
       const search = tu ? tutorSearch(tu, t.sides[seat].graveyard) : null;
       if (!tu || !search || tu.discardRandom || search.to[0]!.zone !== "hand" || !search.test(want.typeLine, infoOf(book, want))) continue;
-      if (t.sides[seat].life - tu.lose < 5) continue;
+      if (tu.lose > 0 && t.sides[seat].life - tu.lose < 1) continue;
       const effects: Effect[] = [{ ...blank("search"), name: want.name, to: "hand" }];
       if (tu.lose) effects.push({ ...blank("life"), player: "ai", amount: -tu.lose });
       return { ...blankAction("cast", c.iid), effects };
@@ -478,8 +495,30 @@ export function winningTurn(g: PracticeGame, book: CardBook, seat: Seat = "opp",
 function wheelWorth(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): boolean {
   const w = wheelSpellOf(book, c);
   if (!w) return false;
-  const left = g.sides[seat].hand.filter((x) => x.iid !== c.iid).length;
+  // What it would lose: the cards it means to play. Counterspells and
+  // answers it holds for the player's turn don't count against a wheel.
+  const hand = g.sides[seat].hand.filter((x) => x.iid !== c.iid);
+  // Never both halves of a win (Thassa's Oracle with Consultation or Pact):
+  // that hand is one land from winning.
+  if (hand.some((x) => oracleWinOf(book, x)) && hand.some((x) => libraryExilerOf(infoOf(book, x)))) return false;
+  const left = hand.filter((x) => liveInHand(book, x)).length;
   return left <= 2 && g.sides[seat].library.length > 10;
+}
+
+/** Jeska's Will is worth casting by itself with a commander out (both
+    modes) and a few cards in the player's hand: mana, and three cards to
+    spend it on. */
+function impulseWorth(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): boolean {
+  return impulseOf(infoOf(book, c)) > 0 && g.sides[seat].battlefield.some((x) => x.commander) && g.sides[other(seat)].hand.length >= 3;
+}
+
+/** A card the planner would play on its own turn: a land, a permanent, or
+    a spell it knows how to use (a tutor, a draw spell, a ritual, a way to
+    win). The rest (counterspells, answers) wait for the player. */
+function liveInHand(book: CardBook, c: PlayCard): boolean {
+  const info = infoOf(book, c);
+  if (isLand(c) || !/\b(Instant|Sorcery)\b/.test((info?.typeLine ?? c.typeLine ?? "").split(" // ")[0]!)) return true;
+  return !!tutorOf(info) || !!drawSpellOf(info) || adNauseamOf(info) || !!libraryExilerOf(info) || !!ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 });
 }
 
 /** The turn without the model: a land (the one that unlocks the most), then
@@ -701,6 +740,8 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
           drawOnly(book, c, sim.sides[seat].life) > 0 ||
           !!tutorOf(infoOf(book, c)) ||
           extraTurnOf(infoOf(book, c)) ||
+          // Jeska's Will with a commander out: the mana and three cards.
+          impulseWorth(sim, seat, c, book) ||
           // Ad Nauseam, with the life to turn into cards.
           (adNauseamOf(infoOf(book, c)) && sim.sides[seat].life >= 20) ||
           wheelWorth(sim, seat, c, book) ||
@@ -721,7 +762,7 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
   function rank(c: PlayCard) {
     // Another turn first: everything after it is worth twice. A combo
     // deck's tutors come before its permanents: the piece is the plan.
-    return extraTurnOf(infoOf(book, c)) || adNauseamOf(infoOf(book, c)) ? -1 : tutorOf(infoOf(book, c)) ? (ending.length ? -0.5 : 1) : drawOnly(book, c) ? 2 : 0;
+    return extraTurnOf(infoOf(book, c)) || adNauseamOf(infoOf(book, c)) || impulseOf(infoOf(book, c)) ? -1 : tutorOf(infoOf(book, c)) ? (ending.length ? -0.5 : 1) : drawOnly(book, c) ? 2 : 0;
   }
   /** A draw engine (Necropotence, Rhystic Study, Mystic Remora, Ad
       Nauseam): worth a ritual to land early. */
@@ -732,7 +773,7 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
   /** A ritual cast first (on the planner's copy of the table) so the
       engine can be paid for: its action, or null. */
   const ritualInto = (c: PlayCard, zone: "hand" | "command"): PlanAction | null => {
-    if (!engine(c) || uncastable(sim, seat, c, book)) return null;
+    if (uncastable(sim, seat, c, book)) return null;
     for (const r of sim.sides[seat].hand) {
       if (r.iid === c.iid || heldForCombo(book, r, combos) || uncastable(sim, seat, r, book)) continue;
       const units = ritualMana(infoOf(book, r), {
@@ -754,7 +795,11 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
   };
   for (const { c, zone } of candidates) {
     if (!castable(sim, seat, c, book, zone)) {
-      const ritual = ritualInto(c, zone);
+      // Worth a ritual: a draw engine, or (in a combo deck) a tutor that
+      // finds the piece it lacks. The win comes next turn: it needn't all
+      // fit in one.
+      const worth = engine(c) || (!!tutorOf(infoOf(book, c)) && !!tutorPick(sim, seat, c, book, combos, { onlyPieces: true }));
+      const ritual = worth ? ritualInto(c, zone) : null;
       if (!ritual) continue;
       main.push(ritual);
     }

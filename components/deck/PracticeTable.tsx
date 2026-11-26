@@ -375,7 +375,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       g = await waitChoice(asked);
       if (!alive.current || g.winner) return setMode(g.winner ? "over" : "main");
     }
-    g = endTurn(g, setup.book);
+    g = endTurn(g, setup.book, setup.combos ?? []);
     setGame(g);
     // An extra turn of yours (Time Warp): your turn again.
     if (!g.winner && g.active === "you") {
@@ -706,7 +706,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     }
     g = await endStepStop(g);
     if (!alive.current) return;
-    g = endTurn(g, setup.book);
+    g = endTurn(g, setup.book, setup.combos ?? []);
     setGame(g);
     setHistory([]);
     // An extra turn of the opponent's: it plays again.

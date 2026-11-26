@@ -57,6 +57,9 @@ export interface PlayCard {
   imprint?: string[];
   /** Age counters, for a cumulative upkeep (Mystic Remora). */
   age?: number;
+  /** In hand for this turn only ("You may play them this turn", Jeska's
+      Will): exiled at the end of the turn if it's still there. */
+  fleeting?: boolean;
 }
 
 export interface PlaytestState {
@@ -186,6 +189,7 @@ export function moveCard(
   if (!from) return state;
   const found = state[from].find((c) => c.iid === iid)!;
   const card: PlayCard = { ...found, tapped: false, flipped: to === "battlefield" ? !!found.flipped : false };
+  delete card.fleeting;
   if (from === "battlefield" && to !== "battlefield") {
     delete card.enteredTurn;
     delete card.damage;
