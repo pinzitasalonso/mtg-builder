@@ -137,7 +137,6 @@ export function readTriggers(text: string, name: string): Triggers {
       twice.add(k);
     } else t[k] = v;
   };
-  const cumulative = /\bcumulative upkeep\b/i.test(text);
   for (const raw of text.split("\n")) {
     const line = raw.replace(/\([^)]*\)/g, "").trim().toLowerCase();
     // Eminence works from the command zone: not this reader's.
@@ -164,7 +163,8 @@ export function readTriggers(text: string, name: string): Triggers {
       if (out) set("dies", { another: m[2] === "another" && !m[1], own: !!m[3], out });
     } else if ((m = new RegExp(`^whenever an opponent draws a card, ${self} deals (\\d+) damage to that player\\.?$`).exec(body))) set("oppDraws", { damage: Number(m[1]), treasure: false, pay: 0 });
     else if ((m = /^whenever an opponent draws a card, that player may pay \{(\d+)\}\. if (?:the|that) player doesn't, you create a treasure token\.?$/.exec(body))) set("oppDraws", { damage: 0, treasure: true, pay: Number(m[1]) });
-    else if (!cumulative && (m = /^whenever an opponent casts (a|their first) (noncreature )?spell(?: each turn)?, (?:you may )?draw a card unless that player pays \{(\d+|x)\}/.exec(body)))
+    // Mystic Remora's cumulative upkeep is the table's now (startTurn).
+    else if ((m = /^whenever an opponent casts (a|their first) (noncreature )?spell(?: each turn)?, (?:you may )?draw a card unless that player pays \{(\d+|x)\}/.exec(body)))
       set("tax", { noncreature: !!m[2], first: m[1] !== "a", cost: m[3] === "x" ? "power" : Number(m[3]) });
   }
   return t;

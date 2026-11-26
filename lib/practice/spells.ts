@@ -4,7 +4,7 @@
 // effect vocabulary (lib/practice/types.ts Effect), so a card that does
 // more is left alone, as before.
 
-import { searchOnCast, type Search } from "./cards";
+import { parseSearch, searchOnCast, type Search } from "./cards";
 import type { CardInfo } from "./types";
 
 const NUMBERS: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5 };
@@ -32,24 +32,59 @@ export interface Tutor {
   /** "…put that card into your hand, discard a card at random, then
       shuffle" (Gamble). */
   discardRandom?: boolean;
+  /** "Delirium — If there are four or more card types among cards in
+      your graveyard, instead search your library for any card…" (Demonic
+      Counsel): the search then. */
+  delirium?: Search;
+}
+
+const CARD_TYPES = ["artifact", "battle", "creature", "enchantment", "instant", "kindred", "land", "planeswalker", "sorcery", "tribal"];
+
+/** The card types among these cards (both faces of a double-faced one). */
+export function cardTypesAmong(typeLines: (string | null | undefined)[]): number {
+  const found = new Set<string>();
+  for (const t of typeLines) for (const type of CARD_TYPES) if (new RegExp(`\\b${type}\\b`, "i").test(t ?? "")) found.add(type === "tribal" ? "kindred" : type);
+  return found.size;
+}
+
+/** What a tutor searches for now: Demonic Counsel finds any card with
+    four card types in the graveyard, a Demon otherwise. */
+export function tutorSearch(t: Tutor, graveyard: { typeLine: string | null }[]): Search {
+  return t.delirium && cardTypesAmong(graveyard.map((c) => c.typeLine)) >= 4 ? t.delirium : t.search;
 }
 export function tutorOf(info: CardInfo | undefined): Tutor | null {
   if (!isSpell(info)) return null;
   // A sacrifice as it's cast (Diabolic Intent) is a cost the table takes.
-  const [first, ...rest] = sentences(info).filter((x) => !/^as an additional cost to cast this spell, sacrifice an? [a-z ]+$/i.test(x));
+  // Bargain (Beseech the Mirror) is a choice the table doesn't make: the
+  // card comes to the hand.
+  const [first, ...rest] = sentences(info).filter((x) => !/^as an additional cost to cast this spell, sacrifice an? [a-z ]+$/i.test(x) && !/^bargain$/i.test(x));
   // The whole sentence, and only to the hand or the top: Entomb's "into
   // your graveyard" isn't this. Gamble's random discard is.
-  const m = first ? /^search your library for [^,.]*?\bcard(?:, reveal (?:it|that card))?, (?:put (?:it|that card|the card) into your hand(, discard a card at random)?, then shuffle|then shuffle and put (?:it|that card|the card) on top)$/i.exec(first) : null;
+  const m = first ? /^search your library for [^,.]*?\bcard(?:, reveal (?:it|that card))?, (?:put (?:it|that card|the card) into your hand(, discard a card at random)?, then shuffle|then shuffle and put (?:it|that card|the card) on top|exile it face down, then shuffle)$/i.exec(first) : null;
   if (!m) return null;
+  const faceDown = /exile it face down/i.test(first!);
   let lose = 0;
+  let delirium: Search | undefined;
   for (const s of rest) {
-    const m = /^you lose (\d+) life$/i.exec(s);
-    if (!m) return null;
-    lose += Number(m[1]);
+    const life = /^you lose (\d+) life$/i.exec(s);
+    if (life) {
+      lose += Number(life[1]);
+      continue;
+    }
+    const d = /^delirium — if there are four or more card types among cards in your graveyard, instead (search your library for any card, put it into your hand, then shuffle)$/i.exec(s);
+    if (d) {
+      // "any card" is a card of any kind.
+      delirium = parseSearch(d[1]!.replace(/\bfor any card\b/i, "for a card")) ?? undefined;
+      continue;
+    }
+    // Beseech the Mirror's rest: the card comes to the hand.
+    if (faceDown && (/^if this spell was bargained, you may cast the exiled card without paying its mana cost/i.test(s) || /^put the exiled card into your hand if it wasn't cast this way$/i.test(s))) continue;
+    return null;
   }
+  if (faceDown && !rest.some((s) => /^put the exiled card into your hand/i.test(s))) return null;
   const search = searchOnCast(info);
   if (!search || search.count !== 1 || search.to[0]!.zone === "battlefield") return null;
-  return { search, lose, ...(m[1] ? { discardRandom: true } : {}) };
+  return { search, lose, ...(m[1] ? { discardRandom: true } : {}), ...(delirium ? { delirium } : {}) };
 }
 
 /** A board wipe: "Destroy all creatures" (Wrath of God, Damnation, Day of
@@ -89,11 +124,15 @@ export function wipeOf(info: CardInfo | undefined): Wipe | null {
 export interface DrawSpell {
   draw: number;
   lose: number;
+  /** "…then put two cards from your hand on top of your library"
+      (Brainstorm): cards that go back after the draw. */
+  back?: number;
 }
 export function drawSpellOf(info: CardInfo | undefined): DrawSpell | null {
   if (!isSpell(info)) return null;
   let draw = 0;
   let lose = 0;
+  let back = 0;
   for (const s of sentences(info)) {
     let m: RegExpExecArray | null;
     if ((m = /^(?:scry \d+, then )?(?:you )?draw (a|one|two|three|four) cards?(?: and (?:you )?lose (\d+) life)?$/i.exec(s))) {
@@ -104,7 +143,14 @@ export function drawSpellOf(info: CardInfo | undefined): DrawSpell | null {
       lose += Number(m[2]);
     } else if ((m = /^you lose (\d+) life$/i.exec(s))) lose += Number(m[1]);
     else if (/^scry \d+$/i.test(s)) continue;
-    else return null;
+    // What changes nothing on the table: a look at a hand (Gitaxian
+    // Probe), flash for the turn (Borne Upon a Wind).
+    else if (/^look at target (?:player's|opponent's) hand$/i.test(s) || /^you may cast spells this turn as though they had flash$/i.test(s)) continue;
+    // Brainstorm.
+    else if ((m = /^draw (a|one|two|three|four) cards?, then put (a|one|two|three) cards? from your hand on top of your library in any order$/i.exec(s))) {
+      draw += num(m[1]!);
+      back += num(m[2]!);
+    } else return null;
   }
-  return draw ? { draw, lose } : null;
+  return draw ? { draw, lose, ...(back ? { back } : {}) } : null;
 }

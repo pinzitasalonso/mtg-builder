@@ -79,7 +79,9 @@ describe("reading the spells", () => {
     expect(drawSpellOf(of("Preordain"))).toEqual({ draw: 1, lose: 0 });
     expect(drawSpellOf(of("Read the Bones"))).toEqual({ draw: 2, lose: 2 });
     expect(drawSpellOf(of("Divination"))).toEqual({ draw: 2, lose: 0 });
-    for (const n of ["Brainstorm", "Ponder", "Painful Truths"]) expect(drawSpellOf(of(n))).toBeNull();
+    // Brainstorm draws three and puts two back (the table does that part).
+    expect(drawSpellOf(of("Brainstorm"))).toEqual({ draw: 3, lose: 0, back: 2 });
+    for (const n of ["Ponder", "Painful Truths"]) expect(drawSpellOf(of(n))).toBeNull();
   });
 });
 

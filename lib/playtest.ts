@@ -55,6 +55,8 @@ export interface PlayCard {
   loyalty?: number;
   /** Chrome Mox: the colours of the card exiled with it. */
   imprint?: string[];
+  /** Age counters, for a cumulative upkeep (Mystic Remora). */
+  age?: number;
 }
 
 export interface PlaytestState {
@@ -195,6 +197,7 @@ export function moveCard(
     delete card.exileAtEnd;
     delete card.loyalty;
     delete card.imprint;
+    delete card.age;
   }
   let next = { ...state, [from]: state[from].filter((c) => c.iid !== iid) } as PlaytestState;
   // What was attached to it stays in play, attached to nothing.
