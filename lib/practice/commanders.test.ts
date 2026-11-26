@@ -145,6 +145,10 @@ const BOOK: CardBook = Object.fromEntries(
     info("Big Aura", { typeLine: "Enchantment — Aura", manaCost: "{3}{W}", manaValue: 4, oracleText: "Enchant creature\nEnchanted creature gets +4/+4." }),
     info("Test Sword", { typeLine: "Artifact — Equipment", manaCost: "{2}", manaValue: 2, oracleText: "Equipped creature gets +2/+1 and has first strike.\nEquip {2}" }),
     info("Legend Blade", { typeLine: "Artifact — Equipment", manaCost: "{1}", manaValue: 1, oracleText: "Equipped creature gets +3/+3.\nEquip legendary creature {1}\nEquip {4}" }),
+    info("Test Hammer", { typeLine: "Artifact — Equipment", manaCost: "{1}", manaValue: 1, oracleText: "Equipped creature gets +10/+10 and loses flying.\nEquip {8}" }),
+    info("Land Blade", { typeLine: "Legendary Artifact — Equipment", manaCost: "{2}", manaValue: 2, oracleText: "Equipped creature gets +1/+1 for each land you control.\nEquip {3}" }),
+    info("Quoted Staff", { typeLine: "Artifact — Equipment", manaCost: "{2}", manaValue: 2, oracleText: "Equipped creature gets +2/+2 and has trample and \"{T}: Draw a card.\"\nEquip {2}" }),
+    info("Test Greaves", { typeLine: "Artifact — Equipment", manaCost: "{2}", manaValue: 2, oracleText: "Equipped creature has haste and shroud.\nEquip {0}" }),
     info("Arrest Aura", { typeLine: "Enchantment — Aura", manaCost: "{1}{W}", manaValue: 2, oracleText: "Enchant creature\nEnchanted creature can't attack or block." }),
     info("Growth Aura", { typeLine: "Enchantment — Aura", manaCost: "{W}", manaValue: 1, oracleText: "Enchant land\nWhenever enchanted land is tapped for mana, its controller adds an additional {G}." }),
     info("Own Aura", { typeLine: "Enchantment — Aura", manaCost: "{W}", manaValue: 1, oracleText: "Enchant creature you control\nEnchanted creature gets +1/+1." }),
@@ -490,6 +494,24 @@ describe("Equipment", () => {
     const gone = moveAnyCard(g, at(g, "you", "Goblin Guide").iid, "graveyard");
     expect(at(gone, "you", "Test Sword").attachedTo).toBeUndefined();
     expect(gone.sides.you.battlefield.some((c) => c.name === "Test Sword")).toBe(true);
+  });
+
+  // The bonus was read only from "gets +N/+N." or "…and has <keywords>.":
+  // "and loses flying", an ability in quotes, or "for each land you control"
+  // gave the creature nothing.
+  it("the bonus is read whatever follows it", () => {
+    const equipped = (eq: string, field: string[] = []) => {
+      const g0 = table({ you: { field: [eq, "Goblin Guide", ...field] }, active: "you" });
+      const g = resolveChoice(playerEquip(g0, at(g0, "you", eq).iid, BOOK), at(g0, "you", "Goblin Guide").iid, BOOK);
+      return at(g, "you", "Goblin Guide");
+    };
+    // Goblin Guide is 2/2.
+    expect(stats(BOOK, equipped("Test Hammer", Array(8).fill("Mountain")))).toEqual({ power: 12, toughness: 12 });
+    expect(stats(BOOK, equipped("Quoted Staff", ["Mountain", "Mountain"]))).toEqual({ power: 4, toughness: 4 });
+    expect(has(BOOK, equipped("Quoted Staff", ["Mountain", "Mountain"]), "Trample")).toBe(true);
+    expect(has(BOOK, equipped("Test Greaves"), "Shroud")).toBe(true);
+    // For each land you control: three lands, +3/+3. (They pay the equip too.)
+    expect(stats(BOOK, equipped("Land Blade", ["Mountain", "Mountain", "Mountain"]))).toEqual({ power: 5, toughness: 5 });
   });
 
   it("an \"Equip legendary creature\" line reads its kind", () => {

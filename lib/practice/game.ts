@@ -584,7 +584,20 @@ function refreshStatics(g: PracticeGame, book: CardBook) {
   const field = (["you", "opp"] as Seat[]).flatMap((seat) => g.sides[seat].battlefield.map((c) => ({ c, seat })));
   const lords = field.flatMap(({ c, seat }) => lordsOf(book, c).map((l) => ({ ...l, seat, from: c.iid })));
   const everyone = [...new Set(field.flatMap(({ c }) => globalKeywordsOf(book, c)))];
-  const auras = field.flatMap(({ c }) => (c.attachedTo !== undefined ? [{ on: c.attachedTo, bonus: auraBonusOf(book, c) }] : []));
+  // "…gets +1/+1 for each land you control": how many of a thing the
+  // Aura's or Equipment's controller has. Null: a thing the table can't count.
+  const countFor = (seat: Seat, self: PlayCard) => (what: string): number | null => {
+    const mine = g.sides[seat].battlefield;
+    const attached = /^(.+?) attached to (?:it|enchanted creature|equipped creature)$/.exec(what);
+    if (attached) return field.filter(({ c }) => c.attachedTo === self.attachedTo && attached[1]!.split(/ and(?:\/or)? | or /).some((t) => isType(book, c, t.replace(/s$/, "")))).length;
+    const yours = /^(other )?(.+?) you control$/.exec(what);
+    if (!yours) return null;
+    const kinds = yours[2]!.split(/ and\/or | or | and /).map((t) => t.trim().replace(/s$/, ""));
+    if (kinds.some((k) => !/^[a-z-]+$/.test(k))) return null;
+    const is = (c: PlayCard, k: string) => (k === "creature" ? isCreature(book, c) : k === "land" ? isLand(c) : k === "permanent" ? true : isType(book, c, k));
+    return mine.filter((c) => kinds.some((k) => is(c, k)) && !(yours[1] && c.iid === self.attachedTo)).length;
+  };
+  const auras = field.flatMap(({ c, seat }) => (c.attachedTo !== undefined ? [{ on: c.attachedTo, bonus: auraBonusOf(book, c, countFor(seat, c)) }] : []));
   if (!lords.length && !everyone.length && !auras.length && !field.some(({ c }) => c.boost)) return;
   for (const seat of ["you", "opp"] as Seat[]) {
     const side = g.sides[seat];
