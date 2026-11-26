@@ -596,6 +596,8 @@ function refreshStatics(g: PracticeGame, book: CardBook) {
     const mine = g.sides[seat].battlefield;
     const attached = /^(.+?) attached to (?:it|enchanted creature|equipped creature)$/.exec(what);
     if (attached) return field.filter(({ c }) => c.attachedTo === self.attachedTo && attached[1]!.split(/ and(?:\/or)? | or /).some((t) => isType(book, c, t.replace(/s$/, "")))).length;
+    // "…for each opponent you have" (Blazing Sunsteel): one, at this table.
+    if (/^opponents? you have$|^opponent$/.test(what)) return 1;
     const yours = /^(other )?(.+?) you control$/.exec(what);
     if (!yours) return null;
     const kinds = yours[2]!.split(/ and\/or | or | and /).map((t) => t.trim().replace(/s$/, ""));

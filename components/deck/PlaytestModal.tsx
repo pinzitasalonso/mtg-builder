@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart3, RotateCw, Swords, Undo2, X } from "lucide-react";
 import { hasKnownBack } from "@/components/useCardFlip";
@@ -26,7 +26,7 @@ import {
   startGame,
   toggleTap,
   turnOver,
-  untapAll, attachCard, attaches, detachCard } from "@/lib/playtest";
+  untapAll, attachCard, attaches, detachCard, byKind, kindBreak } from "@/lib/playtest";
 
 type Pile = "library" | "graveyard" | "exile";
 
@@ -185,7 +185,8 @@ function SoloTable({
   // An Equipment or an Aura on a nonland card sits tucked under it. (On a
   // land it keeps its own place: the lands are a row of their own.)
   const tucked = (c: PlayCard) => c.attachedTo !== undefined && state.battlefield.some((h) => h.iid === c.attachedTo && !isLandCard(h.typeLine));
-  const perms = state.battlefield.filter((c) => !isLandCard(c.typeLine));
+  // Grouped by kind: creatures, then artifacts and the rest.
+  const perms = byKind(state.battlefield.filter((c) => !isLandCard(c.typeLine)), (c) => c.typeLine);
   const landsInHand = state.hand.filter((c) => isLandCard(c.typeLine)).length;
 
   // Hand cards shrink to fit the row, down to a floor, before it scrolls.
@@ -385,13 +386,13 @@ function SoloTable({
             <div className="pt-row pt-row-perms">
               {perms
                 .filter((c) => !tucked(c))
-                .map((c) => (
-                  <AttachGroup
-                    key={c.iid}
-                    under={state.battlefield.filter((a) => a.attachedTo === c.iid && tucked(a)).map((a) => <PtCard key={a.iid} card={a} zone="battlefield" {...cardProps} />)}
-                  >
-                    <PtCard key={c.iid} card={c} zone="battlefield" {...cardProps} selected={attaching === c.iid} />
-                  </AttachGroup>
+                .map((c, i, all) => (
+                  <Fragment key={c.iid}>
+                    {kindBreak(all, i, (x) => x.typeLine) && <span className="pt-kind-gap" aria-hidden />}
+                    <AttachGroup under={state.battlefield.filter((a) => a.attachedTo === c.iid && tucked(a)).map((a) => <PtCard key={a.iid} card={a} zone="battlefield" {...cardProps} />)}>
+                      <PtCard card={c} zone="battlefield" {...cardProps} selected={attaching === c.iid} />
+                    </AttachGroup>
+                  </Fragment>
                 ))}
             </div>
           )}

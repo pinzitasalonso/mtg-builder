@@ -147,6 +147,7 @@ const BOOK: CardBook = Object.fromEntries(
     info("Legend Blade", { typeLine: "Artifact — Equipment", manaCost: "{1}", manaValue: 1, oracleText: "Equipped creature gets +3/+3.\nEquip legendary creature {1}\nEquip {4}" }),
     info("Test Hammer", { typeLine: "Artifact — Equipment", manaCost: "{1}", manaValue: 1, oracleText: "Equipped creature gets +10/+10 and loses flying.\nEquip {8}" }),
     info("Land Blade", { typeLine: "Legendary Artifact — Equipment", manaCost: "{2}", manaValue: 2, oracleText: "Equipped creature gets +1/+1 for each land you control.\nEquip {3}" }),
+    info("Blazing Sunsteel", { typeLine: "Artifact — Equipment", manaCost: "{1}{R}", manaValue: 2, oracleText: "Equipped creature gets +1/+0 for each opponent you have.\nWhenever equipped creature is dealt damage, it deals that much damage to any target.\nEquip {4}" }),
     info("Quoted Staff", { typeLine: "Artifact — Equipment", manaCost: "{2}", manaValue: 2, oracleText: "Equipped creature gets +2/+2 and has trample and \"{T}: Draw a card.\"\nEquip {2}" }),
     info("Test Greaves", { typeLine: "Artifact — Equipment", manaCost: "{2}", manaValue: 2, oracleText: "Equipped creature has haste and shroud.\nEquip {0}" }),
     info("Arrest Aura", { typeLine: "Enchantment — Aura", manaCost: "{1}{W}", manaValue: 2, oracleText: "Enchant creature\nEnchanted creature can't attack or block." }),
@@ -510,6 +511,8 @@ describe("Equipment", () => {
     expect(stats(BOOK, equipped("Quoted Staff", ["Mountain", "Mountain"]))).toEqual({ power: 4, toughness: 4 });
     expect(has(BOOK, equipped("Quoted Staff", ["Mountain", "Mountain"]), "Trample")).toBe(true);
     expect(has(BOOK, equipped("Test Greaves"), "Shroud")).toBe(true);
+    // For each opponent you have: one, at a table of two.
+    expect(stats(BOOK, equipped("Blazing Sunsteel", Array(4).fill("Mountain")))).toEqual({ power: 3, toughness: 2 });
     // For each land you control: three lands, +3/+3. (They pay the equip too.)
     expect(stats(BOOK, equipped("Land Blade", ["Mountain", "Mountain", "Mountain"]))).toEqual({ power: 5, toughness: 5 });
   });
