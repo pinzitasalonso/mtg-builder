@@ -60,6 +60,9 @@ export interface PlayCard {
   /** In hand for this turn only ("You may play them this turn", Jeska's
       Will): exiled at the end of the turn if it's still there. */
   fleeting?: boolean;
+  /** Put on top of its owner's library by their own tutor this turn
+      (Mystical Tutor): the opponent's Necropotence takes it at the end step. */
+  sought?: boolean;
 }
 
 export interface PlaytestState {
@@ -220,6 +223,7 @@ export function moveCard(
   const found = state[from].find((c) => c.iid === iid)!;
   const card: PlayCard = { ...found, tapped: false, flipped: to === "battlefield" ? !!found.flipped : false };
   delete card.fleeting;
+  delete card.sought;
   if (from === "battlefield" && to !== "battlefield") {
     delete card.enteredTurn;
     delete card.damage;

@@ -149,6 +149,7 @@ COMBOS
 - Some combos ask for more than their pieces (cards in your graveyard). The brief says when that isn't there yet: don't start one that can't finish.
 - The turn you go off, make the mana first: free rocks, rituals, a creature sacrificed for mana. Your commander that costs {0} is there to be sacrificed.
 - Never use a combo action for a combo the brief doesn't call READY.
+- You can't name a card you don't hold yet. What a tutor, a draw spell or Jeska's Will brings you this turn is cast by the app after your plan, with the mana that is left: plan the mana for it (cast the ritual in the same turn as the tutor), and don't spend it on something lesser.
 
 ACTIONS
 - {"kind":"land","card":"<id>"}: play a land from your hand. A modal card with a land on its back (marked in your hand) can be cast as its front, or played as your land this way.
@@ -209,12 +210,13 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (manaSinkOf(info)) notes.push("with endless mana from a combo, the app wins the game through this ability: have it on the battlefield (or in your command zone) when you go off");
     if (adNauseamOf(info)) notes.push("the app puts cards into your hand until you're at 8 life: give it no effects, and cast it with life to spend");
     const lfc = lifeForCardsOf(book, front);
-    if (lfc) notes.push(`you skip your draw step; at your end step the app pays life for cards (every life above 15, twenty at most, and it keeps the best at cleanup): don't activate it, and cast it early`);
+    if (lfc) notes.push(`you skip your draw step; at your end step the app pays life for cards (every life above 15, twenty at most, and it keeps the best at cleanup; a card your tutor put on top this turn is always taken): never activate it yourself, and cast it early`);
     else if (skipsDrawOf(book, front)) notes.push("you skip your draw step while it's out");
     if (handSizeOf(book, front)) notes.push(`your maximum hand size is ${handSizeOf(book, front)} while it's out`);
     const cu = cumulativeUpkeepOf(book, front);
     if (cu !== null) notes.push(`the app pays its cumulative upkeep at your upkeep while it's {2} or less, then sacrifices it`);
     const tu = tutorOf(info);
+    if (tu?.discardRandom) notes.push("the app discards a card at random after the search: give it its search effect and no discard");
     if (tu?.delirium) notes.push("it finds any card when your graveyard has four card types (the brief says how many); otherwise only what its first line says");
     if (tu && /exile it face down/i.test(info.oracleText ?? "")) notes.push("a tutor: the card goes to your hand (bargain isn't used)");
     if (handManaOf(info)) notes.push("in your hand it is mana: the app exiles it when your other mana runs short. Don't cast it as a creature");

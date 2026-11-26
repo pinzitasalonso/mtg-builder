@@ -12,7 +12,7 @@ import OpponentPicker from "@/components/deck/OpponentPicker";
 import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom, AttachGroup, TableTitle, LibraryOrderBar, orderLibrary, type LibraryOrder } from "@/components/deck/playtest-parts";
 import { bottomCard, byKind, draw, kindBreak, KIND_GAP, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
-import { aiMulligan, chooseBlocks, fallbackPlan, winningTurn } from "@/lib/practice/ai";
+import { aiMulligan, arrivalsPlan, chooseBlocks, fallbackPlan, winningTurn } from "@/lib/practice/ai";
 import { tutorOf, tutorSearch } from "@/lib/practice/spells";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, wheelAbilityOf, type Search } from "@/lib/practice/cards";
@@ -65,6 +65,7 @@ import { canPayNextTax, declineTax, payTax, playerDraws, concede,
   parseCardId,
   playerScry,
   resolveCombat,
+  manaAhead,
   setBlocks,
   shownLog,
   startTurn,
@@ -465,11 +466,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       targets lit up. If you could answer, it waits until you counter it,
       cast your own instants, or let it resolve; otherwise it resolves after
       a moment, so you can read it. Returns the game after. */
-  async function aiCast(g0: PracticeGame, a: PlanAction, back: Mode): Promise<PracticeGame> {
+  async function aiCast(g0: PracticeGame, a: PlanAction, back: Mode, keep: string[] = []): Promise<PracticeGame> {
     if (!setup) return g0;
     const card = findCard(g0, parseCardId(a.card) ?? -1)?.card;
     if (!card || isLand(card)) {
-      const r = applyAction(g0, "opp", a, setup.book);
+      const r = applyAction(g0, "opp", a, setup.book, { keep });
       setGame(r.game);
       // A refused move shows nothing, so it takes no beat either.
       return r.ok ? pause(BEAT, r.game) : r.game;
@@ -477,7 +478,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const targetIid = a.effects.map((e) => parseCardId(e.target)).find((t) => t !== null) ?? undefined;
     const target = targetIid !== undefined ? findCard(g0, targetIid)?.card.name : undefined;
     const answerable = canAnswer(g0);
-    const paid = applyAction(g0, "opp", a, setup.book, { stage: "pay" });
+    const paid = applyAction(g0, "opp", a, setup.book, { stage: "pay", keep });
     setGame(paid.game);
     if (!paid.ok) return paid.game;
     setSpotlight({ card, target, targetIid });
@@ -570,6 +571,28 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!ninjutsuOptions(next, "you", setup.book).length) ninjaRef.current(next);
   };
 
+  /** The opponent's actions, one after another. Each is paid for knowing
+      what the ones after it need (`manaAhead`): a generic cost isn't paid
+      with the only land that makes the next spell's colour. Null when the
+      game ended, or the table was closed. */
+  async function playActions(g0: PracticeGame, actions: PlanAction[]): Promise<PracticeGame | null> {
+    if (!setup) return null;
+    let g = g0;
+    for (const [i, a] of actions.entries()) {
+      const keep = manaAhead(g, actions.slice(i + 1), setup.book);
+      if (a.kind === "cast") g = await aiCast(g, a, "ai", keep);
+      else if (a.kind === "combo") g = await aiCombo(g, a);
+      else {
+        const r = applyAction(g, "opp", a, setup.book, { keep });
+        g = r.game;
+        setGame(g);
+        if (r.ok) g = await pause(BEAT, await waitChoice(g));
+      }
+      if (!alive.current || g.winner) return null;
+    }
+    return g;
+  }
+
   async function runAi(g0: PracticeGame) {
     if (!setup) return;
     setMode("ai");
@@ -609,17 +632,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     // The plan can take a while to arrive: go on from the game as it is now.
     g = gameRef.current ?? g;
     if (plan.say) setSay(plan.say);
-    for (const a of plan.main) {
-      if (a.kind === "cast") g = await aiCast(g, a, "ai");
-      else if (a.kind === "combo") g = await aiCombo(g, a);
-      else {
-        const r = applyAction(g, "opp", a, setup.book);
-        g = r.game;
-        setGame(g);
-        if (r.ok) g = await pause(BEAT, await waitChoice(g));
-      }
-      if (!alive.current || g.winner) return;
-    }
+    // The hand as the model saw it: what arrives after is the table's to play.
+    const held = new Set(g.sides.opp.hand.map((c) => c.iid));
+    const done = await playActions(g, plan.main);
+    if (!done) return;
+    g = done;
     // What the turn brought (a tutor's find, Ad Nauseam's cards) may let it
     // do more: the built-in planner plans again with the new hand, and a
     // smart opponent takes a win the table can check.
@@ -632,20 +649,18 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       // (Still idle after the planner's land, a fetch land that found
       // mana: it plans again with that mana.)
       const idle = !instinct && !(g.spells?.opp ?? 0);
-      const more = instinct || idle ? fallbackPlan(g, setup.book, "opp", {}, setup.combos ?? []) : winningTurn(g, setup.book, "opp", setup.combos ?? []);
+      // Otherwise a smart opponent takes a win the table can check, or
+      // plays what its turn brought it after the plan was made (a tutor's
+      // find, Jeska's Will's cards): the model couldn't name those.
+      const more =
+        instinct || idle
+          ? fallbackPlan(g, setup.book, "opp", {}, setup.combos ?? [])
+          : (winningTurn(g, setup.book, "opp", setup.combos ?? []) ?? arrivalsPlan(g, setup.book, held, "opp", setup.combos ?? []));
       if (!more?.main.some((a) => a.kind !== "land" || !g.landPlayed)) break;
       const before = stamp(g);
-      for (const a of more.main) {
-        if (a.kind === "cast") g = await aiCast(g, a, "ai");
-        else if (a.kind === "combo") g = await aiCombo(g, a);
-        else {
-          const r = applyAction(g, "opp", a, setup.book);
-          g = r.game;
-          setGame(g);
-          if (r.ok) g = await pause(BEAT, await waitChoice(g));
-        }
-        if (!alive.current || g.winner) return;
-      }
+      const next = await playActions(g, more.main);
+      if (!next) return;
+      g = next;
       if (instinct) attack = more.attack;
       if (stamp(g) === before) break;
     }
@@ -694,17 +709,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     let g = g0;
     // What Silas Renn let it cast from its graveyard comes first.
     const actions = [...aiGraveyardCasts(g, setup.book), ...actions0];
-    for (const a of actions) {
-      if (a.kind === "cast") g = await aiCast(g, a, "ai");
-      else if (a.kind === "combo") g = await aiCombo(g, a);
-      else {
-        const r = applyAction(g, "opp", a, setup.book);
-        g = r.game;
-        setGame(g);
-        if (r.ok) g = await pause(BEAT, await waitChoice(g));
-      }
-      if (!alive.current || g.winner) return;
-    }
+    const done = await playActions(g, actions);
+    if (!done) return;
+    g = done;
     // Its end step: Inalla's Wizards, Braids (you may have to answer).
     const end = aiEndStep(g, setup.book);
     if (end !== g) {
