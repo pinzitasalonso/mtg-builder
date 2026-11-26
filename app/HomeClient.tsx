@@ -1,0 +1,1113 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, Check, ChevronDown, Copy, Heart, Library, LogOut, Pin, Plus, Sparkles, Trash2 } from "lucide-react";
+import { LANDING_FAQ, LANDING_FEATURES, landingJsonLd } from "@/lib/landing";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import Logo from "@/components/Logo";
+import CollectionView from "@/components/CollectionView";
+import { DECKS_CHANGED_EVENT, useAssistant } from "@/components/assistant/AssistantProvider";
+import { forget, forgetAll, peek, remember } from "@/lib/client-cache";
+import { forgetOfflineData, forgetSession, offlineSession, rememberSession } from "@/lib/offline-session";
+import LandingVisual from "@/components/LandingVisual";
+import { PlanPill } from "@/components/Upgrade";
+import CommanderInput from "@/components/CommanderInput";
+import { CardArt, ColorPips, commanderArtName, deckTarget } from "@/components/mtg";
+import { fetchCollectionSummary } from "@/lib/collection-client";
+import { fetchWishlistCount } from "@/lib/wishlist-client";
+import { track } from "@/lib/track";
+import { rememberAfterSignIn, takeAfterSignIn } from "@/lib/after-sign-in";
+import { getIdentityField, LIGHT_VARS } from "@/lib/identity-theme";
+import { BRACKET_TINT, type ScanSummary } from "@/lib/deck-analysis";
+
+/* The home view wears the commander-blue identity field — the same immersive
+   look the deck pages use, matching the Color Identity design. */
+// The landing used to wear the blue identity field — a deck page's ground,
+// borrowed for a page that isn't a deck. The app's home is the neutral table,
+// and the card art is what carries the colour, so this follows it: no forced
+// vars, no forced ground, and the page turns over with light and dark like
+// every other screen.
+//
+// `getIdentityField` is still imported below for the card fan, which is meant
+// to look like decks.
+
+interface Deck {
+  id: number;
+  publicId: string;
+  name: string;
+  format: string;
+  commander: string | null;
+  createdAt: string;
+  pinned?: boolean;
+  colors?: string[];
+  _count: { cards: number };
+  /** The last scan, summarised; null (or absent, in an older cached list) when never scanned. */
+  scan?: ScanSummary | null;
+  /** The commander's stored scan, when the deck holds its commander. */
+  cover?: string | null;
+}
+
+// `aiRemaining` is null for pro (no cap) and absent only if the payload
+// predates it. `deckLimit` is null now for everyone: decks have no cap.
+type Me = {
+  id: number;
+  email: string;
+  tier?: string;
+  aiRemaining?: number | null;
+  deckLimit?: number | null;
+} | null;
+
+
+const FEATURES: { n: string; t: string; d: string; v: "prompt" | "swipe" | "curve" }[] = [
+  { v: "prompt", n: "01", t: "Pour in a theme", d: "Tell Spellpool a commander, a combo, or just a vibe. It reads the whole Oracle text database — not just card names." },
+  { v: "swipe", n: "02", t: "Swipe the pool", d: "Get a living pool of suggestions ranked for your build. Keep what fits, toss what doesn't. The pool reshapes as you go." },
+  { v: "curve", n: "03", t: "Brew to 100", d: "Watch your curve, color identity, and type balance update live. Export to your deck builder the moment it's legal." },
+];
+
+/** A card the home block shows: its name and its stored scan. (An older
+    cached copy holds bare names.) */
+type CollectionSample = { name: string; imageUri: string | null };
+const asSample = (s: CollectionSample | string): CollectionSample => (typeof s === "string" ? { name: s, imageUri: null } : s);
+
+interface HomeCache {
+  me: Me | null;
+  decks: Deck[];
+  publicDecks: Deck[];
+  collection: { unique: number; total: number; pending: number; sample: CollectionSample[] };
+}
+
+/** What the server knew as it rendered the page (app/page.tsx): who is
+    signed in, and their decks. */
+export interface HomeStart {
+  me: Me;
+  decks: Deck[] | null;
+  collection?: HomeCache["collection"] | null;
+  wishlist?: number | null;
+}
+
+export default function HomeClient({ start }: { start?: HomeStart }) {
+  const router = useRouter();
+  // undefined = still resolving the session; null = signed out.
+  // The server says who's signed in, so the first paint is the right home:
+  // the landing used to show first, then swap to a player's decks once the
+  // browser had asked. Without it (an old cached shell), this visit's last
+  // copy (lib/client-cache) seeds it while loadAll re-checks.
+  const [cached] = useState(() => peek<HomeCache>("home"));
+  const [me, setMe] = useState<Me | undefined>(start ? start.me : cached?.me);
+  /// Why a create or a duplicate failed, as the server explains it.
+  const [createError, setCreateError] = useState("");
+  const [listError, setListError] = useState("");
+  // A short confirmation at the bottom of the screen ("Deleted …").
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function flashToast(msg: string) {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
+  }
+  // With the server's start, the first render is exactly what the server
+  // drew (the browser's cache can't be read there, and a difference would
+  // be a mismatch on hydration); loadAll then refreshes everything.
+  const [decks, setDecks] = useState<Deck[]>(start ? (start.decks ?? []) : (cached?.decks ?? []));
+  const [publicDecks, setPublicDecks] = useState<Deck[]>(start ? [] : (cached?.publicDecks ?? []));
+  const [loaded, setLoaded] = useState(start ? !start.me || !!start.decks : Boolean(cached));
+  // The server couldn't be reached: what's shown is the last saved copy.
+  const [offline, setOffline] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  // The collection screen, and which of its two lists it opens on.
+  const [showCollection, setShowCollection] = useState<false | "collection" | "wishlist">(false);
+  // How many cards are on the wishlist, for the home block's button.
+  const [wishCount, setWishCount] = useState(start?.wishlist ?? 0);
+  // The app's one assistant (components/assistant): its conversation lives on
+  // the server and follows the player from page to page.
+  const assistant = useAssistant();
+  // Collection summary for the home block: count + a few names for thumbnails.
+  const [collection, setCollection] = useState<HomeCache["collection"]>((start ? start.collection : cached?.collection) ?? { unique: 0, total: 0, pending: 0, sample: [] });
+  useEffect(() => {
+    if (loaded && me !== undefined) remember<HomeCache>("home", { me, decks, publicDecks, collection });
+  }, [loaded, me, decks, publicDecks, collection]);
+  const [form, setForm] = useState({ name: "", format: "commander", commander: "" });
+  const [creating, setCreating] = useState(false);
+
+  async function loadCollection() {
+    // The counts and a few cards, not the whole collection: this runs on
+    // every visit, and after every change made in the collection screen.
+    const c = await fetchCollectionSummary();
+    // A failed request keeps what's shown: "nothing yet" for a collection of
+    // thousands was worse than a stale count.
+    if (c) setCollection({ unique: c.unique, total: c.total, pending: c.pending, sample: c.sample });
+    setWishCount(await fetchWishlistCount());
+  }
+
+  // Loads overlap (a pin, a delete, coming back online): only the newest
+  // one's answer is used, so an older, slower answer can't put back what a
+  // newer one already changed.
+  const loadSeq = useRef(0);
+  async function loadAll() {
+    const seq = ++loadSeq.current;
+    // Only the server saying "signed out" signs you out. No answer at all
+    // (offline) or a server error keeps the last session, for a day — see
+    // lib/offline-session.
+    let user: Me;
+    let reached = true;
+    try {
+      const r = await fetch("/api/auth/me");
+      if (!r.ok) throw new Error(String(r.status));
+      user = ((await r.json())?.user ?? null) as Me;
+      if (user) rememberSession(user);
+      else forgetSession();
+    } catch {
+      reached = false;
+      user = offlineSession<NonNullable<Me>>();
+    }
+    setOffline(!reached);
+    setMe(user);
+    // Back from signing in for something that needed an account: carry on.
+    if (user && reached) {
+      const next = takeAfterSignIn();
+      if (next === "new") setShowModal(true);
+      else if (next) router.push(next);
+    }
+    // Offline, these come from the service worker's last copy; if even that
+    // is missing, keep what's on screen rather than blank it.
+    const list = (url: string) =>
+      fetch(url)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+    const [own, pub] = await Promise.all([user ? list("/api/decks") : Promise.resolve([]), list("/api/decks?public=1")]);
+    if (seq !== loadSeq.current) return;
+    if (own) setDecks(own);
+    if (pub) setPublicDecks(pub);
+    setLoaded(true);
+    if (user && reached) loadCollection();
+    else if (!user) {
+      setCollection({ unique: 0, total: 0, pending: 0, sample: [] });
+      setWishCount(0);
+    }
+  }
+
+  useEffect(() => {
+    loadAll();
+    track("visit");
+    // A reply that built or changed a deck: show it in the list.
+    const onChanged = () => void loadAll();
+    window.addEventListener(DECKS_CHANGED_EVENT, onChanged);
+    // Back online: check in with the server again.
+    window.addEventListener("online", onChanged);
+    return () => {
+      window.removeEventListener(DECKS_CHANGED_EVENT, onChanged);
+      window.removeEventListener("online", onChanged);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function signOut() {
+    forgetAll();
+    await forgetOfflineData();
+    await fetch("/api/auth/logout", { method: "POST" });
+    setMe(null);
+    setDecks([]);
+    assistant.refresh();
+    loadAll();
+  }
+
+  // A deck needs an account. Signed out, the way to a new deck is through
+  // signing in, and home opens the form once they're back (lib/after-sign-in).
+  function newDeck() {
+    if (me === null) {
+      rememberAfterSignIn("new");
+      router.push("/login");
+      return;
+    }
+    setShowModal(true);
+  }
+
+  async function createDeck(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    setCreating(true);
+    const res = await fetch("/api/decks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: form.name.trim(),
+        format: form.format,
+        commander: form.format === "commander" ? form.commander.trim() || undefined : undefined,
+      }),
+    });
+    const created = await res.json().catch(() => null);
+    setCreating(false);
+    // Signed out since the page loaded (an expired session).
+    if (res.status === 401) {
+      rememberAfterSignIn("new");
+      router.push("/login");
+      return;
+    }
+    // A failure keeps the form open with the reason, rather than closing the
+    // modal and silently reloading, which looked like the button not working.
+    if (!res.ok || !created?.publicId) {
+      setCreateError(created?.error || "Couldn't create that deck. Try again.");
+      return;
+    }
+    setForm({ name: "", format: "commander", commander: "" });
+    setShowModal(false);
+    setCreateError("");
+    router.push(`/deck/${created.publicId}`);
+  }
+
+  // Delete from a tile: confirm by name, take the tile away at once, say so,
+  // and put it back with a reason if the server refused. It used to delete
+  // and quietly reload, so nothing visible happened until the list came back
+  // (and a failure looked exactly like a success).
+  async function deleteDeck(id: string) {
+    const name = [...decks, ...publicDecks].find((d) => d.publicId === id)?.name ?? "this deck";
+    if (!confirm(`Delete “${name}”? This can’t be undone.`)) return;
+    setListError("");
+    setDecks((ds) => ds.filter((d) => d.publicId !== id));
+    setPublicDecks((ds) => ds.filter((d) => d.publicId !== id));
+    const res = await fetch(`/api/decks/${id}`, { method: "DELETE" }).catch(() => null);
+    // A 404 means it's already gone, which is what was asked for.
+    if (!res || (!res.ok && res.status !== 404)) {
+      // The lists as the server has them: only this deck comes back. (Putting
+      // back a snapshot taken before the delete also restored decks deleted
+      // since.)
+      loadAll();
+      setListError(res ? `Couldn’t delete “${name}”. Try again.` : `Couldn’t delete “${name}” — you seem to be offline.`);
+      return;
+    }
+    forget(`deck:${id}`);
+    forget(`cards:${id}`);
+    flashToast(`Deleted “${name}”`);
+    loadAll();
+  }
+
+  /// The free plan's pill: coach questions left today, then Go Pro. Only for
+  /// a free account: Pro has no numbers worth watching, which is what the PRO
+  /// badge says instead.
+  const planMeter = me && typeof me.aiRemaining === "number" ? <PlanPill left={me.aiRemaining} /> : null;
+
+  // Pinned decks sort first; the list re-fetches so the order follows.
+  async function pinDeck(id: string, pinned: boolean) {
+    await fetch(`/api/decks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ pinned }),
+    });
+    loadAll();
+  }
+
+  async function duplicateDeck(id: string) {
+    // A copy is a new deck, so it needs an account too. Back to that deck
+    // after signing in, to copy it from there.
+    const toSignIn = () => {
+      rememberAfterSignIn(`/deck/${id}`);
+      router.push("/login");
+    };
+    if (me === null) return toSignIn();
+    const res = await fetch(`/api/decks/${id}/duplicate`, { method: "POST" });
+    if (res.status === 401) return toSignIn();
+    // A failed duplicate says why. Its own notice rather than the new-deck
+    // modal's — opening "Begin a new deck" to explain it is a non sequitur.
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      setListError(body?.error || "Couldn't duplicate that deck.");
+      return;
+    }
+    if (res.ok) {
+      const copy = await res.json();
+      if (copy?.publicId) router.push(`/deck/${copy.publicId}`);
+      else loadAll();
+    }
+  }
+
+  // "See a sample deck" → open the first public brew, else scroll to the brews.
+  function seeSample() {
+    if (publicDecks[0]) router.push(`/deck/${publicDecks[0].publicId}`);
+    else document.getElementById("brews")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  const totalCards = decks.reduce((s, d) => s + (d._count?.cards || 0), 0);
+  const formatCount = new Set(decks.map((d) => d.format)).size;
+
+  return (
+    <main style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg)", color: "var(--t1)" }}>
+      {/* HERO — on the app's own table */}
+      <div
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          background: "var(--bg)",
+        }}
+      >
+        {/* transparent top nav. On a phone the wordmark and button labels drop
+            out (see .home-header in globals.css) so it stays one row. */}
+        <header
+          className="home-header"
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 40,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "16px clamp(20px, 4vw, 52px)",
+            background: "transparent",
+          }}
+        >
+          <Logo size={19} />
+          <div className="home-header-actions" style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+            {me ? (
+              <>
+                {me.tier === "pro" ? (
+                  <Link href="/account" title="Spellpool Pro: manage your subscription" style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.14em", color: "var(--accent-ink)", background: "var(--gold)", padding: "3px 8px", borderRadius: 999, textDecoration: "none" }}>
+                    PRO
+                  </Link>
+                ) : (
+                  // What the free plan has left, which the web never showed —
+                  // so a player met both caps as a refusal rather than as a
+                  // number they had been watching go down. iOS puts the same
+                  // two figures in Account and beside the assistant's input.
+                  planMeter
+                )}
+                <Link href="/account" className="home-email" title={`${me.email} · Account and billing`} style={{ fontSize: 13, color: "var(--t3)", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textDecoration: "none" }}>
+                  {me.email}
+                </Link>
+                {/* The collection sits below every deck; this is the way to it
+                    without scrolling past them all. */}
+                <button onClick={() => setShowCollection("collection")} className="id-ghost home-icon-btn" style={{ padding: "9px 16px" }} aria-label="Collection">
+                  <Library size={16} strokeWidth={2.25} /> <span className="home-hide">Collection</span>
+                </button>
+                <button onClick={signOut} className="id-ghost home-icon-btn" style={{ padding: "9px 16px" }} aria-label="Sign out">
+                  <LogOut size={16} strokeWidth={2.25} className="home-show" /> <span className="home-hide">Sign out</span>
+                </button>
+              </>
+            ) : (
+              me === null && (
+                <Link href="/login" className="id-ghost" style={{ padding: "9px 16px" }}>Sign in</Link>
+              )
+            )}
+            <button onClick={newDeck} className="id-btn" style={{ padding: "10px 18px", whiteSpace: "nowrap" }}>
+              <Plus size={16} strokeWidth={2.5} className="home-show" /> New deck
+            </button>
+          </div>
+        </header>
+
+        {!me && (
+        <div
+          className="id-hero-grid"
+          style={{ padding: "clamp(28px,5vw,68px) clamp(20px,4vw,52px) clamp(70px,8vw,108px)", maxWidth: 1240, margin: "0 auto" }}
+        >
+          {/* copy */}
+          <div>
+            <Reveal delay={40}>
+              <div className="id-label" style={{ color: "var(--gold)", marginBottom: 18, display: "inline-flex", alignItems: "center", gap: 9 }}>
+                <span style={{ width: 22, height: 2, background: "var(--gold)" }} /> Deck builder and coach for Magic: The Gathering
+              </div>
+            </Reveal>
+            <Reveal delay={90}>
+              <h1 className="id-display" style={{ fontSize: "clamp(52px, 8vw, 104px)", margin: "0 0 22px", color: "var(--t1)" }}>
+                Brew the<br />deck in<br />
+                <span style={{ color: "var(--gold)" }}>your head.</span>
+              </h1>
+            </Reveal>
+            <Reveal delay={150}>
+              <p style={{ fontSize: "clamp(16px,1.5vw,19px)", lineHeight: 1.5, color: "var(--t2)", maxWidth: 440, margin: "0 0 30px" }}>
+                Describe what you want to play. Spellpool reads every card&apos;s rules text and hands you a pool to swipe — building to a legal Commander 100 with the curve and color identity worked out for you. Then score it, find its combos, and playtest it.
+              </p>
+            </Reveal>
+            <Reveal delay={210} style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center" }}>
+              <button className="id-btn" style={{ padding: "15px 26px", fontSize: 16 }} onClick={newDeck}>
+                Start brewing <ArrowRight size={17} strokeWidth={2.25} />
+              </button>
+              <button className="id-ghost" style={{ padding: "14px 22px" }} onClick={seeSample}>
+                See a sample deck
+              </button>
+            </Reveal>
+          </div>
+
+          {/* fanned cards */}
+          <CardFan />
+        </div>
+        )}
+      </div>
+
+      {/* signed in: your decks + collection, on the blue field */}
+      {me && (
+        <div style={{ maxWidth: 1180, width: "100%", margin: "0 auto", padding: "clamp(36px,5vw,64px) clamp(20px,4vw,52px) 0" }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 30, flexWrap: "wrap" }}>
+            <div>
+              <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Your decks</div>
+              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,52px)", margin: 0, color: "var(--t1)", textWrap: "balance" }}>Pick up where you left off.</h2>
+              {offline && (
+                <div role="status" style={{ marginTop: 10, fontSize: 13.5, fontWeight: 600, color: "var(--t2)" }}>
+                  You’re offline — showing your decks as they were last saved.
+                </div>
+              )}
+              {listError && (
+                <div
+                  role="status"
+                  onClick={() => setListError("")}
+                  style={{ marginTop: 12, fontSize: 13.5, color: "var(--danger)", lineHeight: 1.45, cursor: "pointer", maxWidth: 520 }}
+                >
+                  {listError}
+                </div>
+              )}
+            </div>
+            <div style={{ display: "flex", gap: 28, paddingBottom: 4 }}>
+              <CStat n={decks.length} label="Decks" />
+              <CStat n={totalCards} label="Cards" />
+              <CStat n={formatCount} label="Formats" accent />
+            </div>
+          </div>
+          {/* The assistant that sees every deck at once. Styled as the box you'd
+              type into, because that's what tapping it opens. */}
+          {decks.length > 0 && (
+            <button
+              type="button"
+              onClick={assistant.open}
+              className="home-ask"
+              style={{ display: "flex", alignItems: "center", gap: 12, width: "100%", margin: "0 0 26px", padding: "14px 18px", borderRadius: 18, border: "1px solid var(--line)", background: "var(--bg2)", color: "var(--t2)", cursor: "pointer", textAlign: "left", fontFamily: "var(--font-ui)", boxShadow: "0 4px 14px -8px rgba(0,0,0,.25)" }}
+            >
+              <Sparkles size={20} strokeWidth={2} color="var(--gold)" style={{ flex: "none" }} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: "block", fontWeight: 700, fontSize: 15.5, color: "var(--t1)" }}>Ask about all your decks</span>
+                <span style={{ display: "block", fontSize: 13.5, color: "var(--t3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  Which deck is strongest? What can I build from my collection?
+                </span>
+              </span>
+              <ArrowRight size={17} strokeWidth={2.25} style={{ flex: "none" }} />
+            </button>
+          )}
+          <DeckTable decks={decks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onPin={pinDeck} onNew={newDeck} showNew={loaded} />
+          <CollectionBlock unique={collection.unique} total={collection.total} pending={collection.pending} sample={collection.sample} wishlist={wishCount} onOpen={() => setShowCollection("collection")} onWishlist={() => setShowCollection("wishlist")} />
+          <div style={{ height: 64 }} />
+        </div>
+      )}
+
+      {/* HOW IT WORKS — a lifted band (signed-out landing). Tokenised rather
+          than the hard indigo it used to be: that colour is no longer the
+          table, so it read as a stripe of the old design across the new one. */}
+      {!me && (
+        <div style={{ background: "var(--bg2)", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px)" }}>
+          <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+            <Reveal>
+              <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>How it works</div>
+              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: "0 0 48px", maxWidth: 720, color: "var(--t1)", textWrap: "balance" }}>
+                From a sentence to a sideboard.
+              </h2>
+            </Reveal>
+            {/* Three equal columns: the rule above each is its own, so the
+                gap between columns shows as a break in the line. */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0 28px" }}>
+              {FEATURES.map((f, i) => (
+                <Reveal key={f.n} delay={120 + i * 90}>
+                  <div style={{ padding: "28px 0", borderTop: "1px solid var(--line)", height: "100%" }}>
+                    <div className="lv-well">
+                      <LandingVisual kind={f.v} />
+                    </div>
+                    <div className="id-mono" style={{ fontSize: 13, color: "var(--gold)", marginBottom: 10 }}>{f.n}</div>
+                    <div className="id-display" style={{ fontSize: 26, marginBottom: 10, color: "var(--t1)" }}>{f.t}</div>
+                    <p style={{ fontSize: 14.5, lineHeight: 1.55, color: "var(--t2)", margin: 0 }}>{f.d}</p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EVERYTHING IN THE POOL + FAQ — what the app does now, for a first
+          visit (and for search engines: this is the page's real content). */}
+      {!me && (
+        <section aria-labelledby="features-title" style={{ padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px)" }}>
+          <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+            <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Everything in the pool</div>
+            <h2 id="features-title" className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: "0 0 40px", maxWidth: 760, color: "var(--t1)", textWrap: "balance" }}>
+              Build it, score it, play it, own it.
+            </h2>
+            {/* One large tile and seven small ones. The words are short
+                because the pictures are the app's own screens. */}
+            <div className="lv-grid">
+              {LANDING_FEATURES.map((f, i) => (
+                <article key={f.title} className="lv-tile" data-wide={i === 0 || undefined}>
+                  <div className="lv-copy">
+                    <h3>{f.title}</h3>
+                    <p>{f.body}</p>
+                  </div>
+                  <LandingVisual kind={f.visual} />
+                </article>
+              ))}
+            </div>
+
+            <h2 id="faq-title" className="id-display" style={{ fontSize: "clamp(28px,3.6vw,40px)", margin: "clamp(56px,7vw,88px) 0 18px", color: "var(--t1)" }}>
+              Questions
+            </h2>
+            <div style={{ maxWidth: 820, display: "flex", flexDirection: "column" }}>
+              {LANDING_FAQ.map((f) => (
+                <details key={f.q} className="home-faq" style={{ borderTop: "1px solid var(--line)", padding: "16px 0" }}>
+                  <summary style={{ cursor: "pointer", listStyle: "none", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 17, fontWeight: 700, color: "var(--t1)" }}>
+                    <h3 style={{ margin: 0, font: "inherit" }}>{f.q}</h3>
+                    <ChevronDown size={18} strokeWidth={2.25} className="home-faq-chevron" aria-hidden="true" style={{ flex: "none", color: "var(--t3)" }} />
+                  </summary>
+                  <p style={{ margin: "10px 0 0", fontSize: 15, lineHeight: 1.6, color: "var(--t2)" }}>{f.a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Structured data: the app and its FAQ, matching what's on the page. */}
+      {!me && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(landingJsonLd()).replace(/</g, "\\u003c") }} />
+      )}
+
+      {/* PUBLIC BREWS — color-identity showcase */}
+      <div
+        id="brews"
+        style={{
+          // Always navy, so the text uses the light set whatever the page theme —
+          // in light mode the inherited dark tokens were unreadable here.
+          ["--t1" as string]: "#ffffff",
+          ["--t2" as string]: "rgba(255,255,255,.72)",
+          ["--t3" as string]: "rgba(255,255,255,.6)",
+          ["--border" as string]: "rgba(255,255,255,.28)",
+          ["--surface" as string]: "rgba(255,255,255,.06)",
+          background: "#150e52", padding: "clamp(56px,7vw,96px) clamp(20px,4vw,52px) clamp(72px,8vw,112px)", flex: 1 }}>
+        <div style={{ maxWidth: 1180, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 20, marginBottom: 40, flexWrap: "wrap" }}>
+            <div>
+              <div className="id-label" style={{ color: "var(--t3)", marginBottom: 12 }}>Public brews</div>
+              <h2 className="id-display" style={{ fontSize: "clamp(34px,4.5vw,56px)", margin: 0, maxWidth: 640, color: "var(--t1)" }}>
+                Decks the pool is talking about.
+              </h2>
+            </div>
+            <button className="id-pill-gold" style={{ padding: "11px 20px", background: "#fdf26f", color: "#181228", borderColor: "transparent" }} onClick={newDeck}>New brew <ArrowRight size={15} strokeWidth={2.25} /></button>
+          </div>
+          <DeckTable decks={publicDecks} onOpen={(d) => router.push(`/deck/${d.publicId}`)} onDelete={deleteDeck} onDuplicate={duplicateDeck} onNew={newDeck} showNew={loaded && !me} />
+        </div>
+      </div>
+
+      {showCollection && <CollectionView initialTab={showCollection} onClose={() => setShowCollection(false)} onChanged={loadCollection} onWishlistChanged={setWishCount} />}
+
+      {showModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            bottom: 0,
+            right: "var(--assistant-w, 0px)",
+            background: "rgba(8,6,18,.55)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            zIndex: 50,
+            animation: "sp-fade .15s ease",
+          }}
+          onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="new-deck-title"
+            onKeyDown={(e) => {
+              // Escape closes it; the commander field's suggestion list uses
+              // Escape first and marks it handled.
+              if (e.key !== "Escape" || e.defaultPrevented) return;
+              setShowModal(false);
+              setCreateError("");
+            }}
+            style={{
+              ...LIGHT_VARS,
+              background: "var(--bg)",
+              color: "var(--t1)",
+              borderRadius: 20,
+              boxShadow: "0 30px 70px -20px rgba(8,6,18,.6)",
+              padding: "26px 28px 28px",
+              width: "100%",
+              maxWidth: 440,
+              animation: "sp-pop .18s ease",
+            }}
+          >
+            <h2 id="new-deck-title" style={{ margin: "0 0 6px", fontSize: 26, fontWeight: 700, letterSpacing: "-.02em" }}>Begin a new deck</h2>
+            <p style={{ margin: "0 0 18px", fontSize: 14.5, color: "var(--t2)", lineHeight: 1.5 }}>
+              Name your brew and choose a format.
+            </p>
+            <form onSubmit={createDeck} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <input placeholder="Deck name" aria-label="Deck name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required autoFocus style={modalInput} />
+              <select aria-label="Format" value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })} style={modalInput}>
+                <option value="commander">Commander</option>
+                <option value="standard">Standard</option>
+                <option value="modern">Modern</option>
+                <option value="pioneer">Pioneer</option>
+                <option value="legacy">Legacy</option>
+                <option value="vintage">Vintage</option>
+                <option value="pauper">Pauper</option>
+                <option value="draft">Draft</option>
+              </select>
+              {form.format === "commander" && (
+                <CommanderInput placeholder="Commander (optional)" value={form.commander} onChange={(v) => setForm({ ...form, commander: v })} style={modalInput} />
+              )}
+              {createError && (
+                <div style={{ fontSize: 13.5, color: "var(--danger)", lineHeight: 1.45, marginTop: 2 }}>
+                  {createError}
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 6 }}>
+                <button type="button" onClick={() => { setShowModal(false); setCreateError(""); }} className="mn-ghost" style={{ padding: "10px 20px", fontSize: 14 }}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={creating} className="mn-btn" style={{ padding: "10px 24px", fontSize: 14 }}>
+                  {creating ? "Scribing…" : "Create"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* footer — legal links + the WotC fan-content line */}
+      <footer style={{ marginTop: "auto", padding: "28px clamp(20px,4vw,52px) 34px", borderTop: "1px solid var(--line)", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 18px", fontSize: 13.5 }}>
+          <Link href="/privacy" style={{ color: "var(--t2)", textDecoration: "none" }}>Privacy</Link>
+          <Link href="/terms" style={{ color: "var(--t2)", textDecoration: "none" }}>Terms</Link>
+          <Link href="/refund" style={{ color: "var(--t2)", textDecoration: "none" }}>Refunds</Link>
+          <Link href="/pricing" style={{ color: "var(--t2)", textDecoration: "none" }}>Pricing</Link>
+          <a href="mailto:pinzitasalonso@gmail.com" style={{ color: "var(--t2)", textDecoration: "none" }}>Contact</a>
+        </div>
+        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: "var(--t3)", maxWidth: 720 }}>
+          Spellpool is unofficial Fan Content permitted under the Wizards of the Coast Fan Content
+          Policy. Magic: The Gathering is property of Wizards of the Coast LLC. Card data and imagery
+          by Scryfall.
+        </p>
+      </footer>
+      {toast && (
+        <div
+          role="status"
+          aria-live="polite"
+          onClick={() => setToast(null)}
+          style={{
+            position: "fixed",
+            left: "50%",
+            bottom: "max(24px, calc(env(safe-area-inset-bottom) + 12px))",
+            transform: "translateX(-50%)",
+            zIndex: 55,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            maxWidth: "calc(100vw - 32px)",
+            padding: "11px 18px",
+            borderRadius: 999,
+            background: "var(--t1, #14121c)",
+            color: "var(--bg, #fff)",
+            fontSize: 14,
+            fontWeight: 600,
+            boxShadow: "0 12px 30px -10px rgba(0,0,0,.45)",
+            animation: "sp-fade .15s ease",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          <Check size={16} strokeWidth={2.5} style={{ flex: "none" }} />
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{toast}</span>
+        </div>
+      )}
+    </main>
+  );
+}
+
+/* Flips true right after mount, driving CSS entrance transitions. */
+function useRevealed() {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setOn(true)));
+    return () => cancelAnimationFrame(id);
+  }, []);
+  return on;
+}
+
+function Reveal({ delay = 0, style, children }: { delay?: number; style?: React.CSSProperties; children: React.ReactNode }) {
+  return <div style={{ ...style, animation: `id-rise .6s cubic-bezier(.2,.8,.2,1) ${delay}ms both` }}>{children}</div>;
+}
+
+/* Fanned hand of real cards — staggered deal-in + idle float; hover lifts a card. */
+function CardFan() {
+  const [hov, setHov] = useState<number | null>(null);
+  // Classics in their original 1993 frames — the black-bordered Beta
+  // printings — pinned by image: by name alone Scryfall serves the newest.
+  const fan = [
+    { name: "Shivan Dragon", colors: ["R"], src: "https://cards.scryfall.io/normal/front/5/e/5e64822a-6817-4e1e-8155-3e95f8e3763f.jpg" },
+    { name: "Black Lotus", colors: ["C"], src: "https://cards.scryfall.io/normal/front/b/3/b3a69a1c-c80f-4413-a6fd-ae54cabbce28.jpg" },
+    { name: "Serra Angel", colors: ["W"], src: "https://cards.scryfall.io/normal/front/5/6/5669f9c8-2e94-47e2-a551-7efff317fb34.jpg" },
+  ];
+  return (
+    <div className="id-fan" style={{ position: "relative", height: 420, display: "flex", justifyContent: "center", alignItems: "center" }} aria-hidden="true">
+      <div style={{ position: "relative", width: 300, height: 380 }}>
+        {fan.map((c, i) => {
+          const rot = (i - 1) * 13;
+          const dx = (i - 1) * 86;
+          const dy = Math.abs(i - 1) * 26;
+          const hot = hov === i;
+          const t = `translateX(-50%) translateX(${dx}px) translateY(${dy + (hot ? -26 : 0)}px) rotate(${hot ? 0 : rot}deg) scale(${hot ? 1.05 : 1})`;
+          return (
+            <div
+              key={c.name}
+              onMouseEnter={() => setHov(i)}
+              onMouseLeave={() => setHov(null)}
+              style={{
+                position: "absolute",
+                left: "50%",
+                top: 12,
+                width: 214,
+                height: 300,
+                cursor: "pointer",
+                transformOrigin: "bottom center",
+                transform: t,
+                transition: "transform .42s cubic-bezier(.2,.8,.2,1)",
+                zIndex: hot ? 10 : 5 - Math.abs(i - 1),
+              }}
+            >
+              <div style={{ width: "100%", height: "100%", animation: `id-deal .85s cubic-bezier(.18,.86,.26,1) ${240 + i * 150}ms both` }}>
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: 14,
+                    overflow: "hidden",
+                    boxShadow: hot
+                      ? "0 34px 60px -16px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.14)"
+                      : "0 24px 50px -18px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.08)",
+                    animation: `id-float 6.5s ease-in-out ${1200 + i * 260}ms infinite`,
+                  }}
+                >
+                  <CardArt name={c.name} src={c.src} prefer="src" colors={c.colors} version="normal" radius={14} style={{ width: "100%", height: "100%" }} />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function CStat({ n, label, accent }: { n: number; label: string; accent?: boolean }) {
+  return (
+    <div style={{ textAlign: "right" }}>
+      <div className="id-mono" style={{ fontSize: 32, fontWeight: 700, color: accent ? "var(--gold)" : "var(--t1)", lineHeight: 1 }}>{n}</div>
+      <div className="id-label" style={{ marginTop: 6, color: "var(--t3)" }}>{label}</div>
+    </div>
+  );
+}
+
+/* ---------- "Your collection" home block ---------- */
+function CollectionBlock({ unique, total, pending, sample, wishlist, onOpen, onWishlist }: { unique: number; total: number; pending: number; sample: CollectionSample[]; wishlist: number; onOpen: () => void; onWishlist: () => void }) {
+  return (
+    <div style={{ marginTop: 56 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 14, rowGap: 10, flexWrap: "wrap", paddingBottom: 20, borderBottom: "1px solid var(--line)" }}>
+        <h2 className="id-display" style={{ margin: 0, fontSize: "clamp(24px, 4vw, 32px)", color: "var(--t1)" }}>Your collection</h2>
+        <span className="id-mono" style={{ fontSize: 12.5, color: "var(--t3)" }}>{unique > 0 ? `${unique} unique · ${total} total${pending > 0 ? ` · matching ${pending}…` : ""}` : "nothing yet"}</span>
+        {/* The cards you want and don't have: the collection's other list. */}
+        <button onClick={onWishlist} className="id-ghost" style={{ marginLeft: "auto", padding: "9px 18px" }} aria-label={`Wishlist${wishlist ? `, ${wishlist} cards` : ""}`}>
+          <Heart size={15} strokeWidth={2.25} /> Wishlist{wishlist > 0 ? <span className="id-mono" style={{ fontSize: 12.5, color: "var(--t3)" }}>{wishlist}</span> : null}
+        </button>
+        <button onClick={onOpen} className="id-ghost" style={{ padding: "9px 18px" }}>
+          {unique > 0 ? "Browse" : "Import"} <ArrowRight size={15} strokeWidth={2.25} />
+        </button>
+      </div>
+      {unique > 0 ? (
+        <button
+          onClick={onOpen}
+          aria-label="Browse your collection"
+          className="coll-sample"
+          style={{ marginTop: 20, padding: 0, border: "none", background: "transparent", cursor: "pointer", width: "100%" }}
+        >
+          {/* The stored scans, from the image CDN: not seven lookups by name. */}
+          {sample.map(asSample).map((s) => (
+            <div key={s.name} style={{ minWidth: 0, borderRadius: 10, overflow: "hidden", boxShadow: "0 6px 16px -8px rgba(0,0,0,.5)" }}>
+              <CardArt name={s.name} src={s.imageUri ?? undefined} prefer="src" colors={["C"]} version="normal" radius={10} style={{ aspectRatio: "5 / 7" }} />
+            </div>
+          ))}
+        </button>
+      ) : (
+        <p style={{ marginTop: 18, fontSize: 15, color: "var(--t2)", lineHeight: 1.5 }}>
+          Import the cards you own to track them across decks, see what you can build for free, and let the coach factor it in.{" "}
+          <button onClick={onOpen} style={{ background: "none", border: "none", padding: 0, color: "var(--gold)", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>
+            Import your collection
+          </button>
+          .
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ---------- color-identity deck tiles ---------- */
+
+/** The action buttons' slots, from the tile's top-right corner inward. */
+const actionRight = (slot: number): number => 10 + slot * 38;
+
+function DeckTable({
+  decks,
+  onOpen,
+  onDelete,
+  onDuplicate,
+  onPin,
+  onNew,
+  showNew,
+}: {
+  decks: Deck[];
+  onOpen: (d: Deck) => void;
+  onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  /** Absent on the public gallery: pinning is a personal order, not everyone's. */
+  onPin?: (id: string, pinned: boolean) => void;
+  onNew: () => void;
+  showNew: boolean;
+}) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(258px, 1fr))", gap: 22 }}>
+      {decks.map((d, i) => (
+        <DeckTile key={d.id} deck={d} index={i} onOpen={() => onOpen(d)} onDelete={() => onDelete(d.publicId)} onDuplicate={() => onDuplicate(d.publicId)} onPin={onPin ? () => onPin(d.publicId, !d.pinned) : undefined} />
+      ))}
+      {showNew && <NewDeckTile onNew={onNew} />}
+    </div>
+  );
+}
+
+function DeckTile({ deck, index, onOpen, onDelete, onDuplicate, onPin }: { deck: Deck; index: number; onOpen: () => void; onDelete: () => void; onDuplicate: () => void; onPin?: () => void }) {
+  const colors = deck.colors?.length ? deck.colors : ["C"];
+  const field = getIdentityField(colors.join(""));
+  const count = deck._count?.cards || 0;
+  const target = deckTarget(deck.format);
+  const scan = deck.scan ?? null;
+  const isCommander = deck.format.toLowerCase() === "commander";
+  // Brackets are Commander's; another format's deck shows only its Score.
+  const bracket = isCommander ? scan?.bracket ?? null : null;
+  // One line under the commander: the format when it isn't Commander, and
+  // before a scan, how far along an unfinished list is — the count only
+  // matters while a deck is being built. The bracket and the Score are the pill on the art;
+  // the bracket's name (Upgraded, Optimized…) is left out, since it only
+  // restates the number.
+  const meta = [
+    isCommander ? null : deck.format.charAt(0).toUpperCase() + deck.format.slice(1),
+    // A full deck without a scan says nothing: "Not scored yet" only made
+    // its row of tiles taller.
+    scan || count === target ? null : `${count}/${target} cards`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    // The tile fills its grid cell, so tiles in a row match in height whether
+    // or not they have the line under the commander.
+    <Reveal delay={60 + Math.min(index, 8) * 50} style={{ height: "100%" }}>
+      <div className="deck-tile" style={{ position: "relative", height: "100%" }}>
+        <button
+          className="deck-tile-card"
+          onClick={onOpen}
+          style={{
+            textAlign: "left",
+            cursor: "pointer",
+            width: "100%",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            padding: 0,
+            border: "none",
+            borderRadius: 18,
+            overflow: "hidden",
+            position: "relative",
+            color: "#fff",
+            background: `linear-gradient(165deg, ${field.bg}, ${field.deep})`,
+            boxShadow: "0 3px 8px -2px rgba(0,0,0,.28)",
+            transition: "transform .2s, box-shadow .2s",
+          }}
+        >
+          <div style={{ position: "relative", height: 132, flexShrink: 0 }}>
+            {/* No commander and no cards: the deck's colour field alone. (The
+                placeholder used to spell the first two letters of its name.) */}
+            {(deck.commander || deck.cover) && (
+              <CardArt name={commanderArtName(deck.commander)} src={deck.cover ?? undefined} label={deck.name} colors={colors} version="art_crop" radius={0} style={{ position: "absolute", inset: 0 }} />
+            )}
+            <div style={{ position: "absolute", inset: 0, background: `linear-gradient(180deg, transparent 30%, ${field.deep}ee)` }} />
+            <div style={{ position: "absolute", top: 12, left: 14 }}>
+              <ColorPips colors={colors} size={20} />
+            </div>
+            {/* The last scan, as one pill: the bracket in its tint, joined to
+                the Score. A deck in another format has no bracket, so its
+                pill is the Score alone. */}
+            {scan && (
+              <span
+                title={`${bracket ? `Bracket ${bracket}, ` : ""}Score ${scan.label}, as of its last scan`}
+                style={{
+                  position: "absolute",
+                  bottom: 10,
+                  right: 14,
+                  display: "inline-flex",
+                  borderRadius: 8,
+                  overflow: "hidden",
+                  fontSize: 14,
+                  lineHeight: "26px",
+                  color: "#181228",
+                  fontVariantNumeric: "tabular-nums",
+                  boxShadow: "0 2px 8px rgba(0,0,0,.4)",
+                }}
+              >
+                {bracket && <span style={{ background: BRACKET_TINT[bracket], fontWeight: 800, padding: "0 9px" }}>B{bracket}</span>}
+                <span style={{ background: "#F4F0E6", fontWeight: 600, padding: "0 10px" }}>{scan.label}</span>
+              </span>
+            )}
+          </div>
+          <div style={{ padding: "14px 18px 16px" }}>
+            {/* A line height that holds the descenders: at 0.9 the clip that
+                makes the ellipsis also cut the tails off g, y and p. */}
+            <div className="id-display" style={{ fontSize: 30, lineHeight: 1.2, marginBottom: 1, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+              {deck.name}
+            </div>
+            {/* Under the name: who leads it. A Commander deck without one says
+                so; another format has no such line (its format is below). */}
+            {(deck.commander || isCommander) && (
+              <div style={{ fontSize: 13.5, color: "rgba(255,255,255,.78)", marginBottom: meta ? 12 : 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {deck.commander || "No commander yet"}
+              </div>
+            )}
+            {meta && (
+              <div style={{ fontSize: 13, lineHeight: "20px", color: "rgba(255,255,255,.66)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {meta}
+              </div>
+            )}
+          </div>
+        </button>
+        <button
+          className="tile-action"
+          onClick={(e) => { e.stopPropagation(); onDuplicate(); }}
+          title="Duplicate deck"
+          aria-label="Duplicate deck"
+          style={{
+            position: "absolute",
+            top: 10,
+            right: actionRight(onPin ? 2 : 1),
+            width: 30,
+            height: 30,
+            borderRadius: 8,
+            border: "none",
+            cursor: "pointer",
+            background: "rgba(0,0,0,.5)",
+            color: "#fff",
+            fontSize: 12,
+                        display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2,
+          }}
+        >
+          <Copy size={15} strokeWidth={2.25} />
+        </button>
+        <button
+          className="tile-action"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          title="Delete deck"
+          aria-label="Delete deck"
+          style={{
+            position: "absolute",
+            top: 10,
+            right: actionRight(onPin ? 1 : 0),
+            width: 30,
+            height: 30,
+            borderRadius: 8,
+            border: "none",
+            cursor: "pointer",
+            background: "rgba(0,0,0,.5)",
+            color: "#fff",
+            fontSize: 11,
+                        display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2,
+          }}
+        >
+          <Trash2 size={15} strokeWidth={2.25} />
+        </button>
+        {/* Pin: gold once pinned, so the top of the list reads as
+            chosen. The actions wait for a mouse hover; a set pin always
+            shows, and so does everything on a touch screen (see .deck-tile).
+            The pin takes the corner so it sits there alone when the others
+            are hidden. */}
+        {onPin && <button
+          className="tile-action"
+          onClick={(e) => { e.stopPropagation(); onPin(); }}
+          title={deck.pinned ? "Unpin deck" : "Pin deck to the top"}
+          aria-label={deck.pinned ? "Unpin deck" : "Pin deck to the top"}
+          aria-pressed={Boolean(deck.pinned)}
+          data-on={deck.pinned ? "true" : undefined}
+          style={{
+            position: "absolute",
+            top: 10,
+            right: actionRight(0),
+            width: 30,
+            height: 30,
+            borderRadius: 8,
+            border: "none",
+            cursor: "pointer",
+            background: deck.pinned ? "var(--gold)" : "rgba(0,0,0,.5)",
+            color: deck.pinned ? "var(--accent-ink)" : "#fff",
+            fontSize: 12,
+                        display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2,
+          }}
+        >
+          <Pin size={15} strokeWidth={2.25} fill={deck.pinned ? "currentColor" : "none"} />
+        </button>}
+      </div>
+    </Reveal>
+  );
+}
+
+function NewDeckTile({ onNew }: { onNew: () => void }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={onNew}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        minHeight: 250,
+        borderRadius: 18,
+        border: "1.5px dashed var(--border)",
+        background: hover ? "var(--surface)" : "transparent",
+        color: "var(--t2)",
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        transition: "background .15s, border-color .15s",
+        borderColor: hover ? "var(--gold)" : "var(--border)",
+      }}
+    >
+      <span className="id-display" style={{ fontSize: 34, color: hover ? "var(--gold)" : "var(--t2)", lineHeight: 1 }}>+</span>
+      <span className="id-label" style={{ color: "var(--t1)" }}>New deck</span>
+    </button>
+  );
+}
+
+const modalInput: React.CSSProperties = {
+  padding: "13px 16px",
+  border: "1px solid var(--line)",
+  outline: "none",
+  borderRadius: 12,
+  fontFamily: "var(--font-body)",
+  fontSize: 15,
+  color: "var(--t1)",
+  background: "var(--bg2)",
+  width: "100%",
+};
