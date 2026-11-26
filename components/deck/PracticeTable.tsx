@@ -66,6 +66,7 @@ import { canPayNextTax, declineTax, payTax, playerDraws, concede,
   playerScry,
   resolveCombat,
   setBlocks,
+  shownLog,
   startTurn,
   tapToggle,
   withYourSide,
@@ -237,7 +238,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   }, [choiceKind]);
 
   // The history beside the board follows the newest line.
-  const logLength = game?.log.length ?? 0;
+  const logLength = game ? shownLog(game).length : 0;
   useEffect(() => {
     const el = sideLog.current;
     if (el) el.scrollTop = el.scrollHeight;
@@ -468,16 +469,17 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!setup) return g0;
     const card = findCard(g0, parseCardId(a.card) ?? -1)?.card;
     if (!card || isLand(card)) {
-      const g = applyAction(g0, "opp", a, setup.book).game;
-      setGame(g);
-      return pause(BEAT, g);
+      const r = applyAction(g0, "opp", a, setup.book);
+      setGame(r.game);
+      // A refused move shows nothing, so it takes no beat either.
+      return r.ok ? pause(BEAT, r.game) : r.game;
     }
     const targetIid = a.effects.map((e) => parseCardId(e.target)).find((t) => t !== null) ?? undefined;
     const target = targetIid !== undefined ? findCard(g0, targetIid)?.card.name : undefined;
     const answerable = canAnswer(g0);
     const paid = applyAction(g0, "opp", a, setup.book, { stage: "pay" });
     setGame(paid.game);
-    if (!paid.ok) return pause(BEAT, paid.game);
+    if (!paid.ok) return paid.game;
     setSpotlight({ card, target, targetIid });
     let answer: Answer = { kind: "resolve", g: paid.game };
     if (answerable) {
@@ -508,7 +510,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const combo = combos.find((c) => c.id === a.card);
     const paid = applyAction(g0, "opp", a, setup.book, { stage: "pay", combos });
     setGame(paid.game);
-    if (!paid.ok || !combo) return pause(BEAT, paid.game);
+    if (!paid.ok || !combo) return paid.game;
     setPending({ kind: "combo", combo });
     setMode("respond");
     const answer = await new Promise<Answer>((resolve) => (answerRef.current = resolve));
@@ -611,9 +613,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       if (a.kind === "cast") g = await aiCast(g, a, "ai");
       else if (a.kind === "combo") g = await aiCombo(g, a);
       else {
-        g = applyAction(g, "opp", a, setup.book).game;
+        const r = applyAction(g, "opp", a, setup.book);
+        g = r.game;
         setGame(g);
-        g = await pause(BEAT, await waitChoice(g));
+        if (r.ok) g = await pause(BEAT, await waitChoice(g));
       }
       if (!alive.current || g.winner) return;
     }
@@ -636,9 +639,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         if (a.kind === "cast") g = await aiCast(g, a, "ai");
         else if (a.kind === "combo") g = await aiCombo(g, a);
         else {
-          g = applyAction(g, "opp", a, setup.book).game;
+          const r = applyAction(g, "opp", a, setup.book);
+          g = r.game;
           setGame(g);
-          g = await pause(BEAT, await waitChoice(g));
+          if (r.ok) g = await pause(BEAT, await waitChoice(g));
         }
         if (!alive.current || g.winner) return;
       }
@@ -694,9 +698,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       if (a.kind === "cast") g = await aiCast(g, a, "ai");
       else if (a.kind === "combo") g = await aiCombo(g, a);
       else {
-        g = applyAction(g, "opp", a, setup.book).game;
+        const r = applyAction(g, "opp", a, setup.book);
+        g = r.game;
         setGame(g);
-        g = await pause(BEAT, await waitChoice(g));
+        if (r.ok) g = await pause(BEAT, await waitChoice(g));
       }
       if (!alive.current || g.winner) return;
     }
@@ -1150,8 +1155,10 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         )}
       </div>
     );
-  const lastLines = game.log.slice(-3);
-  const recent = game.log.filter((l) => l.card).slice(-4).reverse();
+  // The log as you read it: without the opponent's refused moves.
+  const log = shownLog(game);
+  const lastLines = log.slice(-3);
+  const recent = log.filter((l) => l.card).slice(-4).reverse();
   // A commander waiting in the command zone: small and dimmed beside its
   // side's counts, not a row of the board, until it's cast.
   const commandZone = (seat: Seat) => {
@@ -1544,7 +1551,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                   </div>
                 )}
                 {lastLines.map((l, i) => (
-                  <div key={`${game.log.length}-${i}`} className={`pt-logline${l.seat === "opp" ? " pt-logline-opp" : ""}`}>
+                  <div key={`${log.length}-${i}`} className={`pt-logline${l.seat === "opp" ? " pt-logline-opp" : ""}`}>
                     {l.text}
                   </div>
                 ))}
@@ -1615,7 +1622,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                 const at = findCard(game, l.card!.iid);
                 return (
                   <button
-                    key={`${game.log.length}-${i}`}
+                    key={`${log.length}-${i}`}
                     type="button"
                     className="pt-side-card"
                     data-seat={l.seat ?? undefined}
@@ -1635,8 +1642,8 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           )}
           <div className="pt-zone-label">History</div>
           <ol className="pt-side-log" ref={sideLog}>
-            {game.log.slice(-40).map((l, i) => (
-              <li key={`${game.log.length}-${i}`} className={l.seat === "opp" ? "pt-logline-opp" : undefined}>
+            {log.slice(-40).map((l, i) => (
+              <li key={`${log.length}-${i}`} className={l.seat === "opp" ? "pt-logline-opp" : undefined}>
                 {l.text}
               </li>
             ))}
@@ -1741,7 +1748,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       {logOpen && (
         <Panel title="Game log" onClose={() => setLogOpen(false)}>
           <ol className="pt-log">
-            {game.log.map((l, i) => (
+            {log.map((l, i) => (
               <li key={i} className={l.seat === "opp" ? "pt-logline-opp" : undefined}>
                 {l.text}
               </li>
@@ -1753,7 +1760,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       {mode === "over" && (
         <div className="pt-over">
           <div className="id-display">{game.winner === "you" ? "You win!" : "The opponent wins"}</div>
-          <p>{game.log.at(-1)?.text}</p>
+          <p>{log.at(-1)?.text}</p>
           {opp.hand.length > 0 && <p className="pt-over-hand">It was holding {opp.hand.map((c) => c.name).join(", ")}.</p>}
           {recordLine && <p className="pt-over-record">{recordLine}</p>}
         </div>
