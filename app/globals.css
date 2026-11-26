@@ -1830,9 +1830,40 @@ button {
   gap: 8px;
   margin-top: 14px;
 }
-.pk-solo {
-  margin-top: 26px;
+/* Solo or Match: the two ways to play, as one switch beside the title of
+   both tables (components/deck/playtest-parts.tsx ModeSwitch). */
+.pt-mode {
+  display: inline-flex;
+  flex: none;
+  align-self: center;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.25);
 }
+.pt-mode button {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pt-mode button[aria-selected="true"] {
+  background: var(--gold);
+  color: #181228;
+  cursor: default;
+}
+.pt-mode button:not([aria-selected="true"]):hover { color: #fff; }
+/* The phone's copy: shown only where the title (and the switch beside it)
+   is hidden. */
+.pt-mode-narrow,
+.pk-mode { display: none; }
+.pk-mode { margin-bottom: 14px; }
 /* The commander search. */
 .pk-search {
   display: flex;
@@ -3097,6 +3128,15 @@ button {
   .pt-tools-row .pt-narrow-only {
     display: inline-flex;
   }
+  .pt-tools-row .pt-mode-narrow {
+    display: inline-flex;
+  }
+  .pk-mode {
+    display: block;
+  }
+  .pk-mode .pt-mode-narrow {
+    display: inline-flex;
+  }
   .pt-life-value {
     min-width: 26px;
     font-size: 15px;
@@ -3284,7 +3324,8 @@ button {
     flex: none;
     padding: 6px 10px;
   }
-  .pt-table .pt-tools-row .pt-narrow-only {
+  .pt-table .pt-tools-row .pt-narrow-only,
+  .pt-table .pt-tools-row .pt-mode-narrow {
     display: inline-flex;
   }
   /* The buttons come first: the status has what's left, at least a few

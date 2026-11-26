@@ -180,6 +180,34 @@ export function PtCard({
   );
 }
 
+/** The two ways to play, side by side in the same place on both tables:
+    alone (try hands), or a match against an opponent. The one you're in is
+    lit; the other is one click away. */
+export function ModeSwitch({
+  mode,
+  onSolo,
+  onMatch,
+  narrow,
+}: {
+  mode: "solo" | "match";
+  onSolo?: () => void;
+  onMatch?: () => void;
+  /** The phone's copy: a phone hides the title this sits beside, so the
+      switch leads the row of buttons there instead. */
+  narrow?: boolean;
+}) {
+  return (
+    <div className={narrow ? "pt-mode pt-mode-narrow" : "pt-mode"} role="tablist" aria-label="How to play">
+      <button type="button" role="tab" aria-selected={mode === "solo"} onClick={mode === "solo" ? undefined : onSolo} title="Play alone: draw hands, try lines">
+        Solo
+      </button>
+      <button type="button" role="tab" aria-selected={mode === "match"} onClick={mode === "match" ? undefined : onMatch} title="A practice match against an opponent that pilots a real deck">
+        Match
+      </button>
+    </div>
+  );
+}
+
 /** A permanent with what's attached to it (an Equipment, an Aura): each
     attached card tucked behind it, its name bar showing above. `under` are
     the attached cards' elements, `children` the permanent's own. */
