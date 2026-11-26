@@ -5,7 +5,9 @@ import {
   attaches,
   detachCard,
   bottomCard,
+  byKind,
   draw,
+  kindBreak,
   moveCard,
   mulligan,
   nextTurn,
@@ -247,5 +249,55 @@ describe("attaching", () => {
     expect(gone.battlefield.some((c) => c.iid === 1)).toBe(true);
     // Not onto itself.
     expect(attachCard(base, 1, 1)).toBe(base);
+  });
+});
+
+// The table laid a side's permanents out in the order they were played: a
+// Mana Vault between two creatures, Treasures in a line of attackers.
+describe("the table's order", () => {
+  const perm = (name: string, typeLine: string, token = false) => ({ name, typeLine, ...(token ? { token: {} } : {}) });
+  const played = [
+    perm("Goblin Guide", "Creature — Goblin Scout"),
+    perm("Sol Ring", "Artifact"),
+    perm("Treasure", "Token Artifact — Treasure", true),
+    perm("Krenko, Mob Boss", "Legendary Creature — Goblin Warrior"),
+    perm("Soldier", "Token Creature — Soldier", true),
+    perm("Impact Tremors", "Enchantment"),
+    perm("Chandra, Torch of Defiance", "Legendary Planeswalker — Chandra"),
+    perm("Goblin", "Token Creature — Goblin", true),
+    perm("Solemn Simulacrum", "Artifact Creature — Golem"),
+    perm("Soldier", "Token Creature — Soldier", true),
+    perm("Skullclamp", "Artifact — Equipment"),
+  ];
+  const typeOf = (c: { typeLine: string }) => c.typeLine;
+
+  it("groups them by kind, each group in the order its cards arrived, tokens last", () => {
+    expect(byKind(played, typeOf).map((c) => c.name)).toEqual([
+      // Creatures (an artifact creature is one), then their tokens, same names together.
+      "Goblin Guide",
+      "Krenko, Mob Boss",
+      "Solemn Simulacrum",
+      "Goblin",
+      "Soldier",
+      "Soldier",
+      "Chandra, Torch of Defiance",
+      "Sol Ring",
+      "Skullclamp",
+      "Treasure",
+      "Impact Tremors",
+    ]);
+    // The cards it was given keep their order.
+    expect(played[1]!.name).toBe("Sol Ring");
+  });
+
+  it("marks the one place where the creatures end", () => {
+    const sorted = byKind(played, typeOf);
+    expect(sorted.map((_, i) => kindBreak(sorted, i, typeOf)).filter(Boolean)).toHaveLength(1);
+    expect(kindBreak(sorted, 6, typeOf)).toBe(true);
+    // No creatures, or nothing but creatures: no break.
+    const rocks = byKind([played[1]!, played[10]!], typeOf);
+    expect(rocks.some((_, i) => kindBreak(rocks, i, typeOf))).toBe(false);
+    const guys = byKind([played[0]!, played[3]!], typeOf);
+    expect(guys.some((_, i) => kindBreak(guys, i, typeOf))).toBe(false);
   });
 });

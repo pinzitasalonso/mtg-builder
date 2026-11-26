@@ -1104,6 +1104,10 @@ button {
 .pt-tools-row {
   display: contents;
 }
+/* A button's one-word label, for a phone (its long one is .pt-btn-label). */
+.pt-btn-short {
+  display: none;
+}
 .pt-btn.pt-narrow-only {
   display: none;
 }
@@ -1250,6 +1254,12 @@ button {
 }
 .pt-row-perms {
   flex: 1;
+}
+/* Where a side's creatures end and its artifacts and enchantments begin:
+   a wider gap, so they read as two groups. (KIND_GAP in playtest-parts.) */
+.pt-kind-gap {
+  flex: none;
+  width: 6px;
 }
 .pt-row-lands {
   border-top: 1px dashed rgba(255, 255, 255, 0.14);
@@ -3127,6 +3137,10 @@ button {
   .pt-hand {
     --pt-hand: var(--pt-hand-max) !important;
   }
+  /* The cards are columns of a set width here: no wider gap between groups. */
+  .pt-kind-gap {
+    display: none;
+  }
   .pt-field .pt-row-perms .pt-card,
   .pt-panel .pt-row .pt-card {
     width: calc(50% - 4px);
@@ -3240,6 +3254,9 @@ button {
   }
   .pt-tools-row .pt-narrow-only {
     display: inline-flex;
+  }
+  .pt-btn-short {
+    display: inline;
   }
   .pt-life-value {
     min-width: 26px;
@@ -3431,6 +3448,9 @@ button {
   .pt-table .pt-tools-row .pt-narrow-only {
     display: inline-flex;
   }
+  .pt-table .pt-btn-short {
+    display: inline;
+  }
   /* The buttons come first: the status has what's left, at least a few
      words' width. (It used to ask for 120px, and squeezed the row until
      its last button, Token, was cut in half.) */
@@ -3607,7 +3627,10 @@ button {
   .pt-table .pt-meta > span + span::before {
     content: none;
   }
-  .pt-table .pt-side-cards {
+  /* (My side is named twice: its rule for a wide screen lets the lands
+     wrap under a full line, and there's no room for a second line here.) */
+  .pt-table .pt-side-cards,
+  .pt-table.pt-vs .pt-mine > .pt-side-cards {
     display: flex;
     flex-direction: row;
     flex-wrap: nowrap;

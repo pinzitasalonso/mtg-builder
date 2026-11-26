@@ -86,6 +86,36 @@ const ZONES: Zone[] = ["library", "hand", "battlefield", "graveyard", "exile", "
 
 const frontFace = (typeLine: string | null) => (typeLine ?? "").split(" // ")[0]!;
 export const isLandCard = (typeLine: string | null) => /\bLand\b/.test(typeLine ?? "");
+
+/** The kinds a side's nonland permanents are laid out by, in order: its
+    creatures first, then planeswalkers, artifacts, enchantments, the rest. */
+const KIND_ORDER = ["creature", "planeswalker", "artifact", "enchantment"] as const;
+
+/** A card's kind on the table, from its type line: an artifact creature is
+    a creature. */
+export function kindOf(typeLine: string | null | undefined): number {
+  const type = (typeLine ?? "").split(" // ")[0]!.toLowerCase();
+  const i = KIND_ORDER.findIndex((k) => type.includes(k));
+  return i < 0 ? KIND_ORDER.length : i;
+}
+
+/** A side's nonland permanents in the order the table shows them: grouped
+    by kind (a Mana Vault isn't left between two creatures), each group in
+    the order its cards arrived, its tokens last and same-named together. */
+export function byKind<T extends { name: string; token?: unknown }>(cards: T[], typeOf: (c: T) => string | null | undefined): T[] {
+  return cards
+    .map((c, i) => ({ c, i, kind: kindOf(typeOf(c)) }))
+    .sort((a, b) => a.kind - b.kind || Number(!!a.c.token) - Number(!!b.c.token) || (a.c.token && b.c.token ? a.c.name.localeCompare(b.c.name) : 0) || a.i - b.i)
+    .map((x) => x.c);
+}
+
+/** Where the creatures end and the rest begins: the table leaves a wider
+    gap there (`.pt-kind-gap`), so the two read as two groups. */
+export function kindBreak<T>(sorted: T[], i: number, typeOf: (c: T) => string | null | undefined): boolean {
+  return i > 0 && kindOf(typeOf(sorted[i]!)) > 0 && kindOf(typeOf(sorted[i - 1]!)) === 0;
+}
+/** That gap's own width, in px (the styles' `.pt-kind-gap`). */
+export const KIND_GAP = 6;
 /** Instants and sorceries don't stay: cast from hand, they resolve to the graveyard. */
 export const resolvesToGraveyard = (typeLine: string | null) => /\b(Instant|Sorcery)\b/.test(frontFace(typeLine));
 

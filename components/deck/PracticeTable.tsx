@@ -3,7 +3,7 @@
 import { LimitNotice } from "@/components/Upgrade";
 import { isLimitMessage } from "@/lib/limits";
 import { refreshPlan } from "@/lib/plan-client";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bot, Flag, Loader2, Plus, Sparkles, Swords, Undo2, X } from "lucide-react";
 import type { OpponentOption } from "@/app/api/practice/opponents/route";
@@ -11,7 +11,7 @@ import { PrimerMarkdown } from "@/components/deck/DeckPrimer";
 import OpponentPicker from "@/components/deck/OpponentPicker";
 import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom, AttachGroup, TableTitle, LibraryOrderBar, orderLibrary, type LibraryOrder } from "@/components/deck/playtest-parts";
-import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
+import { bottomCard, byKind, draw, kindBreak, KIND_GAP, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan, winningTurn } from "@/lib/practice/ai";
 import { tutorOf, tutorSearch } from "@/lib/practice/spells";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
@@ -1099,13 +1099,20 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
   const hostOf = (c: PlayCard) => (c.attachedTo === undefined ? undefined : field.find((h) => h.iid === c.attachedTo && !isLand(h)));
   const tucked = (c: PlayCard) => hostOf(c) !== undefined;
   const seatOf = (c: PlayCard): Seat => (you.battlefield.some((x) => x.iid === c.iid) ? "you" : "opp");
+  // A side's nonland permanents, grouped by kind: its creatures, then its
+  // planeswalkers, artifacts and enchantments. (They sat in the order they
+  // were played: a Mana Vault between two creatures, Treasures in a line of
+  // attackers.) A token is what its own type says it is.
+  const kindType = (c: PlayCard) => (c.token ? c.typeLine : (infoOf(book, c)?.typeLine ?? c.typeLine));
   const row = (cards: PlayCard[], seat: Seat) =>
-    cards
-      .filter((c) => !tucked(c))
-      .map((c) => (
-        <AttachGroup key={c.iid} under={field.filter((a) => a.attachedTo === c.iid && tucked(a)).map((a) => <PtCard key={a.iid} {...cardProps(seatOf(a))(a, "battlefield")} />)}>
-          <PtCard key={c.iid} {...cardProps(seat)(c, "battlefield")} />
-        </AttachGroup>
+    byKind(cards.filter((c) => !tucked(c)), kindType)
+      .map((c, i, all) => (
+        <Fragment key={c.iid}>
+          {kindBreak(all, i, kindType) && <span className="pt-kind-gap" aria-hidden />}
+          <AttachGroup under={field.filter((a) => a.attachedTo === c.iid && tucked(a)).map((a) => <PtCard key={a.iid} {...cardProps(seatOf(a))(a, "battlefield")} />)}>
+            <PtCard {...cardProps(seat)(c, "battlefield")} />
+          </AttachGroup>
+        </Fragment>
       ));
   // A side's lands in one pile, each on top of the one before: the same land
   // together, untapped first. However many there are, they take about one
@@ -1124,7 +1131,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const perms = cards.filter((c) => !isLand(c) && !tucked(c));
     const lands = [...cards.filter(isLand)].sort((a, b) => a.name.localeCompare(b.name));
     const landSlots = lands.reduce((n, c, i) => n + (i === 0 ? 1 : lands[i - 1]!.name === c.name ? 0.18 : 0.3), 0);
-    const fixed = cards.length * 8 + (perms.length && lands.length ? 30 : 0);
+    // The break after the creatures: its own width and one more gap.
+    const breaks = byKind(perms, kindType).some((_, i, all) => kindBreak(all, i, kindType)) ? KIND_GAP + 8 : 0;
+    const fixed = cards.length * 8 + (perms.length && lands.length ? 30 : 0) + breaks;
     return { ["--pt-slots" as string]: Math.max(1, perms.length + landSlots), ["--pt-fixed" as string]: `${fixed}px` };
   };
   // A side's command zone in the column of piles: dimmed until it's cast.
@@ -1198,7 +1207,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       : mode === "ninjutsu"
         ? "Blocks are in. Use ninjutsu or sneak for an unblocked attacker, or go to damage."
       : mode === "attack"
-        ? "Tap the creatures that attack."
+        ? picked.length
+          ? "Tap a creature to add it or take it out."
+          : "Tap the creatures that attack."
         : mode === "block"
           ? blocker === null
             ? "Tap one of your creatures, then the attacker it blocks."
@@ -1279,6 +1290,23 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               >
                 <Swords size={14} strokeWidth={2.25} /> Attack
               </button>
+              {/* Every creature that can: picked for you, to confirm or thin out. */}
+              {you.battlefield.filter((c) => canAttack(game, "you", c, book)).length > 1 && (
+                <button
+                  type="button"
+                  className="pt-btn"
+                  onClick={() => {
+                    setPicked(you.battlefield.filter((c) => canAttack(game, "you", c, book)).map((c) => c.iid));
+                    setMode("attack");
+                  }}
+                  disabled={!!game.choice}
+                  aria-label="Attack with all"
+                >
+                  {/* A phone has room for one word: it sits right after "Attack". */}
+                  <span className="pt-btn-label">Attack with all</span>
+                  <span className="pt-btn-short">All</span>
+                </button>
+              )}
               <button type="button" className="pt-btn" onClick={() => void endMyTurn()} disabled={!!game.choice}>
                 End turn
               </button>
@@ -1298,6 +1326,11 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
               <button type="button" className="pt-btn pt-btn-gold" onClick={() => void attack()} disabled={!picked.length}>
                 Attack with {picked.length}
               </button>
+              {picked.length < you.battlefield.filter((c) => canAttack(game, "you", c, book)).length && (
+                <button type="button" className="pt-btn" onClick={() => setPicked(you.battlefield.filter((c) => canAttack(game, "you", c, book)).map((c) => c.iid))}>
+                  Pick all
+                </button>
+              )}
               <button type="button" className="pt-btn" onClick={() => (setPicked([]), setMode("main"))}>
                 Cancel
               </button>
