@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { aiMulligan, arrivalsPlan, fallbackPlan, guardPlan, winningTurn } from "./ai";
 import { comboBrief, lineBrief } from "./brief";
-import { handManaOf, manaOutput, manaSinkOf, sacManaOf, searchAbility } from "./cards";
+import { entersTapped, handManaOf, manaOutput, manaSinkOf, ownTurnOf, sacManaOf, searchAbility } from "./cards";
 import { comboNeeds, type DeckCombo } from "./combos";
 import { report, selfplay } from "./selfplay";
 import { applyAction, availableMana, cardId, comboStatus, endTurn, manaAhead, newGame, playerSpellResolves, shownLog, startTurn, uncastable, type DeckCard } from "./game";
@@ -27,6 +27,12 @@ const BOOK: CardBook = Object.fromEntries(
     info("Swamp", { typeLine: "Basic Land — Swamp", producedMana: ["B"] }),
     info("Bear", { manaCost: "{1}{G}", manaValue: 2, power: 2, toughness: 2 }),
     info("Counterspell", { typeLine: "Instant", manaCost: "{U}{U}", manaValue: 2, oracleText: "Counter target spell." }),
+    // A third match's cards, with Scryfall's text.
+    info("City of Traitors", { typeLine: "Land", producedMana: ["C"], oracleText: "When you play another land, sacrifice this land.\n{T}: Add {C}{C}." }),
+    info("Starting Town", { typeLine: "Land — Town", producedMana: ["B", "C", "G", "R", "U", "W"], oracleText: "This land enters tapped unless it's your first, second, or third turn of the game.\n{T}: Add {C}.\n{T}, Pay 1 life: Add one mana of any color." }),
+    info("Hexing Squelcher", { typeLine: "Creature — Goblin Sorcerer", manaCost: "{1}{R}", manaValue: 2, power: 2, toughness: 2, oracleText: "This spell can't be countered.\nWard—Pay 2 life.\nSpells you control can't be countered.\nOther creatures you control have \"Ward—Pay 2 life.\"" }),
+    info("Copy Enchantment", { typeLine: "Enchantment", manaCost: "{2}{U}", manaValue: 3, oracleText: "You may have this enchantment enter as a copy of any enchantment on the battlefield." }),
+    info("Goblin Piker", { typeLine: "Creature — Goblin Warrior", manaCost: "{1}{R}", manaValue: 2, power: 0, toughness: 3, oracleText: "Whenever this creature attacks, it gets +2/+0 until end of turn." }),
   ].map((c) => [c.name.toLowerCase(), c])
 );
 const of = (name: string) => BOOK[name.toLowerCase()]!;
@@ -639,5 +645,80 @@ describe("what two real matches showed", () => {
     expect(ended.sides.opp.life).toBe(6);
     // With nothing sought, 7 life buys nothing, as before.
     expect(said(endTurn(g0, BOOK))).not.toMatch(/pays \d+ life/);
+  });
+});
+
+// A third match: the opponent sat on one land for eleven turns and lost.
+// Its draws were poor. What it did with its mana was worse.
+describe("mana sense", () => {
+  // Turn 7: it played Starting Town, and City of Traitors was sacrificed
+  // untapped. A player taps the City for {C}{C} first.
+  it("City of Traitors is tapped for its mana before another land takes it", () => {
+    const g0 = { ...table({ opp: { field: ["City of Traitors"], hand: ["Starting Town", "Hexing Squelcher"] } }), landPlayed: false };
+    const played = applyAction(g0, "opp", act("land", at(g0, "opp", "Starting Town")!.iid), BOOK).game;
+    expect(said(played)).toMatch(/The opponent taps City of Traitors for \{C\}\{C\} first: it goes when another land is played/);
+    expect(at(played, "opp", "City of Traitors", "graveyard")).toBeDefined();
+    expect(played.pool?.opp).toEqual(["C", "C"]);
+    // {1}{R}: the floating mana, and the Town's red for a life.
+    const cast = applyAction(played, "opp", act("cast", at(played, "opp", "Hexing Squelcher")!.iid), BOOK);
+    expect(cast.ok).toBe(true);
+    expect(at(cast.game, "opp", "Hexing Squelcher", "battlefield")).toBeDefined();
+    // A City that was already tapped for the turn has nothing more to give.
+    const spent = { ...g0, sides: { ...g0.sides, opp: { ...g0.sides.opp, battlefield: g0.sides.opp.battlefield.map((c) => ({ ...c, tapped: true })) } } };
+    expect(applyAction(spent, "opp", act("land", at(spent, "opp", "Starting Town")!.iid), BOOK).game.pool?.opp ?? []).toEqual([]);
+  });
+
+  it("the planner counts on that mana: the land, then a spell the two together pay for", () => {
+    const g0 = { ...table({ opp: { field: ["City of Traitors"], hand: ["Starting Town", "Hexing Squelcher"] } }), landPlayed: false };
+    const plan = fallbackPlan(g0, BOOK);
+    expect(names(g0, plan)).toEqual(["land:Starting Town", "cast:Hexing Squelcher"]);
+    const g = plan.main.reduce((x, a2) => applyAction(x, "opp", a2, BOOK).game, g0);
+    expect(at(g, "opp", "Hexing Squelcher", "battlefield")).toBeDefined();
+  });
+
+  // It entered untapped on the opponent's fourth turn, and paid for a spell.
+  it("Starting Town enters tapped from its controller's fourth turn", () => {
+    expect(ownTurnOf(5)).toBe(3);
+    expect(ownTurnOf(6)).toBe(3);
+    expect(ownTurnOf(7)).toBe(4);
+    expect(entersTapped(of("Starting Town"), 3)).toBe(false);
+    expect(entersTapped(of("Starting Town"), 4)).toBe(true);
+    const play = (turn: number) => {
+      const g0 = { ...table({ opp: { hand: ["Starting Town"] } }), landPlayed: false, turn };
+      return at(applyAction(g0, "opp", act("land", at(g0, "opp", "Starting Town")!.iid), BOOK).game, "opp", "Starting Town", "battlefield")!;
+    };
+    expect(play(5).tapped).toBe(false);
+    expect(play(7).tapped).toBe(true);
+  });
+
+  // Turn 9: its only land paid Mystic Remora's {1}, and the turn was gone.
+  it("pays a cumulative upkeep only while that leaves mana for the turn", () => {
+    const one = startTurn(table({ opp: { field: ["Mystic Remora", "Underground Sea"] } }), BOOK);
+    expect(said(one)).toMatch(/doesn't pay Mystic Remora's cumulative upkeep: it's sacrificed/);
+    expect(at(one, "opp", "Underground Sea", "battlefield")!.tapped).toBe(false);
+    // Two lands, or one and a land to play: {1} is paid.
+    expect(said(startTurn(table({ opp: { field: ["Mystic Remora", "Underground Sea", "Badlands"] } }), BOOK))).toMatch(/pays \{1\} for Mystic Remora/);
+    expect(said(startTurn(table({ opp: { field: ["Mystic Remora", "Underground Sea"], hand: ["Badlands"] } }), BOOK))).toMatch(/pays \{1\} for Mystic Remora/);
+  });
+
+  // City of Traitors, and a hand of blue, black and red spells: kept at six.
+  it("doesn't keep one land that makes none of the colours the hand asks for", () => {
+    const seven = (...names: string[]) => newGame({ you: { cards: deck(...Array(20).fill("Island")) }, opp: { cards: deck(...names, ...Array(30).fill("Swamp")) }, commanderGame: true, first: "opp", shuffle: keep }).sides.opp;
+    const spells = ["Copy Enchantment", "Final Fortune", "Hexing Squelcher", "Culling the Weak"];
+    // One land and two rocks was a keep, whatever they made.
+    expect(aiMulligan(seven("City of Traitors", "Sol Ring", "Sol Ring", ...spells), BOOK).mulligans).toBeGreaterThanOrEqual(1);
+    // The same hand on a land that makes its colours is kept.
+    expect(aiMulligan(seven("Badlands", "Sol Ring", "Sol Ring", ...spells), BOOK).mulligans).toBe(0);
+    // So is a hand that asks for no colour.
+    expect(aiMulligan(seven("City of Traitors", "Sol Ring", "Sol Ring", "Sol Ring", "Lotus Petal", "Paradise Mantle", "Lion's Eye Diamond"), BOOK).mulligans).toBe(0);
+  });
+
+  // "Slow start, but the little kobold still swings": a 0/1, every turn.
+  it("an attacker with no power stays home, unless attacking is the point", () => {
+    const g = table({ opp: { field: ["Rograkh, Son of Rohgahh", "Goblin Piker", "Bear"] } });
+    const id = (name: string) => cardId(at(g, "opp", name, "battlefield")!.iid);
+    const plan = { say: "", main: [], attack: [id("Rograkh, Son of Rohgahh"), id("Goblin Piker"), id("Bear")], after_combat: [] };
+    // Rograkh is 0/1. The Piker is 0/3 with a trigger on attacking. The Bear is 2/2.
+    expect(guardPlan(g, plan, BOOK).attack).toEqual([id("Goblin Piker"), id("Bear")]);
   });
 });

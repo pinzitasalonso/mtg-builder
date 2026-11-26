@@ -242,11 +242,18 @@ export function manaOutput(info: CardInfo | undefined, typeLine: string | null, 
 
 /** "enters tapped" without an "unless" escape. A shock land ("you may pay
     2 life") doesn't: the AI pays (shockLife). */
-export const entersTapped = (info: CardInfo | undefined) => {
+export const entersTapped = (info: CardInfo | undefined, ownTurn?: number) => {
   const text = frontText(info).toLowerCase();
   if (shockLife(info)) return false;
+  // "…enters tapped unless it's your first, second, or third turn of the
+  // game" (Starting Town): tapped from its controller's fourth turn on.
+  // (`ownTurn` is that player's own turn number; unknown counts as late.)
+  if (/enters (the battlefield )?tapped unless it's your first, second, or third turn of the game/.test(text)) return (ownTurn ?? 99) > 3;
   return /enters (the battlefield )?tapped/.test(text) && !/enters (the battlefield )?tapped unless/.test(text);
 };
+
+/** A player's own turn number: the game counts both players' turns. */
+export const ownTurnOf = (turn: number) => Math.ceil(turn / 2);
 
 /** A shock land's price for entering untapped. */
 export const shockLife = (info: CardInfo | undefined) => (/you may pay 2 life\. if you don't, it enters (the battlefield )?tapped/i.test(frontText(info)) ? 2 : 0);

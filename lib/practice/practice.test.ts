@@ -461,7 +461,8 @@ describe("the AI's judgement without a model", () => {
   });
 
   it("mulligans a hand with no lands, keeping six", () => {
-    const g = newGame({ you: { cards: deck(...Array(20).fill("Forest")) }, opp: { cards: deck(...Array(7).fill("Hill Giant"), ...Array(10).fill("Island")) }, commanderGame: false, first: "you", shuffle: keep });
+    // (Lands that cast its spells: one land that makes none of the hand's colours isn't kept either.)
+    const g = newGame({ you: { cards: deck(...Array(20).fill("Forest")) }, opp: { cards: deck(...Array(7).fill("Grizzly Bears"), ...Array(10).fill("Forest")) }, commanderGame: false, first: "you", shuffle: keep });
     const side = aiMulligan(g.sides.opp, BOOK);
     expect(side.mulligans).toBe(1);
     expect(side.hand).toHaveLength(6);
