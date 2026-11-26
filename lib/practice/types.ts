@@ -85,6 +85,11 @@ export interface PracticeGame {
   /** Extra turns each seat has coming (Time Warp): taken before the other
       player's next turn. */
   extraTurns?: Record<Seat, number>;
+  /** Of those, the ones that cost the game: "At the beginning of that
+      turn's end step, you lose the game" (Final Fortune). `doomed` is the
+      seat taking such a turn now. */
+  doomTurns?: Record<Seat, number>;
+  doomed?: Seat | null;
   /** Spells each seat has cast this turn (Lotho's "second spell"). */
   spells?: Record<Seat, number>;
 }

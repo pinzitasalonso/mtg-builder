@@ -53,8 +53,7 @@ import {
   wheelSpellOf,
   type Wheel,
   type Edict,
-  type SearchAbility,
-} from "./cards";
+  type SearchAbility, handManaOf, sacManaOf } from "./cards";
 import {
   affinityHits,
   affinityOf,
@@ -86,7 +85,8 @@ import {
 } from "./abilities";
 import { triggersOf, type Outcome } from "./triggers";
 import { scaleDamage } from "./damage";
-import { devotion, emptyDrawWinsOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf } from "./wincons";
+import { tutorOf } from "./spells";
+import { adNauseamOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import {
   extraTreasureOf,
   oneOfEachOf,
@@ -101,7 +101,7 @@ import {
   winsWithTreasures,
 } from "./treasure";
 import { colorsOfCost, manaSources, manaTotal, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
-import { comboHeadline, comboOutcome, type DeckCombo } from "./combos";
+import { comboHeadline, comboNeeds, comboOutcome, type DeckCombo } from "./combos";
 import { type PendingTax, other, type CardBook, type Choice, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
@@ -336,11 +336,16 @@ function libraryExile(g: PracticeGame, seat: Seat, source: string, kind: "consul
   say(g, seat, `${source}: ${who(seat)} ${verb(seat, "exile")} ${gone.length} card${gone.length === 1 ? "" : "s"}${found ? ` and ${verb(seat, "put")} ${found.name} into ${seat === "you" ? "your" : "its"} hand` : ""}.`);
 }
 
+/** Ad Nauseam stops once its caster is this low. */
+const AD_NAUSEAM_FLOOR = 8;
+
 /** A spell gave its caster another turn after this one. */
-function extraTurn(g: PracticeGame, seat: Seat, source: string) {
+function extraTurn(g: PracticeGame, seat: Seat, source: string, loses = false) {
   if (!g.extraTurns) g.extraTurns = { you: 0, opp: 0 };
   g.extraTurns[seat] += 1;
-  say(g, seat, `${source}: ${who(seat)} ${verb(seat, "take")} an extra turn after this one.`);
+  // Final Fortune: the turn is the last one.
+  if (loses) g.doomTurns = { you: 0, opp: 0, ...g.doomTurns, [seat]: (g.doomTurns?.[seat] ?? 0) + 1 };
+  say(g, seat, `${source}: ${who(seat)} ${verb(seat, "take")} an extra turn after this one${loses ? `, and ${seat === "you" ? "lose" : "loses"} the game at its end step` : ""}.`);
 }
 
 /** The storm count for the spell just cast: the spells cast before it
@@ -718,6 +723,14 @@ export function availableMana(g: PracticeGame, seat: Seat, book: CardBook, exclu
       }
     }
   }
+  // A Spirit Guide in the opponent's hand: exiled for its mana, when
+  // nothing else pays. (Yours is yours to exile by hand.)
+  if (seat === "opp") {
+    for (const c of side.hand) {
+      const colors = exclude.includes(c.iid) ? null : handManaOf(infoOf(book, c));
+      if (colors) all.push({ iid: c.iid, name: c.name, colors: [...new Set(colors)], amount: colors.length, exile: true });
+    }
+  }
   return [...poolSources(g.pool?.[seat]), ...all];
 }
 
@@ -729,7 +742,10 @@ function spend(g: PracticeGame, seat: Seat, paid: Payment, sources: Source[], bo
   for (const t of paid.tap) {
     if (t < 0) continue;
     const src = sources.find((x) => x.iid === t);
-    if (src?.sacrifice) {
+    if (src?.exile) {
+      moveTo(g, t, "exile", { exact: true });
+      say(g, seat, `${who(seat)} ${verb(seat, "exile")} ${src.name} from ${seat === "you" ? "your" : "its"} hand for mana.`);
+    } else if (src?.sacrifice) {
       const name = findCard(g, t)?.card.name;
       moveTo(g, t, "graveyard");
       say(g, seat, `${who(seat)} sacrifice${seat === "you" ? "" : "s"} ${name} for mana.`);
@@ -943,6 +959,11 @@ export function endTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
   if ((g.extraTurns?.[g.active] ?? 0) > 0) {
     g.extraTurns![g.active] -= 1;
     say(g, g.active, `${who(g.active)} ${verb(g.active, "take")} an extra turn.`);
+    // The newest extra turn comes first, and Final Fortune's is the last.
+    if ((g.doomTurns?.[g.active] ?? 0) > 0) {
+      g.doomTurns![g.active] -= 1;
+      g.doomed = g.active;
+    }
   } else g.active = other(g.active);
   g.turn += 1;
   return startTurn(g, book);
@@ -974,7 +995,21 @@ function endStep(g: PracticeGame, book: CardBook) {
       say(g, s, `The copy of ${c.name} is exiled.`);
     }
   }
+  // "At the beginning of the end step, sacrifice this" (Underworld Breach).
+  for (const s of ["you", "opp"] as Seat[]) {
+    for (const c of g.sides[s].battlefield.filter((x) => triggersOf(book, x).endSacrifice)) {
+      moveTo(g, c.iid, "graveyard");
+      say(g, s, `${s === "you" ? "You sacrifice" : "The opponent sacrifices"} ${faceName(c)}: it only lasts the turn.`);
+      if (isCreature(book, c)) creatureDied(g, s, c, book);
+    }
+  }
   checkState(g, book);
+  // Final Fortune's extra turn ends, and the game with it.
+  if (g.doomed === seat && !g.winner) {
+    g.winner = other(seat);
+    say(g, null, seat === "you" ? "The extra turn is over: you lose the game." : "The opponent's extra turn is over: it loses the game. You win!");
+  }
+  if (g.doomed === seat) g.doomed = null;
 }
 
 // ── Your side (by hand) ────────────────────────────────────────────────
@@ -1048,7 +1083,7 @@ export function playerSpellResolves(g0: PracticeGame, iid: number, book: CardBoo
   const again = extraTurnOf(infoOf(book, at.card));
   if (!w && !ts && !goesForWin && !copies && !again) return g0;
   const g = structuredClone(g0);
-  if (again) extraTurn(g, "you", at.card.name);
+  if (again) extraTurn(g, "you", at.card.name, extraTurnLosesOf(infoOf(book, at.card)));
   if (copies) say(g, "you", `${at.card.name}: storm, ${copies === 1 ? "a copy" : `${copies} copies`} (${copies + 1} in all). Resolve them by hand.`);
   if (goesForWin && exiler) libraryExile(g, "you", at.card.name, exiler, book);
   else if (w) wheel(g, "you", w, at.card.name, book, iid);
@@ -1172,6 +1207,9 @@ export function uncastable(g: PracticeGame, seat: Seat, card: PlayCard, book: Ca
   // An Aura needs something to go on as it's cast. (The AI used to pay for
   // one with no creature in play, and lose it to the graveyard.)
   if (isType(book, card, "aura") && aiAuraHost(g, seat, card, effects, book) === undefined) return `${card.name} has nothing to enchant.`;
+  // "As an additional cost to cast this spell, sacrifice a creature."
+  const sac = sacrificeCostOf(info);
+  if (sac && !g.sides[seat].battlefield.some((c) => sacrificable(book, c, sac))) return `${card.name} needs ${/^[aeiou]/.test(sac) ? "an" : "a"} ${sac} to sacrifice.`;
   return null;
 }
 
@@ -1212,7 +1250,7 @@ const COLOUR_NAME: Record<string, string> = { W: "white", U: "blue", B: "black",
 export function castable(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, zone: Zone): boolean {
   if (isLand(card)) return zone === "hand" && !g.landPlayed && g.active === seat;
   if (uncastable(g, seat, card, book)) return false;
-  return aiPay(g, seat, spellCost(g, seat, card, book, zone), availableMana(g, seat, book, [], { commander: card.commander }), book) !== null;
+  return aiPay(g, seat, spellCost(g, seat, card, book, zone), availableMana(g, seat, book, [card.iid], { commander: card.commander }), book) !== null;
 }
 
 /** A cast in stages, so the player can answer it: "pay" pays and announces
@@ -1240,6 +1278,9 @@ export interface ComboStatus {
   missing: { name: string; where: Zone | "nowhere" }[];
   /** With every piece in place, what still stops it. */
   blocked: string | null;
+  /** What it asks for besides its pieces and isn't there yet (cards in the
+      graveyard): it can't be fixed by casting a piece. */
+  needs: string | null;
 }
 
 const COMBO_ZONE: Record<string, Zone> = { B: "battlefield", H: "hand", G: "graveyard", E: "exile", C: "command", L: "library" };
@@ -1270,7 +1311,18 @@ function comboPiece(g: PracticeGame, seat: Seat, piece: DeckCombo["pieces"][numb
 }
 
 export function comboStatus(g: PracticeGame, seat: Seat, combo: DeckCombo, book: CardBook): ComboStatus {
-  const out: ComboStatus = { ready: false, toCast: [], missing: [], blocked: null };
+  const out: ComboStatus = { ready: false, toCast: [], missing: [], blocked: null, needs: null };
+  // Cards in the graveyard (or the hand and graveyard) besides the pieces.
+  const needs = comboNeeds(combo.prerequisites);
+  const isPiece = (c: PlayCard) => combo.pieces.some((p) => sameCard(c, p.name));
+  const side = g.sides[seat];
+  const inGrave = side.graveyard.filter((c) => !isPiece(c)).length;
+  const wantGrave = needs.graveyard + needs.plus.filter((x) => side.graveyard.some((c) => sameCard(c, x.name))).reduce((n, x) => n + x.count, 0);
+  if (inGrave < wantGrave) out.needs = `It needs ${wantGrave} other cards in your graveyard (${inGrave} there).`;
+  else if (needs.handOrGraveyard) {
+    const have = inGrave + side.hand.filter((c) => !isPiece(c)).length;
+    if (have < needs.handOrGraveyard) out.needs = `It needs ${needs.handOrGraveyard} other cards between your hand and graveyard (${have} there).`;
+  }
   for (const piece of combo.pieces) {
     const { wanted, placed, anywhere } = comboPiece(g, seat, piece);
     if (placed) {
@@ -1282,9 +1334,16 @@ export function comboStatus(g: PracticeGame, seat: Seat, combo: DeckCombo, book:
       continue;
     }
     if (wanted.has("battlefield") && anywhere && (anywhere.zone === "hand" || anywhere.zone === "command")) out.toCast.push(anywhere.card);
+    // A spell the combo wants in the graveyard (Brain Freeze, for
+    // Underworld Breach): cast from the hand, that's where it goes.
+    else if (wanted.has("graveyard") && anywhere?.zone === "hand" && resolvesToGraveyard(infoOf(book, anywhere.card)?.typeLine ?? anywhere.card.typeLine)) out.toCast.push(anywhere.card);
     else out.missing.push({ name: piece.name, where: anywhere?.zone ?? "nowhere" });
   }
   if (out.missing.length || out.toCast.length) return out;
+  if (out.needs) {
+    out.blocked = out.needs;
+    return out;
+  }
   if (!out.blocked && totalOf(parseCost(combo.manaNeeded)) > 0 && !aiPay(g, seat, parseCost(combo.manaNeeded), availableMana(g, seat, book), book)) {
     out.blocked = `It needs ${combo.manaNeeded} and the mana isn't there.`;
   }
@@ -1412,10 +1471,19 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     const no = uncastable(g, seat, card, book, action.effects) ?? mistargeted(g, card, action.effects, book);
     if (no) return fail(`(${no})`);
     const cost = spellCost(g, seat, card, book, at.zone);
-    const sources = availableMana(g, seat, book, [], { commander: card.commander });
+    const sources = availableMana(g, seat, book, [card.iid], { commander: card.commander });
     const paid = aiPay(g, seat, cost, sources, book, { x: action.x ?? 0 });
     if (!paid) return fail(`The opponent can't pay for ${card.name} yet.`);
     spend(g, seat, paid, sources, book);
+    // Its sacrifice, as it's cast (Culling the Weak, Diabolic Intent). A
+    // Treasure spell's (Deadly Dispute) is taken as it resolves.
+    const sacCost = treasureSpellOf(book, card) ? null : sacrificeCostOf(info);
+    const fodder = sacCost ? aiSacrificePick(g, seat, sacCost, book) : null;
+    if (fodder) {
+      moveTo(g, fodder.iid, "graveyard");
+      say(g, seat, `${who(seat)} ${verb(seat, "sacrifice")} ${fodder.name} for ${card.name}.`);
+      if (isCreature(book, fodder)) creatureDied(g, seat, fodder, book);
+    }
     if (at.zone === "command") g.tax[seat] += 1;
     if (fromGrave) g.mayCast = g.mayCast!.filter((i) => i !== card.iid);
     const x = cost.xCount ? ` (X = ${action.x ?? 0})` : "";
@@ -1445,6 +1513,24 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   const untap = untapLandsOf(book, card);
   if (untap && !action.tap_card && !action.mana && (action.life ?? untap.life) >= untap.life) {
     if (!untapLands(g, seat, card, untap.life, book)) return fail(`(${faceName(card)}'s ability is once a turn.)`);
+    return { game: g, ok: true };
+  }
+  // "{T}, Sacrifice a creature: Add {B}{B}" (Phyrexian Tower, Ashnod's
+  // Altar): the table taps it, sacrifices the creature the plan names (or
+  // the cheapest one) and adds the mana, whatever effects the plan gave.
+  const sacMana = sacManaOf(info);
+  if (sacMana) {
+    if (sacMana.tap && card.tapped) return fail(`(${card.name} is already tapped.)`);
+    const named = action.effects.map((e) => parseCardId(e.target)).map((t) => (t === null ? null : findCard(g, t))).find((x) => x && x.seat === seat && x.zone === "battlefield" && isCreature(book, x.card))?.card;
+    const fodder = named ?? aiSacrificePick(g, seat, "creature", book);
+    if (!fodder) return fail(`(${card.name} needs a creature to sacrifice.)`);
+    if (sacMana.tap) update(g, card.iid, (c) => ({ ...c, tapped: true }));
+    moveTo(g, fodder.iid, "graveyard");
+    if (!g.pool) g.pool = { you: [], opp: [] };
+    g.pool[seat] = [...g.pool[seat], ...sacMana.units];
+    say(g, seat, `${who(seat)} ${verb(seat, "sacrifice")} ${fodder.name} to ${card.name}: it adds ${sacMana.units.map((u) => `{${u}}`).join("")}.`, card);
+    creatureDied(g, seat, fodder, book);
+    checkState(g, book);
     return { game: g, ok: true };
   }
   // Kefka's {8}: the table carries it out (the player picks what to
@@ -1812,7 +1898,17 @@ function aiDiscardPick(g: PracticeGame, seat: Seat, book: CardBook): PlayCard | 
   const landsOut = side.battlefield.filter(isLand).length;
   const lands = side.hand.filter(canPlayAsLand);
   if (lands.length >= 2 || (lands.length && landsOut >= 6)) return lands.find(isLand) ?? lands[0]!;
-  const spells = side.hand.filter((c) => !isLand(c)).sort((a, b) => (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0));
+  // What it would least like to lose goes last: a way to win, a tutor, Ad
+  // Nauseam, a card that only works on the right turn, a ritual. Of the
+  // rest, the dearest to cast goes first.
+  const keep = (c: PlayCard) => {
+    const info = infoOf(book, c);
+    if (oracleWinOf(book, c) || libraryExilerOf(info)) return 5;
+    if (tutorOf(info) || adNauseamOf(info) || triggersOf(book, c).endSacrifice) return 4;
+    if (ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 }) || handManaOf(info)) return 2;
+    return 0;
+  };
+  const spells = side.hand.filter((c) => !isLand(c)).sort((a, b) => keep(a) - keep(b) || (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0));
   return spells[0] ?? side.hand[0]!;
 }
 
@@ -1862,7 +1958,8 @@ function aiSacrificePick(g: PracticeGame, seat: Seat, what: string, book: CardBo
   if (!field.length) return null;
   const lands = g.sides[seat].battlefield.filter(isLand).length;
   const cost = (c: PlayCard) => {
-    if (c.commander) return 100;
+    // A commander that costs nothing (Rograkh) comes back for {2}: fodder.
+    if (c.commander) return (infoOf(book, c)?.manaValue ?? 1) === 0 ? 0.6 : 100 + (infoOf(book, c)?.manaValue ?? 0);
     if (c.token) return isCreature(book, c) ? stats(book, c).power * 0.1 : 0.05;
     if (isLand(c)) return (lands >= 5 ? 0.5 : 8) + (/\bBasic\b/.test(c.typeLine ?? "") ? 0 : 0.3);
     return 2 + (infoOf(book, c)?.manaValue ?? 0);
@@ -2542,6 +2639,20 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
   } else if (w) {
     wheel(g, seat, w, card.name, book, card.iid);
     moveTo(g, card.iid, "graveyard");
+  } else if (adNauseamOf(infoOf(book, card))) {
+    // Card after card into the hand, each for its mana value in life,
+    // while there's life to spare (it can't see the next one).
+    moveTo(g, card.iid, "graveyard");
+    let cards = 0;
+    let paid = 0;
+    while (g.sides[seat].library.length && g.sides[seat].life > AD_NAUSEAM_FLOOR && !g.winner) {
+      const top = g.sides[seat].library[0]!;
+      const mv = isLand(top) ? 0 : (infoOf(book, top)?.manaValue ?? 0);
+      g.sides[seat] = { ...g.sides[seat], library: g.sides[seat].library.slice(1), hand: [...g.sides[seat].hand, top], life: g.sides[seat].life - mv };
+      cards += 1;
+      paid += mv;
+    }
+    say(g, seat, `${card.name}: ${who(seat)} ${verb(seat, "put")} ${cards} card${cards === 1 ? "" : "s"} into ${seat === "you" ? "your" : "its"} hand and ${verb(seat, "lose")} ${paid} life.`);
   } else if (ts) {
     // Its extra cost: the AI's own pick (the card it would discard, the
     // permanent it would rather lose). Then the draw and the Treasures.
@@ -2565,11 +2676,27 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
     // Storm: a copy for each spell cast before it this turn, by anyone.
     const copies = hasStorm(infoOf(book, card)) ? stormCount(g) : 0;
     if (copies) say(g, seat, `${card.name}: storm, ${copies === 1 ? "a copy" : `${copies} copies`}.`);
+    // A ritual's mana is the table's to add, as the card reads now (Cabal
+    // Ritual's threshold, Jeska's Will's count): the plan's own figure isn't used.
+    const made = ritualMana(infoOf(book, card), {
+      graveyard: g.sides[seat].graveyard.length,
+      ritesInGraveyards: [...g.sides.you.graveyard, ...g.sides.opp.graveyard].filter((c) => c.name === card.name).length,
+      foeHand: g.sides[other(seat)].hand.length,
+    });
+    const effects = made ? action.effects.filter((e) => e.type !== "mana") : action.effects;
     for (let i = 0; i <= copies && !g.winner; i++) {
-      applyEffects(g, seat, action.effects, book, i ? `${card.name} (copy)` : card.name, card);
+      if (made?.length) applyEffects(g, seat, [{ type: "mana", target: null, player: null, amount: null, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: made.map((u) => `{${u}}`).join("") }], book, i ? `${card.name} (copy)` : card.name, card);
+      applyEffects(g, seat, effects, book, i ? `${card.name} (copy)` : card.name, card);
       checkState(g, book);
     }
-    if (extraTurnOf(infoOf(book, card)) && !g.winner) extraTurn(g, seat, card.name);
+    // Gamble: after the search, a card at random goes.
+    const others = g.sides[seat].hand.filter((c) => c.iid !== card.iid);
+    if (tutorOf(infoOf(book, card))?.discardRandom && others.length) {
+      const gone = others[Math.floor(Math.random() * others.length)]!;
+      moveTo(g, gone.iid, "graveyard");
+      say(g, seat, `${card.name}: ${who(seat)} ${verb(seat, "discard")} ${gone.name} at random.`);
+    }
+    if (extraTurnOf(infoOf(book, card)) && !g.winner) extraTurn(g, seat, card.name, extraTurnLosesOf(infoOf(book, card)));
     moveTo(g, card.iid, "graveyard");
   } else {
     moveTo(g, card.iid, "battlefield");

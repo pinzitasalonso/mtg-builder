@@ -107,6 +107,28 @@ export interface ManaMade {
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
+/** A card that makes mana from the hand: "Exile this card from your hand:
+    Add {R}" (Simian Spirit Guide, Elvish Spirit Guide). Its colours. */
+export function handManaOf(info: CardInfo | undefined): string[] | null {
+  const name = escapeRe((info?.name ?? "").split(" // ")[0]!);
+  for (const line of (info?.oracleText ?? "").split("\n//\n")[0]!.split("\n")) {
+    const m = new RegExp(`^exile (?:this card|${name}) from your hand: add ((?:\\{[WUBRGC]\\})+)\\.?$`, "i").exec(line.trim());
+    if (m) return [...m[1]!.matchAll(/\{([WUBRGC])\}/gi)].map((x) => x[1]!.toUpperCase());
+  }
+  return null;
+}
+
+/** A permanent that turns a creature into mana: "{T}, Sacrifice a creature:
+    Add {B}{B}" (Phyrexian Tower), "Sacrifice a creature: Add {C}{C}"
+    (Ashnod's Altar). The mana, and whether it taps. */
+export function sacManaOf(info: CardInfo | undefined): { units: string[]; tap: boolean } | null {
+  for (const line of (info?.oracleText ?? "").split("\n//\n")[0]!.split("\n")) {
+    const m = /^(\{T\}, )?sacrifice a creature: add ((?:\{[WUBRGC]\})+)\.?$/i.exec(line.trim());
+    if (m) return { units: [...m[2]!.matchAll(/\{([WUBRGC])\}/gi)].map((x) => x[1]!.toUpperCase()), tap: !!m[1] };
+  }
+  return null;
+}
+
 /** One "cost: … add …" line as a mana ability, or null when it isn't one
     a permanent can just be tapped (or sacrificed) for. */
 function manaAbility(line: string, name: string): Omit<ManaMade, "colors"> | null {

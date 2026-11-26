@@ -4,7 +4,7 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { canPlayAsLand, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
+import { canPlayAsLand, handManaOf, sacManaOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
 import { availableMana, castable, cardId, comboStatus, lifeFor, loyaltyOf, uncastable } from "./game";
 import { comboHeadline, type DeckCombo } from "./combos";
 import {
@@ -29,10 +29,10 @@ import {
   untapLandsOf,
   upkeepTokenOf,
   winotaOf, equipOf } from "./abilities";
-import { hasTriggers } from "./triggers";
+import { hasTriggers, triggersOf } from "./triggers";
 import { manaSummary, manaTotal } from "./mana";
 import { makesTreasures, treasureSpellOf } from "./treasure";
-import { emptyDrawWinsOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf } from "./wincons";
+import { adNauseamOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import { damageRuleOf } from "./damage";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
@@ -105,7 +105,9 @@ HOW THIS TABLE WORKS
 HOW TO PLAY WELL
 - Use your mana every turn. A turn where you only play a land is a wasted turn, unless you're holding mana open on purpose for a counterspell.
 - Develop first: mana rocks and ramp, your commander when it's good to cast, card draw and engines, then threats. Spend spare mana on cheap card draw, cantrips and tutors.
-- Rituals and fast mana: cast them when the mana lets you cast something more this turn. Mana a spell adds floats only until the end of the phase.
+- Rituals and fast mana: cast them when the mana lets you cast something more this turn. Mana a spell adds floats only until the end of the phase. The app adds a ritual's mana itself as it resolves (Dark Ritual, Cabal Ritual, Rite of Flame, Culling the Weak, Jeska's Will): give it no mana effect.
+- A spell that says "As an additional cost to cast this spell, sacrifice a creature" (Culling the Weak, Diabolic Intent, Infernal Plunge): the app sacrifices your cheapest creature as you cast it, a commander that costs {0} first. Without a creature you can't cast it.
+- A card that ends with the turn is cast only on the turn it wins: Underworld Breach is sacrificed at the end step, and Final Fortune or Last Chance make you LOSE the game at the end of the extra turn.
 - Keep mana open for a counterspell only when you hold one and have nothing better to do with that mana.
 - Attack when the player can't block well; keep blockers back when their board threatens lethal.
 
@@ -114,6 +116,9 @@ COMBOS
 - A combo deck wins with its combos. Assembling one comes before attacking: find the missing piece with a tutor or card draw, keep the mana for it, and don't spend a piece on anything else.
 - To go for a combo that is READY: {"kind":"combo","card":"<combo id>"}, every other field null and effects []. The app pays its mana, casts the pieces it uses from your hand, and carries out what it makes: a combo that wins ends the game; endless mana fills your pool for the rest of the phase, so put what you spend it on right after. The player gets a moment to answer first, as for any spell.
 - A piece that has to be on the battlefield is cast first, with an ordinary cast action earlier in the same turn. The brief tells you which.
+- Hold a combo's pieces and your rituals until the turn you can finish it. A piece cast on its own is wasted: Underworld Breach is sacrificed at the end of the turn, and a spell is gone once it resolves. Use your tutors early: the piece you lack is the best thing they can find.
+- Some combos ask for more than their pieces (cards in your graveyard). The brief says when that isn't there yet: don't start one that can't finish.
+- The turn you go off, make the mana first: free rocks, rituals, a creature sacrificed for mana. Your commander that costs {0} is there to be sacrificed.
 - Never use a combo action for a combo the brief doesn't call READY.
 
 ACTIONS
@@ -166,7 +171,15 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     const wa = wheelAbilityOf(book, front);
     if (wa) notes.push(`a wheel: to use it, activate it with "mana":"${wa.mana}" and no effects; the app pays${wa.tap ? ", taps" : ""}${wa.sacrifice ? ", sacrifices it" : ""} and makes both players lose their hands and draw`);
     if (wheelOnHitOf(book, front)) notes.push("when it deals combat damage to the player, the app makes both players lose their hands and draw seven");
-    if (extraTurnOf(info)) notes.push("the app gives you the extra turn: give it no effects for that");
+    if (extraTurnLosesOf(info)) notes.push("the app gives you the extra turn, and you LOSE the game at its end step: cast it only when that turn wins");
+    else if (extraTurnOf(info)) notes.push("the app gives you the extra turn: give it no effects for that");
+    if (triggersOf(book, front).endSacrifice) notes.push("the app sacrifices it at the end of the turn: cast it only on the turn you finish its combo");
+    if (sacrificeCostOf(info) && !treasureSpellOf(book, front)) notes.push(`the app sacrifices your cheapest ${sacrificeCostOf(info)} as you cast it (a commander that costs {0} first): have one out`);
+    if (ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 })) notes.push("the app adds its mana as it resolves: give it no mana effect");
+    if (adNauseamOf(info)) notes.push("the app puts cards into your hand until you're at 8 life: give it no effects, and cast it with life to spend");
+    if (handManaOf(info)) notes.push("in your hand it is mana: the app exiles it when your other mana runs short. Don't cast it as a creature");
+    const sm = sacManaOf(info);
+    if (sm) notes.push(`to use it, activate it with no effects: the app ${sm.tap ? "taps it, " : ""}sacrifices your cheapest creature and adds ${sm.units.map((u) => `{${u}}`).join("")}`);
     if (hasStorm(info)) notes.push("storm: the app copies it for each spell cast before it this turn. Give its effects once, and cast it last");
     if (oracleWinOf(book, front)) notes.push("a win: the app wins the game when it enters with your devotion to blue at least your library's size; empty the library first with Demonic Consultation or Tainted Pact");
     if (libraryExilerOf(info)) notes.push("with Thassa's Oracle in your hand or Laboratory Maniac out, the app exiles your whole library with it; otherwise it finds your best card. Give it no effects");
@@ -258,7 +271,7 @@ export function comboBrief(g: PracticeGame, book: CardBook, combos: DeckCombo[])
       const bits = [
         s.toCast.length ? `cast first: ${s.toCast.map((x) => `${cardId(x.iid)} ${x.name}`).join(", ")}` : "",
         s.missing.length ? `missing: ${s.missing.map((m) => `${m.name} (${m.where === "nowhere" ? "not in your deck now" : `in your ${m.where === "command" ? "command zone" : m.where}`})`).join(", ")}` : "",
-        s.blocked ?? "",
+        s.needs ?? s.blocked ?? "",
       ].filter(Boolean);
       return `- ${what}: not yet. ${bits.join("; ")}`;
     })

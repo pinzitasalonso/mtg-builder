@@ -29,13 +29,18 @@ function sentences(info: CardInfo | undefined): string[] {
 export interface Tutor {
   search: Search;
   lose: number;
+  /** "…put that card into your hand, discard a card at random, then
+      shuffle" (Gamble). */
+  discardRandom?: boolean;
 }
 export function tutorOf(info: CardInfo | undefined): Tutor | null {
   if (!isSpell(info)) return null;
-  const [first, ...rest] = sentences(info);
+  // A sacrifice as it's cast (Diabolic Intent) is a cost the table takes.
+  const [first, ...rest] = sentences(info).filter((x) => !/^as an additional cost to cast this spell, sacrifice an? [a-z ]+$/i.test(x));
   // The whole sentence, and only to the hand or the top: Entomb's "into
-  // your graveyard" and Gamble's "discard a card at random" aren't this.
-  if (!first || !/^search your library for [^,.]*?\bcard(?:, reveal (?:it|that card))?, (?:put (?:it|that card|the card) into your hand, then shuffle|then shuffle and put (?:it|that card|the card) on top)$/i.test(first)) return null;
+  // your graveyard" isn't this. Gamble's random discard is.
+  const m = first ? /^search your library for [^,.]*?\bcard(?:, reveal (?:it|that card))?, (?:put (?:it|that card|the card) into your hand(, discard a card at random)?, then shuffle|then shuffle and put (?:it|that card|the card) on top)$/i.exec(first) : null;
+  if (!m) return null;
   let lose = 0;
   for (const s of rest) {
     const m = /^you lose (\d+) life$/i.exec(s);
@@ -44,7 +49,7 @@ export function tutorOf(info: CardInfo | undefined): Tutor | null {
   }
   const search = searchOnCast(info);
   if (!search || search.count !== 1 || search.to[0]!.zone === "battlefield") return null;
-  return { search, lose };
+  return { search, lose, ...(m[1] ? { discardRandom: true } : {}) };
 }
 
 /** A board wipe: "Destroy all creatures" (Wrath of God, Damnation, Day of

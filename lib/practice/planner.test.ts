@@ -135,9 +135,9 @@ describe("the planner's mana", () => {
 
 describe("what isn't a tutor", () => {
   const card = (oracleText: string, typeLine = "Sorcery") => info("X", { typeLine, manaCost: "{B}", manaValue: 1, oracleText });
-  it("Entomb (to the graveyard) and Gamble (a random discard) are left alone", () => {
+  it("Entomb (to the graveyard) is left alone; Gamble is a tutor with a random discard", () => {
     expect(tutorOf(card("Search your library for a card, put that card into your graveyard, then shuffle.", "Instant"))).toBeNull();
-    expect(tutorOf(card("Search your library for a card, put that card into your hand, discard a card at random, then shuffle."))).toBeNull();
+    expect(tutorOf(card("Search your library for a card, put that card into your hand, discard a card at random, then shuffle."))).toMatchObject({ discardRandom: true });
     expect(tutorOf(card("Search your library for a creature card, reveal that card, put it into your hand, then shuffle.", "Instant"))).not.toBeNull();
   });
 });

@@ -1,0 +1,59 @@
+[
+ {
+  "id": "742-1295",
+  "pieces": [
+   {
+    "name": "Demonic Consultation",
+    "zones": [
+     "H"
+    ]
+   },
+   {
+    "name": "Thassa's Oracle",
+    "zones": [
+     "H"
+    ]
+   }
+  ],
+  "produces": [
+   "Exile your library",
+   "Win the game"
+  ],
+  "manaNeeded": "{U}{U}{B}",
+  "steps": "Cast Demonic Consultation by paying {B}, naming Thassa's Oracle and thus exiling your library due to you not having a card named Thassa's Oracle in your library.\nCast Thassa's Oracle by paying {U}{U}.\nThassa's Oracle enters the battlefield, causing you to win the game.",
+  "prerequisites": ""
+ },
+ {
+  "id": "1368-3518-4856",
+  "pieces": [
+   {
+    "name": "Underworld Breach",
+    "zones": [
+     "B"
+    ]
+   },
+   {
+    "name": "Lion's Eye Diamond",
+    "zones": [
+     "B"
+    ]
+   },
+   {
+    "name": "Brain Freeze",
+    "zones": [
+     "G"
+    ]
+   }
+  ],
+  "produces": [
+   "Infinite self-mill",
+   "Near-infinite colored mana",
+   "Near-infinite magecraft triggers",
+   "Near-infinite mill",
+   "Near-infinite storm count"
+  ],
+  "manaNeeded": "",
+  "steps": "Activate Lion's Eye Diamond by discarding your hand and sacrificing it, adding {U}{U}{U}.\nCast Lion's Eye Diamond from your graveyard for its escape cost by exiling three cards besides Brain Freeze from your graveyard.\nCast Brain Freeze from your graveyard for its escape cost by paying {1}{U} and exiling three cards from your graveyard.\nBrain Freeze's storm ability triggers, creating at least one copy of Brain Freeze targeting yourself, and any remaining copies targeting an opponent.\nResolve each Brain Freeze, causing yourself to mill six cards and, if applicable, an opponent to mill three cards for each Brain Freeze remaining.\nRepeat.",
+  "prerequisites": "You have at least six other cards in hand and/or graveyard."
+ }
+]
