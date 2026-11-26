@@ -4,7 +4,7 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { canPlayAsLand, handManaOf, sacManaOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
+import { canPlayAsLand, handManaOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
 import { availableMana, castable, cardId, comboStatus, lifeFor, loyaltyOf, uncastable } from "./game";
 import { comboHeadline, type DeckCombo } from "./combos";
 import {
@@ -34,6 +34,7 @@ import { manaSummary, manaTotal } from "./mana";
 import { makesTreasures, treasureSpellOf } from "./treasure";
 import { adNauseamOf, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import { damageRuleOf } from "./damage";
+import { cardTypesAmong, tutorOf } from "./spells";
 import type { CardBook, Effect, EffectType, PlanAction, PracticeGame, TurnPlan } from "./types";
 
 const EFFECT_TYPES: EffectType[] = ["damage", "life", "destroy", "exile", "bounce", "tap", "untap", "draw", "discard", "mill", "token", "counters", "pump", "search", "mana", "note"];
@@ -116,7 +117,8 @@ COMBOS
 - A combo deck wins with its combos. Assembling one comes before attacking: find the missing piece with a tutor or card draw, keep the mana for it, and don't spend a piece on anything else.
 - To go for a combo that is READY: {"kind":"combo","card":"<combo id>"}, every other field null and effects []. The app pays its mana, casts the pieces it uses from your hand, and carries out what it makes: a combo that wins ends the game; endless mana fills your pool for the rest of the phase, so put what you spend it on right after. The player gets a moment to answer first, as for any spell.
 - A piece that has to be on the battlefield is cast first, with an ordinary cast action earlier in the same turn. The brief tells you which.
-- Hold a combo's pieces and your rituals until the turn you can finish it. A piece cast on its own is wasted: Underworld Breach is sacrificed at the end of the turn, and a spell is gone once it resolves. Use your tutors early: the piece you lack is the best thing they can find.
+- Hold the combo pieces that do nothing alone (Thassa's Oracle, Demonic Consultation, Underworld Breach, Brain Freeze) and your rituals until the turn you can finish. Everything else is for using now: mana rocks, draw engines (Necropotence, Rhystic Study, Mystic Remora), tutors for the piece you lack. A combo deck that passes its early turns has lost its edge.
+- Each turn the brief shows THE APP'S LINE: what the app would play this turn. Play it, or something better. If your plan casts nothing, the app plays its line for you.
 - Some combos ask for more than their pieces (cards in your graveyard). The brief says when that isn't there yet: don't start one that can't finish.
 - The turn you go off, make the mana first: free rocks, rituals, a creature sacrificed for mana. Your commander that costs {0} is there to be sacrificed.
 - Never use a combo action for a combo the brief doesn't call READY.
@@ -177,6 +179,15 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     if (sacrificeCostOf(info) && !treasureSpellOf(book, front)) notes.push(`the app sacrifices your cheapest ${sacrificeCostOf(info)} as you cast it (a commander that costs {0} first): have one out`);
     if (ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 })) notes.push("the app adds its mana as it resolves: give it no mana effect");
     if (adNauseamOf(info)) notes.push("the app puts cards into your hand until you're at 8 life: give it no effects, and cast it with life to spend");
+    const lfc = lifeForCardsOf(book, front);
+    if (lfc) notes.push(`you skip your draw step; at your end step the app pays life for cards (up to your hand size, keeping 10 life): don't activate it, and cast it early`);
+    else if (skipsDrawOf(book, front)) notes.push("you skip your draw step while it's out");
+    if (handSizeOf(book, front)) notes.push(`your maximum hand size is ${handSizeOf(book, front)} while it's out`);
+    const cu = cumulativeUpkeepOf(book, front);
+    if (cu !== null) notes.push(`the app pays its cumulative upkeep at your upkeep while it's {2} or less, then sacrifices it`);
+    const tu = tutorOf(info);
+    if (tu?.delirium) notes.push("it finds any card when your graveyard has four card types (the brief says how many); otherwise only what its first line says");
+    if (tu && /exile it face down/i.test(info.oracleText ?? "")) notes.push("a tutor: the card goes to your hand (bargain isn't used)");
     if (handManaOf(info)) notes.push("in your hand it is mana: the app exiles it when your other mana runs short. Don't cast it as a creature");
     const sm = sacManaOf(info);
     if (sm) notes.push(`to use it, activate it with no effects: the app ${sm.tap ? "taps it, " : ""}sacrifices your cheapest creature and adds ${sm.units.map((u) => `{${u}}`).join("")}`);
@@ -305,7 +316,24 @@ const describe = (g: PracticeGame, book: CardBook, c: PlayCard, opts: { text?: b
 };
 
 /** The board this turn, from the AI's side of the table. */
-export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[], combos: DeckCombo[] = []): string {
+/** The built-in planner's turn, in words: what the app would play. */
+export function lineBrief(g: PracticeGame, plan: TurnPlan): string {
+  const all = [...g.sides.opp.hand, ...g.sides.opp.command, ...g.sides.opp.battlefield];
+  const named = (id: string) => all.find((c) => cardId(c.iid) === id);
+  const steps = plan.main.map((a) => {
+    if (a.kind === "combo") return `go for combo [${a.card}]`;
+    const c = named(a.card);
+    if (!c) return null;
+    const found = a.effects.find((e) => e.type === "search" && e.name)?.name;
+    if (a.kind === "land") return `play ${cardId(c.iid)} ${c.name}`;
+    if (a.kind === "activate") return `activate ${cardId(c.iid)} ${c.name}`;
+    return `cast ${cardId(c.iid)} ${c.name}${found ? ` (finding ${found})` : ""}`;
+  });
+  const said = steps.filter(Boolean);
+  return said.length ? said.join("; ") + "." : "nothing worth casting.";
+}
+
+export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[], combos: DeckCombo[] = [], line?: TurnPlan): string {
   const me = g.sides.opp;
   const them = g.sides.you;
   const sources = availableMana(g, "opp", book);
@@ -339,8 +367,9 @@ export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[], 
     command.length ? `YOUR COMMAND ZONE:\n${command.join("\n")}` : "",
     `YOUR BATTLEFIELD:\n${field(me.battlefield, false)}`,
     `THE PLAYER'S BATTLEFIELD:\n${field(them.battlefield, true)}`,
-    `GRAVEYARDS: yours: ${grave(me.graveyard)}. The player's: ${grave(them.graveyard)}.`,
+    `GRAVEYARDS: yours (${me.graveyard.length} cards, ${cardTypesAmong(me.graveyard.map((c) => c.typeLine))} card types): ${grave(me.graveyard)}. The player's: ${grave(them.graveyard)}.`,
     combos.length ? `YOUR COMBOS THIS TURN:\n${comboBrief(g, book, combos)}` : "",
+    line ? `THE APP'S LINE: ${lineBrief(g, line)} Play it, or something better.` : "",
     `Plan your turn.`,
   ]
     .filter(Boolean)

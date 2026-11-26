@@ -118,6 +118,10 @@ export function handManaOf(info: CardInfo | undefined): string[] | null {
   return null;
 }
 
+/** An Equipment that gives its creature a mana ability: 'Equipped
+    creature has "{T}: Add one mana of any color."' (Paradise Mantle). */
+export const equipManaOf = (info: CardInfo | undefined) => /equipped creature has "\{T\}: Add one mana of any color\."/i.test(info?.oracleText ?? "");
+
 /** A permanent that turns a creature into mana: "{T}, Sacrifice a creature:
     Add {B}{B}" (Phyrexian Tower), "Sacrifice a creature: Add {C}{C}"
     (Ashnod's Altar). The mana, and whether it taps. */
@@ -141,7 +145,10 @@ function manaAbility(line: string, name: string): Omit<ManaMade, "colors"> | nul
   // (Simian Spirit Guide), a discard (Lion's Eye Diamond), or another
   // permanent's sacrifice (Phyrexian Tower's second ability).
   if (!/\{T\}/i.test(cost) && !selfSac) return null;
-  if (/\b(discard|exile|remove|return)\b|\{X\}/i.test(cost)) return null;
+  // Its own counter is fine (Gemstone Mine's mining counters: the table
+  // doesn't count them down).
+  const ownCounter = new RegExp(`\\bremove an? [a-z]+ counter from (?:this \\w+|${escapeRe(name.split(" // ")[0]!)})\\b`, "i");
+  if (/\b(discard|exile|remove|return)\b|\{X\}/i.test(cost.replace(ownCounter, ""))) return null;
   if (/\bsacrifice\b/i.test(cost) && !selfSac) return null;
   let input = 0;
   for (const sym of cost.matchAll(/\{([^}]+)\}/g)) {
@@ -323,13 +330,15 @@ export interface SearchAbility extends Search {
   life: number;
   /** Its mana cost, if any ("{1}"): the player pays that by hand. */
   mana: string | null;
+  /** "An opponent gains control of this artifact" (Wishclaw Talisman). */
+  givesAway?: boolean;
 }
 
 const WORD_NUMBER: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5 };
 const COLOR_PIP: Record<string, string> = { white: "W", blue: "U", black: "B", red: "R", green: "G" };
 
 /** One "Search your library for …" sentence. */
-function parseSearch(line: string): Search | null {
+export function parseSearch(line: string): Search | null {
   const m = /search your library(?: and\/or graveyard)? for (up to (\w+) |an? |any number of )?(.*?) ?cards?\b( with [^,.]+?)?(?=[,.]| and | then |$)/i.exec(line);
   if (!m) return null;
   const count = /^up to/i.test(m[1] ?? "") ? (WORD_NUMBER[(m[2] ?? "").toLowerCase()] ?? 1) : /any number/i.test(m[1] ?? "") ? 99 : 1;
@@ -403,7 +412,8 @@ export function searchAbility(info: CardInfo | undefined): SearchAbility | null 
     const cost = line.slice(0, colon);
     const life = /pay (\d+) life/i.exec(cost);
     const mana = (cost.match(/\{(?!T\})[^}]+\}/g) ?? []).join("");
-    return { ...s, tap: /\{T\}/.test(cost), sacrifice: /sacrifice/i.test(cost), life: life ? Number(life[1]) : 0, mana: mana || null };
+    const givesAway = /\ban opponent gains control of this (?:artifact|permanent)\b/i.test(line);
+    return { ...s, tap: /\{T\}/.test(cost), sacrifice: /sacrifice/i.test(cost), life: life ? Number(life[1]) : 0, mana: mana || null, ...(givesAway ? { givesAway } : {}) };
   }
   return null;
 }
@@ -706,6 +716,34 @@ export function ninjutsuOf(book: CardBook, card: PlayCard): { cost: string; comm
 // ── Fast mana's small print ────────────────────────────────────────────
 
 const own = (book: CardBook, card: PlayCard) => (card.token ? "" : ownText(faceText(infoOf(book, card), card)));
+
+/** "Skip your draw step." (Necropotence, Necrodominance) */
+export const skipsDrawOf = (book: CardBook, card: PlayCard) => /^skip your draw step\.?$/im.test(own(book, card));
+
+/** Cards for life at its controller's end step: Necropotence ("Pay 1 life:
+    Exile the top card of your library face down. Put that card into your
+    hand at the beginning of your next end step") and Necrodominance ("At
+    the beginning of your end step, you may pay any amount of life. If you
+    do, draw that many cards"). "exile" isn't a draw; "draw" is. */
+export function lifeForCardsOf(book: CardBook, card: PlayCard): "exile" | "draw" | null {
+  const text = own(book, card);
+  if (/^pay 1 life: exile the top card of your library face down\. put that card into your hand at the beginning of your next end step\.?$/im.test(text)) return "exile";
+  if (/^at the beginning of your end step, you may pay any amount of life\. if you do, draw that many cards\.?$/im.test(text)) return "draw";
+  return null;
+}
+
+/** "Your maximum hand size is five." (Necrodominance) */
+export function handSizeOf(book: CardBook, card: PlayCard): number | null {
+  const m = /^your maximum hand size is (\w+)\.?$/im.exec(own(book, card));
+  if (!m) return null;
+  return NUMBER_WORDS[m[1]!.toLowerCase()] ?? (Number(m[1]) || null);
+}
+
+/** "Cumulative upkeep {1}": the generic mana each age counter asks for. */
+export function cumulativeUpkeepOf(book: CardBook, card: PlayCard): number | null {
+  const m = /^cumulative upkeep \{(\d+)\}/im.exec(own(book, card));
+  return m ? Number(m[1]) : null;
+}
 
 /** "This artifact doesn't untap during your untap step" (Mana Vault, Grim
     Monolith, Basalt Monolith). */

@@ -5,7 +5,7 @@ import { extractJson } from "@/lib/ai";
 import { recordEvent } from "@/lib/analytics";
 import { currentUser } from "@/lib/auth";
 import { PRACTICE_AI_TURNS } from "@/lib/limits";
-import { fallbackPlan, simpleTurn, winningTurn } from "@/lib/practice/ai";
+import { fallbackPlan, simpleTurn, winningTurn, guardPlan } from "@/lib/practice/ai";
 import { cleanPlan, PLAN_SCHEMA, sinceLastTurn, systemPrompt, turnBrief, type DeckLine } from "@/lib/practice/brief";
 import type { CardBook, TurnPlan } from "@/lib/practice/types";
 import { asGame } from "@/lib/practice/wire";
@@ -73,7 +73,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!process.env.ANTHROPIC_API_KEY) return fallback("The opponent is on autopilot.");
 
   const { rules, deck } = systemPrompt(setup.oppDeck, setup.book, setup.oppCommander, combos);
-  const brief = turnBrief(game, setup.book, sinceLastTurn(game), combos);
+  // What the built-in planner would play: the model is shown it, and the
+  // table plays it when the model's turn casts nothing.
+  const brief = turnBrief(game, setup.book, sinceLastTurn(game), combos, fallbackPlan(game, setup.book, "opp", {}, combos));
   try {
     const anthropic = new Anthropic();
     const res = await anthropic.messages.create(
@@ -106,7 +108,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       return instinct(res.stop_reason === "max_tokens" ? "its plan ran too long" : res.stop_reason === "refusal" ? "it couldn't plan this turn" : `its planning stopped: ${res.stop_reason}`);
     }
     const text = res.content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("");
-    const plan: TurnPlan | null = cleanPlan(extractJson(text));
+    // A combo piece cast on a turn that doesn't go off is taken out.
+    const read = cleanPlan(extractJson(text));
+    const plan: TurnPlan | null = read ? guardPlan(game, read, setup.book) : null;
     if (!plan) {
       console.error(`[practice] unreadable plan: ${text.slice(0, 300)}`);
       return instinct("its plan didn't fit the game");

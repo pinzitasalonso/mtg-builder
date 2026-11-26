@@ -102,8 +102,8 @@ describe("a card's triggers", () => {
   it("an opponent casting, unless they pay", () => {
     expect(read(T.rhystic).tax).toEqual({ noncreature: false, first: false, cost: 1 });
     expect(read(T.sentinel).tax).toEqual({ noncreature: true, first: true, cost: "power" });
-    // Mystic Remora's cumulative upkeep isn't kept by the table, so neither is its tax.
-    expect(read(T.remora).tax).toBeUndefined();
+    // Mystic Remora: the table keeps its cumulative upkeep now, so its tax counts.
+    expect(read(T.remora).tax).toEqual({ noncreature: true, first: false, cost: 4 });
   });
 
   it("leaves alone what has its own reader, or more than the table can do", () => {

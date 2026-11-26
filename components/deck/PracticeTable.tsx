@@ -13,6 +13,7 @@ import { CardArt } from "@/components/mtg";
 import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, type MenuState, type Zoom, AttachGroup, TableTitle, LibraryOrderBar, orderLibrary, type LibraryOrder } from "@/components/deck/playtest-parts";
 import { bottomCard, draw, mulligan, turnOver, type PlayCard, type Zone } from "@/lib/playtest";
 import { aiMulligan, chooseBlocks, fallbackPlan, winningTurn } from "@/lib/practice/ai";
+import { tutorOf, tutorSearch } from "@/lib/practice/spells";
 import { clearSaved, loadSaved, storeSaved, type SavedGame } from "@/lib/practice/save";
 import { canPlayAsLand, counterOf, edictOf, hasAltCost, infoOf, isBlue, isCreature, isInstantSpeed, isLand, searchAbility, searchOnCast, stats, wheelAbilityOf, type Search } from "@/lib/practice/cards";
 import { equipOf, tapTribeOf, untapLandsOf } from "@/lib/practice/abilities";
@@ -290,7 +291,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       first: Math.random() < 0.5 ? "you" : "opp",
     });
     const opp = aiMulligan(g.sides.opp, s.book);
-    g = { ...g, sides: { ...g.sides, opp }, log: opp.mulligans ? [...g.log, { seat: "opp", text: "The opponent mulligans to six." }] : g.log };
+    g = { ...g, sides: { ...g.sides, opp }, log: opp.mulligans ? [...g.log, { seat: "opp", text: `The opponent mulligans to ${["six", "five", "four"][opp.mulligans - 1] ?? 7 - opp.mulligans}.` }] : g.log };
     setSetup(s);
     setGame(g);
     setHistory([]);
@@ -324,7 +325,9 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
         return answered;
       }
       // A tutor, or a creature that searches as it enters: the search opens.
-      const spec = searchOnCast(infoOf(book, card));
+      // (Demonic Counsel finds any card with four card types in your graveyard.)
+      const tutor = tutorOf(infoOf(book, card));
+      const spec = tutor?.delirium ? tutorSearch(tutor, answered.sides.you.graveyard) : searchOnCast(infoOf(book, card));
       if (spec) setSearch({ source: card.name, spec, found: 0, top: [] });
       // A wheel, both hands at once; what a permanent does as it enters
       // (Kefka's discard).
@@ -616,8 +619,14 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     let attack = plan.attack;
     const stamp = (x: PracticeGame) => `${x.sides.opp.hand.map((c) => c.iid).join()}|${x.sides.opp.battlefield.map((c) => `${c.iid}${c.tapped ? "t" : ""}`).join()}|${x.sides.you.library.length}`;
     for (let round = 0; round < 3; round++) {
-      const more = instinct ? fallbackPlan(g, setup.book, "opp", {}, setup.combos ?? []) : winningTurn(g, setup.book, "opp", setup.combos ?? []);
-      if (!more?.main.length) break;
+      // A smart opponent that cast nothing this turn (it passed, or its
+      // plan couldn't be paid for) plays the built-in planner's line: a
+      // turn it could use isn't given away.
+      // (Still idle after the planner's land, a fetch land that found
+      // mana: it plans again with that mana.)
+      const idle = !instinct && !(g.spells?.opp ?? 0);
+      const more = instinct || idle ? fallbackPlan(g, setup.book, "opp", {}, setup.combos ?? []) : winningTurn(g, setup.book, "opp", setup.combos ?? []);
+      if (!more?.main.some((a) => a.kind !== "land" || !g.landPlayed)) break;
       const before = stamp(g);
       for (const a of more.main) {
         if (a.kind === "cast") g = await aiCast(g, a, "ai");

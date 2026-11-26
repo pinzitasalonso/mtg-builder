@@ -4,13 +4,13 @@
 // its combo.
 
 import { describe, expect, it } from "vitest";
-import { fallbackPlan, winningTurn } from "./ai";
-import { comboBrief } from "./brief";
-import { handManaOf, sacManaOf } from "./cards";
+import { aiMulligan, fallbackPlan, guardPlan, winningTurn } from "./ai";
+import { comboBrief, lineBrief } from "./brief";
+import { handManaOf, manaOutput, sacManaOf, searchAbility } from "./cards";
 import { comboNeeds, type DeckCombo } from "./combos";
-import { applyAction, availableMana, cardId, comboStatus, endTurn, newGame, playerSpellResolves, uncastable, type DeckCard } from "./game";
+import { applyAction, availableMana, cardId, comboStatus, endTurn, newGame, playerSpellResolves, startTurn, uncastable, type DeckCard } from "./game";
 import { manaTotal } from "./mana";
-import { tutorOf } from "./spells";
+import { cardTypesAmong, drawSpellOf, tutorOf, tutorSearch } from "./spells";
 import { readTriggers } from "./triggers";
 import type { CardBook, CardInfo, PlanAction, PracticeGame } from "./types";
 import { adNauseamOf, extraTurnLosesOf, ritualMana, sacrificeCostOf } from "./wincons";
@@ -267,5 +267,189 @@ describe("going for the combo", () => {
     const g0 = table({ opp: { hand: ["Thassa's Oracle", "Demonic Consultation", "Demonic Tutor", "Ad Nauseam", "Dark Ritual", "Underworld Breach", "Vampiric Tutor", "Counterspell", "Bear"] } });
     const g = endTurn(g0, BOOK);
     expect(said(g)).toMatch(/discards down to 7 cards: (Counterspell, Bear|Bear, Counterspell)/);
+  });
+});
+
+describe("draw engines", () => {
+  it("Necropotence: no draw step, and cards for life at the end step, keeping 12", () => {
+    const g0 = table({ opp: { field: ["Necropotence", "Swamp"], hand: ["Bear"] }, life: 30 });
+    const g1 = endTurn(g0, BOOK);
+    // Six cards to fill the hand to seven: 30 life down to 24.
+    expect(g1.sides.opp.hand).toHaveLength(7);
+    expect(g1.sides.opp.life).toBe(24);
+    expect(said(g1)).toMatch(/Necropotence: the opponent pays 6 life for 6 cards/);
+    // Its next turn: no draw.
+    const g2 = endTurn(g1, BOOK);
+    expect(g2.active).toBe("opp");
+    expect(g2.sides.opp.hand).toHaveLength(7);
+    expect(said(g2)).toMatch(/Necropotence: The opponent skips the draw step/);
+  });
+
+  it("with a full hand it still digs four, and throws the worst away", () => {
+    const g0 = table({ opp: { field: ["Necropotence", "Swamp"], hand: ["Thassa's Oracle", "Demonic Consultation", "Bear", "Bear", "Bear", "Bear", "Bear"] }, life: 40 });
+    const g = endTurn(g0, BOOK);
+    expect(g.sides.opp.life).toBe(36);
+    expect(g.sides.opp.hand).toHaveLength(7);
+    expect(g.sides.opp.hand.map((c) => c.name)).toEqual(expect.arrayContaining(["Thassa's Oracle", "Demonic Consultation"]));
+  });
+
+  it("near its floor it pays nothing", () => {
+    const g = endTurn(table({ opp: { field: ["Necropotence"], hand: [] }, life: 12 }), BOOK);
+    expect(g.sides.opp.life).toBe(12);
+    expect(g.sides.opp.hand).toHaveLength(0);
+  });
+
+  it("Necrodominance: draws, and the hand size is five", () => {
+    const g0 = table({ opp: { field: ["Necrodominance"], hand: ["Bear", "Bear", "Bear", "Bear", "Bear", "Bear", "Bear"] }, life: 40 });
+    const g = endTurn(g0, BOOK);
+    expect(g.sides.opp.life).toBe(36);
+    expect(g.sides.opp.hand).toHaveLength(5);
+    expect(said(g)).toMatch(/discards down to 5 cards/);
+  });
+
+  it("yours is yours to use by hand: you're reminded, and you skip your draw", () => {
+    const g0 = table({ you: { field: ["Necropotence"] }, active: "you" });
+    const g = endTurn(g0, BOOK);
+    expect(said(g)).toMatch(/Necropotence: pay life for cards now if you want them/);
+    expect(g.sides.you.life).toBe(40);
+    const back = endTurn(g, BOOK);
+    expect(said(back)).toMatch(/Necropotence: You skip the draw step/);
+  });
+
+  it("Mystic Remora: its upkeep is paid at {1} and {2}, then it's sacrificed; it taxes your noncreature spells", () => {
+    expect(readTriggers(of("Mystic Remora").oracleText ?? "", "Mystic Remora").tax).toEqual({ noncreature: true, first: false, cost: 4 });
+    let g = table({ opp: { field: ["Mystic Remora", "Underground Sea", "Underground Sea", "Underground Sea"] } });
+    g = startTurn(g, BOOK);
+    expect(said(g)).toMatch(/pays \{1\} for Mystic Remora's cumulative upkeep/);
+    g = startTurn(g, BOOK);
+    expect(said(g)).toMatch(/pays \{2\} for Mystic Remora's cumulative upkeep/);
+    g = startTurn(g, BOOK);
+    expect(said(g)).toMatch(/doesn't pay Mystic Remora's cumulative upkeep: it's sacrificed/);
+    expect(at(g, "opp", "Mystic Remora", "graveyard")).toBeDefined();
+  });
+
+  it("the planner casts a ritual to land its draw engine", () => {
+    const g0 = table({ opp: { field: ["Swamp"], hand: ["Dark Ritual", "Necrodominance"] } });
+    const plan = fallbackPlan(g0, BOOK);
+    expect(names(g0, plan)).toEqual(["cast:Dark Ritual", "cast:Necrodominance"]);
+    let g = g0;
+    for (const a of plan.main) g = applyAction(g, "opp", a, BOOK).game;
+    expect(at(g, "opp", "Necrodominance", "battlefield")).toBeDefined();
+    // And the model is shown that line.
+    expect(lineBrief(g0, plan)).toMatch(/^cast c\d+ Dark Ritual; cast c\d+ Necrodominance\.$/);
+    // A ritual isn't spent on nothing.
+    expect(fallbackPlan(table({ opp: { field: ["Swamp"], hand: ["Dark Ritual", "Bear"] } }), BOOK).main).toEqual([]);
+  });
+});
+
+describe("cantrips and tutors", () => {
+  it("Gitaxian Probe, Borne Upon a Wind and Brainstorm draw", () => {
+    expect(drawSpellOf(of("Gitaxian Probe"))).toEqual({ draw: 1, lose: 0 });
+    expect(drawSpellOf(of("Borne Upon a Wind"))).toEqual({ draw: 1, lose: 0 });
+    expect(drawSpellOf(of("Brainstorm"))).toEqual({ draw: 3, lose: 0, back: 2 });
+  });
+
+  it("Brainstorm draws three and puts back the two worst", () => {
+    const g0 = table({ opp: { field: ["Underground Sea"], hand: ["Brainstorm", "Thassa's Oracle"], top: ["Swamp", "Sol Ring", "Swamp"] } });
+    const g = cast(g0, "Brainstorm").game;
+    // Three drawn, two back: the Oracle stays, with one of the three.
+    expect(g.sides.opp.hand).toHaveLength(2);
+    expect(g.sides.opp.hand.map((c) => c.name)).toContain("Thassa's Oracle");
+    expect(at(g, "opp", "Brainstorm", "graveyard")).toBeDefined();
+    // The other two are back on top.
+    const kept = g.sides.opp.hand.map((c) => c.name).filter((n) => n !== "Thassa's Oracle");
+    expect([...kept, ...g.sides.opp.library.slice(0, 2).map((c) => c.name)].sort()).toEqual(["Sol Ring", "Swamp", "Swamp"]);
+    expect(said(g)).toMatch(/Brainstorm: The opponent puts 2 cards back on top/);
+  });
+
+  it("Demonic Counsel finds a Demon, or any card with four card types in the graveyard", () => {
+    const t = tutorOf(of("Demonic Counsel"))!;
+    expect(t.delirium).toBeDefined();
+    const demon = info("Imp", { typeLine: "Creature — Demon" });
+    const thin = [{ typeLine: "Instant" }, { typeLine: "Sorcery" }];
+    const full = [...thin, { typeLine: "Basic Land — Swamp" }, { typeLine: "Artifact Creature — Golem" }];
+    expect(cardTypesAmong(full.map((c) => c.typeLine))).toBe(5);
+    expect(tutorSearch(t, thin).test("Instant", of("Dark Ritual"))).toBe(false);
+    expect(tutorSearch(t, thin).test(demon.typeLine, demon)).toBe(true);
+    expect(tutorSearch(t, full).test("Instant", of("Dark Ritual"))).toBe(true);
+  });
+
+  it("Beseech the Mirror is a tutor to the hand", () => {
+    const t = tutorOf(of("Beseech the Mirror"))!;
+    expect(t.search.to).toEqual([{ zone: "hand" }]);
+    expect(t.search.test("Instant", of("Dark Ritual"))).toBe(true);
+  });
+
+  it("Wishclaw Talisman: the opponent uses it for a combo piece, and you get it", () => {
+    expect(searchAbility(of("Wishclaw Talisman"))).toMatchObject({ tap: true, mana: "{1}", givesAway: true });
+    const g0 = table({ opp: { field: ["Wishclaw Talisman", "Underground Sea", "Underground Sea"], hand: ["Thassa's Oracle"], top: ["Bear", "Demonic Consultation"] } });
+    const plan = fallbackPlan(g0, BOOK, "opp", {}, [ORACLE]);
+    expect(names(g0, plan)).toEqual(["activate:Wishclaw Talisman"]);
+    let g = g0;
+    for (const a of plan.main) g = applyAction(g, "opp", a, BOOK, { combos: [ORACLE] }).game;
+    expect(at(g, "opp", "Demonic Consultation")).toBeDefined();
+    expect(at(g, "you", "Wishclaw Talisman", "battlefield")).toBeDefined();
+    expect(said(g)).toMatch(/You gain control of Wishclaw Talisman/);
+    // Not for anything else: it would hand you a tutor.
+    expect(fallbackPlan(table({ opp: { field: ["Wishclaw Talisman", "Underground Sea", "Underground Sea"], top: ["Bear"] } }), BOOK).main).toEqual([]);
+  });
+
+  it("…and with the mana for the rest, it's the turn it wins", () => {
+    const g0 = table({ opp: { field: ["Wishclaw Talisman", "Underground Sea", "Underground Sea", "Underground Sea", "Underground Sea"], hand: ["Thassa's Oracle"], top: ["Bear", "Demonic Consultation"] } });
+    const plan = winningTurn(g0, BOOK, "opp", [ORACLE]);
+    expect(plan).not.toBeNull();
+    let g = g0;
+    for (const a of plan!.main) g = applyAction(g, "opp", a, BOOK, { combos: [ORACLE] }).game;
+    expect(g.winner).toBe("opp");
+  });
+});
+
+describe("mana it used to miss", () => {
+  it("Gemstone Mine taps for any colour", () => {
+    expect(manaOutput(of("Gemstone Mine"), of("Gemstone Mine").typeLine)).toMatchObject({ amount: 1 });
+    expect(manaOutput(of("Gemstone Mine"), of("Gemstone Mine").typeLine)!.colors.sort()).toEqual(["B", "G", "R", "U", "W"]);
+  });
+
+  it("Paradise Mantle's creature taps for one of any colour", () => {
+    const g0 = table({ opp: { field: ["Rograkh, Son of Rohgahh", "Paradise Mantle"] } });
+    const bare = manaTotal(availableMana(g0, "opp", BOOK));
+    const rog = at(g0, "opp", "Rograkh, Son of Rohgahh", "battlefield")!;
+    const g = { ...g0, sides: { ...g0.sides, opp: { ...g0.sides.opp, battlefield: g0.sides.opp.battlefield.map((c) => (c.name === "Paradise Mantle" ? { ...c, attachedTo: rog.iid } : c)) } } };
+    expect(manaTotal(availableMana(g, "opp", BOOK))).toBe(bare + 1);
+  });
+});
+
+describe("the opponent's mulligan", () => {
+  const seven = (...names: string[]) => {
+    const g = newGame({ you: { cards: deck(...Array(20).fill("Island")) }, opp: { cards: deck(...names, ...Array(30).fill("Swamp")) }, commanderGame: true, first: "opp", shuffle: keep });
+    return g.sides.opp;
+  };
+  it("keeps one land with fast mana", () => {
+    const side = seven("Badlands", "Lotus Petal", "Sol Ring", "Dark Ritual", "Brainstorm", "Thassa's Oracle", "Bear");
+    expect(aiMulligan(side, BOOK).mulligans).toBe(0);
+  });
+  it("never keeps a hand with no land: down to five at most", () => {
+    const side = seven("Lotus Petal", "Sol Ring", "Dark Ritual", "Brainstorm", "Thassa's Oracle", "Bear", "Gitaxian Probe");
+    const kept = aiMulligan(side, BOOK);
+    expect(kept.mulligans).toBeGreaterThanOrEqual(1);
+    expect(kept.mulligans).toBeLessThanOrEqual(2);
+    expect(kept.hand).toHaveLength(7 - kept.mulligans);
+    if (kept.mulligans === 1) expect(kept.hand.some((c) => /Land/.test(c.typeLine ?? ""))).toBe(true);
+  });
+});
+
+describe("the smart opponent's plan", () => {
+  const oracle = (g: PracticeGame) => act("cast", at(g, "opp", "Thassa's Oracle")!.iid);
+  it("a combo piece cast on a turn that doesn't go off is taken out", () => {
+    const g = table({ opp: { field: ["Underground Sea", "Underground Sea"], hand: ["Thassa's Oracle", "Sol Ring", "Final Fortune"] } });
+    const plan = { main: [oracle(g), act("cast", at(g, "opp", "Sol Ring")!.iid), act("cast", at(g, "opp", "Final Fortune")!.iid)], attack: [], after_combat: [], say: "" };
+    expect(names(g, guardPlan(g, plan, BOOK))).toEqual(["cast:Sol Ring"]);
+  });
+  it("a plan that goes off is left alone", () => {
+    const g = table({ opp: { field: ["Underground Sea", "Underground Sea", "Underground Sea"], hand: ["Thassa's Oracle", "Demonic Consultation"] } });
+    const plan = { main: [act("cast", at(g, "opp", "Demonic Consultation")!.iid), oracle(g)], attack: [], after_combat: [], say: "" };
+    expect(guardPlan(g, plan, BOOK)).toBe(plan);
+    const combo = { main: [act("combo", 0, { card: ORACLE.id })], attack: [], after_combat: [], say: "" };
+    expect(guardPlan(g, combo, BOOK)).toBe(combo);
   });
 });

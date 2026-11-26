@@ -4,14 +4,15 @@
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
 import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, sacManaOf, searchOnCast, stats, wheelSpellOf } from "./cards";
-import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, comboStatus, indestructible, lifeFor, spellCost } from "./game";
+import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, comboStatus, indestructible, lifeFor, spellCost, uncastable } from "./game";
 import { comboOutcome, type DeckCombo } from "./combos";
 import { equipOf } from "./abilities";
 import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
 import { treasureSpellOf } from "./treasure";
-import { drawSpellOf, tutorOf, wipeOf } from "./spells";
+import { drawSpellOf, tutorOf, tutorSearch, wipeOf, type Tutor } from "./spells";
 import { adNauseamOf, burnOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, ritualOf, sacrificeCostOf } from "./wincons";
 import { triggersOf } from "./triggers";
+import { lifeForCardsOf, searchAbility, type SearchAbility } from "./cards";
 import { scaleDamage } from "./damage";
 import { castTriggerOf } from "./cards";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
@@ -170,14 +171,16 @@ const blank = (type: Effect["type"]): Effect => ({ ...drawEffect(0), type, playe
 /** What a tutor finds: the biggest card it can cast next turn (with one
     more land), or else the biggest. Lands only when it has none in hand and
     few out. */
-function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, combos: DeckCombo[] = []): Effect[] | null {
-  const t = tutorOf(infoOf(book, c));
+function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, combos: DeckCombo[] = [], opts: { tutor?: Tutor; onlyPieces?: boolean } = {}): Effect[] | null {
+  const t = opts.tutor ?? tutorOf(infoOf(book, c));
   if (!t || g.sides[seat].life - t.lose < 10) return null;
   const side = g.sides[seat];
   // Next turn's mana: what it has (tapped or not) and a land drop.
   const reach = manaTotal(availableMana(g, seat, book)) + side.battlefield.filter((x) => x.tapped).length + 1;
   const needLand = !side.hand.some(canPlayAsLand) && side.battlefield.filter(isLand).length < 4;
-  const fits = side.library.filter((x) => t.search.test(x.typeLine, infoOf(book, x)) && (needLand || !isLand(x)) && (infoOf(book, x)?.toughness !== 0 || !isCreature(book, x)));
+  // Demonic Counsel finds any card with four card types in the graveyard.
+  const search = tutorSearch(t, side.graveyard);
+  const fits = side.library.filter((x) => search.test(x.typeLine, infoOf(book, x)) && (needLand || !isLand(x)) && (infoOf(book, x)?.toughness !== 0 || !isCreature(book, x)));
   if (!fits.length) return null;
   const mv = (x: PlayCard) => infoOf(book, x)?.manaValue ?? 0;
   // The missing half of a win comes first: Thassa's Oracle when it holds
@@ -210,7 +213,9 @@ function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, com
   };
   const score = (x: PlayCard) => combo(x) + piece(x) + (needLand && isLand(x) ? 10000 : 0) + (mv(x) <= reach ? 1000 : 0) + mv(x) * 10 + (isCreature(book, x) ? 1 : 0);
   const pick = fits.reduce((a, b) => (score(b) > score(a) ? b : a));
-  const effects: Effect[] = [{ ...blank("search"), name: pick.name, to: t.search.to[0]!.zone === "top" ? "top" : "hand" }];
+  // Wishclaw Talisman goes to the player once used: only for a combo piece.
+  if (opts.onlyPieces && !piece(pick)) return null;
+  const effects: Effect[] = [{ ...blank("search"), name: pick.name, to: search.to[0]!.zone === "top" ? "top" : "hand" }];
   if (t.lose) effects.push({ ...blank("life"), player: "ai", amount: -t.lose });
   return effects;
 }
@@ -257,6 +262,35 @@ function wipePlan(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): Pla
   return { ...blankAction("cast", c.iid), x: w.amount === null ? n : null, effects };
 }
 
+/** A plan (the model's) with the casts that would throw a combo away
+    taken out: Thassa's Oracle or Underworld Breach cast on a turn the
+    plan doesn't go off, and an extra turn that costs the game (Final
+    Fortune). A plan that declares a combo, or empties its library, is
+    left as it is. */
+export function guardPlan(g: PracticeGame, plan: TurnPlan, book: CardBook, seat: Seat = "opp"): TurnPlan {
+  const own = [...g.sides[seat].hand, ...g.sides[seat].command];
+  const cardOf = (a: PlanAction) => own.find((c) => cardId(c.iid) === a.card);
+  const all = [...plan.main, ...plan.after_combat];
+  const goes = all.some((a) => {
+    const c = a.kind === "cast" ? cardOf(a) : undefined;
+    return a.kind === "combo" || (!!c && !!libraryExilerOf(infoOf(book, c)));
+  });
+  if (goes) return plan;
+  const wasted = (a: PlanAction) => {
+    if (a.kind !== "cast") return false;
+    const c = cardOf(a);
+    if (!c) return false;
+    return oracleWinOf(book, c) ? devotion(g, seat, "U", book) + 2 < g.sides[seat].library.length : !!triggersOf(book, c).endSacrifice || extraTurnLosesOf(infoOf(book, c));
+  };
+  if (!all.some(wasted)) return plan;
+  return { ...plan, main: plan.main.filter((a) => !wasted(a)), after_combat: plan.after_combat.filter((a) => !wasted(a)) };
+}
+
+/** An activated tutor's use (Wishclaw Talisman), as a plan action. */
+function abilityTutor(c: PlayCard, ab: SearchAbility, effects: Effect[]): PlanAction {
+  return { ...blankAction("activate", c.iid), tap_card: true, sacrifice_card: ab.sacrifice || null, mana: ab.mana, life: ab.life || null, effects };
+}
+
 /** A card the planner keeps in hand for its combo: a piece the combo wants
     in the hand or the graveyard (Thassa's Oracle, Brain Freeze), or one
     that only lasts the turn it's cast (Underworld Breach). Cast alone, it's
@@ -293,6 +327,8 @@ function goOff(g: PracticeGame, book: CardBook, seat: Seat, combos: DeckCombo[],
     return st.missing.length * 10 + st.toCast.length + (st.needs ? 50 : 0);
   };
   for (const c of [...lines].sort((a, b) => far(a) - far(b))) {
+    // Milling a library that's already empty does nothing more.
+    if (comboOutcome(c.produces) === "mill" && !start.sides[other(seat)].library.length) continue;
     const line = comboLine(start, book, seat, c, combos);
     if (!line) continue;
     const outcome = comboOutcome(c.produces);
@@ -326,11 +362,18 @@ function comboLine(g0: PracticeGame, book: CardBook, seat: Seat, combo: DeckComb
     if (!want) return null;
     for (const c of t.sides[seat].hand) {
       const tu = isPiece(c) ? null : tutorOf(infoOf(book, c));
-      if (!tu || tu.discardRandom || tu.search.to[0]!.zone !== "hand" || !tu.search.test(want.typeLine, infoOf(book, want))) continue;
+      const search = tu ? tutorSearch(tu, t.sides[seat].graveyard) : null;
+      if (!tu || !search || tu.discardRandom || search.to[0]!.zone !== "hand" || !search.test(want.typeLine, infoOf(book, want))) continue;
       if (t.sides[seat].life - tu.lose < 5) continue;
       const effects: Effect[] = [{ ...blank("search"), name: want.name, to: "hand" }];
       if (tu.lose) effects.push({ ...blank("life"), player: "ai", amount: -tu.lose });
       return { ...blankAction("cast", c.iid), effects };
+    }
+    // An activated one on the battlefield (Wishclaw Talisman).
+    for (const c of t.sides[seat].battlefield) {
+      const ab = isLand(c) || c.tapped ? null : searchAbility(infoOf(book, c));
+      if (!ab || !ab.tap || ab.to[0]!.zone !== "hand" || !ab.test(want.typeLine, infoOf(book, want))) continue;
+      return abilityTutor(c, ab, [{ ...blank("search"), name: want.name, to: "hand" }]);
     }
     return null;
   };
@@ -680,8 +723,41 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     // deck's tutors come before its permanents: the piece is the plan.
     return extraTurnOf(infoOf(book, c)) || adNauseamOf(infoOf(book, c)) ? -1 : tutorOf(infoOf(book, c)) ? (ending.length ? -0.5 : 1) : drawOnly(book, c) ? 2 : 0;
   }
+  /** A draw engine (Necropotence, Rhystic Study, Mystic Remora, Ad
+      Nauseam): worth a ritual to land early. */
+  const engine = (c: PlayCard) => {
+    const info = infoOf(book, c);
+    return !!lifeForCardsOf(book, c) || !!triggersOf(book, c).tax || adNauseamOf(info);
+  };
+  /** A ritual cast first (on the planner's copy of the table) so the
+      engine can be paid for: its action, or null. */
+  const ritualInto = (c: PlayCard, zone: "hand" | "command"): PlanAction | null => {
+    if (!engine(c) || uncastable(sim, seat, c, book)) return null;
+    for (const r of sim.sides[seat].hand) {
+      if (r.iid === c.iid || heldForCombo(book, r, combos) || uncastable(sim, seat, r, book)) continue;
+      const units = ritualMana(infoOf(book, r), {
+        graveyard: sim.sides[seat].graveyard.length,
+        ritesInGraveyards: [...sim.sides.you.graveyard, ...sim.sides.opp.graveyard].filter((x) => x.name === r.name).length,
+        foeHand: sim.sides[other(seat)].hand.length,
+      });
+      if (!units || units.length <= totalOf(spellCost(sim, seat, r, book, "hand"))) continue;
+      const saved = sim;
+      if (!payIn(spellCost(sim, seat, r, book, "hand"))) continue;
+      sim = structuredClone(sim);
+      if (!sim.pool) sim.pool = { you: [], opp: [] };
+      sim.pool[seat] = [...sim.pool[seat], ...units];
+      sim.sides[seat] = { ...sim.sides[seat], hand: sim.sides[seat].hand.filter((x) => x.iid !== r.iid) };
+      if (castable(sim, seat, c, book, zone)) return blankAction("cast", r.iid);
+      sim = saved;
+    }
+    return null;
+  };
   for (const { c, zone } of candidates) {
-    if (!castable(sim, seat, c, book, zone)) continue;
+    if (!castable(sim, seat, c, book, zone)) {
+      const ritual = ritualInto(c, zone);
+      if (!ritual) continue;
+      main.push(ritual);
+    }
     // A tutor needs something worth finding; a draw spell, the life to spare.
     const found = tutorOf(infoOf(book, c)) ? tutorPick(sim, seat, c, book, combos) : null;
     if (tutorOf(infoOf(book, c)) && !found) continue;
@@ -695,6 +771,17 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
       sim = structuredClone(sim);
       sim.sides[seat] = { ...sim.sides[seat], life: sim.sides[seat].life - drawSpell.lose };
     } else main.push(blankAction("cast", c.iid));
+  }
+  // An activated tutor on the battlefield (Wishclaw Talisman), for a combo
+  // piece: the player gets it after.
+  for (const c of sim.sides[seat].battlefield) {
+    const ab = isLand(c) || c.tapped ? null : searchAbility(infoOf(book, c));
+    if (!ab || ab.count !== 1 || ab.to[0]!.zone !== "hand" || !ab.tap) continue;
+    const found = tutorPick(sim, seat, c, book, combos, { tutor: { search: ab, lose: ab.life }, onlyPieces: !!ab.givesAway || ab.sacrifice });
+    if (!found || !payIn(parseCost(ab.mana))) continue;
+    main.push(abilityTutor(c, ab, found));
+    sim = structuredClone(sim);
+    sim.sides[seat] = { ...sim.sides[seat], battlefield: sim.sides[seat].battlefield.map((x) => (x.iid === c.iid ? { ...x, tapped: true } : x)) };
   }
   // Then the Equipment that's on nothing, onto its best creature, while it
   // can pay. (An Equipment cast this turn waits for the next: it isn't on
@@ -774,13 +861,33 @@ export function simpleTurn(g: PracticeGame, book: CardBook, seat: Seat = "opp", 
 /** The AI keeps 2–5 lands in seven; otherwise it mulligans once and puts
     back what it has too much of. */
 export function aiMulligan(side: PlaytestState, book: CardBook): PlaytestState {
-  const lands = side.hand.filter((c) => isLandCard(c.typeLine)).length;
-  if (lands >= 2 && lands <= 5) return side;
-  let s = londonMulligan(side);
+  // Fast mana counts towards a hand's mana: a card that costs one or less
+  // and makes mana (Sol Ring, Lotus Petal, a Mox), or a Spirit Guide.
+  const fast = (c: PlayCard) => {
+    if (isLandCard(c.typeLine)) return false;
+    const info = infoOf(book, c);
+    if (handManaOf(info)) return true;
+    const made = manaOutput(info, c.typeLine);
+    return !!made && !isCreature(book, c) && (info?.manaValue ?? 9) <= 1;
+  };
+  const keepable = (hand: PlayCard[], mulligans: number) => {
+    const lands = hand.filter((c) => isLandCard(c.typeLine)).length;
+    const mana = lands + hand.filter(fast).length;
+    if (lands >= 2 && lands <= 5) return true;
+    // One land with fast mana is a turbo deck's keep.
+    if (lands === 1 && mana >= 3) return true;
+    // Past one mulligan, anything with a land in it.
+    return mulligans >= 1 && lands >= 1 && lands <= 6;
+  };
+  if (keepable(side.hand, 0)) return side;
+  let s = side;
+  // Never a hand with no land: down to five at most.
+  do s = londonMulligan(s);
+  while (s.mulligans < 2 && !keepable(s.hand, s.mulligans));
   const after = s.hand.filter((c) => isLandCard(c.typeLine)).length;
   const back = [...s.hand].sort((a, b) => {
-    // Too few lands: bottom the priciest spell. Too many: bottom a land.
-    if (after < 3) return (isLandCard(a.typeLine) ? 1 : 0) - (isLandCard(b.typeLine) ? 1 : 0) || value(book, b) - value(book, a);
+    // Too few lands: bottom the priciest spell (fast mana last). Too many: bottom a land.
+    if (after < 3) return (isLandCard(a.typeLine) ? 1 : 0) - (isLandCard(b.typeLine) ? 1 : 0) || Number(fast(a)) - Number(fast(b)) || value(book, b) - value(book, a);
     return (isLandCard(b.typeLine) ? 1 : 0) - (isLandCard(a.typeLine) ? 1 : 0);
   });
   for (const c of back.slice(0, s.toBottom)) s = bottomCard(s, c.iid);

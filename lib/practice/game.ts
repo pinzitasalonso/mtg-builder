@@ -53,7 +53,7 @@ import {
   wheelSpellOf,
   type Wheel,
   type Edict,
-  type SearchAbility, handManaOf, sacManaOf } from "./cards";
+  type SearchAbility, handManaOf, sacManaOf, equipManaOf, searchAbility, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf } from "./cards";
 import {
   affinityHits,
   affinityOf,
@@ -85,7 +85,7 @@ import {
 } from "./abilities";
 import { triggersOf, type Outcome } from "./triggers";
 import { scaleDamage } from "./damage";
-import { tutorOf } from "./spells";
+import { drawSpellOf, tutorOf } from "./spells";
 import { adNauseamOf, devotion, emptyDrawWinsOf, extraTurnLosesOf, extraTurnOf, hasStorm, libraryExilerOf, oracleWinOf, ritualMana, sacrificeCostOf } from "./wincons";
 import {
   extraTreasureOf,
@@ -723,6 +723,13 @@ export function availableMana(g: PracticeGame, seat: Seat, book: CardBook, exclu
       }
     }
   }
+  // Paradise Mantle: its creature taps for one mana of any colour.
+  for (const e of side.battlefield) {
+    if (e.attachedTo === undefined || !equipManaOf(infoOf(book, e))) continue;
+    const c = side.battlefield.find((x) => x.iid === e.attachedTo);
+    if (!c || !ready(c) || all.some((s) => s.iid === c.iid || s.also?.includes(c.iid))) continue;
+    all.push({ iid: c.iid, name: c.name, colors: ["W", "U", "B", "R", "G"], amount: 1 });
+  }
   // A Spirit Guide in the opponent's hand: exiled for its mana, when
   // nothing else pays. (Yours is yours to exile by hand.)
   if (seat === "opp") {
@@ -894,7 +901,33 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
       loseLife(g, seat, dealt, book);
     }
   }
-  if (g.turn > 1 && !g.winner) drawCards(g, seat, 1, book, { step: true });
+  // "Cumulative upkeep {1}" (Mystic Remora): an age counter, then pay for
+  // each or sacrifice it. The opponent pays while it's {2} or less; yours
+  // is yours to pay (or sacrifice) by hand.
+  for (const c of [...g.sides[seat].battlefield]) {
+    const each = cumulativeUpkeepOf(book, c);
+    if (each === null || g.winner) continue;
+    const age = (c.age ?? 0) + 1;
+    update(g, c.iid, (x) => ({ ...x, age }));
+    const owed = each * age;
+    if (seat === "you") {
+      say(g, "you", `${faceName(c)}: cumulative upkeep, now {${owed}}. Pay it, or sacrifice ${faceName(c)} from its menu.`);
+      continue;
+    }
+    const sources = availableMana(g, seat, book);
+    const paid = owed <= 2 ? aiPay(g, seat, parseCost(`{${owed}}`), sources, book) : null;
+    if (paid) {
+      spend(g, seat, paid, sources, book);
+      say(g, seat, `The opponent pays {${owed}} for ${faceName(c)}'s cumulative upkeep.`);
+    } else {
+      moveTo(g, c.iid, "graveyard");
+      say(g, seat, `The opponent doesn't pay ${faceName(c)}'s cumulative upkeep: it's sacrificed.`);
+    }
+  }
+  // Necropotence, Necrodominance: no draw step.
+  const skips = g.sides[seat].battlefield.find((c) => skipsDrawOf(book, c));
+  if (skips && g.turn > 1 && !g.winner) say(g, seat, `${faceName(skips)}: ${who(seat)} ${verb(seat, "skip")} the draw step.`);
+  else if (g.turn > 1 && !g.winner) drawCards(g, seat, 1, book, { step: true });
   // Mana Vault, still tapped at the draw step.
   for (const c of g.sides[seat].battlefield) {
     const pain = c.tapped ? tappedPainOf(book, c) : 0;
@@ -912,7 +945,10 @@ export const coin = { flip: () => Math.random() < 0.5, d20: () => 1 + Math.floor
 
 /** The most cards a seat may keep at the end of its turn: seven, or none
     to speak of with "You have no maximum hand size" (Reliquary Tower). */
-export const maxHandSize = (g: PracticeGame, seat: Seat, book: CardBook) => (g.sides[seat].battlefield.some((c) => noMaxHandSize(book, c)) ? Infinity : 7);
+export const maxHandSize = (g: PracticeGame, seat: Seat, book: CardBook) =>
+  g.sides[seat].battlefield.some((c) => noMaxHandSize(book, c))
+    ? Infinity
+    : Math.min(7, ...g.sides[seat].battlefield.map((c) => handSizeOf(book, c) ?? 7));
 
 /** The end of your turn with more than seven cards in hand: the game asks
     for a discard (call it again until it changes nothing). */
@@ -994,6 +1030,27 @@ function endStep(g: PracticeGame, book: CardBook) {
       moveTo(g, c.iid, "exile");
       say(g, s, `The copy of ${c.name} is exiled.`);
     }
+  }
+  // Necropotence, Necrodominance: cards for life. The opponent fills its
+  // hand up to its hand size (four at least), keeping 12 life (more when
+  // the player's creatures hit harder). Yours are yours to take by hand.
+  for (const c of [...g.sides[seat].battlefield]) {
+    const kind = lifeForCardsOf(book, c);
+    if (!kind || g.winner) continue;
+    if (seat === "you") {
+      say(g, "you", `${faceName(c)}: pay life for cards now if you want them (Draw, and your life total).`);
+      continue;
+    }
+    const side = g.sides[seat];
+    // Up to its hand size, and at least four to dig for what it lacks:
+    // what's over the hand size goes at cleanup (the worst cards).
+    const room = Math.max(4, Math.min(7, maxHandSize(g, seat, book)) - side.hand.length);
+    const n = Math.max(0, Math.min(room, side.life - Math.max(12, lifeFloor(g, seat, book)), side.library.length));
+    if (!n) continue;
+    loseLife(g, seat, n, book);
+    if (kind === "draw") drawCards(g, seat, n, book);
+    else g.sides[seat] = { ...g.sides[seat], library: g.sides[seat].library.slice(n), hand: [...g.sides[seat].hand, ...g.sides[seat].library.slice(0, n)] };
+    say(g, seat, `${faceName(c)}: the opponent pays ${n} life for ${n} card${n === 1 ? "" : "s"}.`);
   }
   // "At the beginning of the end step, sacrifice this" (Underworld Breach).
   for (const s of ["you", "opp"] as Seat[]) {
@@ -1596,8 +1653,21 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   if (action.sacrifice_card) moveTo(g, card.iid, "graveyard");
   say(g, seat, `${who(seat)} ${action.sacrifice_card ? "sacrifices" : "activates"} ${card.name}.`, card);
   applyEffects(g, seat, action.effects, book, card.name, card);
+  // Wishclaw Talisman: after its search, the other player takes it.
+  if (searchAbility(info)?.givesAway && !action.sacrifice_card) giveAway(g, card.iid);
   checkState(g, book);
   return { game: g, ok: true };
+}
+
+/** A permanent changes hands (Wishclaw Talisman): onto the other side's
+    battlefield, as it was. */
+function giveAway(g: PracticeGame, iid: number) {
+  const at = findCard(g, iid);
+  if (!at || at.zone !== "battlefield") return;
+  const to = other(at.seat);
+  g.sides[at.seat] = { ...g.sides[at.seat], battlefield: g.sides[at.seat].battlefield.filter((c) => c.iid !== iid) };
+  g.sides[to] = { ...g.sides[to], battlefield: [...g.sides[to].battlefield, { ...at.card, attachedTo: undefined, enteredTurn: g.turn }] };
+  say(g, to, `${to === "you" ? "You gain" : "The opponent gains"} control of ${at.card.name}.`);
 }
 
 /** The AI answers a spell the player has just cast: a hard counterspell
@@ -1906,6 +1976,8 @@ function aiDiscardPick(g: PracticeGame, seat: Seat, book: CardBook): PlayCard | 
     if (oracleWinOf(book, c) || libraryExilerOf(info)) return 5;
     if (tutorOf(info) || adNauseamOf(info) || triggersOf(book, c).endSacrifice) return 4;
     if (ritualMana(info, { graveyard: 0, ritesInGraveyards: 0, foeHand: 1 }) || handManaOf(info)) return 2;
+    // A mana rock: the mana it'll need.
+    if (manaOutput(info, c.typeLine) && !isCreature(book, c)) return 2;
     return 0;
   };
   const spells = side.hand.filter((c) => !isLand(c)).sort((a, b) => keep(a) - keep(b) || (infoOf(book, b)?.manaValue ?? 0) - (infoOf(book, a)?.manaValue ?? 0));
@@ -2624,6 +2696,7 @@ export function playerUseSearch(g0: PracticeGame, iid: number, ability: SearchAb
   if (ability.sacrifice) moveTo(g, iid, "graveyard");
   say(g, "you", `You ${ability.sacrifice ? "sacrifice" : "use"} ${at.card.name}${ability.life ? ` and pay ${ability.life} life` : ""} to search your library.`);
   loseLife(g, "you", ability.life, book);
+  if (ability.givesAway && !ability.sacrifice) giveAway(g, iid);
   return g;
 }
 
@@ -2689,6 +2762,20 @@ function resolveCast(g: PracticeGame, seat: Seat, card: PlayCard, action: PlanAc
       applyEffects(g, seat, effects, book, i ? `${card.name} (copy)` : card.name, card);
       checkState(g, book);
     }
+    // Brainstorm: after the draw, the cards it would least like to keep go
+    // back on top (the last one picked ends up on top).
+    const ds = drawSpellOf(infoOf(book, card));
+    const back = ds?.back ?? 0;
+    // Its draw, when the plan left it out.
+    if (back && !action.effects.some((e) => e.type === "draw")) drawCards(g, seat, ds!.draw, book);
+    // The spell itself is on its way to the graveyard, not one of the cards to put back.
+    if (back) moveTo(g, card.iid, "graveyard");
+    for (let i = 0; i < back && g.sides[seat].hand.length; i++) {
+      const pick = aiDiscardPick(g, seat, book);
+      if (!pick) break;
+      moveTo(g, pick.iid, "library");
+    }
+    if (back) say(g, seat, `${card.name}: ${who(seat)} ${verb(seat, "put")} ${back === 1 ? "a card" : `${back} cards`} back on top.`);
     // Gamble: after the search, a card at random goes.
     const others = g.sides[seat].hand.filter((c) => c.iid !== card.iid);
     if (tutorOf(infoOf(book, card))?.discardRandom && others.length) {
