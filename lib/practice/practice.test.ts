@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { chooseBlocks, aiMulligan, fallbackPlan, simpleTurn } from "./ai";
-import { counterOf, fetchOf, has, hitTriggersOf, isCreature, isInstantSpeed, isNinja, manaOutput, ninjutsuOf, removalOf, searchAbility, searchOnCast, stats } from "./cards";
+import { colourGateOf, counterOf, fetchOf, has, hitTriggersOf, isCreature, isInstantSpeed, isNinja, manaOutput, ninjutsuOf, removalOf, searchAbility, searchOnCast, stats } from "./cards";
 import { automatedNotes } from "./brief";
 import {
   addCounters,
@@ -82,6 +82,12 @@ const BOOK: CardBook = Object.fromEntries(
     info("Fierce Guardianship", { typeLine: "Instant", manaCost: "{2}{U}", manaValue: 3, oracleText: "If you control a commander, you may cast this spell without paying its mana cost.\nCounter target noncreature spell." }),
     info("Mental Misstep", { typeLine: "Instant", manaCost: "{U/P}", manaValue: 1, oracleText: "Counter target spell with mana value 1." }),
     info("Daze", { typeLine: "Instant", manaCost: "{1}{U}", manaValue: 2, oracleText: "You may return an Island you control to its owner's hand rather than pay this spell's mana cost.\nCounter target spell unless its controller pays {1}." }),
+    info("Ojer Giant", { manaCost: "{2}{R}{R}", manaValue: 4, power: 4, toughness: 4 }),
+    info("Sea Giant", { manaCost: "{3}{U}{U}", manaValue: 5, power: 5, toughness: 5 }),
+    info("Red Elemental Blast", { typeLine: "Instant", manaCost: "{R}", manaValue: 1, oracleText: "Choose one —\n• Counter target blue spell.\n• Destroy target blue permanent." }),
+    info("Plummet", { typeLine: "Instant", manaCost: "{1}{G}", manaValue: 2, oracleText: "Destroy target creature with flying." }),
+    info("Smite the Small", { typeLine: "Instant", manaCost: "{W}", manaValue: 1, oracleText: "Destroy target creature with power 2 or less." }),
+    info("Odd Kill", { typeLine: "Instant", manaCost: "{B}", manaValue: 1, oracleText: "Destroy target creature that was dealt damage this turn." }),
     info("Pyroblast", { typeLine: "Instant", manaCost: "{R}", manaValue: 1, oracleText: "Choose one —\n• Counter target spell if it's blue.\n• Destroy target permanent if it's blue." }),
     info("Brainstorm", { typeLine: "Instant", manaCost: "{U}", manaValue: 1, oracleText: "Draw three cards, then put two cards from your hand on top of your library in any order." }),
     info("Divination", { typeLine: "Sorcery", manaCost: "{2}{U}", manaValue: 3, oracleText: "Draw two cards." }),
@@ -739,6 +745,57 @@ describe("answering on the other's turn", () => {
     expect(blade.effects[0]!.target).toBe(cardId(iidOf(g, "you", "Serra Angel")));
     g = attackWith(["Serra Angel"], ["Swords to Plowshares"], []);
     expect(aiRemovalAction(g, BOOK, g.combat!.attackers, "attack")).toBeNull();
+  });
+
+  // "Destroy target permanent if it's blue" was read as "destroy target
+  // permanent": the AI Pyroblasted a red creature.
+  it("a removal spell's conditions are read: its colour, a keyword, a size", () => {
+    expect(removalOf(BOOK["pyroblast"])).toMatchObject({ kind: "destroy", onlyColor: "U" });
+    expect(removalOf(BOOK["red elemental blast"])).toMatchObject({ kind: "destroy", onlyColor: "U" });
+    expect(removalOf(BOOK["plummet"])).toMatchObject({ kind: "destroy", needs: "Flying" });
+    expect(removalOf(BOOK["smite the small"])).toMatchObject({ power: { min: 0, max: 2 } });
+    // A condition the table doesn't know: not used as removal at all.
+    expect(removalOf(BOOK["odd kill"])).toBeNull();
+    expect(colourGateOf(BOOK["pyroblast"])).toBe("U");
+    expect(colourGateOf(BOOK["doom blade"])).toBeNull();
+  });
+
+  it("the AI doesn't Pyroblast a red creature, by itself or by its plan", () => {
+    const attackWith = (names: string[], hand: string[], field: string[]) => {
+      let g: PracticeGame = { ...table({ youField: names, oppHand: hand, oppField: field }), active: "you", turn: 4 };
+      g = declareAttackers(g, "you", g.sides.you.battlefield.map((c) => c.iid), BOOK);
+      return g;
+    };
+    // By itself: nothing for the red one, the blast for the blue one.
+    let g = attackWith(["Ojer Giant"], ["Pyroblast"], ["Mountain"]);
+    expect(aiRemovalAction(g, BOOK, g.combat!.attackers, "attack")).toBeNull();
+    g = attackWith(["Ojer Giant", "Sea Giant"], ["Pyroblast"], ["Mountain"]);
+    expect(aiRemovalAction(g, BOOK, g.combat!.attackers, "attack")!.effects[0]).toMatchObject({ type: "destroy", target: cardId(iidOf(g, "you", "Sea Giant")) });
+    // Plummet needs flying; Smite the Small, a small creature.
+    g = attackWith(["Ojer Giant"], ["Plummet", "Smite the Small"], ["Forest", "Forest", "Plains"]);
+    expect(aiRemovalAction(g, BOOK, g.combat!.attackers, "attack")).toBeNull();
+
+    // By its plan: the cast is refused, the card stays in hand, no mana is spent.
+    const t = table({ youField: ["Ojer Giant", "Sea Giant"], oppHand: ["Pyroblast"], oppField: ["Mountain"] });
+    const blast = iidOf(t, "opp", "Pyroblast", "hand");
+    const destroy = (name: string) => action("cast", blast, { effects: [{ type: "destroy", target: cardId(iidOf(t, "you", name)), player: null, amount: null, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: null }] });
+    const red = applyAction(t, "opp", destroy("Ojer Giant"), BOOK);
+    expect(red.ok).toBe(false);
+    expect(red.game.sides.you.battlefield.some((c) => c.name === "Ojer Giant")).toBe(true);
+    expect(red.game.sides.opp.hand.some((c) => c.name === "Pyroblast")).toBe(true);
+    expect(red.game.sides.opp.battlefield.every((c) => !c.tapped)).toBe(true);
+    expect(red.game.log.map((l) => l.text).join(" ")).toMatch(/Pyroblast can only hit a blue card/);
+    const blue = applyAction(t, "opp", destroy("Sea Giant"), BOOK);
+    expect(blue.ok).toBe(true);
+    expect(blue.game.sides.you.battlefield.some((c) => c.name === "Sea Giant")).toBe(false);
+  });
+
+  it("a plan's Doom Blade can't hit a black creature", () => {
+    const t = table({ youField: ["Vampire Nighthawk", "Hill Giant"], oppHand: ["Doom Blade"], oppField: ["Swamp", "Swamp"] });
+    const blade = iidOf(t, "opp", "Doom Blade", "hand");
+    const destroy = (name: string) => action("cast", blade, { effects: [{ type: "destroy", target: cardId(iidOf(t, "you", name)), player: null, amount: null, name: null, power: null, toughness: null, keywords: [], to: null, tapped: null, text: null }] });
+    expect(applyAction(t, "opp", destroy("Vampire Nighthawk"), BOOK).ok).toBe(false);
+    expect(applyAction(t, "opp", destroy("Hill Giant"), BOOK).ok).toBe(true);
   });
 
   it("at the end of your turn, the AI answers a real threat only", () => {
