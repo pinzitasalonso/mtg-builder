@@ -35,6 +35,10 @@ export interface LogLine {
   /** The card a cast (or counter) line is about: the table shows the last
       few as "Last played", like the stack. */
   card?: { iid: number; name: string; imageUri: string };
+  /** A move of the opponent's that the table refused ("can't pay for Gamble
+      yet"). It's kept for the match's trace and the opponent's next brief,
+      and never shown to the player: it names cards in the opponent's hand. */
+  hidden?: boolean;
 }
 
 export interface Combat {

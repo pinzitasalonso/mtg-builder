@@ -35,7 +35,10 @@ import {
   setBlocks,
   startTurn,
   type DeckCard,
+  shownLog,
 } from "./game";
+import { reviewPrompt } from "./review";
+import { sinceLastOwnTurn } from "./trace";
 import { manaSources, parseCost, payCost } from "./mana";
 import type { CardBook, CardInfo, Effect, PlanAction, PracticeGame } from "./types";
 
@@ -256,6 +259,24 @@ describe("the AI's moves", () => {
     const no = applyAction(g, "opp", action("cast", iidOf(g, "opp", "Hill Giant", "hand")), BOOK);
     expect(no.ok).toBe(false);
     expect(no.game.log.at(-1)!.text).toMatch(/can't pay for Hill Giant/);
+  });
+
+  // "The opponent can't pay for Gamble yet." told the player what it held.
+  it("keeps a refused move out of the log the player reads, and out of the review", () => {
+    const g = table({ oppHand: ["Hill Giant"], oppField: ["Forest"] });
+    const before = shownLog(g).length;
+    const no = applyAction(g, "opp", action("cast", iidOf(g, "opp", "Hill Giant", "hand")), BOOK);
+    // Kept, for the match's trace and the opponent's next brief…
+    expect(no.game.log.at(-1)).toMatchObject({ seat: "opp", hidden: true });
+    expect(sinceLastOwnTurn(no.game).join("\n")).toMatch(/can't pay for Hill Giant/);
+    // …and not shown.
+    expect(shownLog(no.game)).toHaveLength(before);
+    expect(shownLog(no.game).map((l) => l.text).join("\n")).not.toMatch(/Hill Giant/);
+    const prompt = reviewPrompt({ game: no.game, deckName: "Mine", format: "commander", commander: null, opponent: "Theirs", bot: false, cards: [] });
+    expect(prompt).not.toMatch(/Hill Giant/);
+    // A card it doesn't have, a land it can't play: the same.
+    const odd = applyAction(g, "opp", action("cast", 99999), BOOK);
+    expect(odd.game.log.at(-1)).toMatchObject({ hidden: true });
   });
 
   it("charges commander tax", () => {

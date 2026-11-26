@@ -102,7 +102,7 @@ import {
 } from "./treasure";
 import { colorsOfCost, manaSources, manaTotal, parseCost, payCost, poolSources, totalOf, type Cost, type Payment, type Source } from "./mana";
 import { comboHeadline, comboNeeds, comboOutcome, type DeckCombo } from "./combos";
-import { type PendingTax, other, type CardBook, type Choice, type Combat, type Effect, type PlanAction, type PracticeGame, type Seat } from "./types";
+import { type PendingTax, other, type CardBook, type Choice, type Combat, type Effect, type LogLine, type PlanAction, type PracticeGame, type Seat } from "./types";
 
 export interface DeckCard {
   name: string;
@@ -185,6 +185,18 @@ function say(g: PracticeGame, seat: Seat | null, text: string, card?: PlayCard) 
   }
   if (g.log.length > LOG_CAP) g.log.splice(0, g.log.length - LOG_CAP);
 }
+
+/** Why a move was refused. The opponent's is kept out of the player's sight
+    (`LogLine.hidden`): "The opponent can't pay for Gamble yet" told you what
+    it was holding. Yours is for you to read. */
+function refused(g: PracticeGame, seat: Seat, text: string) {
+  if (seat === "you") return say(g, seat, text);
+  g.log.push({ seat, text, hidden: true });
+  if (g.log.length > LOG_CAP) g.log.splice(0, g.log.length - LOG_CAP);
+}
+
+/** The log as the player reads it. */
+export const shownLog = (g: PracticeGame): LogLine[] => g.log.filter((l) => !l.hidden);
 
 /** Log lines a move adds after the line that tells of it ("X dies." then
     "X goes to the command zone"): held until the next line is written. */
@@ -1452,7 +1464,7 @@ export function applyCombo(g0: PracticeGame, seat: Seat, combo: DeckCombo, book:
         : status.toCast.length
           ? `${status.toCast.map((c) => c.name).join(" and ")} must be cast first`
           : (status.blocked ?? "it isn't ready");
-      say(g, seat, `(${who(seat)} tried to go for ${names}, but ${why.replace(/\.$/, "")}.)`);
+      refused(g, seat, `(${who(seat)} tried to go for ${names}, but ${why.replace(/\.$/, "")}.)`);
       return { game: g, ok: false };
     }
     const cost = parseCost(combo.manaNeeded);
@@ -1518,7 +1530,7 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   const at = iid === null ? null : findCard(g0, iid);
   const g = structuredClone(g0);
   const fail = (why: string) => {
-    say(g, seat, why);
+    refused(g, seat, why);
     return { game: g, ok: false };
   };
   if (action.kind === "combo") {

@@ -54,7 +54,9 @@ export function reviewPrompt(input: ReviewInput): string {
     .map((c) => `${c.quantity} ${c.name}${c.typeLine ? ` (${c.typeLine.split(" — ")[0]})` : ""}`)
     .join("\n");
   // The whole log where it fits; a long game keeps its start and its end.
-  const lines = g.log.map((l) => (l.seat === "you" ? "[player] " : l.seat === "opp" ? "[opponent] " : "") + l.text);
+  // As the player read it: a move of the opponent's that was refused names
+  // cards it was holding, and the review doesn't get to tell.
+  const lines = g.log.filter((l) => !l.hidden).map((l) => (l.seat === "you" ? "[player] " : l.seat === "opp" ? "[opponent] " : "") + l.text);
   const log = lines.length > 260 ? [...lines.slice(0, 60), `… (${lines.length - 260} lines left out) …`, ...lines.slice(-200)] : lines;
   return [
     `THE PLAYER'S DECK: ${input.deckName} (${input.format}${input.commander ? `, commander: ${input.commander}` : ""})`,
