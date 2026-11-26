@@ -9,6 +9,7 @@ import { fallbackPlan, simpleTurn, winningTurn } from "@/lib/practice/ai";
 import { cleanPlan, PLAN_SCHEMA, sinceLastTurn, systemPrompt, turnBrief, type DeckLine } from "@/lib/practice/brief";
 import type { CardBook, TurnPlan } from "@/lib/practice/types";
 import { asGame } from "@/lib/practice/wire";
+import { asCombos } from "@/lib/practice/combos";
 
 export const runtime = "nodejs";
 
@@ -26,6 +27,8 @@ interface Setup {
   book: CardBook;
   oppDeck: DeckLine[];
   oppCommander: string | null;
+  /** The deck's combos (absent in games started before they were kept). */
+  combos?: unknown;
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -38,35 +41,39 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const game = asGame(body?.game);
   if (!game) return NextResponse.json({ error: "game required" }, { status: 400 });
   const setup = JSON.parse(row.setup) as Setup;
+  const combos = asCombos(setup.combos);
 
   // Counted, so admin shows how often the model is reached. The note says
   // why in a few words, so a player can tell us (and the log has the rest).
   const fallback = (note: string) => {
     void recordEvent("practice_fallback_turn");
-    return NextResponse.json({ plan: fallbackPlan(game, setup.book), source: "fallback", note });
+    return NextResponse.json({ plan: fallbackPlan(game, setup.book, "opp", {}, combos), source: "fallback", note });
   };
   const instinct = (why: string) => fallback(`The opponent played on instinct this turn (${why}).`);
 
   // The basic bot is the built-in planner: no model, no count. (The table
   // plans those turns itself; this answers a client that asks anyway.)
-  if (row.bot) return NextResponse.json({ plan: fallbackPlan(game, setup.book), source: "bot" });
+  if (row.bot) return NextResponse.json({ plan: fallbackPlan(game, setup.book, "opp", {}, combos), source: "bot" });
   // A turn with nothing to decide (a land, and nothing it could cast or
   // attack with) is played at once: the model would take its time to say
   // the same. It isn't one of the game's AI turns.
-  const simple = simpleTurn(game, setup.book);
-  if (simple) return NextResponse.json({ plan: simple, source: "simple" });
   // A win the table can see and has checked (Thassa's Oracle on an empty
-  // library, a lethal storm turn) is played, not left for the model to find.
-  const win = winningTurn(game, setup.book);
+  // library, a lethal storm turn, a combo with every piece in place) is
+  // played, not left for the model to find. Before the "nothing to decide"
+  // check: a combo sitting on the battlefield is exactly a turn with
+  // nothing to cast.
+  const win = winningTurn(game, setup.book, "opp", combos);
   if (win) return NextResponse.json({ plan: win, source: "win" });
+  const simple = simpleTurn(game, setup.book, "opp", combos);
+  if (simple) return NextResponse.json({ plan: simple, source: "simple" });
 
   // One more AI turn, if the game has any left.
   const spent = await prisma.practiceGame.updateMany({ where: { id, userId: user.id, turns: { lt: PRACTICE_AI_TURNS } }, data: { turns: { increment: 1 } } });
   if (!spent.count) return fallback("The opponent is on autopilot for the rest of this game.");
   if (!process.env.ANTHROPIC_API_KEY) return fallback("The opponent is on autopilot.");
 
-  const { rules, deck } = systemPrompt(setup.oppDeck, setup.book, setup.oppCommander);
-  const brief = turnBrief(game, setup.book, sinceLastTurn(game));
+  const { rules, deck } = systemPrompt(setup.oppDeck, setup.book, setup.oppCommander, combos);
+  const brief = turnBrief(game, setup.book, sinceLastTurn(game), combos);
   try {
     const anthropic = new Anthropic();
     const res = await anthropic.messages.create(

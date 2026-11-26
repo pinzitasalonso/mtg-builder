@@ -5,7 +5,8 @@
 
 import type { PlayCard } from "../playtest";
 import { canPlayAsLand, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
-import { availableMana, castable, cardId, lifeFor, loyaltyOf, uncastable } from "./game";
+import { availableMana, castable, cardId, comboStatus, lifeFor, loyaltyOf, uncastable } from "./game";
+import { comboHeadline, type DeckCombo } from "./combos";
 import {
   affinityOf,
   auraTutorOf,
@@ -61,7 +62,7 @@ const EFFECT_SCHEMA = {
 const ACTION_SCHEMA = {
   type: "object",
   properties: {
-    kind: { type: "string", enum: ["land", "cast", "activate"] },
+    kind: { type: "string", enum: ["land", "cast", "activate", "combo"] },
     card: { type: "string" },
     x: nullable("integer"),
     tap_card: nullable("boolean"),
@@ -107,6 +108,13 @@ HOW TO PLAY WELL
 - Rituals and fast mana: cast them when the mana lets you cast something more this turn. Mana a spell adds floats only until the end of the phase.
 - Keep mana open for a counterspell only when you hold one and have nothing better to do with that mana.
 - Attack when the player can't block well; keep blockers back when their board threatens lethal.
+
+COMBOS
+- When your deck has combos, they are listed after your decklist, each with an id, its pieces, where each piece has to be, its mana and its steps. Each turn the brief says where every one stands: READY, what to cast first, or which piece is missing and where it is.
+- A combo deck wins with its combos. Assembling one comes before attacking: find the missing piece with a tutor or card draw, keep the mana for it, and don't spend a piece on anything else.
+- To go for a combo that is READY: {"kind":"combo","card":"<combo id>"}, every other field null and effects []. The app pays its mana, casts the pieces it uses from your hand, and carries out what it makes: a combo that wins ends the game; endless mana fills your pool for the rest of the phase, so put what you spend it on right after. The player gets a moment to answer first, as for any spell.
+- A piece that has to be on the battlefield is cast first, with an ordinary cast action earlier in the same turn. The brief tells you which.
+- Never use a combo action for a combo the brief doesn't call READY.
 
 ACTIONS
 - {"kind":"land","card":"<id>"}: play a land from your hand. A modal card with a land on its back (marked in your hand) can be cast as its front, or played as your land this way.
@@ -214,13 +222,47 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
 }
 
 /** The cached prefix: the rules, then the AI's deck with each card's text. */
-export function systemPrompt(deck: DeckLine[], book: CardBook, commander: string | null): { rules: string; deck: string } {
+export function systemPrompt(deck: DeckLine[], book: CardBook, commander: string | null, combos: DeckCombo[] = []): { rules: string; deck: string } {
   const lines = [...deck].sort((a, b) => a.name.localeCompare(b.name)).map((d) => `- ${d.quantity}× ${line(book, d.name)}`);
   const auto = automatedNotes(deck, book);
   return {
     rules: RULES,
-    deck: `YOUR DECK${commander ? ` (commander: ${commander})` : ""}\n${lines.join("\n")}${auto.length ? `\n\nTHE APP DOES THESE BY ITSELF (never put them in effects)\n${auto.join("\n")}` : ""}`,
+    deck:
+      `YOUR DECK${commander ? ` (commander: ${commander})` : ""}\n${lines.join("\n")}` +
+      (auto.length ? `\n\nTHE APP DOES THESE BY ITSELF (never put them in effects)\n${auto.join("\n")}` : "") +
+      (combos.length ? `\n\nYOUR DECK'S COMBOS (from Commander Spellbook; this is how the deck wins)\n${combos.map(comboLine).join("\n")}` : ""),
   };
+}
+
+const ZONE_WORD: Record<string, string> = { B: "battlefield", H: "hand", G: "graveyard", E: "exile", C: "command zone", L: "library" };
+
+/** A combo, as the deck's list shows it: id, pieces and where each goes, what it makes, its mana, its steps. */
+function comboLine(c: DeckCombo): string {
+  const pieces = c.pieces.map((p) => `${p.name} (${p.zones.map((z) => ZONE_WORD[z] ?? z).join(" or ")})`).join(" + ");
+  const steps = c.steps.replace(/\s*\n\s*/g, " ").slice(0, 500);
+  return `- [${c.id}] ${pieces} → ${c.produces.slice(0, 5).join(", ")}.${c.manaNeeded ? ` Mana: ${c.manaNeeded}.` : ""}${c.prerequisites ? ` Needs: ${c.prerequisites}` : ""}${steps ? ` Steps: ${steps}` : ""}`;
+}
+
+/** Where each combo stands this turn, the nearest first: ready, what to
+    cast first, or what's missing and where it is. */
+export function comboBrief(g: PracticeGame, book: CardBook, combos: DeckCombo[]): string {
+  if (!combos.length) return "";
+  const rows = combos.map((c) => ({ c, s: comboStatus(g, "opp", c, book) }));
+  const far = (r: (typeof rows)[number]) => r.s.missing.length * 10 + r.s.toCast.length + (r.s.blocked ? 1 : 0);
+  return rows
+    .sort((a, b) => far(a) - far(b))
+    .slice(0, 10)
+    .map(({ c, s }) => {
+      const what = `[${c.id}] ${c.pieces.map((p) => p.name).join(" + ")} → ${comboHeadline(c)}`;
+      if (s.ready) return `- ${what}: READY. Go for it: {"kind":"combo","card":"${c.id}"}.`;
+      const bits = [
+        s.toCast.length ? `cast first: ${s.toCast.map((x) => `${cardId(x.iid)} ${x.name}`).join(", ")}` : "",
+        s.missing.length ? `missing: ${s.missing.map((m) => `${m.name} (${m.where === "nowhere" ? "not in your deck now" : `in your ${m.where === "command" ? "command zone" : m.where}`})`).join(", ")}` : "",
+        s.blocked ?? "",
+      ].filter(Boolean);
+      return `- ${what}: not yet. ${bits.join("; ")}`;
+    })
+    .join("\n");
 }
 
 const describe = (g: PracticeGame, book: CardBook, c: PlayCard, opts: { text?: boolean } = {}) => {
@@ -250,7 +292,7 @@ const describe = (g: PracticeGame, book: CardBook, c: PlayCard, opts: { text?: b
 };
 
 /** The board this turn, from the AI's side of the table. */
-export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[]): string {
+export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[], combos: DeckCombo[] = []): string {
   const me = g.sides.opp;
   const them = g.sides.you;
   const sources = availableMana(g, "opp", book);
@@ -285,6 +327,7 @@ export function turnBrief(g: PracticeGame, book: CardBook, sinceLast: string[]):
     `YOUR BATTLEFIELD:\n${field(me.battlefield, false)}`,
     `THE PLAYER'S BATTLEFIELD:\n${field(them.battlefield, true)}`,
     `GRAVEYARDS: yours: ${grave(me.graveyard)}. The player's: ${grave(them.graveyard)}.`,
+    combos.length ? `YOUR COMBOS THIS TURN:\n${comboBrief(g, book, combos)}` : "",
     `Plan your turn.`,
   ]
     .filter(Boolean)
@@ -328,9 +371,10 @@ function cleanEffect(raw: unknown): Effect | null {
 function cleanAction(raw: unknown): PlanAction | null {
   if (!raw || typeof raw !== "object") return null;
   const a = raw as Record<string, unknown>;
-  if (a.kind !== "land" && a.kind !== "cast" && a.kind !== "activate") return null;
-  const card = text(a.card, 20);
-  if (!card || !/^c\d+$/.test(card)) return null;
+  if (a.kind !== "land" && a.kind !== "cast" && a.kind !== "activate" && a.kind !== "combo") return null;
+  // A combo is named by its id in the deck's list ("742-1295"), a card by its id on the table.
+  const card = text(a.card, 40);
+  if (!card || !(a.kind === "combo" ? /^[\w.-]+$/ : /^c\d+$/).test(card)) return null;
   return {
     kind: a.kind,
     card,
