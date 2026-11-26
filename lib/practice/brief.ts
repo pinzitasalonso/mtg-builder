@@ -4,7 +4,7 @@
 // must follow, and the clean-up of that plan. Pure, for tests.
 
 import type { PlayCard } from "../playtest";
-import { canPlayAsLand, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
+import { canPlayAsLand, goesWhenALandIsPlayed, handManaOf, manaSinkOf, sacManaOf, skipsDrawOf, lifeForCardsOf, handSizeOf, cumulativeUpkeepOf, castTriggerOf, counterOf, discardTriggerOf, drawsOnLifeLoss, edictOf, faceText, hitTriggersOf, indestructibleOnYourTurn, infoOf, ninjutsuOf, isCreature, isLand, isSick, keywordsOf, lifeForMana, stats, wheelSpellOf, wheelAbilityOf, wheelOnHitOf, drawCapOf, drawThiefOf } from "./cards";
 import { availableMana, castable, cardId, comboStatus, lifeFor, loyaltyOf, uncastable } from "./game";
 import { comboHeadline, type DeckCombo } from "./combos";
 import {
@@ -214,7 +214,8 @@ export function automatedNotes(deck: DeckLine[], book: CardBook): string[] {
     else if (skipsDrawOf(book, front)) notes.push("you skip your draw step while it's out");
     if (handSizeOf(book, front)) notes.push(`your maximum hand size is ${handSizeOf(book, front)} while it's out`);
     const cu = cumulativeUpkeepOf(book, front);
-    if (cu !== null) notes.push(`the app pays its cumulative upkeep at your upkeep while it's {2} or less, then sacrifices it`);
+    if (cu !== null) notes.push(`the app pays its cumulative upkeep at your upkeep while it's {2} or less and leaves you mana for the turn, then sacrifices it`);
+    if (goesWhenALandIsPlayed(book, front)) notes.push("when you play another land it's sacrificed: the app taps it for its mana first, which floats for that turn. Spend that mana the same turn");
     const tu = tutorOf(info);
     if (tu?.discardRandom) notes.push("the app discards a card at random after the search: give it its search effect and no discard");
     if (tu?.delirium) notes.push("it finds any card when your graveyard has four card types (the brief says how many); otherwise only what its first line says");

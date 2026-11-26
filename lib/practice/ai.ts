@@ -3,7 +3,7 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, sacManaOf, searchOnCast, stats, wheelSpellOf } from "./cards";
+import { BASIC_COLOR, canPlayAsLand, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, ninjutsuOf, ownTurnOf, sacManaOf, searchOnCast, stats, wheelSpellOf } from "./cards";
 import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, comboStatus, indestructible, lifeFor, spellCost, uncastable } from "./game";
 import { comboOutcome, type DeckCombo } from "./combos";
 import { equipOf } from "./abilities";
@@ -283,7 +283,20 @@ function wipePlan(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook): Pla
     plan doesn't go off, and an extra turn that costs the game (Final
     Fortune). A plan that declares a combo, or empties its library, is
     left as it is. */
-export function guardPlan(g: PracticeGame, plan: TurnPlan, book: CardBook, seat: Seat = "opp"): TurnPlan {
+export function guardPlan(g: PracticeGame, plan0: TurnPlan, book: CardBook, seat: Seat = "opp"): TurnPlan {
+  // An attacker with no power stays home, where it can block: Rograkh (0/1)
+  // "swung" every turn for nothing. Unless the attack is the point: a
+  // trigger on attacking, or a Ninja to bring in behind it.
+  const side = g.sides[seat];
+  const attackIsThePoint = (c: PlayCard) =>
+    /\battacks?\b/i.test(infoOf(book, c)?.oracleText ?? "") ||
+    side.battlefield.some((x) => x.iid !== c.iid && /\bwhenever [^.]*\bcreatures? you control attacks?\b/i.test(infoOf(book, x)?.oracleText ?? "")) ||
+    [...side.hand, ...side.command].some((x) => !!ninjutsuOf(book, x));
+  const attack = plan0.attack.filter((id) => {
+    const c = side.battlefield.find((x) => cardId(x.iid) === id);
+    return !c || stats(book, c).power > 0 || attackIsThePoint(c);
+  });
+  const plan = attack.length === plan0.attack.length ? plan0 : { ...plan0, attack };
   const own = [...g.sides[seat].hand, ...g.sides[seat].command];
   const cardOf = (a: PlanAction) => own.find((c) => cardId(c.iid) === a.card);
   const all = [...plan.main, ...plan.after_combat];
@@ -566,8 +579,11 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     );
     // A modal card with a land back is a spell first: a real land goes before it.
     const score = (l: PlayCard) =>
-      landColors(book, l).filter((c) => missing.has(c)).length * 10 + (entersTapped(infoOf(book, l)) ? 0 : 5) + landColors(book, l).length - (isLand(l) ? 0 : 8);
+      landColors(book, l).filter((c) => missing.has(c)).length * 10 + (entersTapped(infoOf(book, l), ownTurnOf(g.turn)) ? 0 : 5) + landColors(book, l).length - (isLand(l) ? 0 : 8);
     const pickLand = lands.reduce((a, b) => (score(b) > score(a) ? b : a));
+    // (Holding a land back to keep City of Traitors was tried, and measured
+    // slower over 200 games a list: the land goes down, and the table taps
+    // the City for its mana first.)
     main.push(blankAction("land", pickLand.iid));
   }
   // Spend the mana: permanents, biggest first, while it can still pay.
@@ -577,7 +593,7 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     const land = sim.sides[seat].hand.find((c) => cardId(c.iid) === main[0]!.card)!;
     // A land that enters tapped (a Triome) gives nothing this turn. (A fetch
     // land or a shock land is played out by the engine below.)
-    const tapped = entersTapped(infoOf(book, land)) && !fetchOf(infoOf(book, land));
+    const tapped = entersTapped(infoOf(book, land), ownTurnOf(g.turn)) && !fetchOf(infoOf(book, land));
     sim.sides[seat] = { ...sim.sides[seat], hand: sim.sides[seat].hand.filter((c) => c !== land), battlefield: [...sim.sides[seat].battlefield, { ...land, enteredTurn: g.turn, tapped }] };
     sim.landPlayed = true;
   }
@@ -944,10 +960,26 @@ export function aiMulligan(side: PlaytestState, book: CardBook): PlaytestState {
     const made = manaOutput(info, c.typeLine);
     return !!made && !isCreature(book, c) && (info?.manaValue ?? 9) <= 1;
   };
+  // A hand's mana has to make a colour its spells ask for. (City of Traitors
+  // as the only land, with a hand of blue, black and red spells, was kept
+  // at six: it cast its {0} commander and nothing else for six turns.) A
+  // fetch land finds a coloured one.
+  const ALL = ["W", "U", "B", "R", "G"];
+  const coloured = (hand: PlayCard[]) => {
+    const made = new Set(
+      hand
+        .filter((c) => isLandCard(c.typeLine) || fast(c))
+        .flatMap((c) => (fetchOf(infoOf(book, c)) ? ALL : (manaOutput(infoOf(book, c), c.typeLine)?.colors ?? (handManaOf(infoOf(book, c)) ? ALL : []))))
+    );
+    const asked = hand.filter((c) => !isLandCard(c.typeLine)).flatMap((c) => parseCost(infoOf(book, c)?.manaCost ?? null).pips.flat().filter((p) => ALL.includes(p)));
+    return !asked.length || asked.some((p) => made.has(p));
+  };
   const keepable = (hand: PlayCard[], mulligans: number) => {
     const lands = hand.filter((c) => isLandCard(c.typeLine)).length;
     const mana = lands + hand.filter(fast).length;
     if (lands >= 2 && lands <= 5) return true;
+    // On one land, that land (or the fast mana beside it) has to cast something.
+    if (!coloured(hand)) return false;
     // One land with fast mana is a turbo deck's keep.
     if (lands === 1 && mana >= 3) return true;
     // Past one mulligan, anything with a land in it.

@@ -23,6 +23,7 @@ import {
   edictOf,
   entersForALand,
   entersTapped,
+  ownTurnOf,
   faceText,
   fetchOf,
   goesWhenALandIsPlayed,
@@ -826,7 +827,7 @@ function aiLandEnters(g: PracticeGame, seat: Seat, land: PlayCard, book: CardBoo
   const info = infoOf(book, land);
   const shock = shockLife(info);
   const untappedShock = shock > 0 && g.sides[seat].life > 6;
-  moveTo(g, land.iid, "battlefield", { tapped: shock > 0 ? !untappedShock : entersTapped(info) });
+  moveTo(g, land.iid, "battlefield", { tapped: shock > 0 ? !untappedShock : entersTapped(info, ownTurnOf(g.turn)) });
   landEntered(g, seat, book, land.iid);
   if (untappedShock) {
     say(g, seat, `${who(seat)} pay${seat === "you" ? "" : "s"} ${shock} life for ${land.name} to enter untapped.`);
@@ -847,7 +848,7 @@ function aiLandEnters(g: PracticeGame, seat: Seat, land: PlayCard, book: CardBoo
   for (const c of side.command) for (const pip of parseCost(infoOf(book, c)?.manaCost ?? null).pips.flat()) need.add(pip);
   const score = (c: PlayCard) => {
     const colors = manaOutput(infoOf(book, c), c.typeLine)?.colors ?? [];
-    return colors.filter((x) => need.has(x) && !have.has(x)).length * 10 + colors.length - (entersTapped(infoOf(book, c)) ? 5 : 0);
+    return colors.filter((x) => need.has(x) && !have.has(x)).length * 10 + colors.length - (entersTapped(infoOf(book, c), ownTurnOf(g.turn)) ? 5 : 0);
   };
   const pick = fits.reduce((a, b) => (score(b) > score(a) ? b : a));
   if (fetch.life) loseLife(g, seat, fetch.life, book);
@@ -855,7 +856,7 @@ function aiLandEnters(g: PracticeGame, seat: Seat, land: PlayCard, book: CardBoo
   say(g, seat, `${who(seat)} crack${seat === "you" ? "" : "s"} ${land.name} for ${pick.name}.`);
   const pickInfo = infoOf(book, pick);
   const pickShock = shockLife(pickInfo);
-  const pickUntapped = !fetch.tapped && (pickShock ? g.sides[seat].life > 6 : !entersTapped(pickInfo));
+  const pickUntapped = !fetch.tapped && (pickShock ? g.sides[seat].life > 6 : !entersTapped(pickInfo, ownTurnOf(g.turn)));
   moveTo(g, pick.iid, "battlefield", { tapped: !pickUntapped });
   landEntered(g, seat, book);
   if (pickShock && pickUntapped) {
@@ -929,7 +930,10 @@ export function startTurn(g0: PracticeGame, book: CardBook = {}): PracticeGame {
       continue;
     }
     const sources = availableMana(g, seat, book);
-    const paid = owed <= 2 ? aiPay(g, seat, parseCost(`{${owed}}`), sources, book) : null;
+    // Only while it leaves mana for the turn (a land still to play counts):
+    // paid with its only land, Mystic Remora cost the opponent its whole turn.
+    const mana = manaTotal(sources) + (!g.landPlayed && g.sides[seat].hand.some((x) => isLand(x)) ? 1 : 0);
+    const paid = owed <= 2 && mana - owed >= 1 ? aiPay(g, seat, parseCost(`{${owed}}`), sources, book) : null;
     if (paid) {
       spend(g, seat, paid, sources, book);
       say(g, seat, `The opponent pays {${owed}} for ${faceName(c)}'s cumulative upkeep.`);
@@ -1585,6 +1589,18 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     // A modal card played as a land goes in land side up.
     const turned = !isLand(card);
     if (turned) update(g, card.iid, (c) => ({ ...c, flipped: true }));
+    // A land that goes when another is played (City of Traitors) is tapped
+    // for its mana first, as a player would: it floats for this turn's
+    // spells. (It was sacrificed untapped, and its {C}{C} with it.)
+    for (const c of g.sides[seat].battlefield.filter((x) => !x.tapped && x.iid !== card.iid && goesWhenALandIsPlayed(book, x))) {
+      const made = manaOutput(infoOf(book, c), c.typeLine);
+      if (!made?.amount) continue;
+      const units = Array.from({ length: made.amount }, () => made.colors[0] ?? "C");
+      update(g, c.iid, (x) => ({ ...x, tapped: true }));
+      if (!g.pool) g.pool = { you: [], opp: [] };
+      g.pool[seat] = [...g.pool[seat], ...units];
+      say(g, seat, `${who(seat)} ${verb(seat, "tap")} ${c.name} for ${units.map((u) => `{${u}}`).join("")} first: it goes when another land is played.`);
+    }
     say(g, seat, `${who(seat)} plays ${turned ? `${card.name.split(" // ")[1] ?? card.name} (the land side of ${card.name.split(" // ")[0]})` : card.name}.`);
     aiLandEnters(g, seat, card, book);
     return { game: g, ok: true };
