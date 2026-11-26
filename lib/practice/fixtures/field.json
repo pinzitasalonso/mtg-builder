@@ -42,6 +42,21 @@
   "producedMana": []
  },
  {
+  "name": "Badlands",
+  "imageUri": "",
+  "typeLine": "Land — Swamp Mountain",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "({T}: Add {B} or {R}.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "R"
+  ]
+ },
+ {
   "name": "Birds of Paradise",
   "imageUri": "",
   "typeLine": "Creature — Bird",
@@ -267,12 +282,38 @@
   "producedMana": []
  },
  {
+  "name": "Dark Ritual",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{B}",
+  "manaValue": 1,
+  "oracleText": "Add {B}{B}{B}.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "B"
+  ]
+ },
+ {
   "name": "Demand Answers",
   "imageUri": "",
   "typeLine": "Instant",
   "manaCost": "{1}{R}",
   "manaValue": 2,
   "oracleText": "As an additional cost to cast this spell, sacrifice an artifact or discard a card.\nDraw two cards.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Demonic Tutor",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{1}{B}",
+  "manaValue": 2,
+  "oracleText": "Search your library for a card, put that card into your hand, then shuffle.",
   "power": null,
   "toughness": null,
   "keywords": [],
@@ -1148,6 +1189,18 @@
   "producedMana": []
  },
  {
+  "name": "Timetwister",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{U}",
+  "manaValue": 3,
+  "oracleText": "Each player shuffles their hand and graveyard into their library, then draws seven cards. (Then put Timetwister into its owner's graveyard.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
   "name": "Tropical Island",
   "imageUri": "",
   "typeLine": "Land — Forest Island",
@@ -1187,6 +1240,21 @@
   "toughness": null,
   "keywords": [],
   "producedMana": []
+ },
+ {
+  "name": "Underground Sea",
+  "imageUri": "",
+  "typeLine": "Land — Island Swamp",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "({T}: Add {U} or {B}.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "U"
+  ]
  },
  {
   "name": "Underworld Breach",
@@ -1253,6 +1321,18 @@
    "R",
    "U"
   ]
+ },
+ {
+  "name": "Wheel of Fortune",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{2}{R}",
+  "manaValue": 3,
+  "oracleText": "Each player discards their hand, then draws seven cards.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
  },
  {
   "name": "Wild Ride",

@@ -38,6 +38,7 @@ import {
   has,
   hasAltCost,
   hitTriggersOf,
+  graveyardEscapeOf,
   drawsOnDamageAura,
   soulbondDrawOf,
   noncombatDrawOf,
@@ -1468,10 +1469,45 @@ function mistargeted(g: PracticeGame, card: PlayCard, effects: PlanAction["effec
 
 const COLOUR_NAME: Record<string, string> = { W: "white", U: "blue", B: "black", R: "red", G: "green" };
 
+/** How many other cards a cast from the graveyard exiles while Underworld
+    Breach is out on this side; 0 with none out. */
+export function escapeCost(g: PracticeGame, seat: Seat, book: CardBook): number {
+  const costs = g.sides[seat].battlefield.filter((c) => !c.token).map((c) => graveyardEscapeOf(infoOf(book, c))).filter((n) => n > 0);
+  return costs.length ? Math.min(...costs) : 0;
+}
+
+/** A card in the graveyard that may be cast by escape now: a nonland card,
+    with enough other cards there to exile. */
+export function escapable(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook): boolean {
+  const n = escapeCost(g, seat, book);
+  const grave = g.sides[seat].graveyard;
+  return n > 0 && !isLand(card) && grave.some((c) => c.iid === card.iid) && grave.length - 1 >= n;
+}
+
+/** The cards exiled for an escape: what the graveyard can best spare.
+    Lands and bodies first; a combo's pieces, a storm spell, tutors and
+    rituals (which escape themselves) last. */
+function escapeFodder(g: PracticeGame, seat: Seat, card: PlayCard, n: number, book: CardBook, combos: DeckCombo[]): PlayCard[] {
+  const worth = (c: PlayCard) => {
+    if (isLand(c)) return 0;
+    const info = infoOf(book, c);
+    if (hasStorm(info)) return 6;
+    const kept = handWorth(c, book, combos);
+    // A permanent that isn't a piece is the same card again for more: it goes before a spell.
+    return kept ? kept : resolvesToGraveyard(info?.typeLine ?? c.typeLine) ? 1 : 0.5;
+  };
+  return g.sides[seat].graveyard
+    .filter((c) => c.iid !== card.iid)
+    .sort((a, b) => worth(a) - worth(b))
+    .slice(0, n);
+}
+
 /** Whether a card in the AI's hand (or command zone) can be cast now, and
-    what it costs including commander tax. */
+    what it costs including commander tax. From the graveyard: only a card
+    it may cast from there (Silas Renn's pick, or escape). */
 export function castable(g: PracticeGame, seat: Seat, card: PlayCard, book: CardBook, zone: Zone): boolean {
   if (isLand(card)) return zone === "hand" && !g.landPlayed && g.active === seat;
+  if (zone === "graveyard" && !g.mayCast?.includes(card.iid) && !escapable(g, seat, card, book)) return false;
   if (uncastable(g, seat, card, book)) return false;
   return aiPay(g, seat, spellCost(g, seat, card, book, zone), availableMana(g, seat, book, [card.iid], { commander: card.commander }), book) !== null;
 }
@@ -1577,7 +1613,13 @@ export function comboStatus(g: PracticeGame, seat: Seat, combo: DeckCombo, book:
       }
       continue;
     }
-    if (wanted.has("battlefield") && anywhere && (anywhere.zone === "hand" || anywhere.zone === "command")) out.toCast.push(anywhere.card);
+    // With Underworld Breach out, a piece in the graveyard is cast from
+    // there: a permanent the combo wants in play is one more cast, and a
+    // spell it wants in hand is cast by the combo itself.
+    const fromGrave = anywhere?.zone === "graveyard" && escapable(g, seat, anywhere.card, book);
+    const spell = !!anywhere && resolvesToGraveyard(infoOf(book, anywhere.card)?.typeLine ?? anywhere.card.typeLine);
+    if (fromGrave && wanted.has("hand") && spell) continue;
+    if (wanted.has("battlefield") && anywhere && (anywhere.zone === "hand" || anywhere.zone === "command" || (fromGrave && !spell))) out.toCast.push(anywhere.card);
     // A spell the combo wants in the graveyard (Brain Freeze, for
     // Underworld Breach): cast from the hand, that's where it goes.
     else if (wanted.has("graveyard") && anywhere?.zone === "hand" && resolvesToGraveyard(infoOf(book, anywhere.card)?.typeLine ?? anywhere.card.typeLine)) out.toCast.push(anywhere.card);
@@ -1789,7 +1831,10 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
   if (action.kind === "cast") {
     // From its graveyard only when a card let it, this turn (Silas Renn).
     const fromGrave = at.zone === "graveyard" && !!g.mayCast?.includes(card.iid);
-    if (at.zone !== "hand" && at.zone !== "command" && !fromGrave) return fail(`(The opponent tried to cast ${card.name} from its ${at.zone}.)`);
+    // Or by escape, while Underworld Breach is out: its mana cost, and
+    // three other cards of the graveyard exiled.
+    const escaping = at.zone === "graveyard" && !fromGrave && escapable(g, seat, card, book);
+    if (at.zone !== "hand" && at.zone !== "command" && !fromGrave && !escaping) return fail(`(The opponent tried to cast ${card.name} from its ${at.zone}.)`);
     if (isLand(card)) return fail(`(The opponent tried to cast the land ${card.name}.)`);
     if (opts.stage === "counter") {
       moveTo(g, card.iid, card.commander ? "command" : "graveyard");
@@ -1838,12 +1883,17 @@ export function applyAction(g0: PracticeGame, seat: Seat, action: PlanAction, bo
     }
     if (at.zone === "command") g.tax[seat] += 1;
     if (fromGrave) g.mayCast = g.mayCast!.filter((i) => i !== card.iid);
+    if (escaping) {
+      const gone = escapeFodder(g, seat, card, escapeCost(g, seat, book), book, opts.combos ?? []);
+      for (const c of gone) moveTo(g, c.iid, "exile");
+      say(g, seat, `${who(seat)} ${verb(seat, "exile")} ${gone.map((c) => c.name).join(", ")} from ${seat === "you" ? "your" : "its"} graveyard: ${card.name} escapes.`);
+    }
     const x = cost.xCount ? ` (X = ${pitched ? (infoOf(book, pitched)?.manaValue ?? 0) : (action.x ?? 0)})` : "";
     const target = action.effects.map((e) => parseCardId(e.target)).find((t) => t !== null);
     const on = pumpHost ? pumpHost.name : target !== undefined && target !== null ? findCard(g, target)?.card.name : undefined;
     if (paid.life) say(g, seat, `${who(seat)} ${verb(seat, "pay")} ${paid.life} life for ${card.name}.`);
     loseLife(g, seat, paid.life, book);
-    say(g, seat, `${who(seat)} casts ${card.name}${x}${on ? ` on ${on}` : ""}.`, card);
+    say(g, seat, `${who(seat)} casts ${card.name}${x}${on ? ` on ${on}` : ""}${escaping ? " from its graveyard" : ""}.`, card);
     castTriggers(g, seat, card, book);
     checkState(g, book);
     if (opts.stage === "pay" || g.winner) return { game: g, ok: true };

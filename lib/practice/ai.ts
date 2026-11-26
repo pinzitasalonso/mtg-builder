@@ -3,8 +3,8 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { BASIC_COLOR, burdenDrawOf, canPlayAsLand, counterOf, digAbilityOf, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, ninjutsuOf, ownTurnOf, permanentFetchOf, removalOf, sacManaOf, searchOnCast, stats, transmuteOf, wheelSpellOf, type Search } from "./cards";
-import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, colourNeeds, comboStatus, indestructible, lifeFor, loopPayoff, spellCost, uncastable } from "./game";
+import { BASIC_COLOR, graveyardEscapeOf, burdenDrawOf, canPlayAsLand, counterOf, digAbilityOf, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, ninjutsuOf, ownTurnOf, permanentFetchOf, removalOf, sacManaOf, searchOnCast, stats, transmuteOf, wheelSpellOf, type Search } from "./cards";
+import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, colourNeeds, comboStatus, escapable, escapeCost, indestructible, lifeFor, loopPayoff, spellCost, uncastable } from "./game";
 import { comboOutcome, type DeckCombo } from "./combos";
 import { equipOf, powerManaOf, punishesIdleOf } from "./abilities";
 import { manaSources, manaTotal, parseCost, payCost, totalOf } from "./mana";
@@ -453,25 +453,48 @@ function goOff(g: PracticeGame, book: CardBook, seat: Seat, combos: DeckCombo[],
   return null;
 }
 
+/** A rehearsal can't count on what comes off the library: a card drawn or
+    exiled to be played (Jeska's Will, Twisted Image) is another card at the
+    real table once the line has shuffled, and the rest of the plan would be
+    built on it. Cards the line didn't have and didn't find by name are
+    taken out of the copy's hand. At the real table they're there, and the
+    look after the plan plays them. */
+function knownOnly(seat: Seat, known: Set<number>, unseen: { cards: number } = { cards: 0 }) {
+  return (t: PracticeGame, a: PlanAction): PracticeGame => {
+    const named = new Set(a.effects.filter((e) => e.type === "search").map((e) => (e.name ?? "").trim().toLowerCase()));
+    const hand = t.sides[seat].hand;
+    const stay = hand.filter((c) => known.has(c.iid) || named.has(c.name.toLowerCase()) || named.has(c.name.split(" // ")[0]!.toLowerCase()));
+    for (const c of [...stay, ...t.sides[seat].battlefield]) known.add(c.iid);
+    // How many came that it can't see: a card is worth something, whatever it is.
+    unseen.cards += hand.length - stay.length;
+    return stay.length === hand.length ? t : { ...t, sides: { ...t.sides, [seat]: { ...t.sides[seat], hand: stay } } };
+  };
+}
+const knownAt = (g: PracticeGame, seat: Seat) => new Set([...g.sides[seat].hand, ...g.sides[seat].command, ...g.sides[seat].battlefield, ...g.sides[seat].graveyard, ...g.sides[seat].exile].map((c) => c.iid));
+
 function comboLine(g0: PracticeGame, book: CardBook, seat: Seat, combo: DeckCombo, combos: DeckCombo[]): { actions: PlanAction[]; after: PracticeGame } | null {
   let t = g0;
   const actions: PlanAction[] = [];
+  const forget = knownOnly(seat, knownAt(g0, seat));
   const step = (a: PlanAction) => {
     const r = applyAction(t, seat, a, book, { combos });
     if (!r.ok || r.game.choice || r.game.winner === other(seat)) return false;
-    t = r.game;
+    t = forget(r.game, a);
     actions.push(a);
     return true;
   };
-  const costOf = (c: PlayCard, zone: "hand" | "command") => totalOf(spellCost(t, seat, c, book, zone));
-  const zoneOf = (c: PlayCard) => (t.sides[seat].command.some((x) => x.iid === c.iid) ? ("command" as const) : ("hand" as const));
+  const costOf = (c: PlayCard, zone: "hand" | "command" | "graveyard") => totalOf(spellCost(t, seat, c, book, zone));
+  const zoneOf = (c: PlayCard) =>
+    t.sides[seat].command.some((x) => x.iid === c.iid) ? ("command" as const) : t.sides[seat].graveyard.some((x) => x.iid === c.iid) ? ("graveyard" as const) : ("hand" as const);
+  /** Cards of the graveyard it may cast now by escape (Underworld Breach out). */
+  const escapes = () => t.sides[seat].graveyard.filter((c) => escapable(t, seat, c, book));
   const isPiece = (c: PlayCard) => combo.pieces.some((p) => p.name.toLowerCase() === c.name.toLowerCase() || p.name.toLowerCase() === c.name.split(" // ")[0]!.toLowerCase());
   /** A tutor in hand that puts this card in the hand, as its cast. (Not
       Gamble: its random discard could throw the piece away.) */
   const tutorFor = (name: string): PlanAction | null => {
     const want = t.sides[seat].library.find((x) => x.name.toLowerCase() === name.toLowerCase() || x.name.split(" // ")[0]!.toLowerCase() === name.toLowerCase());
     if (!want) return null;
-    for (const c of t.sides[seat].hand) {
+    for (const c of [...t.sides[seat].hand, ...escapes()]) {
       const tu = isPiece(c) ? null : tutorOf(infoOf(book, c));
       const search = tu ? tutorSearch(tu, t.sides[seat].graveyard) : null;
       const where = search?.to[0]!.zone;
@@ -498,7 +521,8 @@ function comboLine(g0: PracticeGame, book: CardBook, seat: Seat, combo: DeckComb
   /** One more source of mana, played: true when something was. */
   const makeMana = (): boolean => {
     const side = t.sides[seat];
-    const spare = side.hand.filter((c) => !isLand(c) && !isPiece(c));
+    // What it holds, and what Underworld Breach lets it cast again.
+    const spare = [...side.hand, ...escapes()].filter((c) => !isLand(c) && !isPiece(c));
     // A rock that costs less than it gives (Lotus Petal, a Mox, Sol Ring, Mana Vault).
     for (const c of spare) {
       const made = manaOutput(infoOf(book, c), c.typeLine);
@@ -563,6 +587,11 @@ function comboLine(g0: PracticeGame, book: CardBook, seat: Seat, combo: DeckComb
       const r = applyAction(t, seat, go, book, { combos });
       if (!r.ok) return null;
       return { actions: [...actions, go], after: r.game };
+    }
+    // A piece in the graveyard: Underworld Breach first, and it's cast from there.
+    if (st.missing.some((m) => m.where === "graveyard") && !escapeCost(t, seat, book)) {
+      const breach = t.sides[seat].hand.find((c) => graveyardEscapeOf(infoOf(book, c)) > 0);
+      if (breach && step(blankAction("cast", breach.iid))) continue;
     }
     // What a turn can't mend: a piece that's gone, a graveyard too thin.
     if (st.needs || st.missing.some((m) => m.where !== "library")) return null;
@@ -741,10 +770,14 @@ function pumpedPlan(g: PracticeGame, book: CardBook, seat: Seat, out: { wins?: b
   if (![...g.sides[seat].battlefield, ...zones(g)].some((c) => powerManaOf(book, c))) return null;
   let t = g;
   const lead: PlanAction[] = [];
+  // What a pump draws (Twisted Image, Curiosity on Vivi) isn't looked at:
+  // each such card counts as a card, two points, whatever it is.
+  const unseen = { cards: 0 };
+  const forget = knownOnly(seat, knownAt(g, seat), unseen);
   const step = (a: PlanAction) => {
     const r = applyAction(t, seat, a, book, { combos });
     if (!r.ok || r.game.choice || r.game.winner === other(seat)) return false;
-    t = r.game;
+    t = forget(r.game, a);
     lead.push(a);
     return true;
   };
@@ -787,7 +820,7 @@ function pumpedPlan(g: PracticeGame, book: CardBook, seat: Seat, out: { wins?: b
       const c = a.kind === "cast" ? zones(x).find((h) => cardId(h.iid) === a.card) : undefined;
       return n + (c && !pumpSpellOf(infoOf(book, c)) ? Math.max(1, infoOf(book, c)?.manaValue ?? 0) : 0);
     }, 0);
-  const pumped = worth(g, lead) + worth(t, rest.main);
+  const pumped = worth(g, lead) + worth(t, rest.main) + 2 * unseen.cards;
   if (!after.wins && pumped <= worth(g, base.main)) return null;
   if (after.wins) out.wins = true;
   return { ...rest, main: [...lead, ...rest.main] };
@@ -1086,6 +1119,7 @@ function turnPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp", out: { wi
     sim.sides[seat] = { ...sim.sides[seat], hand: sim.sides[seat].hand.filter((x) => x.iid !== c.iid) };
     transmuted.add(c.iid);
   }
+  const wheels: PlanAction[] = [];
   for (const { c, zone } of candidates) {
     if (transmuted.has(c.iid)) continue;
     if (!castable(sim, seat, c, book, zone)) {
@@ -1113,7 +1147,12 @@ function turnPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp", out: { wi
       main.push({ ...blankAction("cast", c.iid), effects });
       sim = structuredClone(sim);
       sim.sides[seat] = { ...sim.sides[seat], life: sim.sides[seat].life - drawSpell.lose };
-    } else main.push(blankAction("cast", c.iid));
+    }
+    // A wheel is paid for now and cast last of all: what it's cast before
+    // is shuffled away or discarded with the rest of the hand. (A plan
+    // cast Timetwister, then tried to cast a creature from its library.)
+    else if (wheelSpellOf(book, c)) wheels.push(blankAction("cast", c.iid));
+    else main.push(blankAction("cast", c.iid));
   }
   // An activated tutor on the battlefield (Wishclaw Talisman), for a combo
   // piece: the player gets it after.
@@ -1170,7 +1209,7 @@ function turnPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp", out: { wi
     sim.sides[seat] = { ...sim.sides[seat], battlefield: sim.sides[seat].battlefield.map((x) => (x.iid === e.iid ? { ...x, attachedTo: host } : x)) };
   }
   return {
-    main,
+    main: [...main, ...wheels],
     attack: safeAttackers(g, seat, book).map((c) => cardId(c.iid)),
     after_combat: [],
     say: "",
