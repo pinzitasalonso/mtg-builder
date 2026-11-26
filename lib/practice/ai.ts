@@ -3,7 +3,7 @@
 // on when the model can't be reached. See docs/practice-vs-ai.md.
 
 import { mulligan as londonMulligan, bottomCard, isLandCard, type PlayCard, type PlaytestState } from "../playtest";
-import { BASIC_COLOR, burdenDrawOf, canPlayAsLand, counterOf, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, ninjutsuOf, ownTurnOf, removalOf, sacManaOf, searchOnCast, stats, transmuteOf, wheelSpellOf, type Search } from "./cards";
+import { BASIC_COLOR, burdenDrawOf, canPlayAsLand, counterOf, digAbilityOf, edictOf, entersTapped, fetchOf, handManaOf, has, infoOf, isCreature, isLand, manaOutput, ninjutsuOf, ownTurnOf, permanentFetchOf, removalOf, sacManaOf, searchOnCast, stats, transmuteOf, wheelSpellOf, type Search } from "./cards";
 import { aiEquipHost, aiRemovalAction, applyAction, availableMana, canAttack, canBlock, cardId, castable, colourNeeds, comboStatus, indestructible, lifeFor, spellCost, uncastable } from "./game";
 import { comboOutcome, type DeckCombo } from "./combos";
 import { equipOf, punishesIdleOf } from "./abilities";
@@ -14,7 +14,7 @@ import { adNauseamOf, burnOf, devotion, impulseOf, emptyDrawWinsOf, extraTurnLos
 import { triggersOf } from "./triggers";
 import { lifeForCardsOf, searchAbility, type SearchAbility } from "./cards";
 import { scaleDamage } from "./damage";
-import { castTriggerOf } from "./cards";
+import { castTriggerOf, staysTapped } from "./cards";
 import { other, type CardBook, type Effect, type PlanAction, type PracticeGame, type Seat, type TurnPlan } from "./types";
 
 const value = (book: CardBook, c: PlayCard) => (c.token ? 1 : (infoOf(book, c)?.manaValue ?? 0));
@@ -211,9 +211,15 @@ function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, com
   const needLand = !side.hand.some(canPlayAsLand) && side.battlefield.filter(isLand).length < 4;
   // Demonic Counsel finds any card with four card types in the graveyard.
   const search = tutorSearch(t, side.graveyard);
-  const fits = side.library.filter((x) => search.test(x.typeLine, infoOf(book, x)) && (needLand || !isLand(x)) && (infoOf(book, x)?.toughness !== 0 || !isCreature(book, x)));
-  if (!fits.length) return null;
   const mv = (x: PlayCard) => infoOf(book, x)?.manaValue ?? 0;
+  // "…mana value X or less": what the mana left after its own cost reaches.
+  const maxX = t.x ? manaTotal(availableMana(g, seat, book, [c.iid])) - totalOf(spellCost(g, seat, c, book, "hand")) : Infinity;
+  // A Pact is owed next turn: only with the mana to pay it then.
+  if (t.upkeep && !pactPayable(g, seat, t.upkeep, book)) return null;
+  const fits = side.library.filter(
+    (x) => search.test(x.typeLine, infoOf(book, x)) && (needLand || !isLand(x)) && (infoOf(book, x)?.toughness !== 0 || !isCreature(book, x)) && mv(x) <= maxX
+  );
+  if (!fits.length) return null;
   // The missing half of a win comes first: Thassa's Oracle when it holds
   // Demonic Consultation or Tainted Pact (or the other way round), and one
   // of them with Laboratory Maniac out. With neither half in hand but both
@@ -272,9 +278,27 @@ function tutorPick(g: PracticeGame, seat: Seat, c: PlayCard, book: CardBook, com
   if (whole && !fix(pick)) return null;
   // Wishclaw Talisman goes to the player once used: only for a combo piece.
   if (opts.onlyPieces && !piece(pick) && combo(pick) < 100000) return null;
-  const effects: Effect[] = [{ ...blank("search"), name: pick.name, to: search.to[0]!.zone === "top" ? "top" : "hand" }];
+  const effects: Effect[] = [{ ...blank("search"), name: pick.name, to: search.to[0]!.zone }];
   if (t.lose) effects.push({ ...blank("life"), player: "ai", amount: -t.lose });
   return effects;
+}
+
+/** Whether a Pact cast now can be paid for at the next upkeep: with what
+    untaps then (Mana Vault doesn't), and nothing that is used up when it's
+    tapped (a Lotus Petal, a Treasure), which this turn would spend. */
+export function pactPayable(g: PracticeGame, seat: Seat, cost: string, book: CardBook): boolean {
+  const side = g.sides[seat];
+  const then = { ...side, battlefield: side.battlefield.map((x) => (x.tapped && staysTapped(book, x) ? x : { ...x, tapped: false })) };
+  const lasting = manaSources(then, book, g.turn + 2).filter((s) => !s.sacrifice && !s.exile && !staysTapped(book, side.battlefield.find((x) => x.iid === s.iid)!));
+  return !!payCost(parseCost(cost), lasting);
+}
+
+/** The X a tutor is cast with: its find's mana value (Green Sun's Zenith). */
+function tutorX(g: PracticeGame, seat: Seat, c: PlayCard, effects: Effect[], book: CardBook): number {
+  if (!tutorOf(infoOf(book, c))?.x) return 0;
+  const name = (effects.find((e) => e.type === "search")?.name ?? "").toLowerCase();
+  const hit = g.sides[seat].library.find((x) => x.name.toLowerCase() === name);
+  return hit ? (infoOf(book, hit)?.manaValue ?? 0) : 0;
 }
 
 /** A board wipe, when it takes much more of the player's than of its own:
@@ -441,11 +465,14 @@ function comboLine(g0: PracticeGame, book: CardBook, seat: Seat, combo: DeckComb
     for (const c of t.sides[seat].hand) {
       const tu = isPiece(c) ? null : tutorOf(infoOf(book, c));
       const search = tu ? tutorSearch(tu, t.sides[seat].graveyard) : null;
-      if (!tu || !search || tu.discardRandom || search.to[0]!.zone !== "hand" || !search.test(want.typeLine, infoOf(book, want))) continue;
+      const where = search?.to[0]!.zone;
+      // To the hand, or straight onto the battlefield when that's where the combo wants it.
+      const onto = where === "battlefield" && !!combo.pieces.find((p) => p.name.toLowerCase() === name.toLowerCase())?.zones.includes("B");
+      if (!tu || !search || tu.discardRandom || (where !== "hand" && !onto) || !search.test(want.typeLine, infoOf(book, want))) continue;
       if (tu.lose > 0 && t.sides[seat].life - tu.lose < 1) continue;
-      const effects: Effect[] = [{ ...blank("search"), name: want.name, to: "hand" }];
+      const effects: Effect[] = [{ ...blank("search"), name: want.name, to: onto ? "battlefield" : "hand" }];
       if (tu.lose) effects.push({ ...blank("life"), player: "ai", amount: -tu.lose });
-      return { ...blankAction("cast", c.iid), effects };
+      return { ...blankAction("cast", c.iid), x: tu.x ? (infoOf(book, want)?.manaValue ?? 0) : null, effects };
     }
     // An activated one on the battlefield (Wishclaw Talisman).
     for (const c of t.sides[seat].battlefield) {
@@ -610,6 +637,16 @@ export function spareManaPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp
       }
       continue;
     }
+    // An ability that turns mana into cards (Kinnan, Thrasios, The One Ring).
+    if (a.kind === "activate") {
+      const on = sim.sides[seat].battlefield.find((x) => cardId(x.iid) === a.card);
+      if (!on || !(digAbilityOf(book, on) || burdenDrawOf(book, on) || permanentFetchOf(book, on))) continue;
+      const r = applyAction(sim, seat, a, book, { combos });
+      if (!r.ok || manaTotal(availableMana(r.game, seat, book)) < reserve) continue;
+      sim = r.game;
+      main.push(a);
+      continue;
+    }
     if (a.kind !== "cast") continue;
     const c = [...side.hand, ...side.command].find((x) => cardId(x.iid) === a.card);
     // Permanents only, and not a commander: recasting one is the model's call.
@@ -687,9 +724,11 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     sim.landPlayed = true;
   }
   // Pay from the simulated table: tap what's used, and pay the life.
-  const payIn = (cost: ReturnType<typeof parseCost>) => {
-    const sources = availableMana(sim, seat, book);
-    const paid = payCost(cost, sources, { lifeFor: lifeFor(sim, seat, book) });
+  const payIn = (cost: ReturnType<typeof parseCost>, x = 0, spare = false) => {
+    // `spare`: mana with nothing better to do. A creature that can hit for
+    // two or more attacks instead of being tapped for it.
+    const sources = availableMana(sim, seat, book).filter((s) => !spare || (s.attacker ?? 0) < 2);
+    const paid = payCost(cost, sources, { x, lifeFor: lifeFor(sim, seat, book) });
     // The life it costs: K'rrik's, and what a land like Ancient Tomb deals.
     if (!paid) return false;
     const life = paid.life + paid.pain;
@@ -964,8 +1003,9 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     const found = tutorOf(infoOf(book, c)) ? tutorPick(sim, seat, c, book, combos) : null;
     if (tutorOf(infoOf(book, c)) && !found) continue;
     const drawSpell = drawSpellOf(infoOf(book, c));
-    if (!payIn(spellCost(sim, seat, c, book, zone))) continue;
-    if (found) main.push({ ...blankAction("cast", c.iid), effects: found });
+    const x = found ? tutorX(sim, seat, c, found, book) : 0;
+    if (!payIn(spellCost(sim, seat, c, book, zone), x)) continue;
+    if (found) main.push({ ...blankAction("cast", c.iid), x: x || null, effects: found });
     else if (drawSpell && !wheelWorth(sim, seat, c, book) && !treasureSpellOf(book, c)) {
       const effects = [drawEffect(drawSpell.draw)];
       if (drawSpell.lose) effects.push({ ...blank("life"), player: "ai", amount: -drawSpell.lose });
@@ -984,6 +1024,27 @@ export function fallbackPlan(g: PracticeGame, book: CardBook, seat: Seat = "opp"
     main.push(abilityTutor(c, ab, found));
     sim = structuredClone(sim);
     sim.sides[seat] = { ...sim.sides[seat], battlefield: sim.sides[seat].battlefield.map((x) => (x.iid === c.iid ? { ...x, tapped: true } : x)) };
+  }
+  // Sisay's search, when its five colours can be paid; Magda's, with five Treasures.
+  for (const c of sim.sides[seat].battlefield) {
+    const fetch = permanentFetchOf(book, c);
+    if (!fetch) continue;
+    const tokens = sim.sides[seat].battlefield.filter((x) => x.token?.kind === "artifact" && /^treasure$/i.test(x.name));
+    if (tokens.length < fetch.treasures) continue;
+    if (fetch.cost && !payIn(parseCost(fetch.cost))) continue;
+    main.push({ ...blankAction("activate", c.iid), mana: fetch.cost });
+    if (fetch.treasures) {
+      const gone = new Set(tokens.slice(0, fetch.treasures).map((x) => x.iid));
+      sim = structuredClone(sim);
+      sim.sides[seat] = { ...sim.sides[seat], battlefield: sim.sides[seat].battlefield.filter((x) => !gone.has(x.iid)) };
+    }
+  }
+  // What's left goes into Kinnan's or Thrasios's ability, as often as it
+  // pays for: ten mana and nothing in hand was ten mana wasted.
+  for (const c of sim.sides[seat].battlefield) {
+    const dig = digAbilityOf(book, c);
+    if (!dig) continue;
+    for (let n = 0; n < 4 && payIn(parseCost(dig.cost), 0, true); n++) main.push({ ...blankAction("activate", c.iid), mana: dig.cost });
   }
   // The One Ring: a card for each burden counter, every turn it can spare
   // the life (the counters cost one each at its upkeep).

@@ -627,6 +627,9 @@ export interface CastTrigger {
   counters: number;
   /** Damage to each opponent ("it deals 1 damage to each opponent"). */
   damage: number;
+  /** "…deals X damage to each opponent, where X is the number of colors
+      that spell is" (Crystal, Inhuman Princess). */
+  damagePerColor?: boolean;
   /** "Each opponent loses 1 life." */
   drain: number;
   gain: number;
@@ -658,6 +661,7 @@ export function castTriggerOf(book: CardBook, card: PlayCard): CastTrigger | nul
   const onSelf = `(?:${names.join("|")})`;
   const counters = new RegExp(`put (a|an|one|two|three|\\d+) \\+1/\\+1 counters? on ${onSelf}\\b`).exec(rest);
   const damage = /deals? (\d+) damage to each opponent/.exec(rest);
+  const perColor = /deals? x damage to each opponent, where x is the number of colou?rs that spell is/.test(rest);
   const drain = /each opponent loses (\d+) life/.exec(rest);
   const gain = /you gain (\d+) life/.exec(rest);
   const draw = /\bdraw (a|one|two) cards?\b/.exec(rest);
@@ -680,7 +684,8 @@ export function castTriggerOf(book: CardBook, card: PlayCard): CastTrigger | nul
         }
       : null,
   };
-  if (!t.counters && !t.damage && !t.drain && !t.gain && !t.draw && !t.pump && !t.token) return null;
+  if (perColor) t.damagePerColor = true;
+  if (!t.counters && !t.damage && !t.drain && !t.gain && !t.draw && !t.pump && !t.token && !t.damagePerColor) return null;
   return t;
 }
 
@@ -791,6 +796,97 @@ export const imprintsFromHand = (book: CardBook, card: PlayCard) => /\benters[^.
 
 /** "When you play another land, sacrifice this land" (City of Traitors). */
 export const goesWhenALandIsPlayed = (book: CardBook, card: PlayCard) => /\bwhen you play another land, sacrifice\b/i.test(own(book, card));
+
+/** "Whenever a Dwarf you control becomes tapped, create a Treasure token"
+    (Magda, Brazen Outlaw): the creature type. */
+export function tapTreasureOf(book: CardBook, card: PlayCard): string | null {
+  const m = /\bwhenever an? ([a-z]+) you control becomes tapped, create a treasure token\b/i.exec(own(book, card));
+  return m ? m[1]!.toLowerCase() : null;
+}
+
+/** A commander's ability that puts a card from the library onto the
+    battlefield:
+    - Magda: "Sacrifice five Treasures: Search your library for an artifact
+      or Dragon card, put that card onto the battlefield, then shuffle."
+    - Sisay: "{W}{U}{B}{R}{G}: Search your library for a legendary permanent
+      card with mana value less than Sisay's power, put that card onto the
+      battlefield, then shuffle." (She gets +1/+1 for each colour among her
+      other legendary permanents.) */
+export interface PermanentFetch {
+  /** Its mana cost, if it has one. */
+  cost: string | null;
+  /** Treasures sacrificed. */
+  treasures: number;
+  /** "…with mana value less than its power". */
+  underPower: boolean;
+  test: (typeLine: string | null, info: CardInfo | undefined) => boolean;
+}
+export function permanentFetchOf(book: CardBook, card: PlayCard): PermanentFetch | null {
+  for (const line of own(book, card).split("\n")) {
+    const l = line.trim();
+    const magda = /^sacrifice (\w+) treasures: (search your library for [^.]+ card, put that card onto the battlefield, then shuffle)\.?$/i.exec(l);
+    if (magda) {
+      const search = parseSearch(magda[2]!);
+      if (search) return { cost: null, treasures: WORD_NUMBER[magda[1]!.toLowerCase()] ?? (Number(magda[1]) || 5), underPower: false, test: search.test };
+    }
+    const sisay = /^((?:\{[^}]+\})+): search your library for a legendary permanent card with mana value less than [^,]+'s power, put that card onto the battlefield, then shuffle\.?$/i.exec(l);
+    if (sisay) {
+      return {
+        cost: sisay[1]!,
+        treasures: 0,
+        underPower: true,
+        test: (typeLine, info) => {
+          const t = (info?.typeLine ?? typeLine ?? "").split(" // ")[0]!;
+          return /\bLegendary\b/.test(t) && !/\b(Instant|Sorcery)\b/.test(t);
+        },
+      };
+    }
+  }
+  return null;
+}
+
+/** "~ gets +1/+1 for each color among other legendary permanents you
+    control" (Sisay). */
+export const growsWithLegendColoursOf = (book: CardBook, card: PlayCard) => /\bgets \+1\/\+1 for each colou?r among other legendary permanents you control\b/i.test(own(book, card));
+
+/** Kinnan, Bonder Prodigy: "Whenever you tap a nonland permanent for mana,
+    add one mana of any type that permanent produced." */
+export const nonlandManaBonusOf = (info: CardInfo | undefined) => /\bwhenever you tap a nonland permanent for mana, add one mana of any type that permanent produced\b/i.test(ownText(frontText(info)));
+
+/** "Creatures you control have "{T}: Add one mana of any color."" (Cryptolith
+    Rite, Enduring Vitality) or "…Add {G}{G}." (Rok-Tahk): what each creature
+    then taps for. */
+export function creatureManaGrantOf(info: CardInfo | undefined): { colors: string[]; amount: number } | null {
+  const m = /\bcreatures you control have "\{T\}: Add ((?:\{[WUBRGC]\})+|one mana of any color)\."/i.exec(frontText(info));
+  if (!m) return null;
+  if (/any color/i.test(m[1]!)) return { colors: ["W", "U", "B", "R", "G"], amount: 1 };
+  const made = [...m[1]!.matchAll(/\{([WUBRGC])\}/g)].map((x) => x[1]!);
+  return { colors: [...new Set(made)], amount: made.length };
+}
+
+/** A commander's ability that turns mana into cards, turn after turn:
+    - Kinnan: "{5}{G}{U}: Look at the top five cards of your library. You may
+      put a non-Human creature card from among them onto the battlefield.
+      Put the rest on the bottom of your library in a random order."
+    - Thrasios: "{4}: Scry 1, then reveal the top card of your library. If
+      it's a land card, put it onto the battlefield tapped. Otherwise, draw
+      a card." */
+export interface Dig {
+  cost: string;
+  kind: "creature" | "land-or-draw";
+  /** Cards looked at (Kinnan: five). */
+  look: number;
+}
+export function digAbilityOf(book: CardBook, card: PlayCard): Dig | null {
+  for (const line of own(book, card).split("\n")) {
+    const m = /^((?:\{[^}]+\})+): (.+)$/.exec(line.trim());
+    if (!m || /\{(?:T|Q|X)\}/i.test(m[1]!)) continue;
+    const look = /^look at the top (five|four|three|\d+) cards of your library\. you may put a non-human creature card from among them onto the battlefield\. put the rest on the bottom of your library in a random order\.?$/i.exec(m[2]!);
+    if (look) return { cost: m[1]!, kind: "creature", look: WORD_NUMBER[look[1]!.toLowerCase()] ?? (Number(look[1]) || 5) };
+    if (/^scry 1, then reveal the top card of your library\. if it's a land card, put it onto the battlefield tapped\. otherwise, draw a card\.?$/i.test(m[2]!)) return { cost: m[1]!, kind: "land-or-draw", look: 1 };
+  }
+  return null;
+}
 
 /** The One Ring: "{T}: Put a burden counter on The One Ring, then draw a
     card for each burden counter on The One Ring", with a life lost for

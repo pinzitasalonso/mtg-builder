@@ -1,0 +1,2250 @@
+{
+ "name": "Ral, Monsoon Mage // Ral, Leyline Prodigy",
+ "source": {
+  "kind": "mtgtop8",
+  "detail": "Alex Carbonaro won Smitty’s cEDH Tournament (08/11/26) · MTGTop8",
+  "fetchedAt": "2026-11-26"
+ },
+ "commander": "Ral, Monsoon Mage // Ral, Leyline Prodigy",
+ "cards": [
+  {
+   "name": "\"Name Sticker\" Goblin",
+   "quantity": 1,
+   "typeLine": "Creature — Goblin Guest"
+  },
+  {
+   "name": "Birgi, God of Storytelling // Harnfel, Horn of Bounty",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — God // Legendary Artifact"
+  },
+  {
+   "name": "Electro, Assaulting Battery",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Villain"
+  },
+  {
+   "name": "Gandalf, Goblins' Bane // Flameshape",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Avatar Wizard // Sorcery — Adventure"
+  },
+  {
+   "name": "Hexing Squelcher",
+   "quantity": 1,
+   "typeLine": "Creature — Goblin Sorcerer"
+  },
+  {
+   "name": "Ragavan, Nimble Pilferer",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Monkey Pirate"
+  },
+  {
+   "name": "Runaway Steam-Kin",
+   "quantity": 1,
+   "typeLine": "Creature — Elemental"
+  },
+  {
+   "name": "Samut, Tyrant of Naktamun",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Wizard"
+  },
+  {
+   "name": "Simian Spirit Guide",
+   "quantity": 1,
+   "typeLine": "Creature — Ape Spirit"
+  },
+  {
+   "name": "Storm-Kiln Artist",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf Shaman"
+  },
+  {
+   "name": "Tavern Scoundrel",
+   "quantity": 1,
+   "typeLine": "Creature — Human Rogue"
+  },
+  {
+   "name": "Treasonous Ogre",
+   "quantity": 1,
+   "typeLine": "Creature — Ogre Shaman"
+  },
+  {
+   "name": "Chrome Mox",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Lion's Eye Diamond",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Lotus Petal",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mana Vault",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mox Amber",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact"
+  },
+  {
+   "name": "Mox Diamond",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mox Opal",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact"
+  },
+  {
+   "name": "Sol Ring",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Springleaf Drum",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Vexing Bauble",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Abandon Attachments",
+   "quantity": 1,
+   "typeLine": "Instant — Lesson"
+  },
+  {
+   "name": "An Offer You Can't Refuse",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Brain Freeze",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Chain of Vapor",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Daze",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Deflecting Swat",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Demand Answers",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Desperate Ritual",
+   "quantity": 1,
+   "typeLine": "Instant — Arcane"
+  },
+  {
+   "name": "Energybending",
+   "quantity": 1,
+   "typeLine": "Instant — Lesson"
+  },
+  {
+   "name": "Fierce Guardianship",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Flare of Duplication",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Flashback",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Flusterstorm",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Frantic Search",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Gut Shot",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Lava Dart",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Mental Misstep",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Mystical Tutor",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Opera Love Song",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Pact of Negation",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Pyretic Ritual",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Pyroblast",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Red Elemental Blast",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Reiterate",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Return the Favor",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Seething Song",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Sink into Stupor // Soporific Springs",
+   "quantity": 1,
+   "typeLine": "Instant // Land"
+  },
+  {
+   "name": "Snap",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Tibalt's Trickery",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Twinferno",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Twinned Vision",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Untimely Malfunction",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Vision of Love",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Bonus Round",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Echo of Eons",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Flow State",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Gamble",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Gitaxian Probe",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Grapeshot",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Hex Magic",
+   "quantity": 1,
+   "typeLine": "Sorcery — Arcane"
+  },
+  {
+   "name": "Hidden Strings",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Highway Robbery",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Jeska's Will",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Kari Zev's Expertise",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Past in Flames",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Quiet Speculation",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Reckless Impulse",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Rite of Flame",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Rob the Archives",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Romantic Rendezvous",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Sea Gate Restoration // Sea Gate, Reborn",
+   "quantity": 1,
+   "typeLine": "Sorcery // Land"
+  },
+  {
+   "name": "Shatterskull Smashing // Shatterskull, the Hammer Pass",
+   "quantity": 1,
+   "typeLine": "Sorcery // Land"
+  },
+  {
+   "name": "Storm of Memories",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Strike It Rich",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Sundering Eruption // Volcanic Fissure",
+   "quantity": 1,
+   "typeLine": "Sorcery // Land"
+  },
+  {
+   "name": "Timetwister",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Wheel of Fortune",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Wheel of Misfortune",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Will of the Jeskai",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Windfall",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Wrenn's Resolve",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Mystic Remora",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Underworld Breach",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Ancient Tomb",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Arid Mesa",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Bloodstained Mire",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "City of Traitors",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Command Tower",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Flooded Strand",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Gemstone Caverns",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Great Furnace",
+   "quantity": 1,
+   "typeLine": "Artifact Land"
+  },
+  {
+   "name": "Mountain",
+   "quantity": 1,
+   "typeLine": "Basic Land — Mountain"
+  },
+  {
+   "name": "Polluted Delta",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Scalding Tarn",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Steam Vents",
+   "quantity": 1,
+   "typeLine": "Land — Island Mountain"
+  },
+  {
+   "name": "Volcanic Island",
+   "quantity": 1,
+   "typeLine": "Land — Island Mountain"
+  },
+  {
+   "name": "Wooded Foothills",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Ral, Monsoon Mage // Ral, Leyline Prodigy",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Wizard // Legendary Planeswalker — Ral"
+  }
+ ],
+ "book": {
+  "\"name sticker\" goblin": {
+   "name": "\"Name Sticker\" Goblin",
+   "imageUri": "",
+   "typeLine": "Creature — Goblin Guest",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "When this creature enters from anywhere other than a graveyard or exile, if it's on the battlefield and you control 9 or fewer creatures named \"Name Sticker\" Goblin, roll a 20-sided die.\n1-6 | Add {R}{R}{R}{R}.\n7-14 | Add {R}{R}{R}{R}{R}.\n15-20 | Add {R}{R}{R}{R}{R}{R}.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "birgi, god of storytelling // harnfel, horn of bounty": {
+   "name": "Birgi, God of Storytelling // Harnfel, Horn of Bounty",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — God // Legendary Artifact",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Whenever you cast a spell, add {R}. Until end of turn, you don't lose this mana as steps and phases end.\nCreatures you control can boast twice during each of your turns rather than once.\n//\nDiscard a card: Exile the top two cards of your library. You may play those cards this turn.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "electro, assaulting battery": {
+   "name": "Electro, Assaulting Battery",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Villain",
+   "manaCost": "{1}{R}{R}",
+   "manaValue": 3,
+   "oracleText": "Flying\nYou don't lose unspent red mana as steps and phases end.\nWhenever you cast an instant or sorcery spell, add {R}.\nWhen Electro leaves the battlefield, you may pay {X}. When you do, he deals X damage to target player.",
+   "power": 2,
+   "toughness": 3,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "gandalf, goblins' bane // flameshape": {
+   "name": "Gandalf, Goblins' Bane // Flameshape",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Avatar Wizard // Sorcery — Adventure",
+   "manaCost": "{2}{R} // {1}{R}",
+   "manaValue": 3,
+   "oracleText": "Whenever you cast a noncreature spell, Gandalf gets +1/+1 until end of turn and deals 1 damage to each opponent.\n//\nLook at the top two cards of your library and exile them face down. For as long as they remain exiled, you may play them if you control a Wizard.",
+   "power": 2,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": []
+  },
+  "hexing squelcher": {
+   "name": "Hexing Squelcher",
+   "imageUri": "",
+   "typeLine": "Creature — Goblin Sorcerer",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "This spell can't be countered.\nWard—Pay 2 life.\nSpells you control can't be countered.\nOther creatures you control have \"Ward—Pay 2 life.\"",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Ward"
+   ],
+   "producedMana": []
+  },
+  "ragavan, nimble pilferer": {
+   "name": "Ragavan, Nimble Pilferer",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Monkey Pirate",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Whenever Ragavan deals combat damage to a player, create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card.\nDash {1}{R} (You may cast this spell for its dash cost. If you do, it gains haste, and it's returned from the battlefield to its owner's hand at the beginning of the next end step.)",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [
+    "Treasure",
+    "Dash"
+   ],
+   "producedMana": []
+  },
+  "runaway steam-kin": {
+   "name": "Runaway Steam-Kin",
+   "imageUri": "",
+   "typeLine": "Creature — Elemental",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Whenever you cast a red spell, if this creature has fewer than three +1/+1 counters on it, put a +1/+1 counter on this creature.\nRemove three +1/+1 counters from this creature: Add {R}{R}{R}.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "samut, tyrant of naktamun": {
+   "name": "Samut, Tyrant of Naktamun",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Wizard",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "Instant and sorcery spells you control have split second. (As long as a spell with split second is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "simian spirit guide": {
+   "name": "Simian Spirit Guide",
+   "imageUri": "",
+   "typeLine": "Creature — Ape Spirit",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Exile this card from your hand: Add {R}.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "storm-kiln artist": {
+   "name": "Storm-Kiln Artist",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf Shaman",
+   "manaCost": "{3}{R}",
+   "manaValue": 4,
+   "oracleText": "This creature gets +1/+0 for each artifact you control.\nMagecraft — Whenever you cast or copy an instant or sorcery spell, create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Treasure",
+    "Magecraft"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "tavern scoundrel": {
+   "name": "Tavern Scoundrel",
+   "imageUri": "",
+   "typeLine": "Creature — Human Rogue",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Whenever you win a coin flip, create two Treasure tokens. (They're artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")\n{1}, {T}, Sacrifice another permanent: Flip a coin.",
+   "power": 1,
+   "toughness": 3,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "treasonous ogre": {
+   "name": "Treasonous Ogre",
+   "imageUri": "",
+   "typeLine": "Creature — Ogre Shaman",
+   "manaCost": "{3}{R}",
+   "manaValue": 4,
+   "oracleText": "Dethrone (Whenever this creature attacks the player with the most life or tied for most life, put a +1/+1 counter on it.)\nPay 3 life: Add {R}.",
+   "power": 2,
+   "toughness": 3,
+   "keywords": [
+    "Dethrone"
+   ],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "chrome mox": {
+   "name": "Chrome Mox",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Imprint — When this artifact enters, you may exile a nonartifact, nonland card from your hand.\n{T}: Add one mana of any of the exiled card's colors.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Imprint"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "lion's eye diamond": {
+   "name": "Lion's Eye Diamond",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Discard your hand, Sacrifice this artifact: Add three mana of any one color. Activate only as an instant.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "lotus petal": {
+   "name": "Lotus Petal",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "{T}, Sacrifice this artifact: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mana vault": {
+   "name": "Mana Vault",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "This artifact doesn't untap during your untap step.\nAt the beginning of your upkeep, you may pay {4}. If you do, untap this artifact.\nAt the beginning of your draw step, if this artifact is tapped, it deals 1 damage to you.\n{T}: Add {C}{C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "mox amber": {
+   "name": "Mox Amber",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "{T}: Add one mana of any color among legendary creatures and planeswalkers you control.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mox diamond": {
+   "name": "Mox Diamond",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "If this artifact would enter, you may discard a land card instead. If you do, put this artifact onto the battlefield. If you don't, put it into its owner's graveyard.\n{T}: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mox opal": {
+   "name": "Mox Opal",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Metalcraft — {T}: Add one mana of any color. Activate only if you control three or more artifacts.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Metalcraft"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "sol ring": {
+   "name": "Sol Ring",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "{T}: Add {C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "springleaf drum": {
+   "name": "Springleaf Drum",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "{T}, Tap an untapped creature you control: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "vexing bauble": {
+   "name": "Vexing Bauble",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "Whenever a player casts a spell, if no mana was spent to cast it, counter that spell.\n{1}, {T}, Sacrifice this artifact: Draw a card.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "abandon attachments": {
+   "name": "Abandon Attachments",
+   "imageUri": "",
+   "typeLine": "Instant — Lesson",
+   "manaCost": "{1}{U/R}",
+   "manaValue": 2,
+   "oracleText": "You may discard a card. If you do, draw two cards.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "an offer you can't refuse": {
+   "name": "An Offer You Can't Refuse",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Counter target noncreature spell. Its controller creates two Treasure tokens. (They're artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "brain freeze": {
+   "name": "Brain Freeze",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "Target player mills three cards.\nStorm (When you cast this spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Storm",
+    "Mill"
+   ],
+   "producedMana": []
+  },
+  "chain of vapor": {
+   "name": "Chain of Vapor",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Return target nonland permanent to its owner's hand. Then that permanent's controller may sacrifice a land of their choice. If the player does, they may copy this spell and may choose a new target for that copy.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "daze": {
+   "name": "Daze",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "You may return an Island you control to its owner's hand rather than pay this spell's mana cost.\nCounter target spell unless its controller pays {1}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "deflecting swat": {
+   "name": "Deflecting Swat",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nYou may choose new targets for target spell or ability.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "demand answers": {
+   "name": "Demand Answers",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "As an additional cost to cast this spell, sacrifice an artifact or discard a card.\nDraw two cards.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "desperate ritual": {
+   "name": "Desperate Ritual",
+   "imageUri": "",
+   "typeLine": "Instant — Arcane",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Add {R}{R}{R}.\nSplice onto Arcane {1}{R} (As you cast an Arcane spell, you may reveal this card from your hand and pay its splice cost. If you do, add this card's effects to that spell.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Splice"
+   ],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "energybending": {
+   "name": "Energybending",
+   "imageUri": "",
+   "typeLine": "Instant — Lesson",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "Lands you control gain all basic land types until end of turn.\nDraw a card.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "fierce guardianship": {
+   "name": "Fierce Guardianship",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{2}{U}",
+   "manaValue": 3,
+   "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nCounter target noncreature spell.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "flare of duplication": {
+   "name": "Flare of Duplication",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}{R}",
+   "manaValue": 3,
+   "oracleText": "You may sacrifice a nontoken red creature rather than pay this spell's mana cost.\nCopy target instant or sorcery spell. You may choose new targets for the copy.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "flashback": {
+   "name": "Flashback",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Target instant or sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to its mana cost. (You may cast that card from your graveyard for its flashback cost. Then exile it.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "flusterstorm": {
+   "name": "Flusterstorm",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Counter target instant or sorcery spell unless its controller pays {1}.\nStorm (When you cast this spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Storm"
+   ],
+   "producedMana": []
+  },
+  "frantic search": {
+   "name": "Frantic Search",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{2}{U}",
+   "manaValue": 3,
+   "oracleText": "Draw two cards, then discard two cards. Untap up to three lands.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "gut shot": {
+   "name": "Gut Shot",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{R/P}",
+   "manaValue": 1,
+   "oracleText": "({R/P} can be paid with either {R} or 2 life.)\nGut Shot deals 1 damage to any target.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "lava dart": {
+   "name": "Lava Dart",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Lava Dart deals 1 damage to any target.\nFlashback—Sacrifice a Mountain. (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Flashback"
+   ],
+   "producedMana": []
+  },
+  "mental misstep": {
+   "name": "Mental Misstep",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U/P}",
+   "manaValue": 1,
+   "oracleText": "({U/P} can be paid with either {U} or 2 life.)\nCounter target spell with mana value 1.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "mystical tutor": {
+   "name": "Mystical Tutor",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Search your library for an instant or sorcery card, reveal it, then shuffle and put that card on top.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "opera love song": {
+   "name": "Opera Love Song",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Choose one —\n• Exile the top two cards of your library. You may play those cards until your next end step.\n• One or two target creatures each get +2/+0 until end of turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "pact of negation": {
+   "name": "Pact of Negation",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Counter target spell.\nAt the beginning of your next upkeep, pay {3}{U}{U}. If you don't, you lose the game.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "pyretic ritual": {
+   "name": "Pyretic Ritual",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Add {R}{R}{R}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "pyroblast": {
+   "name": "Pyroblast",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Choose one —\n• Counter target spell if it's blue.\n• Destroy target permanent if it's blue.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "red elemental blast": {
+   "name": "Red Elemental Blast",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Choose one —\n• Counter target blue spell.\n• Destroy target blue permanent.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "reiterate": {
+   "name": "Reiterate",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}{R}",
+   "manaValue": 3,
+   "oracleText": "Buyback {3} (You may pay an additional {3} as you cast this spell. If you do, put this card into your hand as it resolves.)\nCopy target instant or sorcery spell. You may choose new targets for the copy.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Buyback"
+   ],
+   "producedMana": []
+  },
+  "return the favor": {
+   "name": "Return the Favor",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{R}{R}",
+   "manaValue": 2,
+   "oracleText": "Spree (Choose one or more additional costs.)\n+ {1} — Copy target instant spell, sorcery spell, activated ability, or triggered ability. You may choose new targets for the copy.\n+ {1} — Change the target of target spell or ability with a single target.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Spree"
+   ],
+   "producedMana": []
+  },
+  "seething song": {
+   "name": "Seething Song",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Add {R}{R}{R}{R}{R}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "sink into stupor // soporific springs": {
+   "name": "Sink into Stupor // Soporific Springs",
+   "imageUri": "",
+   "typeLine": "Instant // Land",
+   "manaCost": "{1}{U}{U}",
+   "manaValue": 3,
+   "oracleText": "Return target spell or nonland permanent an opponent controls to its owner's hand.\n//\nAs this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {U}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "U"
+   ]
+  },
+  "snap": {
+   "name": "Snap",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "Return target creature to its owner's hand. Untap up to two lands.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "tibalt's trickery": {
+   "name": "Tibalt's Trickery",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Counter target spell. Choose 1, 2, or 3 at random. Its controller mills that many cards, then exiles cards from the top of their library until they exile a nonland card with a different name than that spell. They may cast that card without paying its mana cost. Then they put the exiled cards on the bottom of their library in a random order.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Mill"
+   ],
+   "producedMana": []
+  },
+  "twinferno": {
+   "name": "Twinferno",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Choose one —\n• When you cast your next instant or sorcery spell this turn, copy that spell. You may choose new targets for the copy.\n• Target creature you control gains double strike until end of turn. (It deals both first-strike and regular combat damage.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "twinned vision": {
+   "name": "Twinned Vision",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{U/R}",
+   "manaValue": 2,
+   "oracleText": "Draw a card. If this spell wasn't cast from your hand, draw two cards instead.\nFlashback—{1}{U/R}{U/R}, Discard a card. (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Flashback"
+   ],
+   "producedMana": []
+  },
+  "untimely malfunction": {
+   "name": "Untimely Malfunction",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Choose one —\n• Destroy target artifact.\n• Change the target of target spell or ability with a single target.\n• One or two target creatures can't block this turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "vision of love": {
+   "name": "Vision of Love",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "You may sacrifice an artifact or discard a card. If you do, draw two cards.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "bonus round": {
+   "name": "Bonus Round",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{R}{R}",
+   "manaValue": 3,
+   "oracleText": "Until end of turn, whenever a player casts an instant or sorcery spell, that player copies it and may choose new targets for the copy.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "echo of eons": {
+   "name": "Echo of Eons",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{4}{U}{U}",
+   "manaValue": 6,
+   "oracleText": "Each player shuffles their hand and graveyard into their library, then draws seven cards.\nFlashback {2}{U} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Flashback"
+   ],
+   "producedMana": []
+  },
+  "flow state": {
+   "name": "Flow State",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "Look at the top three cards of your library. Put one of them into your hand and the rest on the bottom of your library in any order. If there is an instant card and a sorcery card in your graveyard, instead put two of them into your hand and the rest on the bottom of your library in any order.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "gamble": {
+   "name": "Gamble",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Search your library for a card, put that card into your hand, discard a card at random, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "gitaxian probe": {
+   "name": "Gitaxian Probe",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{U/P}",
+   "manaValue": 1,
+   "oracleText": "({U/P} can be paid with either {U} or 2 life.)\nLook at target player's hand.\nDraw a card.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "grapeshot": {
+   "name": "Grapeshot",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Grapeshot deals 1 damage to any target.\nStorm (When you cast this spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Storm"
+   ],
+   "producedMana": []
+  },
+  "hex magic": {
+   "name": "Hex Magic",
+   "imageUri": "",
+   "typeLine": "Sorcery — Arcane",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Exile all the cards from your hand, then draw that many cards. Until the end of your next turn, you may play cards exiled this way.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "hidden strings": {
+   "name": "Hidden Strings",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "You may tap or untap target permanent, then you may tap or untap another target permanent.\nCipher (Then you may exile this spell card encoded on a creature you control. Whenever that creature deals combat damage to a player, its controller may cast a copy of the encoded card without paying its mana cost.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Cipher"
+   ],
+   "producedMana": []
+  },
+  "highway robbery": {
+   "name": "Highway Robbery",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "You may discard a card or sacrifice a land. If you do, draw two cards.\nPlot {1}{R} (You may pay {1}{R} and exile this card from your hand. Cast it as a sorcery on a later turn without paying its mana cost. Plot only as a sorcery.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Plot"
+   ],
+   "producedMana": []
+  },
+  "jeska's will": {
+   "name": "Jeska's Will",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Choose one. If you control a commander as you cast this spell, you may choose both instead.\n• Add {R} for each card in target opponent's hand.\n• Exile the top three cards of your library. You may play them this turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "kari zev's expertise": {
+   "name": "Kari Zev's Expertise",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{R}{R}",
+   "manaValue": 3,
+   "oracleText": "Gain control of target creature or Vehicle until end of turn. Untap it. It gains haste until end of turn.\nYou may cast a spell with mana value 2 or less from your hand without paying its mana cost.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "past in flames": {
+   "name": "Past in Flames",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{3}{R}",
+   "manaValue": 4,
+   "oracleText": "Each instant and sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to its mana cost.\nFlashback {4}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Flashback"
+   ],
+   "producedMana": []
+  },
+  "quiet speculation": {
+   "name": "Quiet Speculation",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "Search target player's library for up to three cards with flashback and put them into that player's graveyard. Then the player shuffles.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "reckless impulse": {
+   "name": "Reckless Impulse",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Exile the top two cards of your library. Until the end of your next turn, you may play those cards.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "rite of flame": {
+   "name": "Rite of Flame",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Add {R}{R}, then add {R} for each card named Rite of Flame in each graveyard.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "rob the archives": {
+   "name": "Rob the Archives",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Casualty 1 (As you cast this spell, you may sacrifice a creature with power 1 or greater. When you do, copy this spell.)\nExile the top two cards of your library. You may play those cards this turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Casualty"
+   ],
+   "producedMana": []
+  },
+  "romantic rendezvous": {
+   "name": "Romantic Rendezvous",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Discard a card, then draw two cards.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "sea gate restoration // sea gate, reborn": {
+   "name": "Sea Gate Restoration // Sea Gate, Reborn",
+   "imageUri": "",
+   "typeLine": "Sorcery // Land",
+   "manaCost": "{4}{U}{U}{U}",
+   "manaValue": 7,
+   "oracleText": "Draw cards equal to the number of cards in your hand plus one. You have no maximum hand size for the rest of the game.\n//\nAs this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {U}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "U"
+   ]
+  },
+  "shatterskull smashing // shatterskull, the hammer pass": {
+   "name": "Shatterskull Smashing // Shatterskull, the Hammer Pass",
+   "imageUri": "",
+   "typeLine": "Sorcery // Land",
+   "manaCost": "{X}{R}{R}",
+   "manaValue": 2,
+   "oracleText": "Shatterskull Smashing deals X damage divided as you choose among up to two target creatures and/or planeswalkers. If X is 6 or more, Shatterskull Smashing deals twice X damage divided as you choose among them instead.\n//\nAs this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {R}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "storm of memories": {
+   "name": "Storm of Memories",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{2}{R}{R}{R}",
+   "manaValue": 5,
+   "oracleText": "Storm (When you cast this spell, copy it for each spell cast before it this turn.)\nExile an instant or sorcery card with mana value 3 or less from your graveyard at random. You may cast it without paying its mana cost. If that spell would be put into a graveyard, exile it instead.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Storm"
+   ],
+   "producedMana": []
+  },
+  "strike it rich": {
+   "name": "Strike It Rich",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")\nFlashback {2}{R} (You may cast this card from your graveyard for its flashback cost. Then exile it.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Treasure",
+    "Flashback"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "sundering eruption // volcanic fissure": {
+   "name": "Sundering Eruption // Volcanic Fissure",
+   "imageUri": "",
+   "typeLine": "Sorcery // Land",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Destroy target land. Its controller may search their library for a basic land card, put it onto the battlefield tapped, then shuffle. Creatures without flying can't block this turn.\n//\nAs this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {R}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "timetwister": {
+   "name": "Timetwister",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{2}{U}",
+   "manaValue": 3,
+   "oracleText": "Each player shuffles their hand and graveyard into their library, then draws seven cards. (Then put Timetwister into its owner's graveyard.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "wheel of fortune": {
+   "name": "Wheel of Fortune",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Each player discards their hand, then draws seven cards.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "wheel of misfortune": {
+   "name": "Wheel of Misfortune",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Each player secretly chooses a number 0 or greater, then all players reveal those numbers simultaneously and determine the highest and lowest numbers revealed this way. Wheel of Misfortune deals damage equal to the highest number to each player who chose that number. Each player who didn't choose the lowest number discards their hand, then draws seven cards.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "will of the jeskai": {
+   "name": "Will of the Jeskai",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{3}{R}",
+   "manaValue": 4,
+   "oracleText": "Choose one. If you control a commander as you cast this spell, you may choose both instead.\n• Each player may discard their hand and draw five cards.\n• Each instant and sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to its mana cost.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "windfall": {
+   "name": "Windfall",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{2}{U}",
+   "manaValue": 3,
+   "oracleText": "Each player discards their hand, then draws cards equal to the greatest number of cards a player discarded this way.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "wrenn's resolve": {
+   "name": "Wrenn's Resolve",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Exile the top two cards of your library. Until the end of your next turn, you may play those cards.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "mystic remora": {
+   "name": "Mystic Remora",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Cumulative upkeep {1} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhenever an opponent casts a noncreature spell, you may draw a card unless that player pays {4}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Cumulative upkeep"
+   ],
+   "producedMana": []
+  },
+  "underworld breach": {
+   "name": "Underworld Breach",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Each nonland card in your graveyard has escape. The escape cost is equal to the card's mana cost plus exile three other cards from your graveyard. (You may cast cards from your graveyard for their escape cost.)\nAt the beginning of the end step, sacrifice this enchantment.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "ancient tomb": {
+   "name": "Ancient Tomb",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}{C}. This land deals 2 damage to you.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "arid mesa": {
+   "name": "Arid Mesa",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Mountain or Plains card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "bloodstained mire": {
+   "name": "Bloodstained Mire",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Swamp or Mountain card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "city of traitors": {
+   "name": "City of Traitors",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "When you play another land, sacrifice this land.\n{T}: Add {C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "command tower": {
+   "name": "Command Tower",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "flooded strand": {
+   "name": "Flooded Strand",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Plains or Island card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "gemstone caverns": {
+   "name": "Gemstone Caverns",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "If this card is in your opening hand and you're not the starting player, you may begin the game with Gemstone Caverns on the battlefield with a luck counter on it. If you do, exile a card from your hand.\n{T}: Add {C}. If Gemstone Caverns has a luck counter on it, instead add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "great furnace": {
+   "name": "Great Furnace",
+   "imageUri": "",
+   "typeLine": "Artifact Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {R}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "mountain": {
+   "name": "Mountain",
+   "imageUri": "",
+   "typeLine": "Basic Land — Mountain",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {R}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "polluted delta": {
+   "name": "Polluted Delta",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for an Island or Swamp card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "scalding tarn": {
+   "name": "Scalding Tarn",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for an Island or Mountain card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "steam vents": {
+   "name": "Steam Vents",
+   "imageUri": "",
+   "typeLine": "Land — Island Mountain",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {U} or {R}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R",
+    "U"
+   ]
+  },
+  "volcanic island": {
+   "name": "Volcanic Island",
+   "imageUri": "",
+   "typeLine": "Land — Island Mountain",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {U} or {R}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R",
+    "U"
+   ]
+  },
+  "wooded foothills": {
+   "name": "Wooded Foothills",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Mountain or Forest card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "ral, monsoon mage // ral, leyline prodigy": {
+   "name": "Ral, Monsoon Mage // Ral, Leyline Prodigy",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Wizard // Legendary Planeswalker — Ral",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Instant and sorcery spells you cast cost {1} less to cast.\nWhenever you cast an instant or sorcery spell during your turn, flip a coin. If you lose the flip, Ral deals 1 damage to you. If you win the flip, you may exile Ral. If you do, return him to the battlefield transformed under his owner's control.\n//\nRal enters with an additional loyalty counter on him for each instant and sorcery spell you've cast this turn.\n+1: Until your next turn, instant and sorcery spells you cast cost {1} less to cast.\n−2: Ral deals 2 damage divided as you choose among one or two targets. Draw a card if you control a blue permanent other than Ral.\n−8: Exile the top eight cards of your library. You may cast instant and sorcery spells from among them this turn without paying their mana costs.",
+   "power": 1,
+   "toughness": 3,
+   "keywords": [
+    "Transform"
+   ],
+   "producedMana": []
+  }
+ },
+ "combos": [
+  {
+   "id": "1368-1414-4856",
+   "pieces": [
+    {
+     "name": "Underworld Breach",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Lotus Petal",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Brain Freeze",
+     "zones": [
+      "H",
+      "G"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite self-mill",
+    "Near-infinite magecraft triggers",
+    "Near-infinite mill"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Lotus Petal by tapping and sacrificing it, adding {U}.\nCast Lotus Petal from your graveyard for its escape cost by exiling three cards besides Brain Freeze from your graveyard.\nRepeat from step 1 one additional time.\nCast Brain Freeze either from your hand by paying {1}{U}, or from your graveyard for its escape cost by paying {1}{U} and exiling three cards from your graveyard.\nBrain Freeze's storm ability triggers, creating at least two copies of Brain Freeze targeting yourself, and any remaining copies targeting an opponent.\nResolve each Brain Freeze, causing yourself to mill nine cards and, if applicable, an opponent to mill three cards for each Brain Freeze remaining.\nRepeat.",
+   "prerequisites": "You have at least six other cards in your graveyard, plus an additional four cards if Brain Freeze is in your graveyard."
+  },
+  {
+   "id": "1368-3518-4856",
+   "pieces": [
+    {
+     "name": "Underworld Breach",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Lion's Eye Diamond",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Brain Freeze",
+     "zones": [
+      "G"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite self-mill",
+    "Near-infinite colored mana",
+    "Near-infinite magecraft triggers",
+    "Near-infinite mill",
+    "Near-infinite storm count"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Lion's Eye Diamond by discarding your hand and sacrificing it, adding {U}{U}{U}.\nCast Lion's Eye Diamond from your graveyard for its escape cost by exiling three cards besides Brain Freeze from your graveyard.\nCast Brain Freeze from your graveyard for its escape cost by paying {1}{U} and exiling three cards from your graveyard.\nBrain Freeze's storm ability triggers, creating at least one copy of Brain Freeze targeting yourself, and any remaining copies targeting an opponent.\nResolve each Brain Freeze, causing yourself to mill six cards and, if applicable, an opponent to mill three cards for each Brain Freeze remaining.\nRepeat.",
+   "prerequisites": "You have at least six other cards in hand and/or graveyard."
+  },
+  {
+   "id": "1878-3368",
+   "pieces": [
+    {
+     "name": "Reiterate",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Jeska's Will",
+     "zones": [
+      "H"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite magecraft triggers",
+    "Infinite red mana",
+    "Infinite storm count",
+    "Exile your library with the ability to play the exiled cards until end of turn"
+   ],
+   "manaNeeded": "{6}{R}{R}{R}",
+   "steps": "Cast Jeska's Will by paying its mana cost\nHolding priority, cast Reiterate with buyback by paying {4}{R}{R}, creating a copy of Jeska's Will and returning Reiterate to your hand.\nResolve the copy of Jeska's Will, adding at least six {R}.\nRepeat from step 2.",
+   "prerequisites": "An opponent has six or more cards in their hand."
+  },
+  {
+   "id": "3368-4036-5195",
+   "pieces": [
+    {
+     "name": "Storm-Kiln Artist",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Seething Song",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Reiterate",
+     "zones": [
+      "H"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact LTB",
+    "Infinite artifact sacrifice triggers",
+    "Infinite artifact tokens",
+    "Infinite colored mana",
+    "Infinite copies of instant and sorcery spells on the stack",
+    "Infinite power for any creature",
+    "Infinite magecraft triggers",
+    "Infinite storm count",
+    "Infinite Treasure tokens"
+   ],
+   "manaNeeded": "{6}{R}{R}",
+   "steps": "Cast Seething Song by paying {2}{R}.\nStorm-Kiln Artist triggers, creating a Treasure artifact token.\nHolding priority, activate a Treasure by tapping and sacrificing it, adding {R}.\nCast Reiterate with buyback by paying {4}{R}{R}, targeting Seething Song.\nStorm-Kiln Artist triggers, creating a Treasure artifact token.\nResolve Reiterate, copying Seething Song and returning Reiterate to your hand.\nStorm-Kiln Artist triggers, creating a Treasure artifact token.\nResolve the copy of Seething Song, adding {R}{R}{R}{R}{R}.\nRepeat from step 3.\nOnce you have infinite Treasure tokens, you may use the mana to cast Reiterate infinitely and copy any instant and/or sorcery spells on the stack.",
+   "prerequisites": ""
+  },
+  {
+   "id": "2492-3368-4036",
+   "pieces": [
+    {
+     "name": "Reiterate",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Seething Song",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Bonus Round",
+     "zones": [
+      "H"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite magecraft triggers",
+    "Infinite red mana",
+    "Infinite storm count"
+   ],
+   "manaNeeded": "{4}{R}{R}{R}",
+   "steps": "Cast Bonus Round by paying {1}{R}{R}.\nCast Seething Song by paying {2}{R}.\nBonus Round triggers, creating a copy of Seething Song.\nResolve the Seething Song copy, adding {R}{R}{R}{R}{R}.\nHolding priority, cast Reiterate with buyback by paying {4}{R}{R}, creating a copy of Seething Song.\nBonus Round triggers, creating a copy of Reiterate.\nResolve the Reiterate copy, creating a copy of Seething Song.\nResolve the second Seething Song copy, adding {R}{R}{R}{R}{R}.\nResolve the first copy of Seething Song, adding {R}{R}{R}{R}{R}.\nRepeat from step 5.",
+   "prerequisites": ""
+  },
+  {
+   "id": "1368-2196-2492",
+   "pieces": [
+    {
+     "name": "Frantic Search",
+     "zones": [
+      "H",
+      "G"
+     ]
+    },
+    {
+     "name": "Underworld Breach",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Bonus Round",
+     "zones": [
+      "H",
+      "G"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite draw triggers",
+    "Infinite looting",
+    "Infinite self-discard triggers",
+    "Near-infinite magecraft triggers",
+    "Near-infinite mana lands you control can produce",
+    "Near-infinite untap of lands you control"
+   ],
+   "manaNeeded": "{2}{R}{R} at most",
+   "steps": "Cast Bonus Round either from your hand by paying {1}{R}{R} or from your graveyard for its escape cost by paying {1}{R}{R} and exiling three other cards from your graveyard, ensuring not to exile Frantic Search if its in your graveyard, causing any instant or sorcery cast this turn to be copied.\nActivate up to three lands by tapping them, adding at least {1}{U}.\nCast Frantic Search either from your hand by paying {2}{U}, or from your graveyard for its escape cost by paying {2}{U} and exiling three other cards from your graveyard.\nBonus Round triggers, copying Frantic Search.\nResolve the copy of Frantic Search, causing you to loot twice and untap up to three lands.\nHolding priority, activate up to three lands by tapping them, adding at least {1}{U}.\nResolve the original Frantic Search, causing you to loot twice and untap up to three lands.\nRepeat from step 2.",
+   "prerequisites": "You have an additional six cards in your graveyard if both Bonus Round and Frantic Search are in your graveyard, or you have an additional three cards in your graveyard if either card is in your graveyard.\nYou control up to three lands that can tap to produce at least {1}{U}."
+  },
+  {
+   "id": "1368-1878-2706",
+   "pieces": [
+    {
+     "name": "Underworld Breach",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Wheel of Fortune",
+     "zones": [
+      "G"
+     ]
+    },
+    {
+     "name": "Jeska's Will",
+     "zones": [
+      "G"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite draw triggers for all players",
+    "Infinite looting for all players",
+    "Near-infinite magecraft triggers",
+    "Near-infinite storm count"
+   ],
+   "manaNeeded": "{2}{R}",
+   "steps": "Cast Jeska's Will from your graveyard for its escape cost by paying {2}{R} and exiling three other cards from your graveyard, adding at least six {R}.\nCast Wheel of Fortune from your graveyard for its escape cost by paying {2}{R} and exiling three other cards from your graveyard, causing each player to discard their hand and draw seven cards.\nRepeat.",
+   "prerequisites": "You have at least six additional cards in your graveyard, plus an additional six cards between your hand and/or graveyard.\nAn opponent has at least six cards in hand."
+  },
+  {
+   "id": "1368-2706-3518",
+   "pieces": [
+    {
+     "name": "Underworld Breach",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Lion's Eye Diamond",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Wheel of Fortune",
+     "zones": [
+      "G"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite draw triggers",
+    "Infinite looting",
+    "Infinite looting for opponents",
+    "Near-infinite storm count"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Lion's Eye Diamond by discarding your hand and sacrificing it, adding {R}{R}{R}.\nCast Wheel of Fortune from your graveyard for its escape cost by paying {2}{R} and exiling 3 cards from your graveyard.\nResolve Wheel of Fortune, causing each player to discard their hand and draw seven cards.\nCast Lion's Eye Diamond from your graveyard for its escape cost by exiling 3 cards from your graveyard.\n Repeat.",
+   "prerequisites": "You have at least six other cards in hand and/or graveyard."
+  },
+  {
+   "id": "392-3368-4036",
+   "pieces": [
+    {
+     "name": "Birgi, God of Storytelling // Harnfel, Horn of Bounty",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Seething Song",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Reiterate",
+     "zones": [
+      "H"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite magecraft triggers",
+    "Infinite storm count"
+   ],
+   "manaNeeded": "{6}{R}{R}",
+   "steps": "Cast Seething Song by paying {2}{R}.\nBirgi triggers, adding {R}.\nHolding priority, cast Reiterate with buyback by paying {4}{R}{R}, targeting Seething Song.\nBirgi triggers, adding {R}.\nResolve Reiterate, copying Seething Song and returning Reiterate to your hand.\nResolve the copy of Seething Song, adding {R}{R}{R}{R}{R}.\nRepeat from step 3.",
+   "prerequisites": ""
+  },
+  {
+   "id": "2492-3105-3368",
+   "pieces": [
+    {
+     "name": "Reiterate",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Pyretic Ritual",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Bonus Round",
+     "zones": [
+      "H"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite magecraft triggers",
+    "Infinite storm count"
+   ],
+   "manaNeeded": "{5}{R}{R}{R}",
+   "steps": "Cast Bonus Round by paying {1}{R}{R}.\nCast Pyretic Ritual by paying {1}{R}.\nBonus Round triggers, creating a copy of Pyretic Ritual.\nResolve the Pyretic Ritual copy, adding {R}{R}{R}.\nHolding priority, cast Reiterate with buyback by paying {4}{R}{R}, creating a copy of Pyretic Ritual.\nBonus Round triggers, creating a copy of Reiterate.\nResolve the Reiterate copy, creating a copy of Pyretic Ritual.\nResolve the second Pyretic Ritual copy, adding {R}{R}{R}.\nResolve the first copy of Pyretic Ritual, adding {R}{R}{R}.\nRepeat from step 5.",
+   "prerequisites": ""
+  },
+  {
+   "id": "868-2492-3368",
+   "pieces": [
+    {
+     "name": "Reiterate",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Desperate Ritual",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Bonus Round",
+     "zones": [
+      "H"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite magecraft triggers",
+    "Infinite storm count"
+   ],
+   "manaNeeded": "{5}{R}{R}{R}",
+   "steps": "Cast Bonus Round by paying {1}{R}{R}.\nCast Desperate Ritual by paying {1}{R}.\nBonus Round triggers, creating a copy of Desperate Ritual.\nResolve the Desperate Ritual copy, adding {R}{R}{R}.\nHolding priority, cast Reiterate with buyback by paying {4}{R}{R}{R}, creating a copy of Desperate Ritual.\nBonus Round triggers, creating a copy of Reiterate.\nResolve the Reiterate copy, creating a copy of Desperate Ritual.\nResolve the second Desperate Ritual copy, adding {R}{R}{R}.\nResolve the first copy of Desperate Ritual, adding {R}{R}{R}.\nRepeat from step 5.",
+   "prerequisites": ""
+  }
+ ]
+}

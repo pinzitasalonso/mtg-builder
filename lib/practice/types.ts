@@ -81,6 +81,9 @@ export interface PracticeGame {
   attacked?: number[];
   once?: number[];
   mayCast?: number[];
+  /** A Pact cast: paid for at its caster's next upkeep, or the game is lost
+      (Summoner's Pact). */
+  pacts?: { seat: Seat; cost: string; name: string }[];
   /** A player with protection from everything until their next turn (The
       One Ring, as it's cast): damage to them is prevented. */
   shield?: Partial<Record<Seat, boolean>>;

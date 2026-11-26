@@ -28,9 +28,16 @@ export interface DeckCombo {
 /** What a combo amounts to at this table. */
 export type ComboOutcome = "win" | "mill" | "mana" | "other";
 
-const WINS = /^win the game$|\binfinite (?:damage|lifeloss|life loss|combat damage|combat phases|turns)\b|\beach opponent loses\b|\binfinite creature tokens with haste\b|\binfinite hasty\b/i;
+// (Magda's loops end with every artifact of the library on the table and
+// endless Treasures: the game.)
+const WINS =
+  /^win the game$|\binfinite (?:damage|lifeloss|life loss|combat damage|combat phases|turns)\b|\beach opponent loses\b|\binfinite creature tokens with haste\b|\binfinite hasty\b|^put all artifact cards and .* from your library onto the battlefield$/i;
 // Milling the opponents out. ("Infinite self-mill" is the deck's own library.)
-const MILLS = /^(?:near-)?infinite mill$|\bexile (?:all )?opponents'? librar/i;
+const MILLS = /^(?:near-)?infinite mill$|\bexile (?:all |each )?opponent(?:'s|s'|s)? librar/i;
+
+/** A loop that casts spells without end: with a permanent that hurts the
+    other player each time one is cast (Vivi, Crystal), that is the game. */
+export const castsWithoutEnd = (produces: string[]) => produces.some((p) => /\binfinite (?:storm count|magecraft triggers)\b/i.test(p));
 const MANA = /\binfinite\b.*\bmana\b/i;
 
 export function comboOutcome(produces: string[]): ComboOutcome {

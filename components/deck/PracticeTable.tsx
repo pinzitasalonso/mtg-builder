@@ -470,7 +470,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     if (!setup) return g0;
     const card = findCard(g0, parseCardId(a.card) ?? -1)?.card;
     if (!card || isLand(card)) {
-      const r = applyAction(g0, "opp", a, setup.book, { keep });
+      const r = applyAction(g0, "opp", a, setup.book, { keep, combos: setup.combos ?? [] });
       setGame(r.game);
       // A refused move shows nothing, so it takes no beat either.
       return r.ok ? pause(BEAT, r.game) : r.game;
@@ -478,7 +478,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
     const targetIid = a.effects.map((e) => parseCardId(e.target)).find((t) => t !== null) ?? undefined;
     const target = targetIid !== undefined ? findCard(g0, targetIid)?.card.name : undefined;
     const answerable = canAnswer(g0);
-    const paid = applyAction(g0, "opp", a, setup.book, { stage: "pay", keep });
+    const paid = applyAction(g0, "opp", a, setup.book, { stage: "pay", keep, combos: setup.combos ?? [] });
     setGame(paid.game);
     if (!paid.ok) return paid.game;
     setSpotlight({ card, target, targetIid });
@@ -494,7 +494,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       answer = { kind: "resolve", g: await pause(SPOTLIGHT, paid.game) };
     }
     setSpotlight(null);
-    let g = answer.kind === "counter" ? answer.g : applyAction(answer.g, "opp", a, setup.book, { stage: "resolve" }).game;
+    let g = answer.kind === "counter" ? answer.g : applyAction(answer.g, "opp", a, setup.book, { stage: "resolve", combos: setup.combos ?? [] }).game;
     setGame(g);
     g = await waitChoice(g);
     return pause(BEAT, g);
@@ -583,7 +583,7 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
       if (a.kind === "cast") g = await aiCast(g, a, "ai", keep);
       else if (a.kind === "combo") g = await aiCombo(g, a);
       else {
-        const r = applyAction(g, "opp", a, setup.book, { keep });
+        const r = applyAction(g, "opp", a, setup.book, { keep, combos: setup.combos ?? [] });
         g = r.game;
         setGame(g);
         if (r.ok) g = await pause(BEAT, await waitChoice(g));

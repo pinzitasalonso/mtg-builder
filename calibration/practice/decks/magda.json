@@ -1,0 +1,2218 @@
+{
+ "name": "Magda, Brazen Outlaw",
+ "source": {
+  "kind": "mtgtop8",
+  "detail": "Jace [njcedh] won Tournament (22/11/26) · MTGTop8",
+  "fetchedAt": "2026-11-26"
+ },
+ "commander": "Magda, Brazen Outlaw",
+ "cards": [
+  {
+   "name": "Axgard Cavalry",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf Berserker"
+  },
+  {
+   "name": "Barkform Harvester",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Shapeshifter"
+  },
+  {
+   "name": "Battered Golem",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Golem"
+  },
+  {
+   "name": "Bloodfire Dwarf",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf"
+  },
+  {
+   "name": "Dwarven Armorer",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf"
+  },
+  {
+   "name": "Dwarven Grunt",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf"
+  },
+  {
+   "name": "Dwarven Mauler",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf Warrior"
+  },
+  {
+   "name": "Dwarven Scorcher",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf"
+  },
+  {
+   "name": "Enslaved Dwarf",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf"
+  },
+  {
+   "name": "Fíli and Kíli, Joyous",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Dwarf Bard"
+  },
+  {
+   "name": "Glóin, Dwarf Emissary",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Dwarf Advisor"
+  },
+  {
+   "name": "Gogo, Mysterious Mime",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Wizard"
+  },
+  {
+   "name": "Knuckles the Echidna",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Echidna Warrior"
+  },
+  {
+   "name": "Liberated Dwarf",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf"
+  },
+  {
+   "name": "Lwaxana Troi, Charming Guest",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Betazoid Advisor"
+  },
+  {
+   "name": "Magda, the Hoardmaster",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Dwarf Berserker"
+  },
+  {
+   "name": "Metallic Mimic",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Shapeshifter"
+  },
+  {
+   "name": "Pinnacle Monk // Mystic Peak",
+   "quantity": 1,
+   "typeLine": "Creature — Djinn Monk // Land"
+  },
+  {
+   "name": "Plundering Barbarian",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf Barbarian"
+  },
+  {
+   "name": "Professional Face-Breaker",
+   "quantity": 1,
+   "typeLine": "Creature — Human Warrior"
+  },
+  {
+   "name": "Roaming Throne",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Golem"
+  },
+  {
+   "name": "Simian Spirit Guide",
+   "quantity": 1,
+   "typeLine": "Creature — Ape Spirit"
+  },
+  {
+   "name": "Spark Mage",
+   "quantity": 1,
+   "typeLine": "Creature — Dwarf Wizard"
+  },
+  {
+   "name": "Tempestra, Dame of Games",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Elemental Illusion"
+  },
+  {
+   "name": "Three Tree Mascot",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Shapeshifter"
+  },
+  {
+   "name": "Treasonous Ogre",
+   "quantity": 1,
+   "typeLine": "Creature — Ogre Shaman"
+  },
+  {
+   "name": "Twinshot Sniper",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Goblin Archer"
+  },
+  {
+   "name": "Universal Automaton",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Shapeshifter"
+  },
+  {
+   "name": "Xorn",
+   "quantity": 1,
+   "typeLine": "Creature — Elemental"
+  },
+  {
+   "name": "Burner Rocket",
+   "quantity": 1,
+   "typeLine": "Artifact — Vehicle"
+  },
+  {
+   "name": "Captain America's Motorcycle",
+   "quantity": 1,
+   "typeLine": "Artifact — Vehicle"
+  },
+  {
+   "name": "Chrome Mox",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Clock of Omens",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Clown Car",
+   "quantity": 1,
+   "typeLine": "Artifact — Vehicle"
+  },
+  {
+   "name": "Cursed Mirror",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Damping Sphere",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Deep Space 9",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact — Spacecraft"
+  },
+  {
+   "name": "Elixir of Immortality",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Firdoch Core",
+   "quantity": 1,
+   "typeLine": "Kindred Artifact — Shapeshifter"
+  },
+  {
+   "name": "Flywheel Racer",
+   "quantity": 1,
+   "typeLine": "Artifact — Vehicle"
+  },
+  {
+   "name": "Grafdigger's Cage",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Grim Monolith",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "High-Speed Hoverbike",
+   "quantity": 1,
+   "typeLine": "Artifact — Vehicle"
+  },
+  {
+   "name": "Legion Extruder",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Lifecraft Engine",
+   "quantity": 1,
+   "typeLine": "Artifact — Vehicle"
+  },
+  {
+   "name": "Liquimetal Torque",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Lotus Petal",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mana Vault",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Maskwood Nexus",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mox Opal",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact"
+  },
+  {
+   "name": "Peter Parker's Camera",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Portal to Phyrexia",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Relic of Legends",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Sculpting Steel",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Sol Ring",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Springleaf Drum",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Stalactite Dagger",
+   "quantity": 1,
+   "typeLine": "Artifact — Equipment"
+  },
+  {
+   "name": "Torpor Orb",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Unlicensed Hearse",
+   "quantity": 1,
+   "typeLine": "Artifact — Vehicle"
+  },
+  {
+   "name": "Abrade",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Bottle-Cap Blast",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Deflecting Swat",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Lightning Bolt",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Pyrokinesis",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Redirect Lightning",
+   "quantity": 1,
+   "typeLine": "Instant — Lesson"
+  },
+  {
+   "name": "Return the Favor",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Siege Smash",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Sudden Shock",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Untimely Malfunction",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Rite of Flame",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Shatterskull Smashing // Shatterskull, the Hammer Pass",
+   "quantity": 1,
+   "typeLine": "Sorcery // Land"
+  },
+  {
+   "name": "Sundering Eruption // Volcanic Fissure",
+   "quantity": 1,
+   "typeLine": "Sorcery // Land"
+  },
+  {
+   "name": "Urza's Saga",
+   "quantity": 1,
+   "typeLine": "Enchantment Land — Urza's Saga"
+  },
+  {
+   "name": "Tezzeret, Cruel Captain",
+   "quantity": 1,
+   "typeLine": "Legendary Planeswalker — Tezzeret"
+  },
+  {
+   "name": "Ancient Tomb",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Arid Mesa",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Barbarian Ring",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "City of Traitors",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Crystal Vein",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Dragon-Cursed Halls",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Gemstone Caverns",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Great Furnace",
+   "quantity": 1,
+   "typeLine": "Artifact Land"
+  },
+  {
+   "name": "Hall of Echoes",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Hammerheim",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Holdout Settlement",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Kavaron, Memorial World",
+   "quantity": 1,
+   "typeLine": "Land — Planet"
+  },
+  {
+   "name": "Mishra's Workshop",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Mountain",
+   "quantity": 2,
+   "typeLine": "Basic Land — Mountain"
+  },
+  {
+   "name": "Mutavault",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Shinka, the Bloodsoaked Keep",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Snow-Covered Mountain",
+   "quantity": 1,
+   "typeLine": "Basic Snow Land — Mountain"
+  },
+  {
+   "name": "Survivors' Encampment",
+   "quantity": 1,
+   "typeLine": "Land — Desert"
+  },
+  {
+   "name": "Talon Gates of Madara",
+   "quantity": 1,
+   "typeLine": "Land — Gate"
+  },
+  {
+   "name": "Treasure Vault",
+   "quantity": 1,
+   "typeLine": "Artifact Land"
+  },
+  {
+   "name": "Urza's Cave",
+   "quantity": 1,
+   "typeLine": "Land — Urza's Cave"
+  },
+  {
+   "name": "Volatile Fault",
+   "quantity": 1,
+   "typeLine": "Land — Cave"
+  },
+  {
+   "name": "Wooded Foothills",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Magda, Brazen Outlaw",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Dwarf Berserker"
+  }
+ ],
+ "book": {
+  "axgard cavalry": {
+   "name": "Axgard Cavalry",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf Berserker",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "{T}: Target creature gains haste until end of turn. (It can attack and {T} this turn.)",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "barkform harvester": {
+   "name": "Barkform Harvester",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Shapeshifter",
+   "manaCost": "{3}",
+   "manaValue": 3,
+   "oracleText": "Changeling (This card is every creature type.)\nReach\n{2}: Put target card from your graveyard on the bottom of your library.",
+   "power": 2,
+   "toughness": 3,
+   "keywords": [
+    "Reach",
+    "Changeling"
+   ],
+   "producedMana": []
+  },
+  "battered golem": {
+   "name": "Battered Golem",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Golem",
+   "manaCost": "{3}",
+   "manaValue": 3,
+   "oracleText": "This creature doesn't untap during your untap step.\nWhenever an artifact enters, you may untap this creature.",
+   "power": 3,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "bloodfire dwarf": {
+   "name": "Bloodfire Dwarf",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "{R}, Sacrifice this creature: It deals 1 damage to each creature without flying.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "dwarven armorer": {
+   "name": "Dwarven Armorer",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "{R}, {T}, Discard a card: Put a +0/+1 counter or a +1/+0 counter on target creature.",
+   "power": 0,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "dwarven grunt": {
+   "name": "Dwarven Grunt",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Mountainwalk (This creature can't be blocked as long as defending player controls a Mountain.)",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Landwalk",
+    "Mountainwalk"
+   ],
+   "producedMana": []
+  },
+  "dwarven mauler": {
+   "name": "Dwarven Mauler",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf Warrior",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Equip abilities you activate that target this creature cost {2} less to activate.",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "dwarven scorcher": {
+   "name": "Dwarven Scorcher",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Sacrifice this creature: This creature deals 1 damage to target creature unless that creature's controller has this creature deal 2 damage to them.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "enslaved dwarf": {
+   "name": "Enslaved Dwarf",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "{R}, Sacrifice this creature: Target black creature gets +1/+0 and gains first strike until end of turn.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "fíli and kíli, joyous": {
+   "name": "Fíli and Kíli, Joyous",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Dwarf Bard",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Haste\n{T}: Add {R}{R}. Spend this mana only to cast Dwarf, Equipment, and Saga spells.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [
+    "Haste"
+   ],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "glóin, dwarf emissary": {
+   "name": "Glóin, Dwarf Emissary",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Dwarf Advisor",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Whenever you cast a historic spell, create a Treasure token. This ability triggers only once each turn. (Artifacts, legendaries, and Sagas are historic.)\n{T}, Sacrifice a Treasure: Goad target creature. (Until your next turn, that creature attacks each combat if able and attacks a player other than you if able.)",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [
+    "Goad",
+    "Treasure"
+   ],
+   "producedMana": []
+  },
+  "gogo, mysterious mime": {
+   "name": "Gogo, Mysterious Mime",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Wizard",
+   "manaCost": "{3}{R}",
+   "manaValue": 4,
+   "oracleText": "At the beginning of combat on your turn, you may have Gogo become a copy of another target creature you control until end of turn, except its name is Gogo, Mysterious Mime. If you do, Gogo and that creature each get +2/+0 and gain haste until end of turn and attack this turn if able.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "knuckles the echidna": {
+   "name": "Knuckles the Echidna",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Echidna Warrior",
+   "manaCost": "{2}{R}{R}",
+   "manaValue": 4,
+   "oracleText": "Double strike, trample, haste\nWhenever one or more creatures you control deal combat damage to a player, create a Treasure token.\nTreasure Hunter — At the beginning of your upkeep, if you control thirty or more artifacts, you win the game.",
+   "power": 2,
+   "toughness": 4,
+   "keywords": [
+    "Treasure Hunter",
+    "Treasure",
+    "Haste",
+    "Trample",
+    "Double strike"
+   ],
+   "producedMana": []
+  },
+  "liberated dwarf": {
+   "name": "Liberated Dwarf",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "{R}, Sacrifice this creature: Target green creature gets +1/+0 and gains first strike until end of turn.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "lwaxana troi, charming guest": {
+   "name": "Lwaxana Troi, Charming Guest",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Betazoid Advisor",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "You may choose not to untap Lwaxana Troi during your untap step.\n{2}, {T}: Choose another target creature you control. For as long as Lwaxana Troi remains tapped, if a triggered ability of that creature triggers, that ability triggers an additional time.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "magda, the hoardmaster": {
+   "name": "Magda, the Hoardmaster",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Dwarf Berserker",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Whenever you commit a crime, create a tapped Treasure token. This ability triggers only once each turn. (Targeting opponents, anything they control, and/or cards in their graveyards is a crime.)\nSacrifice three Treasures: Create a 4/4 red Scorpion Dragon creature token with flying and haste. Activate only as a sorcery.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": []
+  },
+  "metallic mimic": {
+   "name": "Metallic Mimic",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Shapeshifter",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "As this creature enters, choose a creature type.\nThis creature is the chosen type in addition to its other types.\nEach other creature you control of the chosen type enters with an additional +1/+1 counter on it.",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "pinnacle monk // mystic peak": {
+   "name": "Pinnacle Monk // Mystic Peak",
+   "imageUri": "",
+   "typeLine": "Creature — Djinn Monk // Land",
+   "manaCost": "{3}{R}{R}",
+   "manaValue": 5,
+   "oracleText": "Prowess (Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.)\nWhen this creature enters, return target instant or sorcery card from your graveyard to your hand.\n//\nAs this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {R}.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Prowess"
+   ],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "plundering barbarian": {
+   "name": "Plundering Barbarian",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf Barbarian",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "When this creature enters, choose one —\n• Smash the Chest — Destroy target artifact.\n• Pry It Open — Create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "professional face-breaker": {
+   "name": "Professional Face-Breaker",
+   "imageUri": "",
+   "typeLine": "Creature — Human Warrior",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Menace\nWhenever one or more creatures you control deal combat damage to a player, create a Treasure token.\nSacrifice a Treasure: Exile the top card of your library. You may play that card this turn.",
+   "power": 2,
+   "toughness": 3,
+   "keywords": [
+    "Treasure",
+    "Menace"
+   ],
+   "producedMana": []
+  },
+  "roaming throne": {
+   "name": "Roaming Throne",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Golem",
+   "manaCost": "{4}",
+   "manaValue": 4,
+   "oracleText": "Ward {2}\nAs this creature enters, choose a creature type.\nThis creature is the chosen type in addition to its other types.\nIf a triggered ability of another creature you control of the chosen type triggers, it triggers an additional time.",
+   "power": 4,
+   "toughness": 4,
+   "keywords": [
+    "Ward"
+   ],
+   "producedMana": []
+  },
+  "simian spirit guide": {
+   "name": "Simian Spirit Guide",
+   "imageUri": "",
+   "typeLine": "Creature — Ape Spirit",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Exile this card from your hand: Add {R}.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "spark mage": {
+   "name": "Spark Mage",
+   "imageUri": "",
+   "typeLine": "Creature — Dwarf Wizard",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Whenever this creature deals combat damage to a player, you may have this creature deal 1 damage to target creature that player controls.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "tempestra, dame of games": {
+   "name": "Tempestra, Dame of Games",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Elemental Illusion",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "{2}{R}, {T}, Sacrifice an artifact: Create a token that's a copy of another target creature you control, except it isn't legendary. It gains haste. Sacrifice it at the beginning of the next end step.",
+   "power": 1,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": []
+  },
+  "three tree mascot": {
+   "name": "Three Tree Mascot",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Shapeshifter",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "Changeling (This card is every creature type.)\n{1}: Add one mana of any color. Activate only once each turn.",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [
+    "Changeling"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "treasonous ogre": {
+   "name": "Treasonous Ogre",
+   "imageUri": "",
+   "typeLine": "Creature — Ogre Shaman",
+   "manaCost": "{3}{R}",
+   "manaValue": 4,
+   "oracleText": "Dethrone (Whenever this creature attacks the player with the most life or tied for most life, put a +1/+1 counter on it.)\nPay 3 life: Add {R}.",
+   "power": 2,
+   "toughness": 3,
+   "keywords": [
+    "Dethrone"
+   ],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "twinshot sniper": {
+   "name": "Twinshot Sniper",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Goblin Archer",
+   "manaCost": "{3}{R}",
+   "manaValue": 4,
+   "oracleText": "Reach\nWhen this creature enters, it deals 2 damage to any target.\nChannel — {1}{R}, Discard this card: It deals 2 damage to any target.",
+   "power": 2,
+   "toughness": 3,
+   "keywords": [
+    "Reach",
+    "Channel"
+   ],
+   "producedMana": []
+  },
+  "universal automaton": {
+   "name": "Universal Automaton",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Shapeshifter",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "Changeling (This card is every creature type.)",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Changeling"
+   ],
+   "producedMana": []
+  },
+  "xorn": {
+   "name": "Xorn",
+   "imageUri": "",
+   "typeLine": "Creature — Elemental",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "If you would create one or more Treasure tokens, instead create those tokens plus an additional Treasure token.",
+   "power": 3,
+   "toughness": 2,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": []
+  },
+  "burner rocket": {
+   "name": "Burner Rocket",
+   "imageUri": "",
+   "typeLine": "Artifact — Vehicle",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Flash\nWhen this Vehicle enters, target creature you control gets +2/+0 and gains trample until end of turn.\nCrew 1 (Tap any number of creatures you control with total power 1 or more: This Vehicle becomes an artifact creature until end of turn.)",
+   "power": 3,
+   "toughness": 1,
+   "keywords": [
+    "Crew",
+    "Flash"
+   ],
+   "producedMana": []
+  },
+  "captain america's motorcycle": {
+   "name": "Captain America's Motorcycle",
+   "imageUri": "",
+   "typeLine": "Artifact — Vehicle",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Flash\nWhen this Vehicle enters, target creature or Vehicle gets +2/+0 until end of turn.\nCrew 1 (Tap any number of creatures you control with total power 1 or more: This Vehicle becomes an artifact creature until end of turn.)",
+   "power": 3,
+   "toughness": 1,
+   "keywords": [
+    "Crew",
+    "Flash"
+   ],
+   "producedMana": []
+  },
+  "chrome mox": {
+   "name": "Chrome Mox",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Imprint — When this artifact enters, you may exile a nonartifact, nonland card from your hand.\n{T}: Add one mana of any of the exiled card's colors.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Imprint"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "clock of omens": {
+   "name": "Clock of Omens",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{4}",
+   "manaValue": 4,
+   "oracleText": "Tap two untapped artifacts you control: Untap target artifact.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "clown car": {
+   "name": "Clown Car",
+   "imageUri": "",
+   "typeLine": "Artifact — Vehicle",
+   "manaCost": "{X}",
+   "manaValue": 0,
+   "oracleText": "When this Vehicle enters, roll X six-sided dice. For each odd result, create a 1/1 white Clown Robot artifact creature token. For each even result, put a +1/+1 counter on this Vehicle.\nCrew 2",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Crew"
+   ],
+   "producedMana": []
+  },
+  "cursed mirror": {
+   "name": "Cursed Mirror",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "{T}: Add {R}.\nAs this artifact enters, you may have it become a copy of any creature on the battlefield until end of turn, except it has haste.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "damping sphere": {
+   "name": "Damping Sphere",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "If a land is tapped for two or more mana, it produces {C} instead of any other type and amount.\nEach spell a player casts costs {1} more to cast for each other spell that player has cast this turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "deep space 9": {
+   "name": "Deep Space 9",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact — Spacecraft",
+   "manaCost": "{9}",
+   "manaValue": 9,
+   "oracleText": "When Deep Space 9 enters and at the beginning of your upkeep, exile the top four cards of your library. Put all permanent cards exiled this way onto the battlefield.\nStation (Tap another creature you control: Put charge counters equal to its power on this Spacecraft. Station only as a sorcery.)\n9+ | Creatures you control get +3/+3.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Station"
+   ],
+   "producedMana": []
+  },
+  "elixir of immortality": {
+   "name": "Elixir of Immortality",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "{2}, {T}: You gain 5 life. Shuffle this artifact and your graveyard into their owner's library.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "firdoch core": {
+   "name": "Firdoch Core",
+   "imageUri": "",
+   "typeLine": "Kindred Artifact — Shapeshifter",
+   "manaCost": "{3}",
+   "manaValue": 3,
+   "oracleText": "Changeling (This card is every creature type.)\n{T}: Add one mana of any color.\n{4}: This artifact becomes a 4/4 artifact creature until end of turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Changeling"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "flywheel racer": {
+   "name": "Flywheel Racer",
+   "imageUri": "",
+   "typeLine": "Artifact — Vehicle",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "Vigilance\n{T}: Add one mana of any color. Activate only if this permanent is a creature.\nCrew 1 (Tap any number of creatures you control with total power 1 or more: This Vehicle becomes an artifact creature until end of turn.)",
+   "power": 3,
+   "toughness": 2,
+   "keywords": [
+    "Vigilance",
+    "Crew"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "grafdigger's cage": {
+   "name": "Grafdigger's Cage",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "Creature cards in graveyards and libraries can't enter the battlefield.\nPlayers can't cast spells from graveyards or libraries.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "grim monolith": {
+   "name": "Grim Monolith",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "This artifact doesn't untap during your untap step.\n{T}: Add {C}{C}{C}.\n{4}: Untap this artifact.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "high-speed hoverbike": {
+   "name": "High-Speed Hoverbike",
+   "imageUri": "",
+   "typeLine": "Artifact — Vehicle",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "Flash\nFlying\nWhen this Vehicle enters, tap up to one target creature.\nCrew 1 (Tap any number of creatures you control with total power 1 or more: This Vehicle becomes an artifact creature until end of turn.)",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Flying",
+    "Crew",
+    "Flash"
+   ],
+   "producedMana": []
+  },
+  "legion extruder": {
+   "name": "Legion Extruder",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "When this artifact enters, it deals 2 damage to any target.\n{2}, {T}, Sacrifice another artifact: Create a 3/3 colorless Golem artifact creature token.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "lifecraft engine": {
+   "name": "Lifecraft Engine",
+   "imageUri": "",
+   "typeLine": "Artifact — Vehicle",
+   "manaCost": "{3}",
+   "manaValue": 3,
+   "oracleText": "As this Vehicle enters, choose a creature type.\nVehicle creatures you control are the chosen creature type in addition to their other types.\nEach creature you control of the chosen type other than this Vehicle gets +1/+1.\nCrew 3",
+   "power": 4,
+   "toughness": 4,
+   "keywords": [
+    "Crew"
+   ],
+   "producedMana": []
+  },
+  "liquimetal torque": {
+   "name": "Liquimetal Torque",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add {C}.\n{T}: Target nonland permanent becomes an artifact in addition to its other types until end of turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "lotus petal": {
+   "name": "Lotus Petal",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "{T}, Sacrifice this artifact: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mana vault": {
+   "name": "Mana Vault",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "This artifact doesn't untap during your untap step.\nAt the beginning of your upkeep, you may pay {4}. If you do, untap this artifact.\nAt the beginning of your draw step, if this artifact is tapped, it deals 1 damage to you.\n{T}: Add {C}{C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "maskwood nexus": {
+   "name": "Maskwood Nexus",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{4}",
+   "manaValue": 4,
+   "oracleText": "Creatures you control are every creature type. The same is true for creature spells you control and creature cards you own that aren't on the battlefield.\n{3}, {T}: Create a 2/2 blue Shapeshifter creature token with changeling. (It is every creature type.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "mox opal": {
+   "name": "Mox Opal",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Metalcraft — {T}: Add one mana of any color. Activate only if you control three or more artifacts.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Metalcraft"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "peter parker's camera": {
+   "name": "Peter Parker's Camera",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "This artifact enters with three film counters on it.\n{2}, {T}, Remove a film counter from this artifact: Copy target activated or triggered ability you control. You may choose new targets for the copy.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "portal to phyrexia": {
+   "name": "Portal to Phyrexia",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{9}",
+   "manaValue": 9,
+   "oracleText": "When this artifact enters, each opponent sacrifices three creatures of their choice.\nAt the beginning of your upkeep, put target creature card from a graveyard onto the battlefield under your control. It's a Phyrexian in addition to its other types.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "relic of legends": {
+   "name": "Relic of Legends",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{3}",
+   "manaValue": 3,
+   "oracleText": "{T}: Add one mana of any color.\nTap an untapped legendary creature you control: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "sculpting steel": {
+   "name": "Sculpting Steel",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{3}",
+   "manaValue": 3,
+   "oracleText": "You may have this artifact enter as a copy of any artifact on the battlefield.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "sol ring": {
+   "name": "Sol Ring",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "{T}: Add {C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "springleaf drum": {
+   "name": "Springleaf Drum",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "{T}, Tap an untapped creature you control: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "stalactite dagger": {
+   "name": "Stalactite Dagger",
+   "imageUri": "",
+   "typeLine": "Artifact — Equipment",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "When this Equipment enters, create a 1/1 colorless Shapeshifter creature token with changeling. (It's every creature type.)\nEquipped creature gets +1/+1 and is all creature types.\nEquip {2} ({2}: Attach to target creature you control. Equip only as a sorcery.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Equip"
+   ],
+   "producedMana": []
+  },
+  "torpor orb": {
+   "name": "Torpor Orb",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "Creatures entering don't cause abilities to trigger.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "unlicensed hearse": {
+   "name": "Unlicensed Hearse",
+   "imageUri": "",
+   "typeLine": "Artifact — Vehicle",
+   "manaCost": "{2}",
+   "manaValue": 2,
+   "oracleText": "{T}: Exile up to two target cards from a single graveyard.\nUnlicensed Hearse's power and toughness are each equal to the number of cards exiled with it.\nCrew 2",
+   "power": 0,
+   "toughness": 0,
+   "keywords": [
+    "Crew"
+   ],
+   "producedMana": []
+  },
+  "abrade": {
+   "name": "Abrade",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Choose one —\n• Abrade deals 3 damage to target creature.\n• Destroy target artifact.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "bottle-cap blast": {
+   "name": "Bottle-Cap Blast",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{4}{R}",
+   "manaValue": 5,
+   "oracleText": "Improvise (Your artifacts can help cast this spell. Each artifact you tap after you're done activating mana abilities pays for {1}.)\nBottle-Cap Blast deals 5 damage to any target. If excess damage was dealt to a permanent this way, create that many tapped Treasure tokens. (They're artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Improvise",
+    "Treasure"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "deflecting swat": {
+   "name": "Deflecting Swat",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nYou may choose new targets for target spell or ability.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "lightning bolt": {
+   "name": "Lightning Bolt",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Lightning Bolt deals 3 damage to any target.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "pyrokinesis": {
+   "name": "Pyrokinesis",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{4}{R}{R}",
+   "manaValue": 6,
+   "oracleText": "You may exile a red card from your hand rather than pay this spell's mana cost.\nPyrokinesis deals 4 damage divided as you choose among any number of target creatures.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "redirect lightning": {
+   "name": "Redirect Lightning",
+   "imageUri": "",
+   "typeLine": "Instant — Lesson",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "As an additional cost to cast this spell, pay 5 life or pay {2}.\nChange the target of target spell or ability with a single target.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "return the favor": {
+   "name": "Return the Favor",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{R}{R}",
+   "manaValue": 2,
+   "oracleText": "Spree (Choose one or more additional costs.)\n+ {1} — Copy target instant spell, sorcery spell, activated ability, or triggered ability. You may choose new targets for the copy.\n+ {1} — Change the target of target spell or ability with a single target.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Spree"
+   ],
+   "producedMana": []
+  },
+  "siege smash": {
+   "name": "Siege Smash",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nChoose one —\n• Destroy target artifact.\n• Target creature gets +3/+2 and gains trample until end of turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Split second"
+   ],
+   "producedMana": []
+  },
+  "sudden shock": {
+   "name": "Sudden Shock",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nSudden Shock deals 2 damage to any target.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Split second"
+   ],
+   "producedMana": []
+  },
+  "untimely malfunction": {
+   "name": "Untimely Malfunction",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Choose one —\n• Destroy target artifact.\n• Change the target of target spell or ability with a single target.\n• One or two target creatures can't block this turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "rite of flame": {
+   "name": "Rite of Flame",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{R}",
+   "manaValue": 1,
+   "oracleText": "Add {R}{R}, then add {R} for each card named Rite of Flame in each graveyard.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "shatterskull smashing // shatterskull, the hammer pass": {
+   "name": "Shatterskull Smashing // Shatterskull, the Hammer Pass",
+   "imageUri": "",
+   "typeLine": "Sorcery // Land",
+   "manaCost": "{X}{R}{R}",
+   "manaValue": 2,
+   "oracleText": "Shatterskull Smashing deals X damage divided as you choose among up to two target creatures and/or planeswalkers. If X is 6 or more, Shatterskull Smashing deals twice X damage divided as you choose among them instead.\n//\nAs this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {R}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "sundering eruption // volcanic fissure": {
+   "name": "Sundering Eruption // Volcanic Fissure",
+   "imageUri": "",
+   "typeLine": "Sorcery // Land",
+   "manaCost": "{2}{R}",
+   "manaValue": 3,
+   "oracleText": "Destroy target land. Its controller may search their library for a basic land card, put it onto the battlefield tapped, then shuffle. Creatures without flying can't block this turn.\n//\nAs this land enters, you may pay 3 life. If you don't, it enters tapped.\n{T}: Add {R}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "urza's saga": {
+   "name": "Urza's Saga",
+   "imageUri": "",
+   "typeLine": "Enchantment Land — Urza's Saga",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\nI — This Saga gains \"{T}: Add {C}.\"\nII — This Saga gains \"{2}, {T}: Create a 0/0 colorless Construct artifact creature token with 'This token gets +1/+1 for each artifact you control.'\"\nIII — Search your library for an artifact card with mana cost {0} or {1}, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "tezzeret, cruel captain": {
+   "name": "Tezzeret, Cruel Captain",
+   "imageUri": "",
+   "typeLine": "Legendary Planeswalker — Tezzeret",
+   "manaCost": "{3}",
+   "manaValue": 3,
+   "oracleText": "Whenever an artifact you control enters, put a loyalty counter on Tezzeret.\n0: Untap target artifact or creature. If it's an artifact creature, put a +1/+1 counter on it.\n−3: Search your library for an artifact card with mana value 1 or less, reveal it, put it into your hand, then shuffle.\n−7: You get an emblem with \"At the beginning of combat on your turn, put three +1/+1 counters on target artifact you control. If it's not a creature, it becomes a 0/0 Robot artifact creature.\"",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [],
+   "loyalty": 4
+  },
+  "ancient tomb": {
+   "name": "Ancient Tomb",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}{C}. This land deals 2 damage to you.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "arid mesa": {
+   "name": "Arid Mesa",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Mountain or Plains card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "barbarian ring": {
+   "name": "Barbarian Ring",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {R}. This land deals 1 damage to you.\nThreshold — {R}, {T}, Sacrifice this land: It deals 2 damage to any target. Activate only if there are seven or more cards in your graveyard.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Threshold"
+   ],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "city of traitors": {
+   "name": "City of Traitors",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "When you play another land, sacrifice this land.\n{T}: Add {C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "crystal vein": {
+   "name": "Crystal Vein",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{T}, Sacrifice this land: Add {C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "dragon-cursed halls": {
+   "name": "Dragon-Cursed Halls",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{1}, {T}: Until end of turn, target creature gains \"Whenever this creature deals combat damage to a player, create a Treasure token.\"",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "gemstone caverns": {
+   "name": "Gemstone Caverns",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "If this card is in your opening hand and you're not the starting player, you may begin the game with Gemstone Caverns on the battlefield with a luck counter on it. If you do, exile a card from your hand.\n{T}: Add {C}. If Gemstone Caverns has a luck counter on it, instead add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "great furnace": {
+   "name": "Great Furnace",
+   "imageUri": "",
+   "typeLine": "Artifact Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {R}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "hall of echoes": {
+   "name": "Hall of Echoes",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{5}: This land becomes a copy of target creature you control until end of turn. The \"legend rule\" doesn't apply to permanents you control this turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "hammerheim": {
+   "name": "Hammerheim",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {R}.\n{T}: Target creature loses all landwalk abilities until end of turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "holdout settlement": {
+   "name": "Holdout Settlement",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}. ({C} represents colorless mana.)\n{T}, Tap an untapped creature you control: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "kavaron, memorial world": {
+   "name": "Kavaron, Memorial World",
+   "imageUri": "",
+   "typeLine": "Land — Planet",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "This land enters tapped.\n{T}: Add {R}.\nStation (Tap another creature you control: Put charge counters equal to its power on this Planet. Station only as a sorcery.)\n12+ | {1}{R}, {T}, Sacrifice a land: Create a 2/2 colorless Robot artifact creature token, then creatures you control get +1/+0 and gain haste until end of turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Station"
+   ],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "mishra's workshop": {
+   "name": "Mishra's Workshop",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}{C}{C}. Spend this mana only to cast artifact spells.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "mountain": {
+   "name": "Mountain",
+   "imageUri": "",
+   "typeLine": "Basic Land — Mountain",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {R}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "mutavault": {
+   "name": "Mutavault",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{1}: This land becomes a 2/2 creature with all creature types until end of turn. It's still a land.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "shinka, the bloodsoaked keep": {
+   "name": "Shinka, the Bloodsoaked Keep",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {R}.\n{R}, {T}: Target legendary creature gains first strike until end of turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "snow-covered mountain": {
+   "name": "Snow-Covered Mountain",
+   "imageUri": "",
+   "typeLine": "Basic Snow Land — Mountain",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {R}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "R"
+   ]
+  },
+  "survivors' encampment": {
+   "name": "Survivors' Encampment",
+   "imageUri": "",
+   "typeLine": "Land — Desert",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{T}, Tap an untapped creature you control: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "talon gates of madara": {
+   "name": "Talon Gates of Madara",
+   "imageUri": "",
+   "typeLine": "Land — Gate",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "When this land enters, up to one target creature phases out.\n{T}: Add {C}.\n{1}, {T}: Add one mana of any color.\n{4}: Put this card from your hand onto the battlefield.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "treasure vault": {
+   "name": "Treasure Vault",
+   "imageUri": "",
+   "typeLine": "Artifact Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{X}{X}, {T}, Sacrifice this land: Create X Treasure tokens.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "urza's cave": {
+   "name": "Urza's Cave",
+   "imageUri": "",
+   "typeLine": "Land — Urza's Cave",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{3}, {T}, Sacrifice this land: Search your library for a land card, put it onto the battlefield tapped, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "volatile fault": {
+   "name": "Volatile Fault",
+   "imageUri": "",
+   "typeLine": "Land — Cave",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{1}, {T}, Sacrifice this land: Destroy target nonbasic land an opponent controls. That player may search their library for a basic land card, put it onto the battlefield, then shuffle. You create a Treasure token.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "wooded foothills": {
+   "name": "Wooded Foothills",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Mountain or Forest card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "magda, brazen outlaw": {
+   "name": "Magda, Brazen Outlaw",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Dwarf Berserker",
+   "manaCost": "{1}{R}",
+   "manaValue": 2,
+   "oracleText": "Other Dwarves you control get +1/+0.\nWhenever a Dwarf you control becomes tapped, create a Treasure token.\nSacrifice five Treasures: Search your library for an artifact or Dragon card, put that card onto the battlefield, then shuffle.",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": []
+  }
+ },
+ "combos": [
+  {
+   "id": "1486-1651-5334",
+   "pieces": [
+    {
+     "name": "Magda, Brazen Outlaw",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Clock of Omens",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Roaming Throne",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact LTB",
+    "Infinite artifact sacrifice triggers",
+    "Infinite artifact tokens",
+    "Put all artifact cards and a subset of creature cards from your library onto the battlefield",
+    "Infinite colored mana",
+    "Infinite Treasure tokens",
+    "Infinite mana artifacts you control can produce",
+    "Infinite untap of artifacts you control"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Clock of Omens by tapping Roaming Throne and another artifact, targeting Roaming Throne.\nMagda triggers twice due to Roaming Throne, creating two Treasure tokens.\nResolve the Clock of Omens ability, untapping Roaming Throne.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "643-1486-3459--67",
+   "pieces": [
+    {
+     "name": "Magda, Brazen Outlaw",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Battered Golem",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Maskwood Nexus",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact LTB",
+    "Infinite artifact sacrifice triggers",
+    "Infinite artifact tokens",
+    "Infinite colored mana",
+    "Infinite Treasure tokens",
+    "Put all artifact cards and a subset of creature cards from your library onto the battlefield"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate the Vehicle's crew ability by tapping Battered Golem.\nMagda triggers, creating a Treasure token.\nWhen the Treasure enters the battlefield, Battered Golem triggers, untapping Battered Golem.\nResolve the crew ability.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "1486-3459-7223--67",
+   "pieces": [
+    {
+     "name": "Magda, Brazen Outlaw",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Battered Golem",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Stalactite Dagger",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact LTB",
+    "Infinite artifact sacrifice triggers",
+    "Infinite artifact tokens",
+    "Infinite Treasure tokens",
+    "Infinite colored mana",
+    "Put all artifact cards and a subset of creature cards from your library onto the battlefield"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate the Vehicle's crew ability by tapping Battered Golem.\nMagda triggers, creating a Treasure token.\nWhen the Treasure enters the battlefield, Battered Golem triggers, untapping Battered Golem.\nResolve the crew ability.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "486-1486-1651",
+   "pieces": [
+    {
+     "name": "Magda, Brazen Outlaw",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Clock of Omens",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Liquimetal Torque",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact tokens",
+    "Infinite tapped Treasure tokens",
+    "Put all artifact cards and a subset of creature cards from your library onto the battlefield"
+   ],
+   "manaNeeded": "",
+   "steps": "Cause Magda to become an artifact using Liquimetal Torque.\nActivate Clock of Omens by tapping Magda and another artifact, targeting Magda.\nMagda triggers, creating a Treasure token.\nResolve the Clock of Omens ability, untapping Magda.\nRepeat from step 2.",
+   "prerequisites": ""
+  },
+  {
+   "id": "930-1486-1651",
+   "pieces": [
+    {
+     "name": "Magda, Brazen Outlaw",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Clock of Omens",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Universal Automaton",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact tokens",
+    "Infinite tapped Treasure tokens",
+    "Put all artifact cards and a subset of creature cards from your library onto the battlefield"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Clock of Omens by tapping Universal Automaton and another artifact, targeting Universal Automaton.\nMagda triggers, creating a Treasure token.\nResolve the Clock of Omens ability, untapping Universal Automaton.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "345-1486-1651",
+   "pieces": [
+    {
+     "name": "Magda, Brazen Outlaw",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Clock of Omens",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Metallic Mimic",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact tokens",
+    "Infinite tapped Treasure tokens",
+    "Put all artifact cards and a subset of creature cards from your library onto the battlefield"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Clock of Omens by tapping Metallic Mimic and another artifact, targeting Metallic Mimic.\nMagda triggers, creating a Treasure token.\nResolve the Clock of Omens ability, untapping Metallic Mimic.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "1486-1651-5795",
+   "pieces": [
+    {
+     "name": "Magda, Brazen Outlaw",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Clock of Omens",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Barkform Harvester",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact tokens",
+    "Infinite tapped Treasure tokens",
+    "Put all artifact cards and a subset of creature cards from your library onto the battlefield"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Clock of Omens by tapping Barkform Harvester and another artifact, targeting Barkform Harvester.\nMagda triggers, creating a Treasure token.\nResolve the Clock of Omens ability, untapping Barkform Harvester.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "1486-1651-6837",
+   "pieces": [
+    {
+     "name": "Magda, Brazen Outlaw",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Clock of Omens",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Three Tree Mascot",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact tokens",
+    "Infinite tapped Treasure tokens",
+    "Put all artifact cards and a subset of creature cards from your library onto the battlefield"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Clock of Omens by tapping Three Tree Mascot and another artifact, targeting Three Tree Mascot.\nMagda triggers, creating a Treasure token.\nResolve the Clock of Omens ability, untapping Three Tree Mascot.\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "1486-1651-7298",
+   "pieces": [
+    {
+     "name": "Magda, Brazen Outlaw",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Clock of Omens",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Firdoch Core",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite artifact ETB",
+    "Infinite artifact tokens",
+    "Infinite tapped Treasure tokens",
+    "Put all artifact cards and a subset of creature cards from your library onto the battlefield"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Clock of Omens by tapping Firdoch Core and another artifact, targeting Firdoch Core.\nMagda triggers, creating a Treasure token.\nResolve the Clock of Omens ability, untapping Firdoch Core.\nRepeat.",
+   "prerequisites": ""
+  }
+ ]
+}

@@ -1,0 +1,2372 @@
+{
+ "name": "Thrasios, Triton Hero + Tymna the Weaver",
+ "source": {
+  "kind": "mtgtop8",
+  "detail": "Renato Faria won Official P9Q - Side Quest - cEDH PT (22/11/26) · MTGTop8",
+  "fetchedAt": "2026-11-26"
+ },
+ "commander": "Thrasios, Triton Hero + Tymna the Weaver",
+ "cards": [
+  {
+   "name": "Badgermole Cub",
+   "quantity": 1,
+   "typeLine": "Creature — Badger Mole"
+  },
+  {
+   "name": "Biomancer's Familiar",
+   "quantity": 1,
+   "typeLine": "Creature — Mutant"
+  },
+  {
+   "name": "Birds of Paradise",
+   "quantity": 1,
+   "typeLine": "Creature — Bird"
+  },
+  {
+   "name": "Bloom Tender",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Captain America, Living Legend",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Soldier Hero"
+  },
+  {
+   "name": "Cloud of Faeries",
+   "quantity": 1,
+   "typeLine": "Creature — Faerie"
+  },
+  {
+   "name": "Deathrite Shaman",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Shaman"
+  },
+  {
+   "name": "Delighted Halfling",
+   "quantity": 1,
+   "typeLine": "Creature — Halfling Citizen"
+  },
+  {
+   "name": "Derevi, Empyrial Tactician",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Bird Wizard"
+  },
+  {
+   "name": "Devoted Druid",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Elvish Spirit Guide",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Spirit"
+  },
+  {
+   "name": "Emiel the Blessed",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Unicorn"
+  },
+  {
+   "name": "Endurance",
+   "quantity": 1,
+   "typeLine": "Creature — Elemental Incarnation"
+  },
+  {
+   "name": "Enduring Vitality",
+   "quantity": 1,
+   "typeLine": "Enchantment Creature — Elk Glimmer"
+  },
+  {
+   "name": "Esper Sentinel",
+   "quantity": 1,
+   "typeLine": "Artifact Creature — Human Soldier"
+  },
+  {
+   "name": "Eternal Witness",
+   "quantity": 1,
+   "typeLine": "Creature — Human Shaman"
+  },
+  {
+   "name": "Faerie Mastermind",
+   "quantity": 1,
+   "typeLine": "Creature — Faerie Rogue"
+  },
+  {
+   "name": "Formidable Speaker",
+   "quantity": 1,
+   "typeLine": "Creature — Elf Druid"
+  },
+  {
+   "name": "Gilded Drake",
+   "quantity": 1,
+   "typeLine": "Creature — Drake"
+  },
+  {
+   "name": "Hazel's Brewmaster",
+   "quantity": 1,
+   "typeLine": "Creature — Squirrel Warlock"
+  },
+  {
+   "name": "Kinnan, Bonder Prodigy",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Druid"
+  },
+  {
+   "name": "Lotho, Corrupt Shirriff",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Halfling Rogue"
+  },
+  {
+   "name": "Magus of the Candelabra",
+   "quantity": 1,
+   "typeLine": "Creature — Human Wizard"
+  },
+  {
+   "name": "Noble Hierarch",
+   "quantity": 1,
+   "typeLine": "Creature — Human Druid"
+  },
+  {
+   "name": "Oboro Breezecaller",
+   "quantity": 1,
+   "typeLine": "Creature — Moonfolk Wizard"
+  },
+  {
+   "name": "Orcish Bowmasters",
+   "quantity": 1,
+   "typeLine": "Creature — Orc Archer"
+  },
+  {
+   "name": "Ranger-Captain of Eos",
+   "quantity": 1,
+   "typeLine": "Creature — Human Soldier Ranger"
+  },
+  {
+   "name": "Shang-Chi, Master of Kung Fu",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Warrior Hero"
+  },
+  {
+   "name": "Sowing Mycospawn",
+   "quantity": 1,
+   "typeLine": "Creature — Eldrazi Fungus"
+  },
+  {
+   "name": "Spellseeker",
+   "quantity": 1,
+   "typeLine": "Creature — Human Wizard"
+  },
+  {
+   "name": "The Queen of Dale",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Noble"
+  },
+  {
+   "name": "Voice of Victory",
+   "quantity": 1,
+   "typeLine": "Creature — Human Bard"
+  },
+  {
+   "name": "Candelabra of Tawnos",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Chrome Mox",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Lotus Petal",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mana Vault",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Mox Amber",
+   "quantity": 1,
+   "typeLine": "Legendary Artifact"
+  },
+  {
+   "name": "Mox Diamond",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Sol Ring",
+   "quantity": 1,
+   "typeLine": "Artifact"
+  },
+  {
+   "name": "Borne Upon a Wind",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Chord of Calling",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Crop Rotation",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Deadly Rollick",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Fierce Guardianship",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Flusterstorm",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Force of Negation",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Force of Vigor",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Force of Will",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Legolas's Quick Reflexes",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Mental Misstep",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Mindbreak Trap",
+   "quantity": 1,
+   "typeLine": "Instant — Trap"
+  },
+  {
+   "name": "Pact of Negation",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Silence",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Snap",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Summoner's Pact",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Swan Song",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Vampiric Tutor",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Veil of Summer",
+   "quantity": 1,
+   "typeLine": "Instant"
+  },
+  {
+   "name": "Culling Ritual",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Demonic Tutor",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Eldritch Evolution",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Finale of Devastation",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Green Sun's Zenith",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Imperial Seal",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Nature's Rhythm",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Neoform",
+   "quantity": 1,
+   "typeLine": "Sorcery"
+  },
+  {
+   "name": "Cryptolith Rite",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Mystic Remora",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Rhystic Study",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Smothering Tithe",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Swift Reconfiguration",
+   "quantity": 1,
+   "typeLine": "Enchantment — Aura"
+  },
+  {
+   "name": "Training Grounds",
+   "quantity": 1,
+   "typeLine": "Enchantment"
+  },
+  {
+   "name": "Ancient Tomb",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Bayou",
+   "quantity": 1,
+   "typeLine": "Land — Swamp Forest"
+  },
+  {
+   "name": "Boseiju, Who Endures",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "City of Brass",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Command Tower",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Deserted Temple",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Dryad Arbor",
+   "quantity": 1,
+   "typeLine": "Land Creature — Forest Dryad"
+  },
+  {
+   "name": "Emergence Zone",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Flooded Strand",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Gaea's Cradle",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Gemstone Caverns",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Mana Confluence",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Marsh Flats",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Misty Rainforest",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Otawara, Soaring City",
+   "quantity": 1,
+   "typeLine": "Legendary Land"
+  },
+  {
+   "name": "Polluted Delta",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Savannah",
+   "quantity": 1,
+   "typeLine": "Land — Forest Plains"
+  },
+  {
+   "name": "Scrubland",
+   "quantity": 1,
+   "typeLine": "Land — Plains Swamp"
+  },
+  {
+   "name": "Shifting Woodland",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Talon Gates of Madara",
+   "quantity": 1,
+   "typeLine": "Land — Gate"
+  },
+  {
+   "name": "Tarnished Citadel",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Tropical Island",
+   "quantity": 1,
+   "typeLine": "Land — Forest Island"
+  },
+  {
+   "name": "Tundra",
+   "quantity": 1,
+   "typeLine": "Land — Plains Island"
+  },
+  {
+   "name": "Underground Sea",
+   "quantity": 1,
+   "typeLine": "Land — Island Swamp"
+  },
+  {
+   "name": "Verdant Catacombs",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Windswept Heath",
+   "quantity": 1,
+   "typeLine": "Land"
+  },
+  {
+   "name": "Thrasios, Triton Hero",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Merfolk Wizard"
+  },
+  {
+   "name": "Tymna the Weaver",
+   "quantity": 1,
+   "typeLine": "Legendary Creature — Human Cleric"
+  }
+ ],
+ "book": {
+  "badgermole cub": {
+   "name": "Badgermole Cub",
+   "imageUri": "",
+   "typeLine": "Creature — Badger Mole",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "When this creature enters, earthbend 1. (Target land you control becomes a 0/0 creature with haste that's still a land. Put a +1/+1 counter on it. When it dies or is exiled, return it to the battlefield tapped.)\nWhenever you tap a creature for mana, add an additional {G}.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Earthbend"
+   ],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "biomancer's familiar": {
+   "name": "Biomancer's Familiar",
+   "imageUri": "",
+   "typeLine": "Creature — Mutant",
+   "manaCost": "{G}{U}",
+   "manaValue": 2,
+   "oracleText": "Activated abilities of creatures you control cost {2} less to activate. This effect can't reduce the mana in that cost to less than one mana.\n{T}: The next time target creature adapts this turn, it adapts as though it had no +1/+1 counters on it.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "birds of paradise": {
+   "name": "Birds of Paradise",
+   "imageUri": "",
+   "typeLine": "Creature — Bird",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "Flying\n{T}: Add one mana of any color.",
+   "power": 0,
+   "toughness": 1,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "bloom tender": {
+   "name": "Bloom Tender",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "Vivid — {T}: For each color among permanents you control, add one mana of that color.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Vivid"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "captain america, living legend": {
+   "name": "Captain America, Living Legend",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Soldier Hero",
+   "manaCost": "{1}{W}{U}",
+   "manaValue": 3,
+   "oracleText": "Vigilance\nWhenever a creature you control becomes tapped during your turn, if it's the first time that creature has become tapped this turn, untap it.",
+   "power": 3,
+   "toughness": 4,
+   "keywords": [
+    "Vigilance"
+   ],
+   "producedMana": []
+  },
+  "cloud of faeries": {
+   "name": "Cloud of Faeries",
+   "imageUri": "",
+   "typeLine": "Creature — Faerie",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "Flying\nWhen this creature enters, untap up to two lands.\nCycling {2} ({2}, Discard this card: Draw a card.)",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Flying",
+    "Cycling"
+   ],
+   "producedMana": []
+  },
+  "deathrite shaman": {
+   "name": "Deathrite Shaman",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Shaman",
+   "manaCost": "{B/G}",
+   "manaValue": 1,
+   "oracleText": "{T}: Exile target land card from a graveyard. Add one mana of any color. (Activate only as an instant.)\n{B}, {T}: Exile target instant or sorcery card from a graveyard. Each opponent loses 2 life.\n{G}, {T}: Exile target creature card from a graveyard. You gain 2 life.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "delighted halfling": {
+   "name": "Delighted Halfling",
+   "imageUri": "",
+   "typeLine": "Creature — Halfling Citizen",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "{T}: Add {C}.\n{T}: Add one mana of any color. Spend this mana only to cast a legendary spell, and that spell can't be countered.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "derevi, empyrial tactician": {
+   "name": "Derevi, Empyrial Tactician",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Bird Wizard",
+   "manaCost": "{G}{W}{U}",
+   "manaValue": 3,
+   "oracleText": "Flying\nWhen Derevi enters and whenever a creature you control deals combat damage to a player, you may tap or untap target permanent.\n{1}{G}{W}{U}: Put Derevi onto the battlefield from the command zone.",
+   "power": 2,
+   "toughness": 3,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": []
+  },
+  "devoted druid": {
+   "name": "Devoted Druid",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "{T}: Add {G}.\nPut a -1/-1 counter on this creature: Untap this creature.",
+   "power": 0,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "elvish spirit guide": {
+   "name": "Elvish Spirit Guide",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Spirit",
+   "manaCost": "{2}{G}",
+   "manaValue": 3,
+   "oracleText": "Exile this card from your hand: Add {G}.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "emiel the blessed": {
+   "name": "Emiel the Blessed",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Unicorn",
+   "manaCost": "{2}{W}{W}",
+   "manaValue": 4,
+   "oracleText": "{3}: Exile another target creature you control, then return it to the battlefield under its owner's control.\nWhenever another creature you control enters, you may pay {G/W}. If you do, put a +1/+1 counter on it. If it's a Unicorn, put two +1/+1 counters on it instead. ({G/W} can be paid with either {G} or {W}.)",
+   "power": 4,
+   "toughness": 4,
+   "keywords": [],
+   "producedMana": []
+  },
+  "endurance": {
+   "name": "Endurance",
+   "imageUri": "",
+   "typeLine": "Creature — Elemental Incarnation",
+   "manaCost": "{1}{G}{G}",
+   "manaValue": 3,
+   "oracleText": "Flash\nReach\nWhen this creature enters, up to one target player puts all the cards from their graveyard on the bottom of their library in a random order.\nEvoke—Exile a green card from your hand.",
+   "power": 3,
+   "toughness": 4,
+   "keywords": [
+    "Reach",
+    "Evoke",
+    "Flash"
+   ],
+   "producedMana": []
+  },
+  "enduring vitality": {
+   "name": "Enduring Vitality",
+   "imageUri": "",
+   "typeLine": "Enchantment Creature — Elk Glimmer",
+   "manaCost": "{1}{G}{G}",
+   "manaValue": 3,
+   "oracleText": "Vigilance\nCreatures you control have \"{T}: Add one mana of any color.\"\nWhen Enduring Vitality dies, if it was a creature, return it to the battlefield under its owner's control. It's an enchantment. (It's not a creature.)",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [
+    "Vigilance"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "esper sentinel": {
+   "name": "Esper Sentinel",
+   "imageUri": "",
+   "typeLine": "Artifact Creature — Human Soldier",
+   "manaCost": "{W}",
+   "manaValue": 1,
+   "oracleText": "Whenever an opponent casts their first noncreature spell each turn, draw a card unless that player pays {X}, where X is this creature's power.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "eternal witness": {
+   "name": "Eternal Witness",
+   "imageUri": "",
+   "typeLine": "Creature — Human Shaman",
+   "manaCost": "{1}{G}{G}",
+   "manaValue": 3,
+   "oracleText": "When this creature enters, you may return target card from your graveyard to your hand.",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "faerie mastermind": {
+   "name": "Faerie Mastermind",
+   "imageUri": "",
+   "typeLine": "Creature — Faerie Rogue",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "Flash\nFlying\nWhenever an opponent draws their second card each turn, you draw a card.\n{3}{U}: Each player draws a card.",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [
+    "Flying",
+    "Flash"
+   ],
+   "producedMana": []
+  },
+  "formidable speaker": {
+   "name": "Formidable Speaker",
+   "imageUri": "",
+   "typeLine": "Creature — Elf Druid",
+   "manaCost": "{2}{G}",
+   "manaValue": 3,
+   "oracleText": "When this creature enters, you may discard a card. If you do, search your library for a creature card, reveal it, put it into your hand, then shuffle.\n{1}, {T}: Untap another target permanent.",
+   "power": 2,
+   "toughness": 4,
+   "keywords": [],
+   "producedMana": []
+  },
+  "gilded drake": {
+   "name": "Gilded Drake",
+   "imageUri": "",
+   "typeLine": "Creature — Drake",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "Flying\nWhen this creature enters, exchange control of this creature and up to one target creature an opponent controls. If you don't or can't make an exchange, sacrifice this creature. This ability still resolves if its target becomes illegal.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": []
+  },
+  "hazel's brewmaster": {
+   "name": "Hazel's Brewmaster",
+   "imageUri": "",
+   "typeLine": "Creature — Squirrel Warlock",
+   "manaCost": "{3}{B}",
+   "manaValue": 4,
+   "oracleText": "Menace\nWhenever this creature enters or attacks, exile up to one target card from a graveyard and create a Food token.\nFoods you control have all activated abilities of all creature cards exiled with this creature.",
+   "power": 3,
+   "toughness": 4,
+   "keywords": [
+    "Food",
+    "Menace"
+   ],
+   "producedMana": []
+  },
+  "kinnan, bonder prodigy": {
+   "name": "Kinnan, Bonder Prodigy",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Druid",
+   "manaCost": "{G}{U}",
+   "manaValue": 2,
+   "oracleText": "Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.\n{5}{G}{U}: Look at the top five cards of your library. You may put a non-Human creature card from among them onto the battlefield. Put the rest on the bottom of your library in a random order.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "lotho, corrupt shirriff": {
+   "name": "Lotho, Corrupt Shirriff",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Halfling Rogue",
+   "manaCost": "{W}{B}",
+   "manaValue": 2,
+   "oracleText": "Whenever a player casts their second spell each turn, you lose 1 life and create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "magus of the candelabra": {
+   "name": "Magus of the Candelabra",
+   "imageUri": "",
+   "typeLine": "Creature — Human Wizard",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "{X}, {T}: Untap X target lands.",
+   "power": 1,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": []
+  },
+  "noble hierarch": {
+   "name": "Noble Hierarch",
+   "imageUri": "",
+   "typeLine": "Creature — Human Druid",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "Exalted (Whenever a creature you control attacks alone, that creature gets +1/+1 until end of turn.)\n{T}: Add {G}, {W}, or {U}.",
+   "power": 0,
+   "toughness": 1,
+   "keywords": [
+    "Exalted"
+   ],
+   "producedMana": [
+    "G",
+    "U",
+    "W"
+   ]
+  },
+  "oboro breezecaller": {
+   "name": "Oboro Breezecaller",
+   "imageUri": "",
+   "typeLine": "Creature — Moonfolk Wizard",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "Flying\n{2}, Return a land you control to its owner's hand: Untap target land.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Flying"
+   ],
+   "producedMana": []
+  },
+  "orcish bowmasters": {
+   "name": "Orcish Bowmasters",
+   "imageUri": "",
+   "typeLine": "Creature — Orc Archer",
+   "manaCost": "{1}{B}",
+   "manaValue": 2,
+   "oracleText": "Flash\nWhen this creature enters and whenever an opponent draws a card except the first one they draw in each of their draw steps, this creature deals 1 damage to any target. Then amass Orcs 1.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [
+    "Amass",
+    "Flash"
+   ],
+   "producedMana": []
+  },
+  "ranger-captain of eos": {
+   "name": "Ranger-Captain of Eos",
+   "imageUri": "",
+   "typeLine": "Creature — Human Soldier Ranger",
+   "manaCost": "{1}{W}{W}",
+   "manaValue": 3,
+   "oracleText": "When this creature enters, you may search your library for a creature card with mana value 1 or less, reveal it, put it into your hand, then shuffle.\nSacrifice this creature: Your opponents can't cast noncreature spells this turn.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [],
+   "producedMana": []
+  },
+  "shang-chi, master of kung fu": {
+   "name": "Shang-Chi, Master of Kung Fu",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Warrior Hero",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "You may activate abilities of creatures you control as though those creatures had haste.\n{T}: Add two mana of any one color. Spend this mana only to activate abilities of creature sources.",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "sowing mycospawn": {
+   "name": "Sowing Mycospawn",
+   "imageUri": "",
+   "typeLine": "Creature — Eldrazi Fungus",
+   "manaCost": "{3}{G}",
+   "manaValue": 4,
+   "oracleText": "Devoid (This card has no color.)\nKicker {1}{C} (You may pay an additional {1}{C} as you cast this spell.)\nWhen you cast this spell, search your library for a land card, put it onto the battlefield, then shuffle.\nWhen you cast this spell, if it was kicked, exile target land.",
+   "power": 3,
+   "toughness": 3,
+   "keywords": [
+    "Devoid",
+    "Kicker"
+   ],
+   "producedMana": []
+  },
+  "spellseeker": {
+   "name": "Spellseeker",
+   "imageUri": "",
+   "typeLine": "Creature — Human Wizard",
+   "manaCost": "{2}{U}",
+   "manaValue": 3,
+   "oracleText": "When this creature enters, you may search your library for an instant or sorcery card with mana value 2 or less, reveal it, put it into your hand, then shuffle.",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": []
+  },
+  "the queen of dale": {
+   "name": "The Queen of Dale",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Noble",
+   "manaCost": "{1}{W}",
+   "manaValue": 2,
+   "oracleText": "Whenever an opponent casts their first noncreature spell each turn, you recruit. (Draw a card, then discard a card. If you discarded a nonland card, create a 1/1 white Human Soldier creature token.)",
+   "power": 2,
+   "toughness": 1,
+   "keywords": [
+    "Recruit"
+   ],
+   "producedMana": []
+  },
+  "voice of victory": {
+   "name": "Voice of Victory",
+   "imageUri": "",
+   "typeLine": "Creature — Human Bard",
+   "manaCost": "{1}{W}",
+   "manaValue": 2,
+   "oracleText": "Mobilize 2 (Whenever this creature attacks, create two tapped and attacking 1/1 red Warrior creature tokens. Sacrifice them at the beginning of the next end step.)\nYour opponents can't cast spells during your turn.",
+   "power": 1,
+   "toughness": 3,
+   "keywords": [
+    "Mobilize"
+   ],
+   "producedMana": []
+  },
+  "candelabra of tawnos": {
+   "name": "Candelabra of Tawnos",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "{X}, {T}: Untap X target lands.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "chrome mox": {
+   "name": "Chrome Mox",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Imprint — When this artifact enters, you may exile a nonartifact, nonland card from your hand.\n{T}: Add one mana of any of the exiled card's colors.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Imprint"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "lotus petal": {
+   "name": "Lotus Petal",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "{T}, Sacrifice this artifact: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mana vault": {
+   "name": "Mana Vault",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "This artifact doesn't untap during your untap step.\nAt the beginning of your upkeep, you may pay {4}. If you do, untap this artifact.\nAt the beginning of your draw step, if this artifact is tapped, it deals 1 damage to you.\n{T}: Add {C}{C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "mox amber": {
+   "name": "Mox Amber",
+   "imageUri": "",
+   "typeLine": "Legendary Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "{T}: Add one mana of any color among legendary creatures and planeswalkers you control.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mox diamond": {
+   "name": "Mox Diamond",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "If this artifact would enter, you may discard a land card instead. If you do, put this artifact onto the battlefield. If you don't, put it into its owner's graveyard.\n{T}: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "sol ring": {
+   "name": "Sol Ring",
+   "imageUri": "",
+   "typeLine": "Artifact",
+   "manaCost": "{1}",
+   "manaValue": 1,
+   "oracleText": "{T}: Add {C}{C}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "borne upon a wind": {
+   "name": "Borne Upon a Wind",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "You may cast spells this turn as though they had flash.\nDraw a card.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "chord of calling": {
+   "name": "Chord of Calling",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{X}{G}{G}{G}",
+   "manaValue": 3,
+   "oracleText": "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nSearch your library for a creature card with mana value X or less, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Convoke"
+   ],
+   "producedMana": []
+  },
+  "crop rotation": {
+   "name": "Crop Rotation",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "As an additional cost to cast this spell, sacrifice a land.\nSearch your library for a land card, put that card onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "deadly rollick": {
+   "name": "Deadly Rollick",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{3}{B}",
+   "manaValue": 4,
+   "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nExile target creature.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "fierce guardianship": {
+   "name": "Fierce Guardianship",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{2}{U}",
+   "manaValue": 3,
+   "oracleText": "If you control a commander, you may cast this spell without paying its mana cost.\nCounter target noncreature spell.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "flusterstorm": {
+   "name": "Flusterstorm",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Counter target instant or sorcery spell unless its controller pays {1}.\nStorm (When you cast this spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Storm"
+   ],
+   "producedMana": []
+  },
+  "force of negation": {
+   "name": "Force of Negation",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{U}{U}",
+   "manaValue": 3,
+   "oracleText": "If it's not your turn, you may exile a blue card from your hand rather than pay this spell's mana cost.\nCounter target noncreature spell. If that spell is countered this way, exile it instead of putting it into its owner's graveyard.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "force of vigor": {
+   "name": "Force of Vigor",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{2}{G}{G}",
+   "manaValue": 4,
+   "oracleText": "If it's not your turn, you may exile a green card from your hand rather than pay this spell's mana cost.\nDestroy up to two target artifacts and/or enchantments.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "force of will": {
+   "name": "Force of Will",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{3}{U}{U}",
+   "manaValue": 5,
+   "oracleText": "You may pay 1 life and exile a blue card from your hand rather than pay this spell's mana cost.\nCounter target spell.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "legolas's quick reflexes": {
+   "name": "Legolas's Quick Reflexes",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "Split second (As long as this spell is on the stack, players can't cast spells or activate abilities that aren't mana abilities.)\nUntap target creature. Until end of turn, it gains reach, hexproof, and \"Whenever this creature becomes tapped, it deals damage equal to its power to up to one target creature.\"",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Split second"
+   ],
+   "producedMana": []
+  },
+  "mental misstep": {
+   "name": "Mental Misstep",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U/P}",
+   "manaValue": 1,
+   "oracleText": "({U/P} can be paid with either {U} or 2 life.)\nCounter target spell with mana value 1.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "mindbreak trap": {
+   "name": "Mindbreak Trap",
+   "imageUri": "",
+   "typeLine": "Instant — Trap",
+   "manaCost": "{2}{U}{U}",
+   "manaValue": 4,
+   "oracleText": "If an opponent cast three or more spells this turn, you may pay {0} rather than pay this spell's mana cost.\nExile any number of target spells.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "pact of negation": {
+   "name": "Pact of Negation",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Counter target spell.\nAt the beginning of your next upkeep, pay {3}{U}{U}. If you don't, you lose the game.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "silence": {
+   "name": "Silence",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{W}",
+   "manaValue": 1,
+   "oracleText": "Your opponents can't cast spells this turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "snap": {
+   "name": "Snap",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{1}{U}",
+   "manaValue": 2,
+   "oracleText": "Return target creature to its owner's hand. Untap up to two lands.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "summoner's pact": {
+   "name": "Summoner's Pact",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{0}",
+   "manaValue": 0,
+   "oracleText": "Search your library for a green creature card, reveal it, put it into your hand, then shuffle.\nAt the beginning of your next upkeep, pay {2}{G}{G}. If you don't, you lose the game.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "swan song": {
+   "name": "Swan Song",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Counter target enchantment, instant, or sorcery spell. Its controller creates a 2/2 blue Bird creature token with flying.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "vampiric tutor": {
+   "name": "Vampiric Tutor",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "Search your library for a card, then shuffle and put that card on top. You lose 2 life.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "veil of summer": {
+   "name": "Veil of Summer",
+   "imageUri": "",
+   "typeLine": "Instant",
+   "manaCost": "{G}",
+   "manaValue": 1,
+   "oracleText": "Draw a card if an opponent has cast a blue or black spell this turn. Spells you control can't be countered this turn. You and permanents you control gain hexproof from blue and from black until end of turn. (You and they can't be the targets of blue or black spells or abilities your opponents control.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "culling ritual": {
+   "name": "Culling Ritual",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{2}{B}{G}",
+   "manaValue": 4,
+   "oracleText": "Destroy each nonland permanent with mana value 2 or less. Add {B} or {G} for each permanent destroyed this way.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G"
+   ]
+  },
+  "demonic tutor": {
+   "name": "Demonic Tutor",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{B}",
+   "manaValue": 2,
+   "oracleText": "Search your library for a card, put that card into your hand, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "eldritch evolution": {
+   "name": "Eldritch Evolution",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{1}{G}{G}",
+   "manaValue": 3,
+   "oracleText": "As an additional cost to cast this spell, sacrifice a creature.\nSearch your library for a creature card with mana value X or less, where X is 2 plus the sacrificed creature's mana value. Put that card onto the battlefield, then shuffle. Exile Eldritch Evolution.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "finale of devastation": {
+   "name": "Finale of Devastation",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{X}{G}{G}",
+   "manaValue": 2,
+   "oracleText": "Search your library and/or graveyard for a creature card with mana value X or less and put it onto the battlefield. If you search your library this way, shuffle. If X is 10 or more, creatures you control get +X/+X and gain haste until end of turn.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "green sun's zenith": {
+   "name": "Green Sun's Zenith",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{X}{G}",
+   "manaValue": 1,
+   "oracleText": "Search your library for a green creature card with mana value X or less, put it onto the battlefield, then shuffle. Shuffle Green Sun's Zenith into its owner's library.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "imperial seal": {
+   "name": "Imperial Seal",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{B}",
+   "manaValue": 1,
+   "oracleText": "Search your library for a card, then shuffle and put that card on top. You lose 2 life.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "nature's rhythm": {
+   "name": "Nature's Rhythm",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{X}{G}{G}",
+   "manaValue": 2,
+   "oracleText": "Search your library for a creature card with mana value X or less, put it onto the battlefield, then shuffle.\nHarmonize {X}{G}{G}{G}{G} (You may cast this card from your graveyard for its harmonize cost. You may tap a creature you control to reduce that cost by an amount of generic mana equal to its power. Then exile this spell.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Harmonize"
+   ],
+   "producedMana": []
+  },
+  "neoform": {
+   "name": "Neoform",
+   "imageUri": "",
+   "typeLine": "Sorcery",
+   "manaCost": "{G}{U}",
+   "manaValue": 2,
+   "oracleText": "As an additional cost to cast this spell, sacrifice a creature.\nSearch your library for a creature card with mana value equal to 1 plus the sacrificed creature's mana value, put that card onto the battlefield with an additional +1/+1 counter on it, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "cryptolith rite": {
+   "name": "Cryptolith Rite",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{1}{G}",
+   "manaValue": 2,
+   "oracleText": "Creatures you control have \"{T}: Add one mana of any color.\"",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mystic remora": {
+   "name": "Mystic Remora",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Cumulative upkeep {1} (At the beginning of your upkeep, put an age counter on this permanent, then sacrifice it unless you pay its upkeep cost for each age counter on it.)\nWhenever an opponent casts a noncreature spell, you may draw a card unless that player pays {4}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Cumulative upkeep"
+   ],
+   "producedMana": []
+  },
+  "rhystic study": {
+   "name": "Rhystic Study",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{2}{U}",
+   "manaValue": 3,
+   "oracleText": "Whenever an opponent casts a spell, you may draw a card unless that player pays {1}.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "smothering tithe": {
+   "name": "Smothering Tithe",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{3}{W}",
+   "manaValue": 4,
+   "oracleText": "Whenever an opponent draws a card, that player may pay {2}. If the player doesn't, you create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Treasure"
+   ],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "swift reconfiguration": {
+   "name": "Swift Reconfiguration",
+   "imageUri": "",
+   "typeLine": "Enchantment — Aura",
+   "manaCost": "{W}",
+   "manaValue": 1,
+   "oracleText": "Flash\nEnchant creature or Vehicle\nEnchanted permanent is a Vehicle artifact with crew 5 and it loses all other card types. (It's not a creature unless it's crewed.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Enchant",
+    "Flash"
+   ],
+   "producedMana": []
+  },
+  "training grounds": {
+   "name": "Training Grounds",
+   "imageUri": "",
+   "typeLine": "Enchantment",
+   "manaCost": "{U}",
+   "manaValue": 1,
+   "oracleText": "Activated abilities of creatures you control cost {2} less to activate. This effect can't reduce the mana in that cost to less than one mana.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "ancient tomb": {
+   "name": "Ancient Tomb",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}{C}. This land deals 2 damage to you.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "bayou": {
+   "name": "Bayou",
+   "imageUri": "",
+   "typeLine": "Land — Swamp Forest",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {B} or {G}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G"
+   ]
+  },
+  "boseiju, who endures": {
+   "name": "Boseiju, Who Endures",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {G}.\nChannel — {1}{G}, Discard this card: Destroy target artifact, enchantment, or nonbasic land an opponent controls. That player may search their library for a land card with a basic land type, put it onto the battlefield, then shuffle. This ability costs {1} less to activate for each legendary creature you control.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Channel"
+   ],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "city of brass": {
+   "name": "City of Brass",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "Whenever this land becomes tapped, it deals 1 damage to you.\n{T}: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "command tower": {
+   "name": "Command Tower",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "deserted temple": {
+   "name": "Deserted Temple",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{1}, {T}: Untap target land.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "dryad arbor": {
+   "name": "Dryad Arbor",
+   "imageUri": "",
+   "typeLine": "Land Creature — Forest Dryad",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "(This land isn't a spell, it's affected by summoning sickness, and it has \"{T}: Add {G}.\")",
+   "power": 1,
+   "toughness": 1,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "emergence zone": {
+   "name": "Emergence Zone",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{1}, {T}, Sacrifice this land: You may cast spells this turn as though they had flash.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "C"
+   ]
+  },
+  "flooded strand": {
+   "name": "Flooded Strand",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Plains or Island card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "gaea's cradle": {
+   "name": "Gaea's Cradle",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {G} for each creature you control.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "gemstone caverns": {
+   "name": "Gemstone Caverns",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "If this card is in your opening hand and you're not the starting player, you may begin the game with Gemstone Caverns on the battlefield with a luck counter on it. If you do, exile a card from your hand.\n{T}: Add {C}. If Gemstone Caverns has a luck counter on it, instead add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "mana confluence": {
+   "name": "Mana Confluence",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life: Add one mana of any color.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "marsh flats": {
+   "name": "Marsh Flats",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Plains or Swamp card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "misty rainforest": {
+   "name": "Misty Rainforest",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Forest or Island card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "otawara, soaring city": {
+   "name": "Otawara, Soaring City",
+   "imageUri": "",
+   "typeLine": "Legendary Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {U}.\nChannel — {3}{U}, Discard this card: Return target artifact, creature, enchantment, or planeswalker to its owner's hand. This ability costs {1} less to activate for each legendary creature you control.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Channel"
+   ],
+   "producedMana": [
+    "U"
+   ]
+  },
+  "polluted delta": {
+   "name": "Polluted Delta",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for an Island or Swamp card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "savannah": {
+   "name": "Savannah",
+   "imageUri": "",
+   "typeLine": "Land — Forest Plains",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {G} or {W}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G",
+    "W"
+   ]
+  },
+  "scrubland": {
+   "name": "Scrubland",
+   "imageUri": "",
+   "typeLine": "Land — Plains Swamp",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {W} or {B}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "W"
+   ]
+  },
+  "shifting woodland": {
+   "name": "Shifting Woodland",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "This land enters tapped unless you control a Forest.\n{T}: Add {G}.\nDelirium — {2}{G}{G}: This land becomes a copy of target permanent card in your graveyard until end of turn. Activate only if there are four or more card types among cards in your graveyard.",
+   "power": null,
+   "toughness": null,
+   "keywords": [
+    "Delirium"
+   ],
+   "producedMana": [
+    "G"
+   ]
+  },
+  "talon gates of madara": {
+   "name": "Talon Gates of Madara",
+   "imageUri": "",
+   "typeLine": "Land — Gate",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "When this land enters, up to one target creature phases out.\n{T}: Add {C}.\n{1}, {T}: Add one mana of any color.\n{4}: Put this card from your hand onto the battlefield.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "tarnished citadel": {
+   "name": "Tarnished Citadel",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}: Add {C}.\n{T}: Add one mana of any color. This land deals 3 damage to you.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "C",
+    "G",
+    "R",
+    "U",
+    "W"
+   ]
+  },
+  "tropical island": {
+   "name": "Tropical Island",
+   "imageUri": "",
+   "typeLine": "Land — Forest Island",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {G} or {U}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "G",
+    "U"
+   ]
+  },
+  "tundra": {
+   "name": "Tundra",
+   "imageUri": "",
+   "typeLine": "Land — Plains Island",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {W} or {U}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "U",
+    "W"
+   ]
+  },
+  "underground sea": {
+   "name": "Underground Sea",
+   "imageUri": "",
+   "typeLine": "Land — Island Swamp",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "({T}: Add {U} or {B}.)",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": [
+    "B",
+    "U"
+   ]
+  },
+  "verdant catacombs": {
+   "name": "Verdant Catacombs",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Swamp or Forest card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "windswept heath": {
+   "name": "Windswept Heath",
+   "imageUri": "",
+   "typeLine": "Land",
+   "manaCost": "",
+   "manaValue": 0,
+   "oracleText": "{T}, Pay 1 life, Sacrifice this land: Search your library for a Forest or Plains card, put it onto the battlefield, then shuffle.",
+   "power": null,
+   "toughness": null,
+   "keywords": [],
+   "producedMana": []
+  },
+  "thrasios, triton hero": {
+   "name": "Thrasios, Triton Hero",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Merfolk Wizard",
+   "manaCost": "{G}{U}",
+   "manaValue": 2,
+   "oracleText": "{4}: Scry 1, then reveal the top card of your library. If it's a land card, put it onto the battlefield tapped. Otherwise, draw a card.\nPartner (You can have two commanders if both have partner.)",
+   "power": 1,
+   "toughness": 3,
+   "keywords": [
+    "Partner",
+    "Scry"
+   ],
+   "producedMana": []
+  },
+  "tymna the weaver": {
+   "name": "Tymna the Weaver",
+   "imageUri": "",
+   "typeLine": "Legendary Creature — Human Cleric",
+   "manaCost": "{1}{W}{B}",
+   "manaValue": 3,
+   "oracleText": "Lifelink\nAt the beginning of each of your postcombat main phases, you may pay X life, where X is the number of opponents that were dealt combat damage this turn. If you do, draw X cards.\nPartner (You can have two commanders if both have partner.)",
+   "power": 2,
+   "toughness": 2,
+   "keywords": [
+    "Lifelink",
+    "Partner"
+   ],
+   "producedMana": []
+  }
+ },
+ "combos": [
+  {
+   "id": "3807-4762",
+   "pieces": [
+    {
+     "name": "Devoted Druid",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Swift Reconfiguration",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite green mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Devoted Druid's first ability by tapping it, adding {G}.\nActivate Devoted Druid's second ability by putting a -1/-1 counter on it, untapping itself.\nRepeat.",
+   "prerequisites": "Swift Reconfiguration attached to Devoted Druid."
+  },
+  {
+   "id": "4762-5856",
+   "pieces": [
+    {
+     "name": "Hazel's Brewmaster",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Devoted Druid",
+     "zones": [
+      "E"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite green mana"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate a Food using Devoted Druid's first ability by tapping it, adding {G}.\nActivate a Food using Devoted Druid's second ability by putting a -1/-1 counter on it, untapping it.\nRepeat.",
+   "prerequisites": "You control at least one Food."
+  },
+  {
+   "id": "802-864-2404",
+   "pieces": [
+    {
+     "name": "Eternal Witness",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Snap",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Gaea's Cradle",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite creature ETB",
+    "Infinite creature LTB",
+    "Infinite green mana",
+    "Infinite magecraft triggers",
+    "Infinite mana lands you control can produce",
+    "Infinite storm count",
+    "Infinite untap of lands you control"
+   ],
+   "manaNeeded": "{1}{U}",
+   "steps": "Activate Gaea's Cradle by tapping it, adding at least {G}{G}{G}{G}.\nActivate another land by tapping it, adding at least {U}.\nCast Snap by paying {1}{U}, returning Eternal Witness from the battlefield to your hand and untapping Gaea's Cradle and the land tapped in step 2.\nCast Eternal Witness by paying {1}{G}{G}.\nWhen Eternal Witness enters, it triggers, returning Snap from your graveyard to your hand.\nRepeat.",
+   "prerequisites": "You control a mana-producing land that can tap to produce at least {U}. You control at least [#] creatures.\nYou control four or more creatures."
+  },
+  {
+   "id": "1174-2404-6678",
+   "pieces": [
+    {
+     "name": "Oboro Breezecaller",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Talon Gates of Madara",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Gaea's Cradle",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite mana lands you control can produce",
+    "Infinite green mana",
+    "Infinite landfall triggers",
+    "Phase out any number of creatures any number of times"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Gaea's Cradle by tapping it, adding at least {G}{G}{G}{G}{G}.\nActivate Talon Gates of Madara's first ability by tapping it, adding {C}.\nActivate Oboro Breezecaller by paying {2} and returning Talon Gates of Madara from the battlefield to your hand, untapping Gaea's Cradle.\nActivate Talon Gates of Madara's third ability by paying {4}, putting it from your hand onto the battlefield.\nWhen Talon Gates of Madara enters the battlefield, it triggers, phasing out up to one target creature.\nRepeat any number of times.",
+   "prerequisites": "You control at least five creatures."
+  },
+  {
+   "id": "2608-4499-5168",
+   "pieces": [
+    {
+     "name": "Derevi, Empyrial Tactician",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Emiel the Blessed",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Bloom Tender",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite untap of permanents you control",
+    "Infinite creature LTB",
+    "Infinite creature ETB",
+    "Infinite blinking",
+    "Infinite mana of colors among permanents you control",
+    "Infinite mana permanents you control can produce"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Bloom Tender by tapping it, adding at least {G}{W}{U}.\nActivate Emiel by paying {3}, blinking Derevi.\nWhen Derevi enters the battlefield, it triggers, untapping Bloom Tender\nRepeat.",
+   "prerequisites": ""
+  },
+  {
+   "id": "2404-2608-4499",
+   "pieces": [
+    {
+     "name": "Derevi, Empyrial Tactician",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Emiel the Blessed",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Gaea's Cradle",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite untap of permanents you control",
+    "Infinite blinking",
+    "Infinite creature ETB",
+    "Infinite creature LTB",
+    "Infinite green mana",
+    "Infinite mana permanents you control can produce"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Gaea's Cradle by tapping it, adding at least {G}{G}{G}.\nActivate Emiel by paying {3}, blinking Derevi.\nWhen Derevi enters the battlefield, it triggers, untapping Gaea's Cradle.\nRepeat.",
+   "prerequisites": "You control at least three creatures."
+  },
+  {
+   "id": "129-184-4682",
+   "pieces": [
+    {
+     "name": "Faerie Mastermind",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Smothering Tithe",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Kinnan, Bonder Prodigy",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite card draw for all players",
+    "Infinite draw triggers for all players",
+    "Near-infinite Treasure tokens",
+    "Near-infinite colored mana",
+    "Near-infinite colorless mana"
+   ],
+   "manaNeeded": "{3}{U}",
+   "steps": "Activate Faerie Mastermind by paying {3}{U}, causing each player to draw a card.\nSmothering Tithe triggers for each opponent you have, creating at least three Treasure tokens.\nActivate two Treasures by tapping and sacrificing them, adding {1}{U}.\nKinnan triggers twice, adding {1}{U}.\nRepeat.",
+   "prerequisites": "You have at least three opponents.\nOpponents are unable to pay for Smothering Tithe's trigger."
+  },
+  {
+   "id": "2404-4499-7008",
+   "pieces": [
+    {
+     "name": "Badgermole Cub",
+     "zones": [
+      "H"
+     ]
+    },
+    {
+     "name": "Emiel the Blessed",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Gaea's Cradle",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite creature ETB",
+    "Infinite creature LTB",
+    "Infinite blinking",
+    "Infinite green mana",
+    "Infinite landfall triggers",
+    "Infinite mana lands you control can produce"
+   ],
+   "manaNeeded": "{1}{G}",
+   "steps": "Cast Badgermole Cub by paying {1}{G}.\nWhen Badgermole Cub enters, it triggers, earthbending Gaea's Cradle.\nActivate Gaea's Cradle by tapping it, adding at least {G}{G}{G}{G}{G}\nBadgermole Cub triggers, adding {G}.\nActivate Emiel the Blessed by paying {3}, blinking Gaea's Cradle.\nActivate Emiel the Blessed by paying {3}, blinking Badgermole Cub.\nRepeat from step 2.",
+   "prerequisites": "You control at least one additional creature."
+  },
+  {
+   "id": "184-4682-4893",
+   "pieces": [
+    {
+     "name": "Faerie Mastermind",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Smothering Tithe",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Training Grounds",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite card draw for all players",
+    "Infinite draw triggers for all players",
+    "Near-infinite colored mana",
+    "Near-infinite colorless mana",
+    "Near-infinite Treasure tokens"
+   ],
+   "manaNeeded": "{1}{U}",
+   "steps": "Activate Faerie Mastermind by paying {1}{U}, causing each player to draw a card.\nSmothering Tithe triggers for each opponent you have, creating at least three Treasure tokens.\nActivate two Treasures by tapping and sacrificing them, adding {1}{U}.\nRepeat.",
+   "prerequisites": "You have at least three opponents.\nOpponents are unable to pay for Smothering Tithe's trigger."
+  },
+  {
+   "id": "184-1912-4682",
+   "pieces": [
+    {
+     "name": "Faerie Mastermind",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Smothering Tithe",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Biomancer's Familiar",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite card draw for all players",
+    "Infinite draw triggers for all players",
+    "Near-infinite colored mana",
+    "Near-infinite colorless mana",
+    "Near-infinite Treasure tokens"
+   ],
+   "manaNeeded": "{1}{U}",
+   "steps": "Activate Faerie Mastermind by paying {1}{U}, causing each player to draw a card.\nSmothering Tithe triggers for each opponent you have, creating at least three Treasure tokens.\nActivate two Treasures by tapping and sacrificing them, adding {1}{U}.\nRepeat.",
+   "prerequisites": "You have at least three opponents.\nOpponents are unable to pay for Smothering Tithe's trigger."
+  },
+  {
+   "id": "1741-4499-4893",
+   "pieces": [
+    {
+     "name": "Cloud of Faeries",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Emiel the Blessed",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Training Grounds",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite creature LTB",
+    "Infinite creature ETB",
+    "Infinite mana lands you control can produce",
+    "Infinite blinking",
+    "Infinite untap of lands you control"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate up to two lands by tapping them, adding at least {1}.\nActivate Emiel the Blessed by paying {1}, blinking Cloud of Faeries.\nWhen Cloud of Faeries enters the battlefield, it triggers, untapping up to two lands.\nRepeat.",
+   "prerequisites": "You control up to two lands that can tap to produce at least {1}."
+  },
+  {
+   "id": "1741-1912-4499",
+   "pieces": [
+    {
+     "name": "Cloud of Faeries",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Emiel the Blessed",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Biomancer's Familiar",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite creature LTB",
+    "Infinite creature ETB",
+    "Infinite mana lands you control can produce",
+    "Infinite blinking",
+    "Infinite untap of lands you control"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate up to two lands by tapping them, adding at least {1}.\nActivate Emiel the Blessed by paying {1}, blinking Cloud of Faeries.\nWhen Cloud of Faeries enters the battlefield, it triggers, untapping up to two lands.\nRepeat.",
+   "prerequisites": "You control up to two lands that can tap to produce at least {1}"
+  },
+  {
+   "id": "2364-2608-4499",
+   "pieces": [
+    {
+     "name": "Derevi, Empyrial Tactician",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Emiel the Blessed",
+     "zones": [
+      "B"
+     ]
+    },
+    {
+     "name": "Mana Vault",
+     "zones": [
+      "B"
+     ]
+    }
+   ],
+   "produces": [
+    "Infinite creature LTB",
+    "Infinite creature ETB"
+   ],
+   "manaNeeded": "",
+   "steps": "Activate Mana Vault by tapping it, adding {C}{C}{C}.\nActivate Emiel by paying {3}, blinking Derevi.\nWhen Derevi enters the battlefield, it triggers, untapping Mana Vault.\nRepeat.",
+   "prerequisites": ""
+  }
+ ]
+}

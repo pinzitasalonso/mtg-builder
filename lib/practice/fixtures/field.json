@@ -1,0 +1,713 @@
+[
+ {
+  "name": "Arcane Signet",
+  "imageUri": "",
+  "typeLine": "Artifact",
+  "manaCost": "{2}",
+  "manaValue": 2,
+  "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Axgard Cavalry",
+  "imageUri": "",
+  "typeLine": "Creature — Dwarf Berserker",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "{T}: Target creature gains haste until end of turn. (It can attack and {T} this turn.)",
+  "power": 2,
+  "toughness": 2,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Birds of Paradise",
+  "imageUri": "",
+  "typeLine": "Creature — Bird",
+  "manaCost": "{G}",
+  "manaValue": 1,
+  "oracleText": "Flying\n{T}: Add one mana of any color.",
+  "power": 0,
+  "toughness": 1,
+  "keywords": [
+   "Flying"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Breeding Pool",
+  "imageUri": "",
+  "typeLine": "Land — Forest Island",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "({T}: Add {G} or {U}.)\nAs this land enters, you may pay 2 life. If you don't, it enters tapped.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "U"
+  ]
+ },
+ {
+  "name": "Chord of Calling",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{X}{G}{G}{G}",
+  "manaValue": 3,
+  "oracleText": "Convoke (Your creatures can help cast this spell. Each creature you tap while casting this spell pays for {1} or one mana of that creature's color.)\nSearch your library for a creature card with mana value X or less, put it onto the battlefield, then shuffle.",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Convoke"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "City of Brass",
+  "imageUri": "",
+  "typeLine": "Land",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "Whenever this land becomes tapped, it deals 1 damage to you.\n{T}: Add one mana of any color.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Clever Impersonator",
+  "imageUri": "",
+  "typeLine": "Creature — Shapeshifter",
+  "manaCost": "{2}{U}{U}",
+  "manaValue": 4,
+  "oracleText": "You may have this creature enter as a copy of any nonland permanent on the battlefield.",
+  "power": 0,
+  "toughness": 0,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Clock of Omens",
+  "imageUri": "",
+  "typeLine": "Artifact",
+  "manaCost": "{4}",
+  "manaValue": 4,
+  "oracleText": "Tap two untapped artifacts you control: Untap target artifact.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Command Tower",
+  "imageUri": "",
+  "typeLine": "Land",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "{T}: Add one mana of any color in your commander's color identity.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Crop Rotation",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{G}",
+  "manaValue": 1,
+  "oracleText": "As an additional cost to cast this spell, sacrifice a land.\nSearch your library for a land card, put that card onto the battlefield, then shuffle.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Cryptolith Rite",
+  "imageUri": "",
+  "typeLine": "Enchantment",
+  "manaCost": "{1}{G}",
+  "manaValue": 2,
+  "oracleText": "Creatures you control have \"{T}: Add one mana of any color.\"",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Crystal, Inhuman Princess",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Inhuman Noble Hero",
+  "manaCost": "{1}{R}{G}",
+  "manaValue": 3,
+  "oracleText": "Flying\nWhenever you cast a noncreature spell, Crystal deals X damage to each opponent, where X is the number of colors that spell is.\n{T}: Add {R}, {G}, {W}, or {U}.",
+  "power": 2,
+  "toughness": 3,
+  "keywords": [
+   "Flying"
+  ],
+  "producedMana": [
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Dwarven Grunt",
+  "imageUri": "",
+  "typeLine": "Creature — Dwarf",
+  "manaCost": "{R}",
+  "manaValue": 1,
+  "oracleText": "Mountainwalk (This creature can't be blocked as long as defending player controls a Mountain.)",
+  "power": 1,
+  "toughness": 1,
+  "keywords": [
+   "Landwalk",
+   "Mountainwalk"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Elvish Mystic",
+  "imageUri": "",
+  "typeLine": "Creature — Elf Druid",
+  "manaCost": "{G}",
+  "manaValue": 1,
+  "oracleText": "{T}: Add {G}.",
+  "power": 1,
+  "toughness": 1,
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ]
+ },
+ {
+  "name": "Enduring Vitality",
+  "imageUri": "",
+  "typeLine": "Enchantment Creature — Elk Glimmer",
+  "manaCost": "{1}{G}{G}",
+  "manaValue": 3,
+  "oracleText": "Vigilance\nCreatures you control have \"{T}: Add one mana of any color.\"\nWhen Enduring Vitality dies, if it was a creature, return it to the battlefield under its owner's control. It's an enchantment. (It's not a creature.)",
+  "power": 3,
+  "toughness": 3,
+  "keywords": [
+   "Vigilance"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Eternal Witness",
+  "imageUri": "",
+  "typeLine": "Creature — Human Shaman",
+  "manaCost": "{1}{G}{G}",
+  "manaValue": 3,
+  "oracleText": "When this creature enters, you may return target card from your graveyard to your hand.",
+  "power": 2,
+  "toughness": 1,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Finale of Devastation",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{X}{G}{G}",
+  "manaValue": 2,
+  "oracleText": "Search your library and/or graveyard for a creature card with mana value X or less and put it onto the battlefield. If you search your library this way, shuffle. If X is 10 or more, creatures you control get +X/+X and gain haste until end of turn.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Forest",
+  "imageUri": "",
+  "typeLine": "Basic Land — Forest",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "({T}: Add {G}.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ]
+ },
+ {
+  "name": "Gaea's Cradle",
+  "imageUri": "",
+  "typeLine": "Legendary Land",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "{T}: Add {G} for each creature you control.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ]
+ },
+ {
+  "name": "Green Sun's Zenith",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{X}{G}",
+  "manaValue": 1,
+  "oracleText": "Search your library for a green creature card with mana value X or less, put it onto the battlefield, then shuffle. Shuffle Green Sun's Zenith into its owner's library.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Grim Monolith",
+  "imageUri": "",
+  "typeLine": "Artifact",
+  "manaCost": "{2}",
+  "manaValue": 2,
+  "oracleText": "This artifact doesn't untap during your untap step.\n{T}: Add {C}{C}{C}.\n{4}: Untap this artifact.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ]
+ },
+ {
+  "name": "Gut Shot",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{R/P}",
+  "manaValue": 1,
+  "oracleText": "({R/P} can be paid with either {R} or 2 life.)\nGut Shot deals 1 damage to any target.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Hullbreaker Horror",
+  "imageUri": "",
+  "typeLine": "Creature — Kraken Horror",
+  "manaCost": "{5}{U}{U}",
+  "manaValue": 7,
+  "oracleText": "Flash\nThis spell can't be countered.\nWhenever you cast a spell, choose up to one —\n• Return target spell you don't control to its owner's hand.\n• Return target nonland permanent to its owner's hand.",
+  "power": 7,
+  "toughness": 8,
+  "keywords": [
+   "Flash"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Island",
+  "imageUri": "",
+  "typeLine": "Basic Land — Island",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "({T}: Add {U}.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "U"
+  ]
+ },
+ {
+  "name": "Jeskai Ascendancy",
+  "imageUri": "",
+  "typeLine": "Enchantment",
+  "manaCost": "{U}{R}{W}",
+  "manaValue": 3,
+  "oracleText": "Whenever you cast a noncreature spell, creatures you control get +1/+1 until end of turn. Untap those creatures.\nWhenever you cast a noncreature spell, you may draw a card. If you do, discard a card.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Kinnan, Bonder Prodigy",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Human Druid",
+  "manaCost": "{G}{U}",
+  "manaValue": 2,
+  "oracleText": "Whenever you tap a nonland permanent for mana, add one mana of any type that permanent produced.\n{5}{G}{U}: Look at the top five cards of your library. You may put a non-Human creature card from among them onto the battlefield. Put the rest on the bottom of your library in a random order.",
+  "power": 2,
+  "toughness": 2,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Liquimetal Torque",
+  "imageUri": "",
+  "typeLine": "Artifact",
+  "manaCost": "{2}",
+  "manaValue": 2,
+  "oracleText": "{T}: Add {C}.\n{T}: Target nonland permanent becomes an artifact in addition to its other types until end of turn.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ]
+ },
+ {
+  "name": "Llanowar Elves",
+  "imageUri": "",
+  "typeLine": "Creature — Elf Druid",
+  "manaCost": "{G}",
+  "manaValue": 1,
+  "oracleText": "{T}: Add {G}.",
+  "power": 1,
+  "toughness": 1,
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ]
+ },
+ {
+  "name": "Lotho, Corrupt Shirriff",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Halfling Rogue",
+  "manaCost": "{W}{B}",
+  "manaValue": 2,
+  "oracleText": "Whenever a player casts their second spell each turn, you lose 1 life and create a Treasure token. (It's an artifact with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+  "power": 2,
+  "toughness": 1,
+  "keywords": [
+   "Treasure"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Lotus Petal",
+  "imageUri": "",
+  "typeLine": "Artifact",
+  "manaCost": "{0}",
+  "manaValue": 0,
+  "oracleText": "{T}, Sacrifice this artifact: Add one mana of any color.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Magda, Brazen Outlaw",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Dwarf Berserker",
+  "manaCost": "{1}{R}",
+  "manaValue": 2,
+  "oracleText": "Other Dwarves you control get +1/+0.\nWhenever a Dwarf you control becomes tapped, create a Treasure token.\nSacrifice five Treasures: Search your library for an artifact or Dragon card, put that card onto the battlefield, then shuffle.",
+  "power": 2,
+  "toughness": 1,
+  "keywords": [
+   "Treasure"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Mana Confluence",
+  "imageUri": "",
+  "typeLine": "Land",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "{T}, Pay 1 life: Add one mana of any color.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Mountain",
+  "imageUri": "",
+  "typeLine": "Basic Land — Mountain",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "({T}: Add {R}.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "R"
+  ]
+ },
+ {
+  "name": "Mox Amber",
+  "imageUri": "",
+  "typeLine": "Legendary Artifact",
+  "manaCost": "{0}",
+  "manaValue": 0,
+  "oracleText": "{T}: Add one mana of any color among legendary creatures and planeswalkers you control.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Nature's Rhythm",
+  "imageUri": "",
+  "typeLine": "Sorcery",
+  "manaCost": "{X}{G}{G}",
+  "manaValue": 2,
+  "oracleText": "Search your library for a creature card with mana value X or less, put it onto the battlefield, then shuffle.\nHarmonize {X}{G}{G}{G}{G} (You may cast this card from your graveyard for its harmonize cost. You may tap a creature you control to reduce that cost by an amount of generic mana equal to its power. Then exile this spell.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [
+   "Harmonize"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Necrodominance",
+  "imageUri": "",
+  "typeLine": "Legendary Enchantment",
+  "manaCost": "{B}{B}{B}",
+  "manaValue": 3,
+  "oracleText": "Skip your draw step.\nAt the beginning of your end step, you may pay any amount of life. If you do, draw that many cards.\nYour maximum hand size is five.\nIf a card or token would be put into your graveyard from anywhere, exile it instead.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Pili-Pala",
+  "imageUri": "",
+  "typeLine": "Artifact Creature — Scarecrow",
+  "manaCost": "{2}",
+  "manaValue": 2,
+  "oracleText": "Flying\n{2}, {Q}: Add one mana of any color. ({Q} is the untap symbol.)",
+  "power": 1,
+  "toughness": 1,
+  "keywords": [
+   "Flying"
+  ],
+  "producedMana": [
+   "B",
+   "G",
+   "R",
+   "U",
+   "W"
+  ]
+ },
+ {
+  "name": "Priest of Titania",
+  "imageUri": "",
+  "typeLine": "Creature — Elf Druid",
+  "manaCost": "{1}{G}",
+  "manaValue": 2,
+  "oracleText": "{T}: Add {G} for each Elf on the battlefield.",
+  "power": 1,
+  "toughness": 1,
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ]
+ },
+ {
+  "name": "Ragavan, Nimble Pilferer",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Monkey Pirate",
+  "manaCost": "{R}",
+  "manaValue": 1,
+  "oracleText": "Whenever Ragavan deals combat damage to a player, create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card.\nDash {1}{R} (You may cast this spell for its dash cost. If you do, it gains haste, and it's returned from the battlefield to its owner's hand at the beginning of the next end step.)",
+  "power": 2,
+  "toughness": 1,
+  "keywords": [
+   "Treasure",
+   "Dash"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Retraction Helix",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{U}",
+  "manaValue": 1,
+  "oracleText": "Until end of turn, target creature gains \"{T}: Return target nonland permanent to its owner's hand.\"",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Rok-Tahk, Budding Scientist",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Brikar Scientist",
+  "manaCost": "{4}{G}{G}",
+  "manaValue": 6,
+  "oracleText": "Creatures you control have \"{T}: Add {G}{G}.\"\nWhen Rok-Tahk enters, create Murf, a legendary 0/1 green Ooze Slug creature token with indestructible.",
+  "power": 5,
+  "toughness": 5,
+  "keywords": [],
+  "producedMana": [
+   "G"
+  ]
+ },
+ {
+  "name": "Sisay, Weatherlight Captain",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Human Soldier",
+  "manaCost": "{2}{W}",
+  "manaValue": 3,
+  "oracleText": "Sisay gets +1/+1 for each color among other legendary permanents you control.\n{W}{U}{B}{R}{G}: Search your library for a legendary permanent card with mana value less than Sisay's power, put that card onto the battlefield, then shuffle.",
+  "power": 2,
+  "toughness": 2,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Sol Ring",
+  "imageUri": "",
+  "typeLine": "Artifact",
+  "manaCost": "{1}",
+  "manaValue": 1,
+  "oracleText": "{T}: Add {C}{C}.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "C"
+  ]
+ },
+ {
+  "name": "Summoner's Pact",
+  "imageUri": "",
+  "typeLine": "Instant",
+  "manaCost": "{0}",
+  "manaValue": 0,
+  "oracleText": "Search your library for a green creature card, reveal it, put it into your hand, then shuffle.\nAt the beginning of your next upkeep, pay {2}{G}{G}. If you don't, you lose the game.",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": []
+ },
+ {
+  "name": "Thrasios, Triton Hero",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Merfolk Wizard",
+  "manaCost": "{G}{U}",
+  "manaValue": 2,
+  "oracleText": "{4}: Scry 1, then reveal the top card of your library. If it's a land card, put it onto the battlefield tapped. Otherwise, draw a card.\nPartner (You can have two commanders if both have partner.)",
+  "power": 1,
+  "toughness": 3,
+  "keywords": [
+   "Partner",
+   "Scry"
+  ],
+  "producedMana": []
+ },
+ {
+  "name": "Tropical Island",
+  "imageUri": "",
+  "typeLine": "Land — Forest Island",
+  "manaCost": "",
+  "manaValue": 0,
+  "oracleText": "({T}: Add {G} or {U}.)",
+  "power": null,
+  "toughness": null,
+  "keywords": [],
+  "producedMana": [
+   "G",
+   "U"
+  ]
+ },
+ {
+  "name": "Vivi Ornitier",
+  "imageUri": "",
+  "typeLine": "Legendary Creature — Wizard",
+  "manaCost": "{1}{U}{R}",
+  "manaValue": 3,
+  "oracleText": "{0}: Add X mana in any combination of {U} and/or {R}, where X is Vivi Ornitier's power. Activate only during your turn and only once each turn.\nWhenever you cast a noncreature spell, put a +1/+1 counter on Vivi Ornitier and it deals 1 damage to each opponent.",
+  "power": 0,
+  "toughness": 3,
+  "keywords": [],
+  "producedMana": [
+   "R",
+   "U"
+  ]
+ },
+ {
+  "name": "Woodland Bellower",
+  "imageUri": "",
+  "typeLine": "Creature — Beast",
+  "manaCost": "{4}{G}{G}",
+  "manaValue": 6,
+  "oracleText": "When this creature enters, you may search your library for a nonlegendary green creature card with mana value 3 or less, put it onto the battlefield, then shuffle.",
+  "power": 6,
+  "toughness": 5,
+  "keywords": [],
+  "producedMana": []
+ }
+]
