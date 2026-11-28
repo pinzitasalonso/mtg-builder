@@ -1057,6 +1057,12 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
           <>
             {/* Whose turn, and where in it. */}
             <div className="pt-phase" data-seat={game.active} role="status" aria-label={`Turn ${game.turn}, ${phaseWho}${phaseStep ? `, ${PHASE_LABEL[phaseStep]}` : ""}`}>
+              {/* On a phone held sideways, commander damage is read here, once there is some: the counts beside each side are buttons there. */}
+              {game.commanderGame && game.cmdDamage.you + game.cmdDamage.opp > 0 && (
+                <span className="pt-cmdr-dmg">
+                  Cmdr damage: you {game.cmdDamage.you} · opp {game.cmdDamage.opp}
+                </span>
+              )}
               <span className="pt-turn">Turn {game.turn}</span>
               {mode !== "over" && <span className="pt-phase-who">{phaseWho}</span>}
               {phaseStep && (
@@ -1529,18 +1535,18 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                     <span>Library {opp.library.length}</span>
                     <span>
                       <button type="button" className="pt-link" onClick={() => setPile({ seat: "opp", zone: "graveyard" })}>
-                        Graveyard {opp.graveyard.length}
+                        Graveyard <b>{opp.graveyard.length}</b>
                       </button>
                     </span>
                     {opp.exile.length > 0 && (
                       <span>
                         <button type="button" className="pt-link" onClick={() => setPile({ seat: "opp", zone: "exile" })}>
-                          Exile {opp.exile.length}
+                          Exile <b>{opp.exile.length}</b>
                         </button>
                       </span>
                     )}
                     {game.commanderGame && (
-                  <span title={`Commander damage to you: ${game.cmdDamage.you}`}>
+                  <span className="pt-meta-cmdr" title={`Commander damage to you: ${game.cmdDamage.you}`}>
                     <span className="pt-long">Commander damage to you</span>
                     <span className="pt-short">Cmdr → you</span> {game.cmdDamage.you}
                   </span>
@@ -1574,21 +1580,21 @@ export default function PracticeTable({ deckId, onClose, onSolo }: { deckId: str
                   <span className="pt-meta">
                     <span>
                       <button type="button" className="pt-link" onClick={() => setPile({ seat: "you", zone: "library" })}>
-                        Library {you.library.length}
+                        Library <b>{you.library.length}</b>
                       </button>
                     </span>
                     <span>
                       <button type="button" className="pt-link" onClick={() => setPile({ seat: "you", zone: "graveyard" })}>
-                        Graveyard {you.graveyard.length}
+                        Graveyard <b>{you.graveyard.length}</b>
                       </button>
                     </span>
                     <span>
                       <button type="button" className="pt-link" onClick={() => setPile({ seat: "you", zone: "exile" })}>
-                        Exile {you.exile.length}
+                        Exile <b>{you.exile.length}</b>
                       </button>
                     </span>
                     {game.commanderGame && (
-                    <span title={`Commander damage to the opponent: ${game.cmdDamage.opp}`}>
+                    <span className="pt-meta-cmdr" title={`Commander damage to the opponent: ${game.cmdDamage.opp}`}>
                       <span className="pt-long">Commander damage to the opponent</span>
                       <span className="pt-short">Cmdr → opp</span> {game.cmdDamage.opp}
                     </span>

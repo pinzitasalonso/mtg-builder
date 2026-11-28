@@ -4,7 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart3, RotateCw, Swords, Undo2, X } from "lucide-react";
 import { hasKnownBack } from "@/components/useCardFlip";
-import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, type MenuState, type Zoom, AttachGroup, TableTitle, LibraryOrderBar, orderLibrary, type LibraryOrder } from "@/components/deck/playtest-parts";
+import { ActionMenu, HandToggle, LifeCounter, Panel, PileZone, PtCard, RotateHint, ScryPanel, ZoomPreview, useLandscapeLock, useTableGround, type MenuState, type Zoom, AttachGroup, TableTitle, LibraryOrderBar, orderLibrary, type LibraryOrder } from "@/components/deck/playtest-parts";
 import PracticeTable from "@/components/deck/PracticeTable";
 import { PoolEntry } from "@/lib/pool-client";
 import { hypergeometric, hypergeometricAtLeast } from "@/lib/probability";
@@ -71,6 +71,8 @@ export default function PlaytestModal({
   const [vsAi, setVsAi] = useState(!!startVsAi && !!aiAvailable);
   // A phone plays sideways: fullscreen and locked where the browser allows.
   useLandscapeLock();
+  // And the page behind is the table's colour while it's open.
+  useTableGround();
   if (vsAi && deckId) return <PracticeTable deckId={deckId} onClose={onClose} onSolo={() => setVsAi(false)} />;
   return <SoloTable cards={cards} sourceLabel={sourceLabel} commander={commander} format={format} onClose={onClose} onVsAi={aiAvailable && deckId ? () => setVsAi(true) : undefined} />;
 }
