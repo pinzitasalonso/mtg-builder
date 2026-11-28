@@ -5,6 +5,7 @@ import { ArrowRight, Check, ChevronDown, Crown, Dices, Ellipsis, Layers, Refresh
 import { CardArt } from "@/components/mtg";
 import { backImageOf, useVerifiedBack } from "@/components/useCardFlip";
 import type { PlayCard, Zone } from "@/lib/playtest";
+import { TABLE_GROUND } from "@/lib/table-ground";
 
 /* The pieces of a playtest table, shared by the solo table (PlaytestModal)
    and the practice game against the AI (PracticeTable): a card, a pile, a
@@ -547,6 +548,26 @@ export function useLandscapeLock() {
         /* not locked after all */
       }
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+    };
+  }, []);
+}
+
+/** While a table is open, the page behind it takes the table's colour. An
+    iPhone held sideways keeps a page inside the screen's safe area and
+    paints the strips beside the notch with the page's own background: on
+    the light ground that was two white bars either side of a dark table.
+    The browser's bar takes the colour too. Put back on close. */
+export function useTableGround() {
+  useEffect(() => {
+    const els = [document.documentElement, document.body];
+    const was = els.map((el) => el.style.backgroundColor);
+    for (const el of els) el.style.backgroundColor = TABLE_GROUND;
+    const metas = [...document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')];
+    const tints = metas.map((m) => m.content);
+    for (const m of metas) m.content = TABLE_GROUND;
+    return () => {
+      els.forEach((el, i) => (el.style.backgroundColor = was[i]!));
+      metas.forEach((m, i) => (m.content = tints[i]!));
     };
   }, []);
 }
